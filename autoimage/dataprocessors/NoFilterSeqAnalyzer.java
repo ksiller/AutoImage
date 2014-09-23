@@ -4,7 +4,7 @@
  */
 package autoimage.dataprocessors;
 
-import autoimage.dataprocessors.BranchedAnalyzer;
+import autoimage.dataprocessors.BranchedProcessor;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,7 +12,7 @@ import java.util.List;
  *
  * @author Karsten
  */
-public class NoFilterSeqAnalyzer<E> extends BranchedAnalyzer<E>{
+public class NoFilterSeqAnalyzer<E> extends BranchedProcessor<E>{
 
     public NoFilterSeqAnalyzer() {
         this("");

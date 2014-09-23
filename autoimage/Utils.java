@@ -5,7 +5,7 @@
 package autoimage;
 
 import autoimage.dataprocessors.ExtDataProcessor;
-import autoimage.dataprocessors.SiteInfoDataProcessor;
+import autoimage.dataprocessors.SiteInfoUpdater;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.io.Opener;
@@ -13,6 +13,8 @@ import ij.measure.Calibration;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
 import ij.process.ShortProcessor;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.Point2D;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -23,6 +25,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
@@ -31,6 +34,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.tree.DefaultMutableTreeNode;
 import mmcorej.TaggedImage;
+import org.apache.commons.math.linear.Array2DRowRealMatrix;
+import org.apache.commons.math.linear.LUDecompositionImpl;
+import org.apache.commons.math.linear.RealMatrix;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -112,7 +118,7 @@ public class Utils {
     
     public static DefaultMutableTreeNode createDefaultImageProcTree() {
 //        DefaultMutableTreeNode root=new DefaultMutableTreeNode(new ExtDataProcessor(ProcessorTree.PROC_NAME_ACQ_ENG));
-            DefaultMutableTreeNode infoProcNode=new DefaultMutableTreeNode(new SiteInfoDataProcessor(ProcessorTree.PROC_NAME_ACQ_ENG,null));
+            DefaultMutableTreeNode infoProcNode=new DefaultMutableTreeNode(new SiteInfoUpdater(ProcessorTree.PROC_NAME_ACQ_ENG,null));
 //            root.add(infoProcNode);
 /*               List<String> chList=new ArrayList<String>();
                chList.add("DAPI");
@@ -403,5 +409,70 @@ public class Utils {
         return node;
     }
     
+    //expects two 2D vectors
+    public static double angle2D_Rad(Point2D.Double v1, Point2D.Double v2) {
+        return Math.acos((v1.x*v2.x + v1.y*v2.y) / (Math.sqrt(v1.x*v1.x + v1.y*v1.y)*Math.sqrt(v2.x*v2.x + v2.y*v2.y)));
+    }
+       
 
+    
+    
+    public static AffineTransform calcAffTransform(Point2D.Double[] src, Point2D.Double[] dst) throws Exception {
+        if (src == null || dst == null || src.length != dst.length || src.length==0)
+            throw new Exception("calcAffTransform: illegal arguments.");
+        AffineTransform at=null;
+        //single point: translation
+        if (src.length == 1) {
+            at = new AffineTransform();
+            at.translate(dst[0].x - src[0].x, dst[0].y - src[0].y);
+        }
+        //two points: translation, scale, rotation
+        if (src.length == 2) {
+            Point2D.Double v1=new Point2D.Double(src[1].x-src[0].x, src[1].y-src[0].y);
+            Point2D.Double v2=new Point2D.Double(dst[1].x-dst[0].x, dst[1].y-dst[0].y);
+            IJ.log("v1: "+v1.toString()+", v2:"+v2.toString());
+            at = new AffineTransform();
+            at.translate(dst[0].x - src[0].x, dst[0].y - src[0].y);
+            double angleRad=0;
+            double scale=1.0;
+            if (!v1.equals(v2)) {
+                angleRad=Utils.angle2D_Rad(v1, v2);
+
+                double length_src=Math.sqrt(
+                        ((src[1].x-src[0].x)*(src[1].x-src[0].x))
+                       +((src[1].y-src[0].y)*(src[1].y-src[0].y)));
+                double length_dst=Math.sqrt(
+                        ((dst[1].x-dst[0].x)*(dst[1].x-dst[0].x))
+                       +((dst[1].y-dst[0].y)*(dst[1].y-dst[0].y)));
+                scale=length_dst/length_src;
+                at.rotate(angleRad);
+                //uniform scale
+                at.scale(scale,scale);
+            }
+            IJ.log("angle: "+angleRad/Math.PI*360+", scale: "+scale+", translate: "+(dst[0].x-src[0].x)+"/"+(dst[0].y-src[0].y));
+        }
+        //three points: translation, scale, rotation, shear
+        if (src.length > 2) {
+            Array2DRowRealMatrix x = new Array2DRowRealMatrix(new double[][] {
+            { src[0].getX(), src[1].getX(), src[2].getX() }, { src[0].getY(), src[1].getY(), src[2].getY() },{ 1, 1, 1 } });
+            Array2DRowRealMatrix y = new Array2DRowRealMatrix(new double[][] {
+            { dst[0].getX(), dst[1].getX(), dst[2].getX() }, { dst[0].getY(), dst[1].getY(), dst[2].getY() },{ 0, 0, 0 } });
+            double determinant=new LUDecompositionImpl(x).getDeterminant();
+            RealMatrix inv_x=new LUDecompositionImpl(x).getSolver().getInverse();
+            double[][] matrix = y.multiply(inv_x).getData();
+            at = new AffineTransform(new double[] { matrix[0][0], matrix[1][0], matrix[0][1], matrix[1][1], matrix[0][2], matrix[1][2] });
+        }
+        return at;
+    }
+    
+    public static double MedianDouble(List<Double> values){
+        Collections.sort(values); 
+        if (values.size() % 2 == 1)
+            return values.get((values.size()+1)/2-1);
+        else {
+            double lower = values.get(values.size()/2-1);
+            double upper = values.get(values.size()/2);
+            return (lower + upper) / 2.0;
+        }	
+    }
 }

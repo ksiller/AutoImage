@@ -4,12 +4,13 @@
  */
 package autoimage.dataprocessors;
 
-import autoimage.RuntimeTileManager;
+import autoimage.TileManager;
 import autoimage.Tile;
 import autoimage.Utils;
 import bsh.EvalError;
 import bsh.Interpreter;
 import ij.IJ;
+import ij.Prefs;
 import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -44,20 +45,20 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
     protected List<Tile> tileList;
     protected List<String> options_;
     protected List<String> selectedSeq;
-    private final List<RuntimeTileManager> tileManagerList;
+    private final List<TileManager> tileManagerList;
     private final ExecutorService listenerExecutor;
 
     public RoiFinder () {
         this("","","",null,false);
     }
     
-    public RoiFinder (final String script, final String args, String path, RuntimeTileManager tileManager) {
+    public RoiFinder (final String script, final String args, String path, TileManager tileManager) {
         this(script, args, path, tileManager,false);
     }
 
-    public RoiFinder (final String script, final String args, String path, RuntimeTileManager tileManager, boolean saveRT) {
+    public RoiFinder (final String script, final String args, String path, TileManager tileManager, boolean saveRT) {
         super(script, args, path, saveRT);
-        tileManagerList=new ArrayList<RuntimeTileManager>();
+        tileManagerList=new ArrayList<TileManager>();
         if (tileManager!=null)
             tileManagerList.add(tileManager);
         selectedSeq=new ArrayList<String> ();
@@ -105,11 +106,11 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
         interpreter.set("tileList",tileList);
     }
 
-    public void addRuntimeTileManager(RuntimeTileManager tileManager) {
+    public void addRuntimeTileManager(TileManager tileManager) {
         tileManagerList.add(tileManager);
     }
     
-    public void removeRuntimeTileManager(RuntimeTileManager tileManager) {
+    public void removeRuntimeTileManager(TileManager tileManager) {
         tileManagerList.remove(tileManager);
     }
     
@@ -126,6 +127,8 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
             String name=meta.getString(MMTags.Image.POS_NAME);
             int imgWidth=meta.getInt(MMTags.Image.WIDTH);
             int imgHeight=meta.getInt(MMTags.Image.HEIGHT);
+            JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
+            double pixSize=summary.getDouble(MMTags.Summary.PIXSIZE);
             double stageX=meta.getDouble(MMTags.Image.XUM);
             double stageY=meta.getDouble(MMTags.Image.YUM);
             double stageZ=meta.getDouble(MMTags.Image.ZUM);
@@ -133,30 +136,31 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
             if (tileList.size()>0){
                 for (final Tile tile:tileList) {
                     tile.name=name;
-                    tile.centerX=stageX-imgWidth/2+tile.centerX;
-                    tile.centerY=stageY-imgWidth/2+tile.centerY;
+                    tile.centerX=stageX-pixSize*imgWidth/2+tile.centerX;
+                    tile.centerY=stageY-pixSize*imgHeight/2+tile.centerY;
                     tile.relZPos=stageZ;
-//                    for (RuntimeTileManager rtm:tileManagerList)
-//                        rtm.addStageROI(area,tile);
+//                    for (TileManager rtm:tileManagerList)
+//                        rtm.addStagePosToTileList(area,tile);
                     
                     synchronized (tileManagerList) {
-                        for (final RuntimeTileManager rtm : tileManagerList) {
+                        for (final TileManager rtm : tileManagerList) {
                             listenerExecutor.submit(
 	                       new Runnable() {
 	                          @Override
 	                          public void run() {
-                                    rtm.addStageROI(area,tile);
+                                    rtm.addStagePosToTileList(area,tile);
 	                          }
 	                       });
                         }
                     }
       
-                    IJ.log("         ROIs for "+area+", "+tile.name+", "+tile.centerX+", "+tile.centerY+", "+tile.relZPos);
+                    IJ.log("    ROIs for "+area+", "+tile.name+", "+tile.centerX+", "+tile.centerY+", "+tile.relZPos);
                 }    
             } else {
-                IJ.log("         no ROIs found");
+                IJ.log("    no ROIs found");
             }    
         } catch (JSONException ex) {
+            IJ.log("    Script "+script_+"Problem parsing JSONObject.");
             Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
         }
 
@@ -203,10 +207,22 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
             @Override
             public void actionPerformed(ActionEvent event) {
                 JFileChooser fc=new JFileChooser();
-                fc.setCurrentDirectory(new File(scriptField.getText()).getParentFile());
-                int result=fc.showSaveDialog(null);
-                if (result == JFileChooser.APPROVE_OPTION)
+                
+                File scriptFile=new File(scriptField.getText()).getParentFile();
+                if (scriptFile != null)
+                    fc.setCurrentDirectory(scriptFile);
+                else {
+                    if (scriptDir.equals("")) {
+                        fc.setCurrentDirectory(new File(Prefs.getImageJDir()));
+                    } else {
+                        fc.setCurrentDirectory(new File(scriptDir));
+                    }
+                }    
+                int result=fc.showOpenDialog(null);
+                if (result == JFileChooser.APPROVE_OPTION) {
                     scriptField.setValue(fc.getSelectedFile().getAbsolutePath());
+                    scriptDir=fc.getCurrentDirectory().getAbsolutePath();
+                }
             }
         });
         filePanel.setAlignmentX(Component.LEFT_ALIGNMENT);

@@ -40,19 +40,19 @@ import org.micromanager.utils.ReportingUtils;
  * 
  *
  */
-public abstract class BranchedAnalyzer<E> extends ExtDataProcessor<E> {
+public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
 
    private BlockingQueue<E> modifiedOutput_;
 
-   public BranchedAnalyzer () {
+   public BranchedProcessor () {
         super("","");
    }
     
-   public BranchedAnalyzer (String pName) {
+   public BranchedProcessor (String pName) {
         super(pName);
    }     
    
-   public BranchedAnalyzer(String pName, String path) {
+   public BranchedProcessor(String pName, String path) {
        super(pName, path);
    }
    
@@ -60,7 +60,7 @@ public abstract class BranchedAnalyzer<E> extends ExtDataProcessor<E> {
    
    /*
     * The analyze method should be overridden by classes implementing
-    * BranchedAnalyzer, to provide a analysis and processing function.
+  BranchedProcessoryzer, to provide a analysis and processing function.
     *
     * For example, an "Identity" DataProcessor (where nothing is
     * done to the data) would override process() thus:

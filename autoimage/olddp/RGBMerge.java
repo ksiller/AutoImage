@@ -5,7 +5,7 @@
 package autoimage.olddp;
 
 import autoimage.Utils;
-import autoimage.dataprocessors.MultiChannelImageStackAnalyzer;
+import autoimage.dataprocessors.MultiChMultiZAnalyzer;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.plugin.RGBStackMerge;
@@ -23,7 +23,7 @@ import org.json.JSONObject;
  *
  * @author Karsten
  */
-public class RGBMerge extends MultiChannelImageStackAnalyzer<File> {
+public class RGBMerge extends MultiChMultiZAnalyzer<File> {
 
 
     public RGBMerge(String path, List<String> channels, List<Long> slices) {
@@ -76,5 +76,5 @@ public class RGBMerge extends MultiChannelImageStackAnalyzer<File> {
         } else
             return null;
     }
-    
+
 }

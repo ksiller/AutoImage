@@ -4,10 +4,10 @@
  */
 package autoimage;
 
-import autoimage.dataprocessors.BranchedAnalyzer;
+import autoimage.dataprocessors.BranchedProcessor;
 import autoimage.dataprocessors.ExtDataProcessor;
 import autoimage.dataprocessors.ImageTagFilter;
-import autoimage.dataprocessors.MultiChannelImageStackAnalyzer;
+import autoimage.dataprocessors.MultiChMultiZAnalyzer;
 import autoimage.dataprocessors.RoiFinder;
 import autoimage.dataprocessors.ScriptAnalyzer;
 import java.awt.Component;
@@ -33,7 +33,7 @@ public class ProcessorTreeCellRenderer extends DefaultTreeCellRenderer {
     final Icon fTagIcon=new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/Filter_Tag.png"));
     final Icon fAreaIcon=new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/Area.png"));
     final Icon fZPosIcon=new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/Filter_Z.png"));
-    final Icon fFrameIcon=new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/Frame.png"));
+    final Icon fFrameIcon=new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/Filter_Frame.png"));
     final Icon scriptIcon=new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/script.png"));
     final Icon acqEngIcon=new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/microscope.png"));
     final Icon roiIcon=new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/roi.png"));
@@ -56,7 +56,7 @@ public class ProcessorTreeCellRenderer extends DefaultTreeCellRenderer {
         if (dp instanceof TaggedImageAnalyzer) {
             setIcon(taIcon);
         }
-        if (dp instanceof BranchedAnalyzer) {
+        if (dp instanceof BranchedProcessor) {
             setIcon(baIcon);
         }
         if (dp instanceof ExtDataProcessor) {
@@ -81,7 +81,7 @@ public class ProcessorTreeCellRenderer extends DefaultTreeCellRenderer {
             }
             if (dp instanceof ScriptAnalyzer)// || dp instanceof MC_ScriptAnalyzer)
                 setIcon(scriptIcon);
-            if (dp instanceof MultiChannelImageStackAnalyzer)
+            if (dp instanceof MultiChMultiZAnalyzer)
                 setIcon(aMC_MZ_Icon);
             if (dp instanceof RoiFinder)
                 setIcon(roiIcon);

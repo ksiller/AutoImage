@@ -1,7 +1,7 @@
 package autoimage;
 
 import autoimage.dataprocessors.ExtDataProcessor;
-import autoimage.dataprocessors.BranchedAnalyzer;
+import autoimage.dataprocessors.BranchedProcessor;
 import ij.IJ;
 import java.io.File;
 import java.util.Enumeration;
@@ -80,7 +80,7 @@ public class ProcessorTree<E> {
        //  System.out.println(currentProc.getClass().getName());
          //connect inputQueue
          if (lastNode!=null && lastNode.isNodeRelated(currentNode) && lastNode.isNodeChild(currentNode)) {
-            if (lastProc instanceof BranchedAnalyzer) {// && currentNode.isNodeChild(lastNode)) {
+            if (lastProc instanceof BranchedProcessor) {// && currentNode.isNodeChild(lastNode)) {
                 dataIn=analysisOut;
                 if (analysisOut==null)
                     IJ.log("Error: cannot connect input to prevSib analysisOut");
@@ -98,13 +98,13 @@ public class ProcessorTree<E> {
          }
 
          //create OutputQueue for currentNode
-         if (currentProc instanceof BranchedAnalyzer) {
+         if (currentProc instanceof BranchedProcessor) {
             IJ.log("current=SeqAnalyzer: "+currentProc.getClass().getSimpleName());
             if (currentNode.getChildCount()>0)
                 analysisOut=new LinkedBlockingQueue(1);
             else 
                 analysisOut=null;
-            ((BranchedAnalyzer)currentProc).setAnalysisOutput(analysisOut);
+            ((BranchedProcessor)currentProc).setAnalysisOutput(analysisOut);
             IJ.log("    setting analysisOutput for  "+currentProc.getClass().getSimpleName());
             DefaultMutableTreeNode sibNode=currentNode.getNextSibling();
             if (sibNode != null) {

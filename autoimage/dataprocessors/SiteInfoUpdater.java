@@ -26,17 +26,17 @@ import org.micromanager.utils.ReportingUtils;
  * 
  * @author Karsten
  */
-public class SiteInfoDataProcessor extends ExtDataProcessor<TaggedImage> implements IDataProcessorNotifier{
+public class SiteInfoUpdater extends ExtDataProcessor<TaggedImage> implements IDataProcessorNotifier{
     
     private ArrayList<JSONObject> siteInfo;
     private final List<IDataProcessorListener> listeners = Collections.synchronizedList(new ArrayList<IDataProcessorListener>());
     private final ExecutorService listenerExecutor;
     
-    public SiteInfoDataProcessor() {
+    public SiteInfoUpdater() {
         this("Acq Engine",null);
     }
     
-    public SiteInfoDataProcessor(String pName, ArrayList<JSONObject> sInfoList) {
+    public SiteInfoUpdater(String pName, ArrayList<JSONObject> sInfoList) {
         super(pName,"");
         siteInfo=sInfoList;
         listenerExecutor = Executors.newFixedThreadPool(1);
@@ -97,20 +97,15 @@ public class SiteInfoDataProcessor extends ExtDataProcessor<TaggedImage> impleme
             final DataProcessor dp=this;
             final JSONObject metadata=nextImage.tags;
             synchronized (listeners) {
-	            for (final IDataProcessorListener l : listeners) {
-	               listenerExecutor.submit(
-	                       new Runnable() {
-	                          @Override
-	                          public void run() {
-	                             l.imageProcessed(metadata,dp);
-	                          }
-	                       });
-	            }
-	         }
-            
- /*           
-            for (IDataProcessorListener l:listeners) {
-                l.imageProcessed(nextImage.tags, this);
-            }*/
+                for (final IDataProcessorListener l : listeners) {
+                   listenerExecutor.submit(
+                           new Runnable() {
+                              @Override
+                              public void run() {
+                                 l.imageProcessed(metadata,dp);
+                              }
+                           });
+                }
+            }
     }    
 }

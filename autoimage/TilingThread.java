@@ -14,9 +14,9 @@ public class TilingThread implements Runnable {//Callable<List<Area.Tile>> {
     private double fovX;
     private double fovY;
     private TilingSetting setting;
-    private RuntimeTileManager tileManager;
+    private TileManager tileManager;
     
-    public TilingThread(RuntimeTileManager tManager, Area a, double w, double h, TilingSetting s) {
+    public TilingThread(TileManager tManager, Area a, double w, double h, TilingSetting s) {
         area=a;
         setting=s;
         fovX=w;

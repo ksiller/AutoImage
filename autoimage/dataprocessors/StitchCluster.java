@@ -45,7 +45,7 @@ import org.micromanager.api.TaggedImageStorage;
  *
  * @author Karsten
  */
-public class StitchCluster extends AreaAnalyzer {
+public class StitchCluster extends AreaProcessor {
     
     private String fusionMethod;
     private double regressionTh;

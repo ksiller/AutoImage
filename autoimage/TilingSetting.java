@@ -21,7 +21,7 @@ class TilingSetting {
     boolean cluster;
     int nrClusterTileX;// irrelevant if Full tiling
     int nrClusterTileY;// irrelevant if Full tiling
-    boolean clusterOverlap;
+    boolean siteOverlap;
     int maxSites;
     boolean insideOnly;
     double overlap;
@@ -47,7 +47,7 @@ class TilingSetting {
     public static final String TAG_CLUSTER = "CLUSTER";
     public static final String TAG_NR_CLUSTER_TILE_X = "NR_CLUSTER_TILE_X";
     public static final String TAG_NR_CLUSTER_TILE_Y = "NR_CLUSTER_TILE_Y";
-    public static final String TAG_CLUSTER_OVERLAP = "CLUSTER_OVERLAP";
+    public static final String TAG_SITE_OVERLAP = "SITE_OVERLAP";
     public static final String TAG_MAX_SITES = "MAX_SITES";
     public static final String TAG_INSIDE_ONLY = "INSIDE_ONLY";
     public static final String TAG_OVERLAP = "OVERLAP";
@@ -55,13 +55,13 @@ class TilingSetting {
     
 
     
-    public TilingSetting(Mode m, boolean c, int nrCX, int nrCY, boolean cOverlap, int mSites, boolean iOnly, double tOverlap, byte tileDir) {
+    public TilingSetting(Mode m, boolean c, int nrCX, int nrCY, boolean sOverlap, int mSites, boolean iOnly, double tOverlap, byte tileDir) {
         mode=m;
         tileCoordFName="";
         cluster=c;
         nrClusterTileX=nrCX;
         nrClusterTileY=nrCY;
-        clusterOverlap=cOverlap;
+        siteOverlap=sOverlap;
         maxSites=mSites;
         insideOnly=iOnly;
         overlap=tOverlap;
@@ -74,7 +74,7 @@ class TilingSetting {
         cluster=true;
         nrClusterTileX=1;
         nrClusterTileY=1;
-        clusterOverlap=true;
+        siteOverlap=true;
         maxSites=1;
         insideOnly=false;
         overlap=0;
@@ -98,7 +98,7 @@ class TilingSetting {
             cluster=obj.getBoolean(TAG_CLUSTER);
             nrClusterTileX=obj.getInt(TAG_NR_CLUSTER_TILE_X);
             nrClusterTileY=obj.getInt(TAG_NR_CLUSTER_TILE_Y);
-            clusterOverlap=obj.getBoolean(TAG_CLUSTER_OVERLAP);
+            siteOverlap=obj.getBoolean(TAG_SITE_OVERLAP);
             maxSites=obj.getInt(TAG_MAX_SITES);
             insideOnly=obj.getBoolean(TAG_INSIDE_ONLY);
             overlap=obj.getDouble(TAG_OVERLAP);
@@ -113,7 +113,7 @@ class TilingSetting {
         obj.put(TAG_CLUSTER, cluster);
         obj.put(TAG_NR_CLUSTER_TILE_X,nrClusterTileX);
         obj.put(TAG_NR_CLUSTER_TILE_Y,nrClusterTileY);
-        obj.put(TAG_CLUSTER_OVERLAP, clusterOverlap);
+        obj.put(TAG_SITE_OVERLAP, siteOverlap);
         obj.put(TAG_MAX_SITES, maxSites);
         obj.put(TAG_INSIDE_ONLY, insideOnly);
         obj.put(TAG_OVERLAP,overlap);
@@ -145,8 +145,8 @@ class TilingSetting {
         return nrClusterTileY;
     }
     
-    public boolean isClusterOverlap() {
-        return clusterOverlap;
+    public boolean isSiteOverlap() {
+        return siteOverlap;
     }
     
     public int getMaxSites() {
@@ -163,7 +163,7 @@ class TilingSetting {
         ts.cluster=this.cluster;
         ts.nrClusterTileX=this.nrClusterTileX;
         ts.nrClusterTileY=this.nrClusterTileY;
-        ts.clusterOverlap=this.clusterOverlap;
+        ts.siteOverlap=this.siteOverlap;
         ts.maxSites=this.maxSites;
         ts.insideOnly=this.insideOnly;
         ts.overlap=this.overlap;

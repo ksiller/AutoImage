@@ -69,9 +69,11 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
         return workDir;
     }
     
+    @Override
     public void makeConfigurationGUI() {}
     
    //should be overridden when using makeConfigurationGUI
+    @Override
     public void dispose() {}
     
     @Override

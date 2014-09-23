@@ -15,22 +15,23 @@ import org.json.JSONObject;
  */
 class RefArea {
 
-    private double stageX;
-    private double stageY;
-    private double stageZ;
+    private double stageX; // center of RefArea
+    private double stageY; // center of RefArea
+    private double stageZ; // center of RefArea
     private double physWidth;
     private double physHeight;
     private double layoutCoordX; //center of RefArea
-    private double layoutCoordY;
+    private double layoutCoordY; //center of RefArea
     private double layoutCoordOrigX;
     private double layoutCoordOrigY;
-    private double layoutCoordZ;
+    private double layoutCoordZ; //offset from layout flat bottom plane
     private boolean zDefined;
     private String name;
     private String refImageFile;
     private boolean changed;
-    private boolean stagePosFound;
-    private boolean selected;
+    private boolean stagePosMapped; //false unless stagePos mapped to Layout; currently via RefPointListDialog
+    private boolean selected; //used to highlight landmark in LayoutPanel
+    private static double cameraRot; //in radians relative to x-y staga axis, NOT layout 
     
     public final static String TAG_NAME="NAME";
     public final static String TAG_STAGE_X="STAGE_X";
@@ -58,8 +59,9 @@ class RefArea {
         zDefined=true;
         refImageFile=rImage;
         changed=false;
-        stagePosFound=false;
+        stagePosMapped=false;
         selected=false;
+        cameraRot=0;
     }
     
     public RefArea(RefArea rp) {
@@ -76,6 +78,8 @@ class RefArea {
         refImageFile=rp.getRefImageFile();
         changed=rp.isChanged();
         selected=rp.isSelected();
+        stagePosMapped=rp.isStagePosFound();
+        cameraRot=0;
     }
     
     public JSONObject toJSONObject() throws JSONException {
@@ -109,6 +113,8 @@ class RefArea {
         zDefined=obj.getBoolean(TAG_Z_POS_DEFINED);
         changed=false;
         selected=false;
+        stagePosMapped=false;
+        cameraRot=0;
         IJ.log("initialization completed: "+this.getClass().getName());
     }
     
@@ -116,12 +122,20 @@ class RefArea {
         initializeFromJSONObject(obj);
     }
 
-    public void setStagePosFound(boolean b) {
-        stagePosFound=b;
+    public static void setCameraRot(double rot) {
+        cameraRot=rot;
     }
     
-    public boolean getStagePosFound() {
-        return stagePosFound;
+    public static double getCameraRot() {
+        return cameraRot;
+    }
+    
+    public void setStagePosMapped(boolean b) {
+        stagePosMapped=b;
+    }
+    
+    public boolean isStagePosFound() {
+        return stagePosMapped;
     }
     
     public void setSelected(boolean b) {
@@ -227,6 +241,7 @@ class RefArea {
         refImageFile=rif;
     }
     
+    /*
     public double convertLayoutCoordToStageCoord_X (double lX) {
         return stageX+lX-layoutCoordX;
     }
@@ -242,7 +257,7 @@ class RefArea {
     public double convertStagePosToLayoutCoord_Y (double sY) {
         return sY-stageY+layoutCoordY;
     }
-
+*/
     public boolean isZPosDefined() {
         return zDefined;
     }

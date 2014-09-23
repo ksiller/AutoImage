@@ -27,7 +27,7 @@ public class ImageTagFilterOptLong<E> extends ImageTagFilterOpt<E,Long> {
 
     @Override
     public boolean equalValue(Long t1, Long t2) {
-        return t1 == t2;
+        return t1.equals(t2);
     }
     
 }

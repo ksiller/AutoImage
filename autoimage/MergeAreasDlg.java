@@ -6,62 +6,58 @@
 
 package autoimage;
 
-import java.awt.Component;
+import ij.IJ;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.FocusEvent;
-import java.awt.event.FocusListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-
-import javax.swing.AbstractCellEditor;
-import javax.swing.JButton;
-import javax.swing.JScrollPane;
-import javax.swing.JTable;
-import javax.swing.JTextField;
-import javax.swing.ListSelectionModel;
-import javax.swing.SpringLayout;
-import javax.swing.table.AbstractTableModel;
-import javax.swing.table.TableCellEditor;
-
-import mmcorej.CMMCore;
-import org.micromanager.utils.MMDialog;
-
-import ij.IJ;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.List;
-
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
+import javax.swing.JButton;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.ListSelectionModel;
+import javax.swing.SpringLayout;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
-
+import javax.swing.table.AbstractTableModel;
 import org.micromanager.api.ScriptInterface;
-import org.micromanager.utils.GUIUtils;
-import org.micromanager.utils.ReportingUtils;
 
 
-public class MergeAreasDlg extends MMDialog implements MouseListener, ChangeListener, TableModelListener {
+
+public class MergeAreasDlg extends javax.swing.JDialog implements TableModelListener {
 
    private JTable areaTable;
-   private SpringLayout springLayout;
    private AcqFrame acqFrame;
    private AcquisitionLayout acqLayout;
-   private CMMCore core_;
-   private ScriptInterface gui_;
 
-   public JButton markButtonRef;
-
+   //implementation of TableModelListener
     @Override
     public void tableChanged(TableModelEvent tme) {
         acqFrame.setMergeAreasBounds(calcMergeAreasBounds());
     }
 
+/*    
+   @Override
+   public void stateChanged(ChangeEvent e) {
+        try {
+            IJ.showMessage("stateChanged");
+            GUIUtils.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    areaTable.revalidate();
+                }
+            });
+        } catch (InterruptedException ex) {
+            ReportingUtils.logError(ex);
+        } catch (InvocationTargetException ex) {
+            ReportingUtils.logError(ex);
+       }
+    }
+*/
 
    private class AreaTableModel extends AbstractTableModel {
       private static final long serialVersionUID = 1L;
@@ -154,40 +150,36 @@ public class MergeAreasDlg extends MMDialog implements MouseListener, ChangeList
           areas.add(a);
           fireTableRowsInserted(getRowCount()-1,getRowCount()-1);
       }
+      
    }
 
 
-   /**
-    * Create the dialog
-    */
-   public MergeAreasDlg(AcqFrame aFrame, AcquisitionLayout al, CMMCore core, ScriptInterface gui) {
+   public MergeAreasDlg(AcqFrame aFrame, AcquisitionLayout al, ScriptInterface gui) {
       super();
       addWindowListener(new WindowAdapter() {
          @Override
          public void windowClosing(WindowEvent arg0) {
-            savePosition();
+//            savePosition();
 //            IJ.showMessage("window closing");
             removeAllAreas();
          }
       });
       acqFrame=aFrame;
       acqLayout=al;
-      core_ = core;
-      gui_ = gui;
       setTitle("Merge Areas");
-      springLayout = new SpringLayout();
+      SpringLayout springLayout = new SpringLayout();
       getContentPane().setLayout(springLayout);
       setBounds(100, 100, 362, 595);
-
-      /*Preferences root = Preferences.userNodeForPackage(this.getClass());
+/*
+      Preferences root = Preferences.userNodeForPackage(this.getClass());
       prefs_ = root.node(root.absolutePath() + "/XYPositionListDlg");
       setPrefsNode(prefs_);
 
       Rectangle r = getBounds();
       GUIUtils.recallPosition(this);
 */
-      setBackground(gui_.getBackgroundColor());
-      gui_.addMMBackgroundListener(this);
+      setBackground(gui.getBackgroundColor());
+      gui.addMMBackgroundListener(this);
 
       final JScrollPane scrollPane = new JScrollPane();
       getContentPane().add(scrollPane);
@@ -198,11 +190,8 @@ public class MergeAreasDlg extends MMDialog implements MouseListener, ChangeList
       model.setData(new ArrayList<Area>());
       areaTable.setModel(model);
       model.addTableModelListener(this);
-      CellEditor cellEditor_ = new CellEditor();
-      areaTable.setDefaultEditor(Object.class, cellEditor_);
       areaTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
       scrollPane.setViewportView(areaTable);
-      areaTable.addMouseListener(this);
 
       JButton removeButton = new JButton();
       removeButton.setFont(new Font("Arial", Font.PLAIN, 10));
@@ -214,7 +203,7 @@ public class MergeAreasDlg extends MMDialog implements MouseListener, ChangeList
          }
       });
       removeButton.setText("Remove");
-      removeButton.setToolTipText("Remove Area from list");
+      removeButton.setToolTipText("Remove selected Area(s) from list");
       getContentPane().add(removeButton);
       
       int northConstraint = 17;
@@ -232,9 +221,10 @@ public class MergeAreasDlg extends MMDialog implements MouseListener, ChangeList
       final JButton cancelButton = new JButton();
       cancelButton.setFont(new Font("Arial", Font.PLAIN, 10));
       cancelButton.addActionListener(new ActionListener() {
+         @Override
          public void actionPerformed(ActionEvent arg0) {
             removeAllAreas();
-            savePosition();
+//            savePosition();
             dispose();
          }
       });
@@ -249,9 +239,10 @@ public class MergeAreasDlg extends MMDialog implements MouseListener, ChangeList
         final JButton mergeButton = new JButton();
         mergeButton.setFont(new Font("Arial", Font.PLAIN, 10));
         mergeButton.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent arg0) {
                 mergeAreas();
-                savePosition();
+//                savePosition();
                 dispose();
             }
         });
@@ -270,21 +261,21 @@ public class MergeAreasDlg extends MMDialog implements MouseListener, ChangeList
         acqLayout=acqL;
     }    
    
-    public void addAreas(List<Area> al) {
-        if (al!=null) {
+    public void addAreas(List<Area> additionalAreaList) {
+        if (additionalAreaList!=null) {
             AreaTableModel atm = (AreaTableModel)areaTable.getModel();
             List<Area> areas=atm.getAreaList();
-            for (int i=0; i<al.size(); i++){
-               boolean unique=true;
-               for (int j=0; j<areas.size(); j++) {
-                  if (al.get(i).getId()==areas.get(j).getId()) {
-                      unique=false;
-                      break;
-                  }
-               }
-               if (unique) {
-                   atm.addRow(al.get(i));
-               }    
+            for (Area additionalArea : additionalAreaList) {
+                boolean unique=true;
+                for (Area area : areas) {
+                    if (additionalArea.getId() == area.getId()) {
+                        unique=false;
+                        break;
+                    }
+                }
+                if (unique) {
+                    atm.addRow(additionalArea);
+                }    
             }
         }
     }
@@ -308,27 +299,6 @@ public class MergeAreasDlg extends MMDialog implements MouseListener, ChangeList
         }
     }
    
-    
-   @Override
-   public void stateChanged(ChangeEvent e) {
-        try {
-            GUIUtils.invokeLater(new Runnable() {
-                @Override
-                public void run() {
-                    areaTable.revalidate();
-                }
-            });
-        } catch (Exception ex) {
-            ReportingUtils.logError(ex);
-        }
-    }
-
-
-   public void updateAreaData() {
-      AreaTableModel ptm = (AreaTableModel)areaTable.getModel();
-      ptm.fireTableDataChanged();
-   }
-   
 
    private String createNewAreaName() {
        String s="";
@@ -338,11 +308,11 @@ public class MergeAreasDlg extends MMDialog implements MouseListener, ChangeList
        while (exists) {
             s="Merged_Area_"+Integer.toString(n);
             exists=false;
-            for (int i=0; i<areas.size(); i++) {
-                if (s.equals(areas.get(i).getName())) {
-                    exists=true;
-                }
-            }
+           for (Area area : areas) {
+               if (s.equals(area.getName())) {
+                   exists=true;
+               }
+           }
             n++;
        }
        return s;
@@ -384,102 +354,11 @@ public class MergeAreasDlg extends MMDialog implements MouseListener, ChangeList
             AreaTableModel atm=(AreaTableModel)areaTable.getModel();
             layoutAreas.removeAll(atm.getAreaList());
             layoutAreas.add(mergedArea);
-            removeAllAreas();
+            removeAllAreas();//in MergeAreasDlg
             acqLayout.setModified(true);
        } else 
            IJ.showMessage("empty");
    } 
    
 
-   /**
-    * Editor component for the position list table
-    */
-   public class CellEditor extends AbstractCellEditor implements TableCellEditor, FocusListener {
-      private static final long serialVersionUID = 3L;
-      // This is the component that will handle editing of the cell's value
-      JTextField text_ = new JTextField();
-      int editingCol_;
-
-      public CellEditor() {
-         super();
-         text_.addFocusListener(this);
-      }
-
-      @Override
-      public void focusLost(FocusEvent e) {
-         fireEditingStopped();
-      }
-
-      @Override
-      public void focusGained(FocusEvent e) {
- 
-      }
-
-      // This method is called when a cell value is edited by the user.
-      @Override
-      public Component getTableCellEditorComponent(JTable table, Object value,
-            boolean isSelected, int rowIndex, int colIndex) {
-
-        editingCol_ = colIndex;
-
-         // Configure the component with the specified value
-         if (colIndex == 0) {
-            text_.setText((String)value);
-            return text_;
-         }
-
-         return null;
-      }
-                                                                             
-      // This method is called when editing is completed.
-      // It must return the new value to be stored in the cell. 
-      @Override
-      public Object getCellEditorValue() {
-         if (editingCol_ == 0) {
-               return text_.getText();
-         }
-         return null;
-      }
-   }
-
-   private List<Area> getAreaList() {
-      AreaTableModel ptm = (AreaTableModel)areaTable.getModel();
-      return ptm.getAreaList();
-
-   }
-
-   private void handleError(Exception e) {
-      ReportingUtils.showError(e);
-   }
-
-
-   /*
-    * Implementation of MouseListener
-    * Sole purpose is to be able to unselect rows in the positionlist table
-    */
-   @Override
-   public void mousePressed (MouseEvent e) {}
-   @Override
-   public void mouseReleased (MouseEvent e) {}
-   @Override
-   public void mouseEntered (MouseEvent e) {}
-   @Override
-   public void mouseExited (MouseEvent e) {}
-   /*
-    * This event is fired after the table sets its selection
-    * Remember where was clicked previously so as to allow for toggling the selected row
-    */
-   private static int lastRowClicked_;
-   @Override
-   public void mouseClicked (MouseEvent e) {
-      java.awt.Point p = e.getPoint();
-      int rowIndex = areaTable.rowAtPoint(p);
-      if (rowIndex >= 0) {
-         if (rowIndex == areaTable.getSelectedRow() && rowIndex == lastRowClicked_) {
-               areaTable.clearSelection();
-               lastRowClicked_ = -1;
-         } else
-            lastRowClicked_ = rowIndex;
-      }
-   }
 }

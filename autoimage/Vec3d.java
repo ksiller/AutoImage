@@ -4,6 +4,8 @@
  */
 package autoimage;
 
+import java.awt.geom.Point2D;
+
 /**
  *
  * @author Karsten
@@ -59,4 +61,12 @@ public class Vec3d {
     public Double angle(Vec3d v2) {
         return Math.acos(Vec3d.dot(this, v2)/(this.length()*v2.length()))/Math.PI*180;
     }
+    
+    public Vec3d minus(Vec3d v) throws Exception {
+        if (v!=null)
+            return new Vec3d(x-v.x,y-v.y,z-v.z);
+        else 
+            throw new Exception("Vec3d: argument is null");        
+    }
+ 
 }

@@ -5,7 +5,7 @@
 package autoimage.dataprocessors;
 
 import autoimage.Utils;
-import autoimage.dataprocessors.BranchedAnalyzer;
+import autoimage.dataprocessors.BranchedProcessor;
 import ij.IJ;
 import java.io.File;
 import java.util.ArrayList;
@@ -27,7 +27,7 @@ import org.micromanager.api.MMTags;
  * @author Karsten
  * @param <E> 
  */ 
-public abstract class MultiChannelImageStackAnalyzer<E> extends BranchedAnalyzer<E> {
+public abstract class MultiChMultiZAnalyzer<E> extends BranchedProcessor<E> {
     
     protected List<String> selChannels_;
     protected List<Long> selSlices_;
@@ -39,7 +39,7 @@ public abstract class MultiChannelImageStackAnalyzer<E> extends BranchedAnalyzer
     protected List<E> imageList;
    // protected JSONObject meta; 
     
-    public MultiChannelImageStackAnalyzer(final String pName, final String path,final List<String> channels, final List<Long> slices) {
+    public MultiChMultiZAnalyzer(final String pName, final String path,final List<String> channels, final List<Long> slices) {
         super(pName, path);
         selChannels_=channels;
         selSlices_=slices;
@@ -84,7 +84,7 @@ public abstract class MultiChannelImageStackAnalyzer<E> extends BranchedAnalyzer
             try {
                 return Utils.parseMetadata((File)element);
             } catch (JSONException ex) {
-                Logger.getLogger(MultiChannelImageStackAnalyzer.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(MultiChMultiZAnalyzer.class.getName()).log(Level.SEVERE, null, ex);
                  return null;
             }    
         }
@@ -170,7 +170,7 @@ public abstract class MultiChannelImageStackAnalyzer<E> extends BranchedAnalyzer
                 imageList.add(element);
                 return returnValue;
              } catch (JSONException ex) {
-                 Logger.getLogger(MultiChannelImageStackAnalyzer.class.getName()).log(Level.SEVERE, null, ex);
+                 Logger.getLogger(MultiChMultiZAnalyzer.class.getName()).log(Level.SEVERE, null, ex);
                  IJ.log("  analyze: problem parsing metadata" );
                  return null;
              }

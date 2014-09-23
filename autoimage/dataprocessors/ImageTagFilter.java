@@ -36,7 +36,7 @@ import org.micromanager.utils.ImageUtils;
 
 //E: element type in BlockingQueue (either TaggedImage or File)
 //T: tag value type
-public abstract class ImageTagFilter<E,T> extends BranchedAnalyzer<E>{
+public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
     
     protected String key_; //key to retrieve property of JSONObject in TaggedImages that will be filtered
     protected List<T> values_; //accepted values for property retrieved with key_

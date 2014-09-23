@@ -30,7 +30,7 @@ import org.micromanager.utils.ImageUtils;
  *
  * @author Karsten
  */
-public class ZProj extends MultiChannelImageStackAnalyzer<File> {
+public class ZProj extends MultiChMultiZAnalyzer<File> {
 
     public ZProj() {
         this("",null,null);

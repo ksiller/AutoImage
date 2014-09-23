@@ -22,7 +22,7 @@ import org.json.JSONObject;
  * 
  * @author Karsten
  */ 
-public class AreaAnalyzer extends BranchedAnalyzer<File> {
+public class AreaProcessor extends BranchedProcessor<File> {
     
 //    protected final List<String> selAreas_;
 //    private final int frameIndex_;
@@ -34,11 +34,11 @@ public class AreaAnalyzer extends BranchedAnalyzer<File> {
     protected List<File> imageList;
     protected JSONObject meta; 
     
-    public AreaAnalyzer(final String pName) {
+    public AreaProcessor(final String pName) {
         this (pName,"",null);
     }
     
-    public AreaAnalyzer(final String pName, final String path,final List<String> areas) {
+    public AreaProcessor(final String pName, final String path,final List<String> areas) {
         super(pName, path);
         //selAreas_=areas;
         imageList=new ArrayList<File>();
@@ -60,7 +60,7 @@ public class AreaAnalyzer extends BranchedAnalyzer<File> {
             meta=Utils.parseMetadata((File)element);
         } catch (JSONException ex) {
             meta=null;
-            Logger.getLogger(AreaAnalyzer.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(AreaProcessor.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
     

@@ -5,6 +5,7 @@ import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Composite;
 import java.awt.Graphics2D;
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,6 +43,7 @@ public abstract class Area {
     static final String TAG_CLUSTER = "CLUSTER";
     
     protected String name;
+    protected static double cameraRot;//in radians relative to x-y stage axis, NOT layout
 //    protected static String shape;
 //    protected TilingSetting tiling;
     protected List<Tile> tilePosList;
@@ -80,6 +82,7 @@ public abstract class Area {
         this(n, -1, 0,0,0,0,0,false,"");
     }
     
+    //expects layout coordinates in phys dim
     public Area(String n, int id, double ox, double oy, double oz, double w, double h, boolean s, String anot) {
         name=n;
         this.id=id;
@@ -95,6 +98,7 @@ public abstract class Area {
 //        tiling=new TilingSetting();
         tilePosList=null;
         unknownTileNum=true;
+        cameraRot=0;
     }
 
 /*    
@@ -102,6 +106,14 @@ public abstract class Area {
         return this.getClass().getName();
     }
 */
+  
+    public static void setCameraRot(double rot) {
+        cameraRot=rot;
+    }
+    
+    public static double getCameraRot() {
+        return cameraRot;
+    } 
     
     public Tile createTile(String n, double x, double y, double z) {
         return new Tile(n,x,y,z);
@@ -158,7 +170,16 @@ public abstract class Area {
         return s;
     }
     
-    private boolean createCluster(int clusterNr,double seedX, double seedY, double fovX, double fovY, TilingSetting setting ) {
+    private boolean overlapsOtherTiles(Rectangle2D.Double r, double fovX, double fovY) {
+        for (Tile t:tilePosList) {
+            Rectangle2D.Double tRect=new Rectangle2D.Double(t.centerX-fovX/2, t.centerY-fovY/2,fovX,fovY);
+            if (tRect.intersects(r))
+                return true;
+        }
+        return false;
+    }
+    
+    private int createCluster(int clusterNr,double seedX, double seedY, double fovX, double fovY, TilingSetting setting ) {
         double tileOverlap=setting.getTileOverlap();
         int tilingDir=setting.getTilingDirection();
         double tileOffsetX=(1-tileOverlap)*fovX;
@@ -170,12 +191,8 @@ public abstract class Area {
         double startx=seedX-(clusterW/2)+fovX/2;//*physToPixelRatio;
         double starty=seedY-(clusterH/2)+fovY/2;//*physToPixelRatio;
 
-        if (!setting.isClusterOverlap()) {
-            for (Tile t:tilePosList) {
-                Rectangle2D.Double tRect=new Rectangle2D.Double(t.centerX-fovX/2, t.centerY-fovY/2,fovX,fovY);
-                if (tRect.intersects(startx-fovX/2, starty-fovY/2, clusterW, clusterH))
-                    return false;
-            }
+        if (!setting.isSiteOverlap() && overlapsOtherTiles(new Rectangle2D.Double(startx-fovX/2, starty-fovY/2, clusterW, clusterH),fovX,fovY)) {
+            return 0;
         }
         
         double x;
@@ -295,7 +312,7 @@ public abstract class Area {
             }            
         }
   //      IJ.log("Area.creatCluster: end"); 
-        return true;
+        return siteCounter;
     }
     
     public int calcFullTilePositions(double fovX, double fovY, TilingSetting setting) throws InterruptedException {
@@ -475,12 +492,14 @@ public abstract class Area {
 //            IJ.log("Area.calcRandomPositions: "+nr+", "+x+", "+y+", "+w+", "+h);
             if (acceptTilePos(x,y,w,h,setting.isInsideOnly())) {
                 if (setting.isCluster() && (setting.getNrClusterTileX()>1 || setting.getNrClusterTileY()>1)) {
-                    if (createCluster(nr,x,y,fovX,fovY, setting)) {
+                    if (createCluster(nr,x,y,fovX,fovY, setting) > 0) {
                         nr++;
                     }
                 } else {
-                    tilePosList.add(new Tile("Site"+paddedTileIndex(nr), x, y, relPosZ));
-                    nr++;
+                    if (setting.isSiteOverlap() || (!setting.isSiteOverlap() && !overlapsOtherTiles(new Rectangle2D.Double(x-fovX/2,y-fovY/2,fovX,fovY),fovX,fovY))) {
+                        tilePosList.add(new Tile("Site"+paddedTileIndex(nr), x, y, relPosZ));
+                        nr++;
+                    }
                 }
             }
 
@@ -489,83 +508,66 @@ public abstract class Area {
         return tilePosList.size();
     }
     
-    private int calcCenterTilePositions(double fovX, double fovY, TilingSetting setting) throws InterruptedException {
+    private int calcCenterTilePositions(double fovX, double fovY, TilingSetting tSetting) throws InterruptedException {
         int size=1;
-        if (setting.isCluster())
-            size=size*setting.getNrClusterTileX()*setting.getNrClusterTileY();
+        if (tSetting.isCluster())
+            size=size*tSetting.getNrClusterTileX()*tSetting.getNrClusterTileY();
 //        tilePosList.clear();
         tilePosList = new ArrayList<Tile>(size);
-        double w;
-        double h;
-        if (setting.isCluster() && (setting.getNrClusterTileX()>1 || setting.getNrClusterTileY()>1)) {
-            double offsetX=fovX*(1-setting.getTileOverlap());
-            double offsetY=fovY*(1-setting.getTileOverlap());
-            w=fovX+offsetX*(setting.getNrClusterTileX()-1);
-            h=fovY+offsetY*(setting.getNrClusterTileY()-1);
-        } else {
-            w=fovX;
-            h=fovY;
-        }
-        double x=getCenterX();
-        double y=getCenterY();
-        if (acceptTilePos(x,y,w,h,setting.isInsideOnly())) {
-            if (setting.isCluster() && (setting.getNrClusterTileX()>1 || setting.getNrClusterTileY()>1))
-                createCluster(1,x,y,fovX,fovY, setting);
-            else
-                tilePosList.add(new Tile("Site"+paddedTileIndex(1), x, y, relPosZ));
-        }
+        addTilesAroundSeed(getCenterX(), getCenterY(), fovX, fovY, tSetting);
         unknownTileNum=Thread.currentThread().isInterrupted();
         return tilePosList.size();
     }
     
-        
+    
+    private synchronized int addTilesAroundSeed(double seedX, double seedY, double fovX, double fovY, TilingSetting tSetting) {
+        double w=fovX;
+        double h=fovY;
+        if (tSetting.isCluster() && (tSetting.getNrClusterTileX()>1 || tSetting.getNrClusterTileY()>1)) {
+            double offsetX=fovX*(1-tSetting.getTileOverlap());
+            double offsetY=fovY*(1-tSetting.getTileOverlap());
+            w=fovX+offsetX*(tSetting.getNrClusterTileX()-1);
+            h=fovY+offsetY*(tSetting.getNrClusterTileY()-1);
+        }
+        if (acceptTilePos(seedX,seedY,w,h,tSetting.isInsideOnly())) {
+            if (tSetting.isCluster() && (tSetting.getNrClusterTileX()>1 || tSetting.getNrClusterTileY()>1)) {
+                return createCluster(1,seedX,seedY,fovX,fovY, tSetting);
+            }
+            else {
+                tilePosList.add(new Tile("Site"+paddedTileIndex(1), seedX, seedY, relPosZ));
+                return 1;
+            }    
+        } else
+            return 0;
+    }
     //NEED TO SET RELZPOS
-    private int calcRuntimeTilePositions(RuntimeTileManager tileManager,double fovX, double fovY, TilingSetting setting) throws InterruptedException {
+    private int calcRuntimeTilePositions(TileManager tileManager,double fovX, double fovY, TilingSetting tSetting) throws InterruptedException {
         IJ.log("Area.calcRuntimeTilePosition: "+name);
-        if (tileManager==null || tileManager.getROIs().isEmpty()) {
+        if (tileManager==null || tileManager.getAreaMap().isEmpty()) {
             IJ.log("    Area.calcRuntimeTilePosition: tileManager==null or no ROIs");
             
             unknownTileNum=true;
             tilePosList.clear();
             return 0;
         }
-        Map<String,List<Tile>> roiMap=tileManager.getROIs();
+        Map<String,List<Tile>> roiMap=tileManager.getAreaMap();
         if (roiMap.containsKey(name)) {
             IJ.log("    Area.calcRuntimeTilePosition, "+name+", ROIs: "+roiMap.get(name).size());
             List<Tile> seedList=(List<Tile>)roiMap.get(name);
-            int size=Math.max(seedList.size(),setting.getMaxSites());
-            if (setting.isCluster())
-                size=size*setting.getNrClusterTileX()*setting.getNrClusterTileY();
+            int size=Math.max(seedList.size(),tSetting.getMaxSites());
+            if (tSetting.isCluster())
+                size=size*tSetting.getNrClusterTileX()*tSetting.getNrClusterTileY();
             tilePosList = new ArrayList<Tile>(size);
             int nr=1;
             int acceptedNr=0;
-            while (!Thread.currentThread().isInterrupted() && nr<seedList.size() && acceptedNr <= setting.getMaxSites()) {// && !abortTileCalc) {
-                double w;
-                double h;
-                if (setting.isCluster() && (setting.getNrClusterTileX()>1 || setting.getNrClusterTileY()>1)) {
-                    double offsetX=fovX*(1-setting.getTileOverlap());
-                    double offsetY=fovY*(1-setting.getTileOverlap());
-                    w=fovX+offsetX*(setting.getNrClusterTileX()-1);
-                    h=fovY+offsetY*(setting.getNrClusterTileY()-1);
-                } else {
-                    w=fovX;
-                    h=fovY;
-                }
-                double x=seedList.get(nr).centerX;
-                double y=seedList.get(nr).centerY;
-                IJ.log("Area.calcRuntimePositions: "+name+", "+nr+", "+x+", "+y+", "+w+", "+h);
-                if (acceptTilePos(x,y,w,h,setting.isInsideOnly())) {
-                    if (setting.isCluster() && (setting.getNrClusterTileX()>1 || setting.getNrClusterTileY()>1)) {
-                        if (createCluster(nr,x,y,fovX,fovY, setting)) {
-                       //     nr++;
-                        }
-                    } else {
-                        tilePosList.add(new Tile("Site"+paddedTileIndex(nr), x, y, relPosZ));
-                     //   nr++;
-                    }
+//            while (!Thread.currentThread().isInterrupted() && nr<seedList.size() && acceptedNr <= tSetting.getMaxSites()) {// && !abortTileCalc) {
+            while (!Thread.currentThread().isInterrupted() && nr<seedList.size() && acceptedNr <= tSetting.getMaxSites()) {// && !abortTileCalc) {
+                if (addTilesAroundSeed(seedList.get(nr).centerX, seedList.get(nr).centerY, fovX, fovY, tSetting) > 0)
                     acceptedNr++;
-                }
                 nr++;
+            }
+            for (Tile t:tilePosList) {
+                IJ.log("Area.calcRuntimeTilePositions: layout: "+t.centerX+", "+t.centerY+", "+t.relZPos);
             }
         } else {
             tilePosList.clear();
@@ -574,7 +576,7 @@ public abstract class Area {
         return tilePosList.size();
     }
 
-    public synchronized int calcTilePositions(RuntimeTileManager tileManager,double fovX, double fovY, TilingSetting setting) throws InterruptedException {
+    public synchronized int calcTilePositions(TileManager tileManager,double fovX, double fovY, TilingSetting setting) throws InterruptedException {
         if (selectedForAcq) {
             switch (setting.getMode()) {
                 case FULL:      
@@ -632,11 +634,20 @@ public abstract class Area {
                 g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.25f));
             for (int i=0; i<tilePosList.size(); i++) {
                 Tile t=tilePosList.get(i);
-                int x=bdPix+(int)Math.round((t.centerX-fovX/2)*physToPixelRatio);
-                int y=bdPix+(int)Math.round((t.centerY-fovY/2)*physToPixelRatio);
+                int xo=bdPix+(int)Math.round((t.centerX-fovX/2)*physToPixelRatio);
+                int yo=bdPix+(int)Math.round((t.centerY-fovY/2)*physToPixelRatio);
+                int xCenter=bdPix+(int)Math.round(t.centerX*physToPixelRatio);
+                int yCenter=bdPix+(int)Math.round(t.centerY*physToPixelRatio);
                 int w=(int)Math.round(fovX*physToPixelRatio);
                 int h=(int)Math.round(fovY*physToPixelRatio);
-                g2d.fillRect(x,y,w,h);
+                
+                AffineTransform at=g2d.getTransform();
+                g2d.translate(xCenter,yCenter);
+                g2d.rotate(cameraRot);                        
+                g2d.translate(-xCenter,-yCenter);
+                g2d.fillRect(xo,yo,w,h);
+                g2d.setTransform(at);
+                
             }    
             g2d.setComposite(oldComposite);
         }
@@ -762,35 +773,22 @@ public abstract class Area {
         return info;
     }
     
-    public PositionList addTilePositions(PositionList pl, ArrayList<JSONObject> posInfoL, String xyStageLabel, String zStageLabel, ArrayList<RefArea> rpList, Vec3d normVec) {
-        if (rpList==null | rpList.size()<1)
-            return null;
-        RefArea rp=rpList.get(0);
-        double sOffsetX=rp.convertLayoutCoordToStageCoord_X(0);
-        double sOffsetY=rp.convertLayoutCoordToStageCoord_Y(0);
-        double sOffsetZ=rp.getStageCoordZ()-rpList.get(0).getLayoutCoordZ();
-        
+    public PositionList addTilePositions(PositionList pl, ArrayList<JSONObject> posInfoL, String xyStageLabel, String zStageLabel, AcquisitionLayout aLayout) {
         if (pl==null)
             pl=new PositionList();
-/*        double x0=rp.getStageCoordX();
-        double y0=rp.getStageCoordY();
-        double z0=rp.getStageCoordZ()-rp.getLayoutCoordZ();
-        double a=normVec.x;
-        double b=normVec.y;
-        double c=normVec.z;
-*/      
         for (Tile tile:tilePosList) {
-        //for (int i=0; i<tilePosList.size(); i++) {
-        //    Tile t=tilePosList.get(i);
-            double x=rp.convertLayoutCoordToStageCoord_X(tile.centerX);
-            double y=rp.convertLayoutCoordToStageCoord_Y(tile.centerY);
-            double z=((-normVec.x*(x-rp.getStageCoordX())-normVec.y*(y-rp.getStageCoordY()))/normVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ()+relPosZ;
-            
-            MultiStagePosition msp=new MultiStagePosition(xyStageLabel, x, y, zStageLabel, z);
-            msp.setLabel(name+"-"+tile.name);
-            pl.addPosition(msp);
-            if (posInfoL!=null)
-                posInfoL.add(createSiteInfo(tile.name));
+            Vec3d stage;
+            try {
+                stage = aLayout.convertLayoutToStagePos(tile.centerX,tile.centerY, relPosZ);
+                MultiStagePosition msp=new MultiStagePosition(xyStageLabel, stage.x, stage.y, zStageLabel, stage.z);
+                msp.setLabel(name+"-"+tile.name);
+                pl.addPosition(msp);
+                if (posInfoL!=null)
+                    posInfoL.add(createSiteInfo(tile.name));
+            } catch (Exception ex) {
+                IJ.log("Area.addTilePosition: "+ex.getMessage());
+                Logger.getLogger(Area.class.getName()).log(Level.SEVERE, null, ex);
+            }
         }
         return pl;
     }
@@ -798,9 +796,7 @@ public abstract class Area {
     public List<Tile> getTilePositions() {
         return tilePosList;
     }
-    
-    //public abstract String[] getXMLTags();
-    
+        
     public boolean setAreaParams (List<String> params) {
         if (params!=null && params.size()>=1 && params.get(0).equals(this.getName())) 
             return true;
@@ -903,6 +899,7 @@ public abstract class Area {
         relPosZ=obj.getDouble(TAG_REL_POS_Z);
         selectedForAcq=obj.getBoolean(TAG_SELECTED);
         comment=obj.getString(TAG_COMMENT);
+        cameraRot=0;
     }
     
     public static Area createFromJSONObject(JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {

@@ -11,6 +11,7 @@ import bsh.Interpreter;
 import bsh.TargetError;
 import ij.IJ;
 import ij.ImagePlus;
+import ij.Prefs;
 import ij.measure.ResultsTable;
 import java.awt.Component;
 import java.awt.event.ActionEvent;
@@ -43,12 +44,13 @@ import org.micromanager.api.MMTags;
  *
  * @author Karsten
  */
-public class ScriptAnalyzer extends BranchedAnalyzer<File>  {
+public class ScriptAnalyzer extends BranchedProcessor<File>  {
     
     protected String script_;
     protected String args_;
     protected boolean saveRT_;
     protected ResultsTable rTable_; //new table for each image
+    protected static String scriptDir = "";
     
     
     public ScriptAnalyzer() {
@@ -66,7 +68,6 @@ public class ScriptAnalyzer extends BranchedAnalyzer<File>  {
         args_=args;
         saveRT_=saveRT;
         rTable_=null;
-
     }
     
     @Override
@@ -321,10 +322,21 @@ public class ScriptAnalyzer extends BranchedAnalyzer<File>  {
             @Override
             public void actionPerformed(ActionEvent event) {
                 JFileChooser fc=new JFileChooser();
-                fc.setCurrentDirectory(new File(scriptField.getText()).getParentFile());
-                int result=fc.showSaveDialog(null);
-                if (result == JFileChooser.APPROVE_OPTION)
+                File scriptFile=new File(scriptField.getText()).getParentFile();
+                if (scriptFile != null)
+                    fc.setCurrentDirectory(scriptFile);
+                else {
+                    if (scriptDir.equals("")) {
+                        fc.setCurrentDirectory(new File(Prefs.getImageJDir()));
+                    } else {
+                        fc.setCurrentDirectory(new File(scriptDir));
+                    }
+                }    
+                int result=fc.showOpenDialog(null);
+                if (result == JFileChooser.APPROVE_OPTION) {
                     scriptField.setValue(fc.getSelectedFile().getAbsolutePath());
+                    scriptDir=fc.getCurrentDirectory().getAbsolutePath();
+                }    
             }
         });
         filePanel.setAlignmentX(Component.LEFT_ALIGNMENT);

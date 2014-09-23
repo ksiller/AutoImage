@@ -5,7 +5,7 @@
 package autoimage;
 
 
-import autoimage.dataprocessors.BranchedAnalyzer;
+import autoimage.dataprocessors.BranchedProcessor;
 import autoimage.dataprocessors.ExtDataProcessor;
 import autoimage.dataprocessors.ImageTagFilter;
 import autoimage.dataprocessors.ImageTagFilterLong;
@@ -16,7 +16,7 @@ import autoimage.dataprocessors.ImageTagFilterString;
 import autoimage.dataprocessors.NoFilterSeqAnalyzer;
 import autoimage.dataprocessors.RoiFinder;
 import autoimage.dataprocessors.ScriptAnalyzer;
-import autoimage.dataprocessors.SiteInfoDataProcessor;
+import autoimage.dataprocessors.SiteInfoUpdater;
 import ij.CompositeImage;
 import ij.IJ;
 import ij.ImagePlus;
@@ -48,9 +48,7 @@ import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -60,7 +58,6 @@ import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.nio.channels.FileChannel;
 import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -103,6 +100,9 @@ import javax.swing.JFormattedTextField;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
@@ -120,7 +120,6 @@ import javax.swing.event.TableModelListener;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.JTableHeader;
 import javax.swing.table.TableColumn;
-import javax.swing.table.TableColumnModel;
 import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
@@ -130,7 +129,6 @@ import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
-import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 import mmcorej.CMMCore;
@@ -140,7 +138,6 @@ import mmcorej.TaggedImage;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.micromanager.MMVersion;
 import org.micromanager.acquisition.DefaultTaggedImageSink;
 import org.micromanager.acquisition.MMImageCache;
 import org.micromanager.acquisition.TaggedImageStorageDiskDefault;
@@ -166,7 +163,7 @@ import org.micromanager.utils.ReportingUtils;
  *
  * @author Karsten Siller
  */
-public class AcqFrame extends javax.swing.JFrame implements TableModelListener, WindowListener, AcqSettingsListener, ImageCacheListener, IDataProcessorListener {//, LiveModeListener {
+public class AcqFrame extends javax.swing.JFrame implements ActionListener, TableModelListener, WindowListener, ILiveListener, AcqSettingsListener, ImageCacheListener, IDataProcessorListener {//, LiveModeListener {
 
     private final ScriptInterface gui;
     private boolean imagePipelineSupported;
@@ -174,9 +171,11 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     private IAcquisitionEngine2010 acqEng2010;
     private RefPointListDialog refPointListDialog;
     private MergeAreasDlg mergeAreasDialog;
+    private CameraRotDlg cameraRotDialog;
     private ThreadPoolExecutor retilingExecutor;
     private DisplayUpdater displayUpdater;
-//    private RuntimeTileManager tileManager;
+    private LiveModeMonitor liveModeMonitor;
+//    private TileManager tileManager;
 
     //MM Config Paramters
 //    private String channelGroupStr;
@@ -185,13 +184,13 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     private String zStageLabel;
     private String xyStageLabel;
     private List<String> availableObjectives;
-    private StrVector availableChannels;
-    private String[] cameras;
-    private String[] binningOptions;
-    private int currentBinning;
-    private int cCameraPixX;
-    private int cCameraPixY;
+//    private String[] cameras;
+//    private String[] binningOptions;
+//    private int currentBinning;
+//    private int cCameraPixX;
+//    private int cCameraPixY;
     private Rectangle cameraROI;
+    private Detector currentDetector;
     
     //Settings
     private File expSettingsFile;
@@ -205,8 +204,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     private AcqSetting currentAcqSetting;
     private TilingSetting prevTilingSetting;
     private String prevObjLabel;
-    private String cameraLabel;
-    private byte tilingDir;
+//    private String cameraLabel;
     
     //Operational Status
     private boolean instrumentOnline;
@@ -224,14 +222,14 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     private boolean isAcquiring = false;
     private boolean isAborted = false;
     private boolean recalculateTiles = false;
-    private boolean landmarkFound;
+//    private boolean landmarkFound;
     private boolean calculating;
     private boolean retilingAborted;
     private Area lastArea;
     
     // Callback
     private final StagePosMonitor stageMonitor;
-    private List<MMListenerInterface> MMListeners_ = (List<MMListenerInterface>) Collections.synchronizedList(new ArrayList<MMListenerInterface>());
+//    private final List<MMListenerInterface> MMListeners_ = (List<MMListenerInterface>) Collections.synchronizedList(new ArrayList<MMListenerInterface>());
     private final Cursor zoomCursor;
     private static final Cursor moveToCursor = new Cursor(Cursor.CROSSHAIR_CURSOR);
     private static final Cursor normCursor = new Cursor(Cursor.DEFAULT_CURSOR);
@@ -251,6 +249,11 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     protected static final String TAG_LAYOUT_FILE="LAYOUT_FILE";
     protected static final String TAG_ACQ_SETTING_FILE="ACQ_SETTING_FILE";
     protected static final String TAG_PROCESSOR_TREE_FILE="PROCESSOR_TREE_FILE";
+    
+    private static final String CMD_NEW_DATA = "Acquire new data";
+    private static final String CMD_REVIEW_DATA = "Review data";
+    private static final String CMD_CAMERA_ROTATION = "Check camera rotation";
+    private static final String CMD_MANAGE_LAYOUT = "Manage layout";
 
 
     //WindowListener interface
@@ -262,6 +265,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     public void windowClosing(WindowEvent we) {
         if (we.getSource() == mergeAreasDialog) {
             mergeAreasMode = false;
+            areaTable.repaint();
             acqLayoutPanel.revalidate();
             acqLayoutPanel.repaint();
             selectButton.setEnabled(true);
@@ -279,6 +283,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     public void windowClosed(WindowEvent we) {
         if (we.getSource() == mergeAreasDialog) {
             mergeAreasMode = false;
+            areaTable.repaint();
             acqLayoutPanel.revalidate();
             acqLayoutPanel.repaint();
             selectButton.setEnabled(true);
@@ -313,7 +318,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     public void settingsChanged() {
         //settings in AcqFrame and MDA window are not synchronized at the moment
 //        IJ.log("AcqFrame.settingsChanged: ");
-        JOptionPane.showMessageDialog(this,"AcqFrame.settingsChanged: ");
+        JOptionPane.showMessageDialog(this,"AcqFrame.settingsChanged: acquisition settings changed");
     }
 
     //ImageListener interface
@@ -342,7 +347,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     @Override
     public void imagingFinished(String string) {
 //        IJ.log("AcqFrame.imagingFinished(Listener): begin. "+string);
-        currentAcqSetting.getTileManager().clearAllROIs();
+        currentAcqSetting.getTileManager().clearAllSeeds();
 
         IJ.log("finished sequence: "+currentAcqSetting.getName()+"\n");
 
@@ -393,7 +398,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             acqSettingTable.setRowSelectionInterval(cAcqSettingIdx + 1, cAcqSettingIdx + 1);
             runAcquisition(currentAcqSetting);
         } else {
-//            tileManager.clearAllROIs();
+//            tileManager.clearAllSeeds();
             acquireButton.setText("Acquire");
             progressBar.setValue(0);
             isAcquiring = false;
@@ -418,7 +423,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 
     @Override
     public void imageProcessed(final JSONObject metadata, final DataProcessor source) {
-        if (source instanceof SiteInfoDataProcessor && ((SiteInfoDataProcessor)source).getProcName().equals(ProcessorTree.PROC_NAME_ACQ_ENG)) {
+        if (source instanceof SiteInfoUpdater && ((SiteInfoUpdater)source).getProcName().equals(ProcessorTree.PROC_NAME_ACQ_ENG)) {
             SwingUtilities.invokeLater(new Runnable(){ 
                 @Override
                 public void run() {
@@ -433,6 +438,58 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 }
             });
         }
+    }
+
+    private void showCameraRotDlg(boolean modal) {
+        double stepSize;
+        try {
+            //try to set step size to 50% of field of view --> 50% overlap
+            stepSize=Math.min(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel())*core.getPixelSizeUm()/2;
+        } catch (Exception ex) {
+            stepSize=100;
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        if (cameraRotDialog == null) {
+            cameraRotDialog = new  CameraRotDlg(
+                this,
+                gui,
+                liveModeMonitor,
+                currentAcqSetting.getChannelGroupStr(),
+                stepSize);
+            cameraRotDialog.setIterations(5);
+            cameraRotDialog.addWindowListener(this);
+            cameraRotDialog.addOkListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+//                        cameraRotDialog.setVisible(false);
+                    CameraRotDlg.Measurement m=cameraRotDialog.getResult();
+                    if (m!=null)
+                        currentDetector.setFieldRotation(cameraRotDialog.getResult().cameraAngle);
+                    IJ.showMessage("currentDetector.fieldRotation: "+currentDetector.fieldRotation);
+                }
+            });
+        } else {
+            //cameraRotDialog.setChannelGroup(currentAcqSetting.getChannelGroupStr());
+            cameraRotDialog.setStageStepSize(stepSize);
+        }
+        cameraRotDialog.setModal(modal);
+        cameraRotDialog.setVisible(true);
+                
+    }
+    
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        if (e.getActionCommand().equals(CMD_CAMERA_ROTATION)) {
+            showCameraRotDlg(false);
+        }
+    }
+
+    //LiveListener
+    @Override
+    public void liveModeChanged(boolean isLive) {
+        liveButton.setText(isLive ? "Stop" : "Live");
+        snapButton.setEnabled(!isLive && !calculating && !isAcquiring);
+//        acquireButton.setEnabled(!isLive && !calculating && !isAcquiring && acqLayout.getNoOfMappedStagePos() > 0);
     }
 
 
@@ -511,6 +568,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                     } catch (JSONException je) {
                         IJ.log("DisplayUpdater.process: JSONException - cannot parse image metadata title");
                     }
+                    imp.setDisplayRange(0, 1024);
                     imp.setProcessor(ip);
                     try {
                         imp.setTitle(metadata.getString(MMTags.Image.CHANNEL) + ": Area " + metadata.getString("Area") + ", t" + (metadata.getInt(MMTags.Image.FRAME_INDEX)) + ", z" + (metadata.getInt(MMTags.Image.SLICE_INDEX)));
@@ -615,12 +673,12 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             if (retilingAborted) {
                 recalculateTiles = false;
                 if (command.equals(ADJUSTING_SETTINGS)) {
-                    currentAcqSetting.setObjective(prevObjLabel, getPixelSize(prevObjLabel));
+                    currentAcqSetting.setObjective(prevObjLabel, getObjPixelSize(prevObjLabel));
                     currentAcqSetting.setTilingSetting(prevTilingSetting);
                     ((LayoutPanel) acqLayoutPanel).setAcqSetting(currentAcqSetting, false);
                     recalculateTiles = true;
                     updateAcqSettingTab(currentAcqSetting);
-                    calcTilePositions(null, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), "Restoring...");
+                    calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), "Restoring...");
                 } else if (command.equals(SELECTING_AREA) && restoreObj != null) {
                     AreaTableModel atm = (AreaTableModel) areaTable.getModel();
                     for (Area area : ((List<Area>) restoreObj)) {
@@ -655,40 +713,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         }
     }
     
-
-    class LiveModeMonitor extends SwingWorker<Void, Boolean> {
-
-        @Override
-        public Void doInBackground() {
-            while (!this.isCancelled()) {
-                try {
-                    Thread.sleep(250);
-                    publish(gui.isLiveModeOn());
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }
-            return null;
-        }
-
-        @Override
-        protected void process(final List<Boolean> chunks) {
-            // Updates the relevant GUI fields
-            boolean b = chunks.get(chunks.size() - 1);
-            liveButton.setText(b ? "Stop" : "Live");
-            snapButton.setEnabled(!b && !calculating && !isAcquiring);
-        }
-        /*
-         * Executed in event dispatching thread
-         */
-
-        @Override
-        public void done() {
-            liveButton.setText("Live");
-            snapButton.setEnabled(true);
-        }
-    }
-
+    
     class StagePosMonitor extends SwingWorker<Void, double[]> {
         /*
          * Main task. Executed in background thread.
@@ -699,9 +724,11 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         private double stageZ;
         private String xyStageName;
         private String zStageName;
+        private int interval_ms;
 
-        public StagePosMonitor() {
+        public StagePosMonitor(int interval) {
             super();
+            interval_ms=interval;
             try {
                 xyStageName = core.getXYStageDevice();
                 zStageName = core.getFocusDevice();
@@ -738,7 +765,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                     if (newStagePosition()) {
                         publish(stage);
                     }
-                    Thread.sleep(100);
+                    Thread.sleep(interval_ms);
 
                 } catch (InterruptedException ex) {
                     Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
@@ -756,10 +783,10 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 stagePosYLabel.setText(String.format("%1$,.2f", s[1]));
                 stagePosZLabel.setText(String.format("%1$,.2f", s[2]));
                 if (refPointListDialog != null) {
-                    refPointListDialog.updateStagePos(s[0], s[1], s[2]);
+                    refPointListDialog.updateStagePosLabel(s[0], s[1], s[2]);
                 }
                 ((LayoutPanel) acqLayoutPanel).setCurrentXYStagePos(s[0], s[1]);
-                Area a = acqLayout.getFirstContainingAreaAbs(s[0], s[1], currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight());
+                Area a = acqLayout.getFirstContainingAreaAbs(s[0], s[1], currentAcqSetting.getTileWidth_UM(), currentAcqSetting.getTileHeight_UM());
                 if (a != lastArea) {
                     if (a != null) {
                         areaLabel.setText(a.getName());
@@ -776,7 +803,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             } catch (Exception ex) {
                 gui.logError(ex);
             }
-//            IJ.log("StagePosMonitor.process : "+Double.toString(s[0])+", "+Double.toString(s[1])+", "+Double.toString(s[2]));
+            IJ.log("StagePosMonitor.process : "+Double.toString(s[0])+", "+Double.toString(s[1])+", "+Double.toString(s[2]));
         }
 
         @Override
@@ -1257,15 +1284,19 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 
         public AcqSettingTableModel(List<AcqSetting> al) {
             super();
-            setData(al);
-        }
-
-        public void setData(List<AcqSetting> al) {
+//            setData(al);
             if (al == null) {
                 al = new ArrayList<AcqSetting>();
             }
             this.settings = al;
         }
+
+//        public void setData(List<AcqSetting> al) {
+//            if (al == null) {
+//                al = new ArrayList<AcqSetting>();
+//            }
+//            this.settings = al;
+//        }
 
         public List<AcqSetting> getAcqSettingList() {
             return settings;
@@ -1388,21 +1419,20 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 */
         public void removeRows(int[] rowIdxArray) {
             for (int i = rowIdxArray.length-1; i>=0; i--) {
-                        AcqSetting setting=settings.get(rowIdxArray[i]);
-                        DefaultMutableTreeNode root=setting.getImageProcessorTree();
-                        Enumeration<DefaultMutableTreeNode> en = root.preorderEnumeration();
-                        while (en.hasMoreElements()) {
-                            DefaultMutableTreeNode node = en.nextElement();
-                            DataProcessor proc=(DataProcessor)node.getUserObject();
-                            if (proc.isAlive()) {
-                                IJ.log("remove AcqSetting '"+setting.getName()+"': requesting DataProcessor '"+proc.getName()+"' to stop");
-                                proc.requestStop();
-                            }
-                            while (proc.isAlive()) {
-                            }
-                            IJ.log("remove AcqSetting '"+setting.getName()+"': DataProcessor '"+proc.getName()+"' is not alive");
-                        }
-                        settings.remove(rowIdxArray[i]);
+                AcqSetting setting=settings.get(rowIdxArray[i]);
+                DefaultMutableTreeNode root=setting.getImageProcessorTree();
+                Enumeration<DefaultMutableTreeNode> en = root.preorderEnumeration();
+                while (en.hasMoreElements()) {
+                    DefaultMutableTreeNode node = en.nextElement();
+                    DataProcessor proc=(DataProcessor)node.getUserObject();
+                    if (proc.isAlive()) {
+                        IJ.log("remove AcqSetting '"+setting.getName()+"': requesting DataProcessor '"+proc.getName()+"' to stop");
+                        proc.requestStop();
+                    }
+                    while (proc.isAlive()) {}
+                    IJ.log("remove AcqSetting '"+setting.getName()+"': DataProcessor '"+proc.getName()+"' is not alive");
+                }
+                settings.remove(rowIdxArray[i]);
             }
             fireTableRowsDeleted(rowIdxArray[0], rowIdxArray[rowIdxArray.length - 1]);
         }
@@ -1515,7 +1545,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
      currentAcqSetting=acqSettings.get(cAcqSettingIdx);
      prevTilingSetting=currentAcqSetting.getTilingSetting().duplicate();
      prevObjLabel=currentAcqSetting.getObjective();
-     calcTilePositions(null,currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+     calcTilePositions(null,currentAcqSegetTileWidth_UMeWidth(), currentAcqSegetTileHeight_UMHeight(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
      ((LayoutPanel)acqLayoutPanel).setAcqSetting(currentAcqSetting, true);
      updateAcqSettingTab(currentAcqSetting);
      }    
@@ -1536,7 +1566,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 
         @Override
         public boolean verify(JComponent jc) {
-            /*            calcTilePositions(null, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(),currentAcqSetting.getTilingSetting(), "Verifying...");
+            /*            calcTilePositions(null, currentAcgetTileWidth_UMTileWidth(), currentAcgetTileHeight_UMileHeight(),currentAcqSetting.getTilingSetting(), "Verifying...");
              while (calculating) {};*/
 //            IJ.showMessage(jc.getName(),"verifying");
             JTextField field = (JTextField) jc;
@@ -1613,6 +1643,29 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 
         instrumentOnline = false; //to ensure that during gui initialization instrument does not respond 
         initComponents();
+        
+        JMenuBar menubar = new JMenuBar();
+        
+        JMenu expMenu = new JMenu("Experiments");
+        JMenuItem newData=new JMenuItem(CMD_NEW_DATA);
+        newData.addActionListener(this);
+        expMenu.add(newData);
+        JMenuItem reviewData=new JMenuItem(CMD_REVIEW_DATA);
+        reviewData.addActionListener(this);
+        expMenu.add(reviewData);
+        
+        JMenu utilMenu = new JMenu("Utilities");
+        JMenuItem manageLayout=new JMenuItem(CMD_MANAGE_LAYOUT);
+        manageLayout.addActionListener(this);
+        utilMenu.add(manageLayout);
+        JMenuItem checkCamRotation=new JMenuItem(CMD_CAMERA_ROTATION);
+        checkCamRotation.addActionListener(this);
+        utilMenu.add(checkCamRotation);
+        
+        menubar.add(expMenu);
+        menubar.add(utilMenu);
+        
+        setJMenuBar(menubar);
         
         //initialize comboBox to select TilingMode
         Object[] tilingModeOptions = new Object[]{
@@ -1693,13 +1746,19 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         progressBar.setStringPainted(false);
 
 //        acqSettingListBox.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-//        tileManager = new RuntimeTileManager(null);
+//        tileManager = new TileManager(null);
         
         loadPreferences();
         loadAvailableObjectiveLabels();
         //load last settings
         expSettingsFile = new File(Prefs.getHomeDir(),"LastExpSettings.txt");
+        IJ.log("AcqFrame.constructor: Before load expSettings");
         loadExpSettings(expSettingsFile, true);
+        IJ.log("AcqFrame.constructor: after load expSettings");
+
+        acqSettingTable.getSelectionModel().setSelectionInterval(0, 0);
+        sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
+                        "Sequence: "+currentAcqSetting.getName()));
 
         //initialize processorTreeView
         processorTreeView.setEditable(true);
@@ -1714,10 +1773,12 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         }
 
         //initialize and start stage and live-mode monitors
-        stageMonitor = new StagePosMonitor();
+        stageMonitor = new StagePosMonitor(100);
         stageMonitor.execute();
-        LiveModeMonitor monitor = new LiveModeMonitor();
-        monitor.execute();
+        liveModeMonitor = new LiveModeMonitor(gui,100);
+        liveModeChanged(liveModeMonitor.isLive());
+        liveModeMonitor.addListener(this);
+        liveModeMonitor.execute();
 
         instrumentOnline = true;
     }
@@ -1760,7 +1821,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 	         }
 	         return true;
 	
-	      } catch (Exception ex) {
+	      } catch (NumberFormatException ex) {
 	         throw new MMScriptException ("Format of version String should be \"a.b.c\"");
 	      }
 	   } 
@@ -1787,6 +1848,9 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 
     public void cleanUp() {
         cancelStagePosMonitor();
+        if (liveModeMonitor!=null) {
+            liveModeMonitor.removeListener(this);
+        }
         if (acqLayout.isModifed()) {
             int save = JOptionPane.showConfirmDialog(null, "Acquisition layout has been modified.\n\nDo you want to save it?", "", JOptionPane.YES_NO_OPTION);
             if (save == JOptionPane.YES_OPTION) {
@@ -1818,10 +1882,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         buttonGroup2 = new javax.swing.ButtonGroup();
         jLabel36 = new javax.swing.JLabel();
         settingsPanel = new javax.swing.JPanel();
-        acquireButton = new javax.swing.JButton();
-        jLabel8 = new javax.swing.JLabel();
-        experimentTextField = new javax.swing.JTextField();
-        controlTabbedPane = new javax.swing.JTabbedPane();
+        sequenceTabbedPane = new javax.swing.JTabbedPane();
         jPanel2 = new javax.swing.JPanel();
         jScrollPane2 = new javax.swing.JScrollPane();
         areaTable = new javax.swing.JTable();
@@ -1832,34 +1893,39 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         mergeAreasButton = new javax.swing.JButton();
         jLabel3 = new javax.swing.JLabel();
         totalAreasLabel = new javax.swing.JLabel();
-        acqSelector_Areas = new javax.swing.JComboBox();
-        jLabel35 = new javax.swing.JLabel();
         jLabel37 = new javax.swing.JLabel();
         totalTilesLabel = new javax.swing.JLabel();
         jPanel5 = new javax.swing.JPanel();
-        acqSettingPanel = new javax.swing.JPanel();
-        jLabel5 = new javax.swing.JLabel();
-        tileSizeLabel = new javax.swing.JLabel();
+        jPanel10 = new javax.swing.JPanel();
+        timelapseCheckBox = new javax.swing.JCheckBox();
+        clusterYField = new javax.swing.JTextField();
+        tilingDirComboBox = new javax.swing.JComboBox();
         jLabel1 = new javax.swing.JLabel();
         objectiveComboBox = new javax.swing.JComboBox();
-        jLabel12 = new javax.swing.JLabel();
+        jLabel4 = new javax.swing.JLabel();
+        jLabel5 = new javax.swing.JLabel();
+        tileSizeLabel = new javax.swing.JLabel();
+        zStackCheckBox = new javax.swing.JCheckBox();
+        jLabel6 = new javax.swing.JLabel();
         pixelSizeLabel = new javax.swing.JLabel();
-        jLabel10 = new javax.swing.JLabel();
-        binningComboBox = new javax.swing.JComboBox();
-        jLabel33 = new javax.swing.JLabel();
-        tilingFileLabel = new javax.swing.JLabel();
-        jSeparator2 = new javax.swing.JSeparator();
-        jSeparator3 = new javax.swing.JSeparator();
-        clusterCheckBox = new javax.swing.JCheckBox();
-        clusterXField = new javax.swing.JTextField();
-        clusterLabel1 = new javax.swing.JLabel();
-        clusterYField = new javax.swing.JTextField();
+        jLabel34 = new javax.swing.JLabel();
         clusterLabel2 = new javax.swing.JLabel();
         maxSitesField = new javax.swing.JTextField();
-        jLabel4 = new javax.swing.JLabel();
         maxSitesLabel = new javax.swing.JLabel();
         tileOverlapField = new javax.swing.JTextField();
+        jLabel33 = new javax.swing.JLabel();
+        autofocusCheckBox = new javax.swing.JCheckBox();
+        jLabel12 = new javax.swing.JLabel();
+        binningComboBox = new javax.swing.JComboBox();
+        jLabel10 = new javax.swing.JLabel();
+        clusterCheckBox = new javax.swing.JCheckBox();
         insideOnlyCheckBox = new javax.swing.JCheckBox();
+        acqOrderList = new javax.swing.JComboBox();
+        autofocusButton = new javax.swing.JButton();
+        tilingModeComboBox = new javax.swing.JComboBox();
+        clusterXField = new javax.swing.JTextField();
+        siteOverlapCheckBox = new javax.swing.JCheckBox();
+        clusterLabel1 = new javax.swing.JLabel();
         acqModePane = new javax.swing.JTabbedPane();
         jPanel4 = new javax.swing.JPanel();
         jScrollPane3 = new javax.swing.JScrollPane();
@@ -1886,7 +1952,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         jLabel24 = new javax.swing.JLabel();
         jLabel25 = new javax.swing.JLabel();
         jLabel26 = new javax.swing.JLabel();
-        jLabel27 = new javax.swing.JLabel();
         reverseButton = new javax.swing.JButton();
         jPanel3 = new javax.swing.JPanel();
         jLabel13 = new javax.swing.JLabel();
@@ -1900,29 +1965,8 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         framesField = new javax.swing.JTextField();
         jLabel18 = new javax.swing.JLabel();
         durationText = new javax.swing.JLabel();
-        jLabel6 = new javax.swing.JLabel();
-        acqOrderList = new javax.swing.JComboBox();
-        autofocusCheckBox = new javax.swing.JCheckBox();
-        zStackCheckBox = new javax.swing.JCheckBox();
-        timelapseCheckBox = new javax.swing.JCheckBox();
-        siteCoordFileButton = new javax.swing.JButton();
-        clusterOverlapCheckBox = new javax.swing.JCheckBox();
-        jLabel34 = new javax.swing.JLabel();
-        tilingDirComboBox = new javax.swing.JComboBox();
-        tilingModeComboBox = new javax.swing.JComboBox();
-        autofocusButton = new javax.swing.JButton();
-        addAcqSettingButton = new javax.swing.JButton();
-        deleteAcqSettingButton = new javax.swing.JButton();
-        acqSettingDownButton = new javax.swing.JButton();
-        jScrollPane7 = new javax.swing.JScrollPane();
-        acqSettingTable = new javax.swing.JTable();
-        acqSettingUpButton = new javax.swing.JButton();
-        loadAcqSettingButton = new javax.swing.JButton();
-        saveAcqSettingButton = new javax.swing.JButton();
         jPanel9 = new javax.swing.JPanel();
-        jLabel11 = new javax.swing.JLabel();
         jLabel28 = new javax.swing.JLabel();
-        acqSelector_Processors = new javax.swing.JComboBox();
         jScrollPane4 = new javax.swing.JScrollPane();
         processorTreeView = new javax.swing.JTree();
         addImageTagFilterButton = new javax.swing.JButton();
@@ -1940,21 +1984,32 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         loadProcTreeButton = new javax.swing.JButton();
         saveProcTreeButton = new javax.swing.JButton();
         loadImagePipelineButton = new javax.swing.JButton();
-        processProgressBar = new javax.swing.JProgressBar();
-        cancelThreadButton = new javax.swing.JButton();
-        jPanel7 = new javax.swing.JPanel();
-        saveExpSettingFileButton = new javax.swing.JButton();
-        saveLayoutButton = new javax.swing.JButton();
+        sequenceListPanel = new javax.swing.JPanel();
+        acqSettingUpButton = new javax.swing.JButton();
+        acqSettingDownButton = new javax.swing.JButton();
+        deleteAcqSettingButton = new javax.swing.JButton();
+        jScrollPane7 = new javax.swing.JScrollPane();
+        acqSettingTable = new javax.swing.JTable();
+        saveAcqSettingButton = new javax.swing.JButton();
+        addAcqSettingButton = new javax.swing.JButton();
+        loadAcqSettingButton = new javax.swing.JButton();
+        jPanel11 = new javax.swing.JPanel();
+        jLabel8 = new javax.swing.JLabel();
+        experimentTextField = new javax.swing.JTextField();
         loadExpSettingFileButton = new javax.swing.JButton();
-        browseImageDestPathButton = new javax.swing.JButton();
+        saveExpSettingFileButton = new javax.swing.JButton();
         loadLayoutButton = new javax.swing.JButton();
-        jPanel8 = new javax.swing.JPanel();
+        saveLayoutButton = new javax.swing.JButton();
+        browseImageDestPathButton = new javax.swing.JButton();
         jLabel32 = new javax.swing.JLabel();
-        jLabel7 = new javax.swing.JLabel();
-        layoutFileLabel = new javax.swing.JLabel();
         expSettingsFileLabel = new javax.swing.JLabel();
-        rootDirLabel = new javax.swing.JLabel();
         jLabel2 = new javax.swing.JLabel();
+        layoutFileLabel = new javax.swing.JLabel();
+        jLabel7 = new javax.swing.JLabel();
+        rootDirLabel = new javax.swing.JLabel();
+        processProgressBar = new javax.swing.JProgressBar();
+        acquireButton = new javax.swing.JButton();
+        cancelThreadButton = new javax.swing.JButton();
         statusPanel = new javax.swing.JPanel();
         stagePosXLabel = new javax.swing.JLabel();
         stagePosYLabel = new javax.swing.JLabel();
@@ -1979,8 +2034,8 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("AutoImage");
-        setMinimumSize(new java.awt.Dimension(1024, 700));
-        setSize(new java.awt.Dimension(0, 0));
+        setBounds(new java.awt.Rectangle(0, 22, 1024, 710));
+        setMinimumSize(new java.awt.Dimension(1024, 710));
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowOpened(java.awt.event.WindowEvent evt) {
                 formWindowOpened(evt);
@@ -1996,25 +2051,8 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         settingsPanel.setRequestFocusEnabled(false);
         settingsPanel.setSize(new java.awt.Dimension(0, 649));
 
-        acquireButton.setText("Acquire");
-        acquireButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                acquireButtonActionPerformed(evt);
-            }
-        });
-
-        jLabel8.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel8.setText("Experiment:");
-
-        experimentTextField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        experimentTextField.setText("jTextField1");
-        experimentTextField.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusLost(java.awt.event.FocusEvent evt) {
-                experimentTextFieldFocusLost(evt);
-            }
-        });
-
-        controlTabbedPane.setPreferredSize(new java.awt.Dimension(410, 540));
+        sequenceTabbedPane.setBorder(javax.swing.BorderFactory.createTitledBorder(null, "Sequence:", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Lucida Grande", 0, 12))); // NOI18N
+        sequenceTabbedPane.setPreferredSize(new java.awt.Dimension(410, 540));
 
         areaTable.setModel(new AreaTableModel(null));
         areaTable.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
@@ -2084,19 +2122,10 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         totalAreasLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         totalAreasLabel.setText("0");
 
-        acqSelector_Areas.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        acqSelector_Areas.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-        acqSelector_Areas.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                acqSelector_AreasActionPerformed(evt);
-            }
-        });
-
-        jLabel35.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel35.setText("Acquisition Setting:");
-
+        jLabel37.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel37.setText("Tiles: ");
 
+        totalTilesLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         totalTilesLabel.setText("0");
 
         org.jdesktop.layout.GroupLayout jPanel2Layout = new org.jdesktop.layout.GroupLayout(jPanel2);
@@ -2105,41 +2134,31 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel2Layout.createSequentialGroup()
                 .add(6, 6, 6)
-                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jPanel2Layout.createSequentialGroup()
-                        .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                            .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel2Layout.createSequentialGroup()
-                                .add(jLabel3)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(totalAreasLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 48, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                                .add(jLabel37)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(totalTilesLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                            .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 349, Short.MAX_VALUE))
+                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
+                    .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel2Layout.createSequentialGroup()
+                        .add(jLabel3)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
-                                .add(org.jdesktop.layout.GroupLayout.LEADING, areaDownButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(mergeAreasButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(org.jdesktop.layout.GroupLayout.LEADING, areaUpButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                            .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
-                                .add(org.jdesktop.layout.GroupLayout.LEADING, removeAreaButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(org.jdesktop.layout.GroupLayout.LEADING, newAreaButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))))
-                    .add(jPanel2Layout.createSequentialGroup()
-                        .add(jLabel35)
+                        .add(totalAreasLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 48, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                        .add(acqSelector_Areas, 0, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+                        .add(jLabel37)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(totalTilesLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 337, Short.MAX_VALUE))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
+                        .add(org.jdesktop.layout.GroupLayout.LEADING, areaDownButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(mergeAreasButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(org.jdesktop.layout.GroupLayout.LEADING, areaUpButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
+                        .add(org.jdesktop.layout.GroupLayout.LEADING, removeAreaButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(org.jdesktop.layout.GroupLayout.LEADING, newAreaButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
                 .addContainerGap())
         );
         jPanel2Layout.setVerticalGroup(
             jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel2Layout.createSequentialGroup()
-                .add(6, 6, 6)
-                .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(acqSelector_Areas, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(jLabel35))
-                .add(1, 1, 1)
+                .addContainerGap()
                 .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel3)
                     .add(totalAreasLabel)
@@ -2157,19 +2176,40 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                         .add(areaDownButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(mergeAreasButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                    .add(jScrollPane2, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 432, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(22, 22, 22))
+                    .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 315, Short.MAX_VALUE))
+                .add(3, 3, 3))
         );
 
-        controlTabbedPane.addTab("Areas", jPanel2);
+        sequenceTabbedPane.addTab("Areas", jPanel2);
 
-        acqSettingPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Setting: XXX"));
+        timelapseCheckBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        timelapseCheckBox.setText("Time-lapse");
+        timelapseCheckBox.addItemListener(new java.awt.event.ItemListener() {
+            public void itemStateChanged(java.awt.event.ItemEvent evt) {
+                timelapseCheckBoxItemStateChanged(evt);
+            }
+        });
 
-        jLabel5.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel5.setText("Tile Size:");
+        clusterYField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        clusterYField.setText("jTextField2");
+        clusterYField.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusLost(java.awt.event.FocusEvent evt) {
+                clusterYFieldFocusLost(evt);
+            }
+        });
+        clusterYField.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                clusterYFieldActionPerformed(evt);
+            }
+        });
 
-        tileSizeLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        tileSizeLabel.setText("jLabel6");
+        tilingDirComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        tilingDirComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
+        tilingDirComboBox.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                tilingDirComboBoxActionPerformed(evt);
+            }
+        });
 
         jLabel1.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel1.setText("Objective:");
@@ -2182,14 +2222,82 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             }
         });
 
-        jLabel12.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel12.setText("Pixel size:");
+        jLabel4.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel4.setText("Tile overlap (%):");
+
+        jLabel5.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel5.setText("Tile:");
+
+        tileSizeLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        tileSizeLabel.setText("jLabel6");
+
+        zStackCheckBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        zStackCheckBox.setText("Z-Stack");
+        zStackCheckBox.addItemListener(new java.awt.event.ItemListener() {
+            public void itemStateChanged(java.awt.event.ItemEvent evt) {
+                zStackCheckBoxItemStateChanged(evt);
+            }
+        });
+        zStackCheckBox.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                zStackCheckBoxActionPerformed(evt);
+            }
+        });
+
+        jLabel6.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel6.setText("Order:");
 
         pixelSizeLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         pixelSizeLabel.setText("jLabel13");
 
-        jLabel10.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel10.setText("Binning:");
+        jLabel34.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel34.setText("Direction:");
+
+        clusterLabel2.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        clusterLabel2.setText("Tiles");
+
+        maxSitesField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        maxSitesField.setText("jTextField1");
+        maxSitesField.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusLost(java.awt.event.FocusEvent evt) {
+                maxSitesFieldFocusLost(evt);
+            }
+        });
+        maxSitesField.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                maxSitesFieldActionPerformed(evt);
+            }
+        });
+
+        maxSitesLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        maxSitesLabel.setText("Site/Cluster #:");
+
+        tileOverlapField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        tileOverlapField.setText("jTextField1");
+        tileOverlapField.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusLost(java.awt.event.FocusEvent evt) {
+                tileOverlapFieldFocusLost(evt);
+            }
+        });
+        tileOverlapField.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                tileOverlapFieldActionPerformed(evt);
+            }
+        });
+
+        jLabel33.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel33.setText("Tiling:");
+
+        autofocusCheckBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        autofocusCheckBox.setText("Autofocus");
+        autofocusCheckBox.addItemListener(new java.awt.event.ItemListener() {
+            public void itemStateChanged(java.awt.event.ItemEvent evt) {
+                autofocusCheckBoxItemStateChanged(evt);
+            }
+        });
+
+        jLabel12.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel12.setText("Pixel:");
 
         binningComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
         binningComboBox.addActionListener(new java.awt.event.ActionListener() {
@@ -2198,11 +2306,8 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             }
         });
 
-        jLabel33.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel33.setText("Tiling:");
-
-        tilingFileLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        tilingFileLabel.setText("SiteCoords");
+        jLabel10.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel10.setText("Binning:");
 
         clusterCheckBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         clusterCheckBox.setText("Cluster:");
@@ -2212,76 +2317,190 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             }
         });
 
-        clusterXField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        clusterXField.setText("jTextField2");
-        clusterXField.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                clusterXFieldActionPerformed(evt);
-            }
-        });
-        clusterXField.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusLost(java.awt.event.FocusEvent evt) {
-                clusterXFieldFocusLost(evt);
-            }
-        });
-
-        clusterLabel1.setText("x");
-
-        clusterYField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        clusterYField.setText("jTextField2");
-        clusterYField.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                clusterYFieldActionPerformed(evt);
-            }
-        });
-        clusterYField.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusLost(java.awt.event.FocusEvent evt) {
-                clusterYFieldFocusLost(evt);
-            }
-        });
-
-        clusterLabel2.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        clusterLabel2.setText("Tiles");
-
-        maxSitesField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        maxSitesField.setText("jTextField1");
-        maxSitesField.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                maxSitesFieldActionPerformed(evt);
-            }
-        });
-        maxSitesField.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusLost(java.awt.event.FocusEvent evt) {
-                maxSitesFieldFocusLost(evt);
-            }
-        });
-
-        jLabel4.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel4.setText("Tile Overlap (%):");
-
-        maxSitesLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        maxSitesLabel.setText("Site/Cluster #:");
-
-        tileOverlapField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        tileOverlapField.setText("jTextField1");
-        tileOverlapField.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                tileOverlapFieldActionPerformed(evt);
-            }
-        });
-        tileOverlapField.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusLost(java.awt.event.FocusEvent evt) {
-                tileOverlapFieldFocusLost(evt);
-            }
-        });
-
         insideOnlyCheckBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        insideOnlyCheckBox.setText("Inside Only");
+        insideOnlyCheckBox.setText("Inside only");
         insideOnlyCheckBox.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 insideOnlyCheckBoxActionPerformed(evt);
             }
         });
+
+        acqOrderList.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        acqOrderList.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                acqOrderListActionPerformed(evt);
+            }
+        });
+
+        autofocusButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/wrench_orange.png"))); // NOI18N
+        autofocusButton.setToolTipText("Autofocu Configuration");
+        autofocusButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                autofocusButtonActionPerformed(evt);
+            }
+        });
+
+        tilingModeComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        tilingModeComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
+        tilingModeComboBox.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                tilingModeComboBoxActionPerformed(evt);
+            }
+        });
+
+        clusterXField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        clusterXField.setText("jTextField2");
+        clusterXField.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusLost(java.awt.event.FocusEvent evt) {
+                clusterXFieldFocusLost(evt);
+            }
+        });
+        clusterXField.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                clusterXFieldActionPerformed(evt);
+            }
+        });
+
+        siteOverlapCheckBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        siteOverlapCheckBox.setText("Overlapping sites");
+        siteOverlapCheckBox.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                siteOverlapCheckBoxActionPerformed(evt);
+            }
+        });
+
+        clusterLabel1.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        clusterLabel1.setText("x");
+
+        org.jdesktop.layout.GroupLayout jPanel10Layout = new org.jdesktop.layout.GroupLayout(jPanel10);
+        jPanel10.setLayout(jPanel10Layout);
+        jPanel10Layout.setHorizontalGroup(
+            jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(jPanel10Layout.createSequentialGroup()
+                .add(3, 3, 3)
+                .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel10Layout.createSequentialGroup()
+                        .add(autofocusCheckBox)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(autofocusButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(35, 35, 35)
+                        .add(zStackCheckBox)
+                        .add(26, 26, 26)
+                        .add(timelapseCheckBox)
+                        .add(15, 15, 15))
+                    .add(jPanel10Layout.createSequentialGroup()
+                        .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(jPanel10Layout.createSequentialGroup()
+                                .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                                    .add(jPanel10Layout.createSequentialGroup()
+                                        .add(jLabel12)
+                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                        .add(pixelSizeLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 102, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                                    .add(jPanel10Layout.createSequentialGroup()
+                                        .add(jLabel33)
+                                        .add(2, 2, 2)
+                                        .add(tilingModeComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 111, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jLabel5)
+                                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jLabel34))
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                                    .add(tileSizeLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 144, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                    .add(jPanel10Layout.createSequentialGroup()
+                                        .add(tilingDirComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 61, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                        .add(0, 0, 0)
+                                        .add(insideOnlyCheckBox))))
+                            .add(jPanel10Layout.createSequentialGroup()
+                                .add(jLabel6)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(acqOrderList, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 216, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                            .add(jPanel10Layout.createSequentialGroup()
+                                .add(jLabel1)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(objectiveComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 189, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(jLabel10)
+                                .add(0, 0, 0)
+                                .add(binningComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 59, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                            .add(jPanel10Layout.createSequentialGroup()
+                                .add(jLabel4)
+                                .add(2, 2, 2)
+                                .add(tileOverlapField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 49, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .add(29, 29, 29)
+                                .add(maxSitesLabel)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(maxSitesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 58, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                            .add(jPanel10Layout.createSequentialGroup()
+                                .add(clusterCheckBox)
+                                .add(0, 0, 0)
+                                .add(clusterXField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 48, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .add(1, 1, 1)
+                                .add(clusterLabel1)
+                                .add(0, 0, 0)
+                                .add(clusterYField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 18, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .add(0, 0, 0)
+                                .add(clusterLabel2)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
+                                .add(siteOverlapCheckBox)))
+                        .add(9, 9, 9))))
+        );
+
+        jPanel10Layout.linkSize(new java.awt.Component[] {clusterXField, clusterYField}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
+
+        jPanel10Layout.setVerticalGroup(
+            jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(jPanel10Layout.createSequentialGroup()
+                .add(0, 0, 0)
+                .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel1)
+                    .add(objectiveComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(binningComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(jLabel10, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 15, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .add(2, 2, 2)
+                .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel12)
+                    .add(pixelSizeLabel)
+                    .add(jLabel5)
+                    .add(tileSizeLabel))
+                .add(6, 6, 6)
+                .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
+                    .add(jLabel33)
+                    .add(tilingModeComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(jLabel34)
+                    .add(tilingDirComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(insideOnlyCheckBox))
+                .add(3, 3, 3)
+                .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(jPanel10Layout.createSequentialGroup()
+                        .add(1, 1, 1)
+                        .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                            .add(clusterLabel2)
+                            .add(siteOverlapCheckBox)))
+                    .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                        .add(clusterXField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(clusterCheckBox))
+                    .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                        .add(clusterYField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(clusterLabel1)))
+                .add(3, 3, 3)
+                .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel4)
+                    .add(tileOverlapField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(maxSitesLabel)
+                    .add(maxSitesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .add(6, 6, 6)
+                .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel6)
+                    .add(acqOrderList, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .add(0, 0, 0)
+                .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
+                    .add(autofocusCheckBox)
+                    .add(autofocusButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(zStackCheckBox)
+                    .add(timelapseCheckBox))
+                .add(0, 0, 0))
+        );
 
         acqModePane.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         acqModePane.setMinimumSize(new java.awt.Dimension(72, 300));
@@ -2325,7 +2544,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             }
         });
 
-        snapButton.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
         snapButton.setText("Snap");
         snapButton.setToolTipText("Snap Image(s) using selected Channel Configurations ");
         snapButton.addActionListener(new java.awt.event.ActionListener() {
@@ -2334,7 +2552,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             }
         });
 
-        liveButton.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
         liveButton.setText("Live");
         liveButton.setToolTipText("Live Acquisition using selected Channel Configuration");
         liveButton.addActionListener(new java.awt.event.ActionListener() {
@@ -2353,12 +2570,12 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                         .add(addChannelButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .add(2, 2, 2)
                         .add(removeChannelButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                    .add(snapButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
+                    .add(snapButton, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .add(jPanel6Layout.createSequentialGroup()
                         .add(channelUpButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .add(2, 2, 2)
                         .add(channelDownButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                    .add(liveButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE))
+                    .add(liveButton, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .add(0, 0, 0))
         );
         jPanel6Layout.setVerticalGroup(
@@ -2373,10 +2590,10 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                     .add(channelDownButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(channelUpButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .add(2, 2, 2)
-                .add(snapButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 21, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(snapButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .add(2, 2, 2)
-                .add(liveButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 18, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .add(0, 0, 0))
+                .add(liveButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         jPanel6Layout.linkSize(new java.awt.Component[] {liveButton, snapButton}, org.jdesktop.layout.GroupLayout.VERTICAL);
@@ -2387,19 +2604,19 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel4Layout.createSequentialGroup()
                 .add(6, 6, 6)
-                .add(jScrollPane3, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 277, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jPanel6, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .add(26, 26, 26))
+                .add(jScrollPane3, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 249, Short.MAX_VALUE)
+                .add(6, 6, 6)
+                .add(jPanel6, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(6, 6, 6))
         );
         jPanel4Layout.setVerticalGroup(
             jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel4Layout.createSequentialGroup()
-                .add(6, 6, 6)
-                .add(jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                    .add(jPanel6, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .add(jScrollPane3, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE))
-                .add(6, 6, 6))
+                .add(3, 3, 3)
+                .add(jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(jScrollPane3, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
+                    .add(jPanel6, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 92, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .add(3, 3, 3))
         );
 
         acqModePane.addTab("Channels", jPanel4);
@@ -2470,15 +2687,19 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 
         jLabel24.setFont(new java.awt.Font("Symbol", 0, 12)); // NOI18N
         jLabel24.setText("um");
+        jLabel24.setMaximumSize(new java.awt.Dimension(18, 15));
+        jLabel24.setMinimumSize(new java.awt.Dimension(18, 15));
 
         jLabel25.setFont(new java.awt.Font("Symbol", 0, 12)); // NOI18N
         jLabel25.setText("um");
+        jLabel25.setMaximumSize(new java.awt.Dimension(18, 15));
+        jLabel25.setMinimumSize(new java.awt.Dimension(18, 15));
+        jLabel25.setPreferredSize(new java.awt.Dimension(18, 15));
 
         jLabel26.setFont(new java.awt.Font("Symbol", 0, 12)); // NOI18N
         jLabel26.setText("um");
-
-        jLabel27.setFont(new java.awt.Font("Symbol", 0, 12)); // NOI18N
-        jLabel27.setText("um");
+        jLabel26.setMaximumSize(new java.awt.Dimension(18, 15));
+        jLabel26.setMinimumSize(new java.awt.Dimension(18, 15));
 
         reverseButton.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         reverseButton.setText("Reverse");
@@ -2496,68 +2717,68 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 .add(6, 6, 6)
                 .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(jPanel1Layout.createSequentialGroup()
-                        .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(jPanel1Layout.createSequentialGroup()
-                                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                                    .add(jLabel20)
-                                    .add(jLabel19))
-                                .add(0, 0, 0)
-                                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                                    .add(zStackBeginField, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 56, Short.MAX_VALUE)
-                                    .add(zStackEndField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE))
-                                .add(0, 0, 0)
-                                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                                    .add(jLabel25, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 26, Short.MAX_VALUE)
-                                    .add(jLabel26, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+                        .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
                             .add(jPanel1Layout.createSequentialGroup()
                                 .add(1, 1, 1)
-                                .add(reverseButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 101, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                                .add(reverseButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 101, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                            .add(jPanel1Layout.createSequentialGroup()
+                                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                                    .add(jPanel1Layout.createSequentialGroup()
+                                        .add(9, 9, 9)
+                                        .add(jLabel20))
+                                    .add(jLabel19))
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                                    .add(zStackBeginField)
+                                    .add(zStackEndField))))
+                        .add(6, 6, 6)
                         .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                            .add(org.jdesktop.layout.GroupLayout.TRAILING, jLabel23)
                             .add(jPanel1Layout.createSequentialGroup()
-                                .add(40, 40, 40)
-                                .add(jLabel21))
+                                .add(jLabel23)
+                                .add(17, 17, 17)
+                                .add(zStackTotalDistLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                             .add(jPanel1Layout.createSequentialGroup()
+                                .add(jLabel25, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .add(jLabel21)
+                                .add(6, 6, 6)
+                                .add(zStackSlicesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 77, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                            .add(jPanel1Layout.createSequentialGroup()
+                                .add(jLabel26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                 .add(18, 18, 18)
-                                .add(jLabel22)))
-                        .add(0, 0, 0)
-                        .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                            .add(zStackTotalDistLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 60, Short.MAX_VALUE)
-                            .add(zStackSlicesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE)
-                            .add(zStackStepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE))
-                        .add(0, 0, 0)
-                        .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                            .add(jLabel24, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 26, Short.MAX_VALUE)
-                            .add(jLabel27, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+                                .add(jLabel22)
+                                .add(6, 6, 6)
+                                .add(zStackStepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 77, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                        .add(6, 6, 6)
+                        .add(jLabel24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                     .add(zStackCenteredCheckBox))
-                .addContainerGap())
+                .addContainerGap(29, Short.MAX_VALUE))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel1Layout.createSequentialGroup()
                 .add(0, 0, 0)
                 .add(zStackCenteredCheckBox)
-                .add(0, 0, 0)
                 .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(zStackBeginField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(jLabel25, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(jLabel19)
                     .add(jLabel21, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 16, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(zStackSlicesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(zStackBeginField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(jLabel25, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 17, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(0, 0, 0)
+                    .add(zStackSlicesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .add(3, 3, 3)
                 .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(zStackStepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(zStackEndField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(jLabel26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(jLabel20)
                     .add(jLabel22)
-                    .add(zStackEndField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(jLabel24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 17, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(jLabel26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 17, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(0, 0, 0)
+                    .add(zStackStepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(jLabel24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .add(3, 3, 3)
                 .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel23)
                     .add(zStackTotalDistLabel)
-                    .add(reverseButton)
-                    .add(jLabel27, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 17, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                    .add(reverseButton))
+                .add(143, 143, 143))
         );
 
         acqModePane.addTab("Z-Stack", jPanel1);
@@ -2666,7 +2887,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                                 .add(intSecField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 40, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                 .add(3, 3, 3)
                                 .add(jLabel16)))
-                        .addContainerGap(69, Short.MAX_VALUE))
+                        .addContainerGap())
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, durationText, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
         );
         jPanel3Layout.setVerticalGroup(
@@ -2688,366 +2909,39 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 .add(jPanel3Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(jPanel3Layout.createSequentialGroup()
                         .add(jLabel18)
-                        .add(0, 15, Short.MAX_VALUE))
+                        .add(0, 0, Short.MAX_VALUE))
                     .add(durationText, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addContainerGap())
         );
 
         acqModePane.addTab("Time-lapse", jPanel3);
 
-        jLabel6.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel6.setText("Order:");
-
-        acqOrderList.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        acqOrderList.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                acqOrderListActionPerformed(evt);
-            }
-        });
-
-        autofocusCheckBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        autofocusCheckBox.setText("Autofocus");
-        autofocusCheckBox.addItemListener(new java.awt.event.ItemListener() {
-            public void itemStateChanged(java.awt.event.ItemEvent evt) {
-                autofocusCheckBoxItemStateChanged(evt);
-            }
-        });
-
-        zStackCheckBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        zStackCheckBox.setText("Z-Stack");
-        zStackCheckBox.addItemListener(new java.awt.event.ItemListener() {
-            public void itemStateChanged(java.awt.event.ItemEvent evt) {
-                zStackCheckBoxItemStateChanged(evt);
-            }
-        });
-        zStackCheckBox.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                zStackCheckBoxActionPerformed(evt);
-            }
-        });
-
-        timelapseCheckBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        timelapseCheckBox.setText("Time-lapse");
-        timelapseCheckBox.addItemListener(new java.awt.event.ItemListener() {
-            public void itemStateChanged(java.awt.event.ItemEvent evt) {
-                timelapseCheckBoxItemStateChanged(evt);
-            }
-        });
-
-        siteCoordFileButton.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        siteCoordFileButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/openDoc.png"))); // NOI18N
-        siteCoordFileButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                siteCoordFileButtonActionPerformed(evt);
-            }
-        });
-
-        clusterOverlapCheckBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        clusterOverlapCheckBox.setText("Overlapping Clusters");
-        clusterOverlapCheckBox.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                clusterOverlapCheckBoxActionPerformed(evt);
-            }
-        });
-
-        jLabel34.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel34.setText("Direction:");
-
-        tilingDirComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        tilingDirComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-        tilingDirComboBox.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                tilingDirComboBoxActionPerformed(evt);
-            }
-        });
-
-        tilingModeComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        tilingModeComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-        tilingModeComboBox.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                tilingModeComboBoxActionPerformed(evt);
-            }
-        });
-
-        autofocusButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/wrench_orange.png"))); // NOI18N
-        autofocusButton.setToolTipText("Autofocu Configuration");
-        autofocusButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                autofocusButtonActionPerformed(evt);
-            }
-        });
-
-        org.jdesktop.layout.GroupLayout acqSettingPanelLayout = new org.jdesktop.layout.GroupLayout(acqSettingPanel);
-        acqSettingPanel.setLayout(acqSettingPanelLayout);
-        acqSettingPanelLayout.setHorizontalGroup(
-            acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(acqSettingPanelLayout.createSequentialGroup()
-                .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(acqSettingPanelLayout.createSequentialGroup()
-                        .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(acqSettingPanelLayout.createSequentialGroup()
-                                .add(clusterCheckBox)
-                                .add(0, 0, 0)
-                                .add(clusterXField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 48, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(0, 0, 0)
-                                .add(clusterLabel1)
-                                .add(0, 0, 0)
-                                .add(clusterYField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 18, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(0, 0, 0)
-                                .add(clusterLabel2)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                                .add(clusterOverlapCheckBox))
-                            .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                                .add(tileSizeLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 144, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(jSeparator2, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 367, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(insideOnlyCheckBox))
-                            .add(acqSettingPanelLayout.createSequentialGroup()
-                                .addContainerGap()
-                                .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                                    .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                                        .add(acqSettingPanelLayout.createSequentialGroup()
-                                            .add(jLabel12)
-                                            .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                            .add(pixelSizeLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 77, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                            .add(18, 18, 18)
-                                            .add(jLabel5))
-                                        .add(org.jdesktop.layout.GroupLayout.TRAILING, acqSettingPanelLayout.createSequentialGroup()
-                                            .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                                                .add(org.jdesktop.layout.GroupLayout.TRAILING, tilingFileLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 201, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                                .add(acqSettingPanelLayout.createSequentialGroup()
-                                                    .add(jLabel33)
-                                                    .add(2, 2, 2)
-                                                    .add(tilingModeComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 111, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                                    .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                                    .add(jLabel34)))
-                                            .add(0, 0, 0)
-                                            .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                                                .add(tilingDirComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 61, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                                .add(siteCoordFileButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))))
-                                    .add(acqSettingPanelLayout.createSequentialGroup()
-                                        .add(jLabel4)
-                                        .add(2, 2, 2)
-                                        .add(tileOverlapField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 49, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                        .add(29, 29, 29)
-                                        .add(maxSitesLabel)
-                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                        .add(maxSitesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 58, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                                    .add(acqSettingPanelLayout.createSequentialGroup()
-                                        .add(jLabel1)
-                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                        .add(objectiveComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 189, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                        .add(jLabel10)
-                                        .add(0, 0, 0)
-                                        .add(binningComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 59, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                                    .add(acqSettingPanelLayout.createSequentialGroup()
-                                        .add(jLabel6)
-                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                        .add(acqOrderList, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 216, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))))
-                            .add(jSeparator3, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 366, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                        .add(0, 0, Short.MAX_VALUE))
-                    .add(acqModePane, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
-                    .add(org.jdesktop.layout.GroupLayout.TRAILING, acqSettingPanelLayout.createSequentialGroup()
-                        .add(autofocusCheckBox)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(autofocusButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .add(35, 35, 35)
-                        .add(zStackCheckBox)
-                        .add(26, 26, 26)
-                        .add(timelapseCheckBox)
-                        .add(17, 17, 17)))
-                .addContainerGap())
-        );
-
-        acqSettingPanelLayout.linkSize(new java.awt.Component[] {clusterXField, clusterYField}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
-
-        acqSettingPanelLayout.setVerticalGroup(
-            acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(acqSettingPanelLayout.createSequentialGroup()
-                .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel1)
-                    .add(objectiveComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(binningComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(jLabel10, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 15, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(2, 2, 2)
-                .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel12)
-                    .add(pixelSizeLabel)
-                    .add(jLabel5)
-                    .add(tileSizeLabel))
-                .add(0, 0, 0)
-                .add(jSeparator2, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .add(0, 0, 0)
-                .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
-                    .add(jLabel33)
-                    .add(tilingModeComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(jLabel34)
-                    .add(tilingDirComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(insideOnlyCheckBox))
-                .add(2, 2, 2)
-                .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
-                    .add(siteCoordFileButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(tilingFileLabel))
-                .add(2, 2, 2)
-                .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(acqSettingPanelLayout.createSequentialGroup()
-                        .add(1, 1, 1)
-                        .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                            .add(clusterLabel2)
-                            .add(clusterOverlapCheckBox)))
-                    .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                        .add(clusterXField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .add(clusterCheckBox))
-                    .add(acqSettingPanelLayout.createSequentialGroup()
-                        .add(5, 5, 5)
-                        .add(clusterLabel1))
-                    .add(clusterYField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(4, 4, 4)
-                .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel4)
-                    .add(tileOverlapField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(maxSitesLabel)
-                    .add(maxSitesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(0, 0, 0)
-                .add(jSeparator3, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 10, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .add(0, 0, 0)
-                .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel6)
-                    .add(acqOrderList, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(0, 0, 0)
-                .add(acqSettingPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
-                    .add(autofocusCheckBox)
-                    .add(autofocusButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(zStackCheckBox)
-                    .add(timelapseCheckBox))
-                .add(0, 0, 0)
-                .add(acqModePane, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 145, Short.MAX_VALUE)
-                .add(0, 0, 0))
-        );
-
-        addAcqSettingButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/add2.png"))); // NOI18N
-        addAcqSettingButton.setToolTipText("Add new Acquisition Setting");
-        addAcqSettingButton.setMaximumSize(new java.awt.Dimension(24, 24));
-        addAcqSettingButton.setMinimumSize(new java.awt.Dimension(24, 24));
-        addAcqSettingButton.setPreferredSize(new java.awt.Dimension(24, 24));
-        addAcqSettingButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                addAcqSettingButtonActionPerformed(evt);
-            }
-        });
-
-        deleteAcqSettingButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/delete.png"))); // NOI18N
-        deleteAcqSettingButton.setToolTipText("Remove Acquisition Setting");
-        deleteAcqSettingButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                deleteAcqSettingButtonActionPerformed(evt);
-            }
-        });
-
-        acqSettingDownButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/Down.png"))); // NOI18N
-        acqSettingDownButton.setToolTipText("Move Acquisition Setting down");
-        acqSettingDownButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                acqSettingDownButtonActionPerformed(evt);
-            }
-        });
-
-        acqSettingTable.setModel(new AcqSettingTableModel(null));
-        jScrollPane7.setViewportView(acqSettingTable);
-
-        acqSettingUpButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/Up.png"))); // NOI18N
-        acqSettingUpButton.setToolTipText("Move Acquisition Setting up");
-        acqSettingUpButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                acqSettingUpButtonActionPerformed(evt);
-            }
-        });
-
-        loadAcqSettingButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/openDoc.png"))); // NOI18N
-        loadAcqSettingButton.setToolTipText("Load Acquisition Setting");
-        loadAcqSettingButton.setMaximumSize(new java.awt.Dimension(24, 24));
-        loadAcqSettingButton.setMinimumSize(new java.awt.Dimension(24, 24));
-        loadAcqSettingButton.setPreferredSize(new java.awt.Dimension(24, 24));
-        loadAcqSettingButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                loadAcqSettingButtonActionPerformed(evt);
-            }
-        });
-
-        saveAcqSettingButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/saveDoc.png"))); // NOI18N
-        saveAcqSettingButton.setToolTipText("Save Acquisition Setting");
-        saveAcqSettingButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                saveAcqSettingButtonActionPerformed(evt);
-            }
-        });
-
         org.jdesktop.layout.GroupLayout jPanel5Layout = new org.jdesktop.layout.GroupLayout(jPanel5);
         jPanel5.setLayout(jPanel5Layout);
         jPanel5Layout.setHorizontalGroup(
             jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel5Layout.createSequentialGroup()
-                .add(6, 6, 6)
-                .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                    .add(acqSettingPanel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
+                .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(jPanel10, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(jPanel5Layout.createSequentialGroup()
-                        .add(jScrollPane7, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 324, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .add(6, 6, 6)
-                        .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(jPanel5Layout.createSequentialGroup()
-                                .add(addAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(3, 3, 3)
-                                .add(deleteAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                            .add(jPanel5Layout.createSequentialGroup()
-                                .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                                    .add(acqSettingUpButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                    .add(loadAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                                .add(3, 3, 3)
-                                .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                                    .add(saveAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                    .add(acqSettingDownButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))))))
-                .addContainerGap())
+                        .add(acqModePane, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 363, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         jPanel5Layout.setVerticalGroup(
             jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel5Layout.createSequentialGroup()
+            .add(jPanel5Layout.createSequentialGroup()
                 .add(0, 0, 0)
-                .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                    .add(jPanel5Layout.createSequentialGroup()
-                        .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(jPanel5Layout.createSequentialGroup()
-                                .add(deleteAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(3, 3, 3)
-                                .add(saveAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                            .add(jPanel5Layout.createSequentialGroup()
-                                .add(addAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(3, 3, 3)
-                                .add(loadAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
-                        .add(3, 3, 3)
-                        .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(acqSettingUpButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(acqSettingDownButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
-                    .add(jScrollPane7, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 74, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(acqSettingPanel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .add(4, 4, 4))
+                .add(jPanel10, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(6, 6, 6)
+                .add(acqModePane, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 140, Short.MAX_VALUE)
+                .add(6, 6, 6))
         );
 
-        controlTabbedPane.addTab("Acq Settings", jPanel5);
-
-        jLabel11.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel11.setText("Acquisition Setting:");
+        sequenceTabbedPane.addTab("Acq Settings", jPanel5);
 
         jLabel28.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel28.setText("Image Processors/Analyzers:");
-
-        acqSelector_Processors.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        acqSelector_Processors.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-        acqSelector_Processors.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                acqSelector_ProcessorsActionPerformed(evt);
-            }
-        });
 
         jScrollPane4.setViewportView(processorTreeView);
 
@@ -3223,8 +3117,9 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 .add(6, 6, 6)
                 .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel9Layout.createSequentialGroup()
-                        .add(jScrollPane4, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 321, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .add(6, 6, 6)
+                        .add(0, 0, Short.MAX_VALUE)
+                        .add(jScrollPane4, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 315, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(3, 3, 3)
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
                             .add(jPanel9Layout.createSequentialGroup()
                                 .add(addFrameFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
@@ -3257,26 +3152,17 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                             .add(addImageStorageButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                         .add(6, 6, 6))
                     .add(jPanel9Layout.createSequentialGroup()
-                        .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(jLabel28)
-                            .add(jPanel9Layout.createSequentialGroup()
-                                .add(jLabel11)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                                .add(acqSelector_Processors, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 254, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                        .add(jLabel28)
                         .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
         );
         jPanel9Layout.setVerticalGroup(
             jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel9Layout.createSequentialGroup()
-                .add(6, 6, 6)
-                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel11)
-                    .add(acqSelector_Processors, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .addContainerGap()
                 .add(jLabel28)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jScrollPane4, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 422, Short.MAX_VALUE)
+                    .add(jScrollPane4, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 312, Short.MAX_VALUE)
                     .add(jPanel9Layout.createSequentialGroup()
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(addZFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
@@ -3311,7 +3197,257 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 .addContainerGap())
         );
 
-        controlTabbedPane.addTab("Process", jPanel9);
+        sequenceTabbedPane.addTab("Process", jPanel9);
+
+        sequenceListPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(null, "Acquisition Sequences", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Lucida Grande", 0, 12))); // NOI18N
+
+        acqSettingUpButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/Up.png"))); // NOI18N
+        acqSettingUpButton.setToolTipText("Move Acquisition Setting up");
+        acqSettingUpButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                acqSettingUpButtonActionPerformed(evt);
+            }
+        });
+
+        acqSettingDownButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/Down.png"))); // NOI18N
+        acqSettingDownButton.setToolTipText("Move Acquisition Setting down");
+        acqSettingDownButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                acqSettingDownButtonActionPerformed(evt);
+            }
+        });
+
+        deleteAcqSettingButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/delete.png"))); // NOI18N
+        deleteAcqSettingButton.setToolTipText("Remove Acquisition Setting");
+        deleteAcqSettingButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                deleteAcqSettingButtonActionPerformed(evt);
+            }
+        });
+
+        acqSettingTable.setModel(new AcqSettingTableModel(null));
+        jScrollPane7.setViewportView(acqSettingTable);
+
+        saveAcqSettingButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/saveDoc.png"))); // NOI18N
+        saveAcqSettingButton.setToolTipText("Save Acquisition Setting");
+        saveAcqSettingButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                saveAcqSettingButtonActionPerformed(evt);
+            }
+        });
+
+        addAcqSettingButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/add2.png"))); // NOI18N
+        addAcqSettingButton.setToolTipText("Add new Acquisition Setting");
+        addAcqSettingButton.setMaximumSize(new java.awt.Dimension(24, 24));
+        addAcqSettingButton.setMinimumSize(new java.awt.Dimension(24, 24));
+        addAcqSettingButton.setPreferredSize(new java.awt.Dimension(24, 24));
+        addAcqSettingButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                addAcqSettingButtonActionPerformed(evt);
+            }
+        });
+
+        loadAcqSettingButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/openDoc.png"))); // NOI18N
+        loadAcqSettingButton.setToolTipText("Load Acquisition Setting");
+        loadAcqSettingButton.setMaximumSize(new java.awt.Dimension(24, 24));
+        loadAcqSettingButton.setMinimumSize(new java.awt.Dimension(24, 24));
+        loadAcqSettingButton.setPreferredSize(new java.awt.Dimension(24, 24));
+        loadAcqSettingButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                loadAcqSettingButtonActionPerformed(evt);
+            }
+        });
+
+        org.jdesktop.layout.GroupLayout sequenceListPanelLayout = new org.jdesktop.layout.GroupLayout(sequenceListPanel);
+        sequenceListPanel.setLayout(sequenceListPanelLayout);
+        sequenceListPanelLayout.setHorizontalGroup(
+            sequenceListPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(sequenceListPanelLayout.createSequentialGroup()
+                .add(3, 3, 3)
+                .add(jScrollPane7, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 337, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(6, 6, 6)
+                .add(sequenceListPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(addAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(acqSettingUpButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(loadAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .add(2, 2, 2)
+                .add(sequenceListPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(deleteAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(saveAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(acqSettingDownButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .add(6, 6, 6))
+        );
+        sequenceListPanelLayout.setVerticalGroup(
+            sequenceListPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(sequenceListPanelLayout.createSequentialGroup()
+                .add(0, 0, 0)
+                .add(sequenceListPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                    .add(sequenceListPanelLayout.createSequentialGroup()
+                        .add(jScrollPane7, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
+                        .add(3, 3, 3))
+                    .add(sequenceListPanelLayout.createSequentialGroup()
+                        .add(sequenceListPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(deleteAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(addAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                        .add(2, 2, 2)
+                        .add(sequenceListPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(saveAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(loadAcqSettingButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                        .add(2, 2, 2)
+                        .add(sequenceListPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(acqSettingUpButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(acqSettingDownButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                        .add(4, 4, 4))))
+        );
+
+        jPanel11.setBorder(javax.swing.BorderFactory.createTitledBorder(null, "Experiment", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Lucida Grande", 0, 12))); // NOI18N
+
+        jLabel8.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel8.setText("Experiment:");
+
+        experimentTextField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        experimentTextField.setText("jTextField1");
+        experimentTextField.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusLost(java.awt.event.FocusEvent evt) {
+                experimentTextFieldFocusLost(evt);
+            }
+        });
+
+        loadExpSettingFileButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/openDoc.png"))); // NOI18N
+        loadExpSettingFileButton.setPreferredSize(new java.awt.Dimension(24, 24));
+        loadExpSettingFileButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                loadExpSettingFileButtonActionPerformed(evt);
+            }
+        });
+
+        saveExpSettingFileButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/saveDoc.png"))); // NOI18N
+        saveExpSettingFileButton.setPreferredSize(new java.awt.Dimension(24, 24));
+        saveExpSettingFileButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                saveExpSettingFileButtonActionPerformed(evt);
+            }
+        });
+
+        loadLayoutButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/openDoc.png"))); // NOI18N
+        loadLayoutButton.setPreferredSize(new java.awt.Dimension(24, 24));
+        loadLayoutButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                loadLayoutButtonActionPerformed(evt);
+            }
+        });
+
+        saveLayoutButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/saveDoc.png"))); // NOI18N
+        saveLayoutButton.setPreferredSize(new java.awt.Dimension(24, 24));
+        saveLayoutButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                saveLayoutButtonActionPerformed(evt);
+            }
+        });
+
+        browseImageDestPathButton.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
+        browseImageDestPathButton.setText("...");
+        browseImageDestPathButton.setPreferredSize(new java.awt.Dimension(24, 24));
+        browseImageDestPathButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                browseImageDestPathButtonActionPerformed(evt);
+            }
+        });
+
+        jLabel32.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel32.setText("Settings:");
+
+        expSettingsFileLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        expSettingsFileLabel.setText("jLabel33");
+
+        jLabel2.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel2.setText("Layout:");
+
+        layoutFileLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        layoutFileLabel.setText("jLabel3");
+
+        jLabel7.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel7.setText("Save to:");
+
+        rootDirLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        rootDirLabel.setText("jLabel8");
+
+        org.jdesktop.layout.GroupLayout jPanel11Layout = new org.jdesktop.layout.GroupLayout(jPanel11);
+        jPanel11.setLayout(jPanel11Layout);
+        jPanel11Layout.setHorizontalGroup(
+            jPanel11Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(jPanel11Layout.createSequentialGroup()
+                .add(6, 6, 6)
+                .add(jPanel11Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(jPanel11Layout.createSequentialGroup()
+                        .add(jLabel8)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(experimentTextField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 258, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(jPanel11Layout.createSequentialGroup()
+                        .add(jPanel11Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(jLabel2)
+                            .add(jLabel7)
+                            .add(jLabel32))
+                        .add(3, 3, 3)
+                        .add(jPanel11Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(expSettingsFileLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 283, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(rootDirLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 283, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(layoutFileLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 283, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))))
+                .add(6, 6, 6)
+                .add(jPanel11Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
+                    .add(jPanel11Layout.createSequentialGroup()
+                        .add(loadExpSettingFileButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(2, 2, 2)
+                        .add(saveExpSettingFileButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(jPanel11Layout.createSequentialGroup()
+                        .add(loadLayoutButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(2, 2, 2)
+                        .add(saveLayoutButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(browseImageDestPathButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .add(6, 6, 6))
+        );
+        jPanel11Layout.setVerticalGroup(
+            jPanel11Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(jPanel11Layout.createSequentialGroup()
+                .add(0, 0, 0)
+                .add(jPanel11Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(jPanel11Layout.createSequentialGroup()
+                        .add(jPanel11Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(jLabel32, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(expSettingsFileLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                        .add(2, 2, 2)
+                        .add(jPanel11Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(jLabel2, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(layoutFileLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                        .add(2, 2, 2)
+                        .add(jPanel11Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(jLabel7, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(rootDirLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                        .add(2, 2, 2)
+                        .add(jPanel11Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                            .add(jLabel8)
+                            .add(experimentTextField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                    .add(jPanel11Layout.createSequentialGroup()
+                        .add(jPanel11Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(loadExpSettingFileButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, saveExpSettingFileButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                        .add(2, 2, 2)
+                        .add(jPanel11Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(saveLayoutButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(loadLayoutButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                        .add(2, 2, 2)
+                        .add(browseImageDestPathButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                .addContainerGap())
+        );
+
+        jPanel11Layout.linkSize(new java.awt.Component[] {browseImageDestPathButton, loadExpSettingFileButton, saveExpSettingFileButton, saveLayoutButton}, org.jdesktop.layout.GroupLayout.VERTICAL);
+
+        acquireButton.setText("Acquire");
+        acquireButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                acquireButtonActionPerformed(evt);
+            }
+        });
 
         cancelThreadButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/delete.png"))); // NOI18N
         cancelThreadButton.addActionListener(new java.awt.event.ActionListener() {
@@ -3320,172 +3456,40 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             }
         });
 
-        saveExpSettingFileButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/saveDoc.png"))); // NOI18N
-        saveExpSettingFileButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                saveExpSettingFileButtonActionPerformed(evt);
-            }
-        });
-
-        saveLayoutButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/saveDoc.png"))); // NOI18N
-        saveLayoutButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                saveLayoutButtonActionPerformed(evt);
-            }
-        });
-
-        loadExpSettingFileButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/openDoc.png"))); // NOI18N
-        loadExpSettingFileButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                loadExpSettingFileButtonActionPerformed(evt);
-            }
-        });
-
-        browseImageDestPathButton.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        browseImageDestPathButton.setText("...");
-        browseImageDestPathButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                browseImageDestPathButtonActionPerformed(evt);
-            }
-        });
-
-        loadLayoutButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/openDoc.png"))); // NOI18N
-        loadLayoutButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                loadLayoutButtonActionPerformed(evt);
-            }
-        });
-
-        org.jdesktop.layout.GroupLayout jPanel7Layout = new org.jdesktop.layout.GroupLayout(jPanel7);
-        jPanel7.setLayout(jPanel7Layout);
-        jPanel7Layout.setHorizontalGroup(
-            jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(jPanel7Layout.createSequentialGroup()
-                .addContainerGap()
-                .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(org.jdesktop.layout.GroupLayout.TRAILING, browseImageDestPathButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel7Layout.createSequentialGroup()
-                        .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                            .add(loadLayoutButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(org.jdesktop.layout.GroupLayout.TRAILING, loadExpSettingFileButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                        .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(org.jdesktop.layout.GroupLayout.TRAILING, saveExpSettingFileButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(org.jdesktop.layout.GroupLayout.TRAILING, saveLayoutButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))))
-                .addContainerGap())
-        );
-        jPanel7Layout.setVerticalGroup(
-            jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(jPanel7Layout.createSequentialGroup()
-                .add(0, 0, 0)
-                .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
-                    .add(loadExpSettingFileButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(saveExpSettingFileButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(jPanel7Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
-                    .add(loadLayoutButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(saveLayoutButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(browseImageDestPathButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 15, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .add(0, 0, 0))
-        );
-
-        jPanel7Layout.linkSize(new java.awt.Component[] {browseImageDestPathButton, loadExpSettingFileButton, saveExpSettingFileButton, saveLayoutButton}, org.jdesktop.layout.GroupLayout.VERTICAL);
-
-        jLabel32.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel32.setText("Settings:");
-
-        jLabel7.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel7.setText("Save to:");
-
-        layoutFileLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        layoutFileLabel.setText("jLabel3");
-
-        expSettingsFileLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        expSettingsFileLabel.setText("jLabel33");
-
-        rootDirLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        rootDirLabel.setText("jLabel8");
-
-        jLabel2.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel2.setText("Layout:");
-
-        org.jdesktop.layout.GroupLayout jPanel8Layout = new org.jdesktop.layout.GroupLayout(jPanel8);
-        jPanel8.setLayout(jPanel8Layout);
-        jPanel8Layout.setHorizontalGroup(
-            jPanel8Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(jPanel8Layout.createSequentialGroup()
-                .add(0, 0, 0)
-                .add(jPanel8Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jLabel32, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 53, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(jLabel2)
-                    .add(jLabel7))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jPanel8Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(layoutFileLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .add(expSettingsFileLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .add(rootDirLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addContainerGap())
-        );
-        jPanel8Layout.setVerticalGroup(
-            jPanel8Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(jPanel8Layout.createSequentialGroup()
-                .add(2, 2, 2)
-                .add(jPanel8Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
-                    .add(expSettingsFileLabel)
-                    .add(jLabel32))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jPanel8Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
-                    .add(jLabel2)
-                    .add(layoutFileLabel))
-                .add(5, 5, 5)
-                .add(jPanel8Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(rootDirLabel)
-                    .add(jLabel7))
-                .add(0, 0, 0))
-        );
-
         org.jdesktop.layout.GroupLayout settingsPanelLayout = new org.jdesktop.layout.GroupLayout(settingsPanel);
         settingsPanel.setLayout(settingsPanelLayout);
         settingsPanelLayout.setHorizontalGroup(
             settingsPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(settingsPanelLayout.createSequentialGroup()
+            .add(org.jdesktop.layout.GroupLayout.TRAILING, settingsPanelLayout.createSequentialGroup()
                 .add(6, 6, 6)
-                .add(settingsPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(controlTabbedPane, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(settingsPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
                     .add(settingsPanelLayout.createSequentialGroup()
+                        .add(6, 6, 6)
                         .add(acquireButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 122, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .add(processProgressBar, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 182, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(processProgressBar, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                        .add(cancelThreadButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 25, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                    .add(org.jdesktop.layout.GroupLayout.TRAILING, settingsPanelLayout.createSequentialGroup()
-                        .add(settingsPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                            .add(settingsPanelLayout.createSequentialGroup()
-                                .add(jLabel8)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(experimentTextField))
-                            .add(jPanel8, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(jPanel7, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
-                .addContainerGap())
+                        .add(cancelThreadButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 25, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(85, 85, 85))
+                    .add(org.jdesktop.layout.GroupLayout.LEADING, settingsPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
+                        .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel11, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .add(org.jdesktop.layout.GroupLayout.LEADING, sequenceListPanel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .add(org.jdesktop.layout.GroupLayout.LEADING, sequenceTabbedPane, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))))
         );
         settingsPanelLayout.setVerticalGroup(
             settingsPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(org.jdesktop.layout.GroupLayout.TRAILING, settingsPanelLayout.createSequentialGroup()
-                .add(0, 0, 0)
-                .add(settingsPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
-                    .add(jPanel7, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .add(jPanel8, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .add(0, 0, 0)
-                .add(settingsPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel8)
-                    .add(experimentTextField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+            .add(settingsPanelLayout.createSequentialGroup()
+                .add(jPanel11, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(sequenceListPanel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(sequenceTabbedPane, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 414, Short.MAX_VALUE)
                 .add(3, 3, 3)
-                .add(controlTabbedPane, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 534, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .add(0, 0, 0)
                 .add(settingsPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
+                    .add(acquireButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(processProgressBar, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(acquireButton)
                     .add(cancelThreadButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .addContainerGap())
+                .add(12, 12, 12))
         );
 
         statusPanel.setMaximumSize(new java.awt.Dimension(32767, 130));
@@ -3600,7 +3604,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                                 .add(18, 18, 18)
                                 .add(stagePosZLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 91, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                 .add(18, 18, 18)
-                                .add(cursorLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 171, Short.MAX_VALUE)
+                                .add(cursorLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 105, Short.MAX_VALUE)
                                 .add(96, 96, 96))
                             .add(statusPanelLayout.createSequentialGroup()
                                 .add(commentButton)
@@ -3644,7 +3648,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 .add(statusPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(timepointLabel)
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, areaLabel))
-                .addContainerGap())
+                .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         layoutScrollPane.addComponentListener(new java.awt.event.ComponentAdapter() {
@@ -3679,25 +3683,25 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         layout.setHorizontalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(layout.createSequentialGroup()
-                .add(12, 12, 12)
+                .add(6, 6, 6)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(statusPanel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 651, Short.MAX_VALUE)
+                    .add(statusPanel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 585, Short.MAX_VALUE)
                     .add(layoutScrollPane))
-                .add(0, 0, 0)
-                .add(settingsPanel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 420, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(settingsPanel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 421, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .add(6, 6, 6))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(layout.createSequentialGroup()
-                .add(12, 12, 12)
+                .add(6, 6, 6)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(settingsPanel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 671, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(settingsPanel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 680, Short.MAX_VALUE)
                     .add(layout.createSequentialGroup()
                         .add(layoutScrollPane)
                         .add(6, 6, 6)
-                        .add(statusPanel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 122, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
-                .add(0, 0, 0))
+                        .add(statusPanel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 104, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                .add(6, 6, 6))
         );
 
         pack();
@@ -3720,13 +3724,13 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
              a.setSelected((Boolean)atm.getValueAt(row, column));
              IJ.log("AcqFrame.tableChanged: clicked checkbox in row "+Integer.toString(row)+", "+Boolean.toString(a.isSelected()));*/
             /*            if (currentAcqSetting!=null) {
-             calcTilePositions(currentAcqSetting.getTileWidth(),currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting());               
+             calcTilePositions(currengetTileWidth_UMgetTileWidth(),currengetTileHeight_UMetTileHeight(), currentAcqSetting.getTilingSetting());               
              }   */
             AreaTableModel atm = (AreaTableModel) areaTable.getModel();
             if (recalculateTiles && column == 0 && (Boolean) atm.getValueAt(row, 0)) {
                 List<Area> al = new ArrayList<Area>(1);
                 al.add(atm.getRowData(row));
-                calcTilePositions(al, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), SELECTING_AREA);
+                calcTilePositions(al, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), SELECTING_AREA);
             } else
                 calcTotalTileNumber();
             updateAcqLayoutPanel();
@@ -3736,21 +3740,8 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 || e.getType() == TableModelEvent.INSERT)) {
 //                || e.getType() == TableModelEvent.UPDATE)) {
             updatingAcqSettingTable=true;
-            IJ.log("tableChanged: AcqSettingTable");
-            acqSettingPanel.setBorder(BorderFactory.createTitledBorder(currentAcqSetting.getName()));
-            acqSettingPanel.repaint();
-            acqSelector_Areas.removeAllItems();
-            acqSelector_Processors.removeAllItems();
-            String[] settingNames = new String[acqSettings.size()];
-            for (int i=0;i<acqSettings.size();i++) {
-                settingNames[i]=new String(acqSettings.get(i).getName());
-                acqSelector_Areas.addItem(settingNames[i]);
-                acqSelector_Processors.addItem(settingNames[i]);
-            }
 /*            for (AcqSetting setting:acqSettings)
                 acqSettingComboBox.addItem(setting.getName());*/
-            acqSelector_Areas.setSelectedIndex(cAcqSettingIdx);
-            acqSelector_Processors.setSelectedIndex(cAcqSettingIdx);
 //            initializeProgressTree(currentAcqSetting);
             updateProcessorTreeView(currentAcqSetting);
             if (e.getType() == TableModelEvent.INSERT) {
@@ -3770,13 +3761,12 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             cAcqSettingIdx = minIndex;
             AcqSetting newSetting = acqSettings.get(minIndex);
             if (currentAcqSetting != newSetting) {
-                IJ.log("acqSettingSelectionChanged:");
                 currentAcqSetting = newSetting;
+                sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
+                        "Sequence: "+currentAcqSetting.getName()));
                 prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
                 prevObjLabel = currentAcqSetting.getObjective();
-                acqSelector_Areas.setSelectedIndex(cAcqSettingIdx);
-                acqSelector_Processors.setSelectedIndex(cAcqSettingIdx);
-                calcTilePositions(null, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+                calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
                 ((LayoutPanel) acqLayoutPanel).setAcqSetting(currentAcqSetting, true);
                 updateAcqSettingTab(currentAcqSetting);
                 updateProcessorTreeView(currentAcqSetting);
@@ -3785,16 +3775,13 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     }
 
     public void setLandmarkFound(boolean b) {
-        landmarkFound = b;
-        acqLayout.setLandmarkFound(landmarkFound);
-        if (acqLayoutPanel != null) {
-            ((LayoutPanel) acqLayoutPanel).setLandmarkFound(landmarkFound);
-        }
-        acquireButton.setEnabled(landmarkFound);
-        moveToScreenCoordButton.setEnabled(landmarkFound);
-        newAreaButton.setEnabled(landmarkFound);
+        //acqLayout.setLandmarkFound(b);
+        IJ.log("AcqFrame.setLandmarkFound("+b+")");
+        acquireButton.setEnabled(b);
+        moveToScreenCoordButton.setEnabled(b);
+        newAreaButton.setEnabled(b);
         if (moveToMode) {
-            moveToMode = landmarkFound;
+            moveToMode = b;
         }
     }
 
@@ -3809,12 +3796,12 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         try {
 //            StrVector availableChannels = core.getAvailableConfigs(channelGroupStr);
             if (acqSetting.getChannelGroupStr()==null || acqSetting.getChannelGroupStr().equals("")) {
-                String chGroupStr=loadAvailableChannelConfigs("");
+                String chGroupStr=MMCoreUtils.loadAvailableChannelConfigs(this,"", core);
                 currentAcqSetting.setChannelGroupStr(chGroupStr);
             }    
             StrVector availableChannels = core.getAvailableConfigs(acqSetting.getChannelGroupStr());
             if (availableChannels == null || availableChannels.isEmpty()) {
-                acqSetting.setChannelGroupStr(loadAvailableChannelConfigs(acqSetting.getChannelGroupStr()));
+                acqSetting.setChannelGroupStr(MMCoreUtils.loadAvailableChannelConfigs(this,acqSetting.getChannelGroupStr(), core));
             }
             if (!initializeChannelTable(acqSetting)) {
                 return null;
@@ -3893,7 +3880,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         areaTable.setEnabled(b);
 
         acqSettingTable.setEnabled(b);
-        acqSelector_Areas.setEnabled(b);
         addAcqSettingButton.setEnabled(b);
         deleteAcqSettingButton.setEnabled(b);
         loadAcqSettingButton.setEnabled(b);
@@ -3904,19 +3890,17 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         binningComboBox.setEnabled(b);
         tilingModeComboBox.setEnabled(b);
         tilingDirComboBox.setEnabled(b);
-        tilingFileLabel.setEnabled(b && currentAcqSetting.getTilingMode() == TilingSetting.Mode.FILE);
-        siteCoordFileButton.setEnabled(tilingFileLabel.isEnabled());
         insideOnlyCheckBox.setEnabled(b);
         clusterCheckBox.setEnabled(b && (currentAcqSetting.getTilingMode() != TilingSetting.Mode.FULL));
         clusterXField.setEnabled(b && clusterCheckBox.isSelected() && clusterCheckBox.isEnabled());
         clusterYField.setEnabled(b && clusterCheckBox.isSelected() && clusterCheckBox.isEnabled());
-        clusterOverlapCheckBox.setEnabled(b && clusterCheckBox.isSelected() && clusterCheckBox.isEnabled() && currentAcqSetting.getTilingMode() != TilingSetting.Mode.CENTER);
+//        clusterOverlapCheckBox.setEnabled(b && clusterCheckBox.isSelected() && clusterCheckBox.isEnabled() && currentAcqSetting.getTilingMode() != TilingSetting.Mode.CENTER);
+        siteOverlapCheckBox.setEnabled(b && currentAcqSetting.getTilingMode() == TilingSetting.Mode.RANDOM);
         maxSitesLabel.setEnabled(b && (currentAcqSetting.getTilingMode() == TilingSetting.Mode.RANDOM || currentAcqSetting.getTilingMode() == TilingSetting.Mode.RUNTIME));
         maxSitesField.setEnabled(maxSitesLabel.isEnabled());
         tileOverlapField.setEnabled(b);
         autofocusButton.setEnabled(b);
         
-        acqSelector_Processors.setEnabled(b);
         addImageTagFilterButton.setEnabled(b);
         addChannelFilterButton.setEnabled(b);
         addZFilterButton.setEnabled(b);
@@ -3949,7 +3933,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         channelDownButton.setEnabled(b);
         enableTimelapsePane(b);
         enableZStackPane(b);
-        ((LayoutPanel) acqLayoutPanel).showLandmark(b);
     }
 
     public JSONObject createSummary(AcqSetting as, SequenceSettings s, PositionList pl) {
@@ -3974,8 +3957,8 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 System.out.println("Unsupported pixel type");
                 return summary;
             }
-            summary.put(MMTags.Summary.WIDTH, as.getTileWidth());
-            summary.put(MMTags.Summary.HEIGHT, as.getTileHeight());
+            summary.put(MMTags.Summary.WIDTH, as.getTileWidth_UM());
+            summary.put(MMTags.Summary.HEIGHT, as.getTileHeight_UM());
             summary.put(MMTags.Summary.PREFIX, s.prefix); // Acquisition name
 
             //these are used to create display settings
@@ -4024,12 +4007,19 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 } catch (Exception ex) {
                     Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                 }
-                IJ.showMessage(objectiveDevStr+", "+setting.getObjective());
+                JOptionPane.showMessageDialog(this,"Error selecting "+objectiveDevStr+", "+setting.getObjective());
                 setting.setObjectiveDevStr(objectiveDevStr);
                 return false;
             }
+            
+
             try {
                 core.setProperty(core.getCameraDevice(), "Binning", Integer.toString(setting.getBinning()));
+            
+                if (updateGUI) {
+                    gui.refreshGUI();
+                }
+
             } catch (Exception e) {
                 ReportingUtils.showError(e);
                 return false;
@@ -4348,9 +4338,9 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 
         AreaTableModel atm = (AreaTableModel) areaTable.getModel();
         ArrayList<JSONObject> posInfoList = new ArrayList<JSONObject>();
-   //     RuntimeTileManager tManager =currentAcqSetting.getTileManager();
-   //     double tileWidth = setting.getTileWidth();
-   //     double tileHeight = setting.getTileHeight();
+   //     TileManager tManager =currentAcqSetting.getTileManager();
+   //     dougetTileWidth_UMh = setting.getTileWidth();
+   //     doubgetTileHeight_UM = setting.getTileHeight();
         final TilingSetting tSetting = setting.getTilingSetting();
 
 
@@ -4359,7 +4349,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             if (a.isSelectedForAcq()) {                   
           //      try {
                     //a.calcTilePositions(tManager,tileWidth, tileHeight, tSetting);
-                    pl = a.addTilePositions(pl, posInfoList, xyStageLabel, zStageLabel, acqLayout.getLandmarks(), acqLayout.getNormalVector());
+                    pl = a.addTilePositions(pl, posInfoList, xyStageLabel, zStageLabel, acqLayout);
           //      } catch (InterruptedException ie) {
           //      }
             }
@@ -4382,8 +4372,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 //            acqMonitor = new AcquisitionMonitor(tp,pl.getNumberOfPositions(),slices,channels,timeFirst, System.currentTimeMillis());
         //acqEng.attachRunnable(-1,-1, -1, -1, (new Thread(new ProgressUpdate(retilingMonitor))));
 
-        //DataProcessor siteInfoProc = new SiteInfoDataProcessor(posInfoList);
-        
+        //DataProcessor siteInfoProc = new SiteInfoDataProcesSiteInfoUpdater     
         //guiEngW.addImageProcessor(iProcessor);
         setObjectiveAndBinning(setting, true);
         final File sequenceDir = new File(imageDestPath, setting.getName());
@@ -4412,8 +4401,8 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 /*                if (dp instanceof StitchCluster) {
                     node.setUserObject(new StitchCluster());
                 }*/
-                if (dp instanceof SiteInfoDataProcessor) {
-                    ((SiteInfoDataProcessor)dp).setPositionInfoList(posInfoList);
+                if (dp instanceof SiteInfoUpdater) {
+                    ((SiteInfoUpdater)dp).setPositionInfoList(posInfoList);
                 }    
                 if (dp instanceof ExtDataProcessor
                         && ((ExtDataProcessor)dp).getProcName().equals(ProcessorTree.PROC_NAME_IMAGE_STORAGE)) {
@@ -4435,7 +4424,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         new Thread(new Runnable() {
             @Override
             public void run() {
-                acqLayout.saveTileCoordsToXMLFile(new File(sequenceDir, "TileCoordinates.XML").getAbsolutePath(), tSetting,setting.getTileWidth(),setting.getTileHeight(),setting.getPixelSize());
+                acqLayout.saveTileCoordsToXMLFile(new File(sequenceDir, "TileCoordinates.XML").getAbsolutePath(), tSetting,setting.getTileWidth_UM(),setting.getTileHeight_UM(),setting.getImagePixelSize());
 /*                        List<String> ch = new ArrayList<String>();
                         for (Channel c:setting.getChannels()) {
                             if (c.getStitch()) {
@@ -4452,6 +4441,8 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             acqEng2010 = gui.getAcquisitionEngine2010();
             BlockingQueue<TaggedImage> engineOutputQueue = acqEng2010.run(mdaSettings, false, pl, gui.getAutofocusManager().getDevice());
             JSONObject summaryMetadata = acqEng2010.getSummaryMetadata();
+            summaryMetadata.put("StageToLayoutTransform",acqLayout.getStageToLayoutTransform().toString());
+            summaryMetadata.put("fieldRotationAngle",currentAcqSetting.getFieldOfView().getFieldRotation());
             // Set up the DataProcessor<TaggedImage> sequence                    
   
             
@@ -4471,7 +4462,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 //                    TaggedImageStorage storage = new TaggedImageStorageMultipageTiff(sequenceDir.getAbsolutePath(), true, summaryMetadata, true, false, true);
             MMImageCache imageCache = new MMImageCache(storage);
             imageCache.addImageCacheListener(this);
-            displayUpdater = new DisplayUpdater(imageCache, setting.getChannels(),currentAcqSetting.getPixelSize());
+            displayUpdater = new DisplayUpdater(imageCache, setting.getChannels(),currentAcqSetting.getImagePixelSize());
             displayUpdater.execute();
 
             if (mainImageStorageNode.getChildCount()>0) {
@@ -4528,12 +4519,11 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             ace.stopCellEditing();
         }
 
+        
         //camera ROI not supported yet. current ROI saved, cleared before acquisition start, and restored after acqusition finish
         try {
             cameraROI = core.getROI();
-            if (cameraROI != null 
-                    && (cameraROI.getWidth()<currentAcqSetting.getTileWidth()
-                    || cameraROI.getHeight()<currentAcqSetting.getTileHeight())) {
+            if (cameraROI != null) {
                 JOptionPane.showMessageDialog(this,"ROIs are not supported.\nUsing full camera chip.");
             }
             core.clearROI();
@@ -4541,6 +4531,14 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
 
+        /*for future: set roi for camera/detector
+        Rectangle roi=currentAcqSetting.getFieldOfView().roi_Pixel_bin;
+        try {
+            core.setROI(roi.x,roi.y,roi.width,roi.height);
+        } catch (Exception ex) {
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        */
 //        cAcqSettingIdx=0;
         String s = null;
 //        if (acqSettings!=null && acqSettings.size() > 0)
@@ -4581,7 +4579,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                         for (AcqSetting as:acqSettings) {
                             if (as.getName().equals(selSeq)) {
                                 as.getTileManager().setAcquisitionLayout(acqLayout);
-                                as.getTileManager().clearAllROIs();
+                                as.getTileManager().clearAllSeeds();
                                 roifinder.addRuntimeTileManager(as.getTileManager());
                                 sequenceFound=true;
                                 break;
@@ -4759,7 +4757,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 }
                 recalculateTiles = true;
                 if (isLeftMouseButton) {
-                    calcTilePositions(al, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), "Selecting Area...");
+                    calcTilePositions(al, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), "Selecting Area...");
                 } //updateAcqLayoutPanel is called automatically when calctile thread is completed or aborted (in TileCalcMonitor.done)
                 else {
                     calcTotalTileNumber();
@@ -4984,12 +4982,12 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         if (dupIndex != -1) {
             JOptionPane.showMessageDialog(this, "Each Area name has to be unique.\n"
                     + "Area name '" + acqLayout.getAreaByIndex(dupIndex).getName() + "' is used more than once.", "Acquisition", JOptionPane.ERROR_MESSAGE);
-            controlTabbedPane.setSelectedIndex(0);
+            sequenceTabbedPane.setSelectedIndex(0);
             return;
         }
         if (acqLayout.getNumOfSelectedAreas() < 1) {
             JOptionPane.showMessageDialog(this, "No Areas selected.", "Acquisition", JOptionPane.ERROR_MESSAGE);
-            controlTabbedPane.setSelectedIndex(0);
+            sequenceTabbedPane.setSelectedIndex(0);
             return;
         }
         for (int i = 0; i < acqSettings.size(); i++) {//(AcqSetting setting:acqSettings) {
@@ -5000,7 +4998,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 acqSettingTable.setRowSelectionInterval(i, i);
 //                acqSettingListBox.setSelectedValue(setting.getName(),true);
                 recalculateTiles = true;
-                controlTabbedPane.setSelectedIndex(1);
+                sequenceTabbedPane.setSelectedIndex(1);
                 channelTable.requestFocusInWindow();
                 return;
             }
@@ -5010,11 +5008,11 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 acqSettingTable.setRowSelectionInterval(i, i);
 //                acqSettingListBox.setSelectedValue(setting.getName(), true);
                 recalculateTiles = true;
-                controlTabbedPane.setSelectedIndex(1);
+                sequenceTabbedPane.setSelectedIndex(1);
                 channelTable.requestFocusInWindow();
                 return;
             }
-            if (setting.getPixelSize() == -1) {
+            if (setting.getImagePixelSize() == -1) {
                 recalculateTiles = false;
                 acqSettingTable.setRowSelectionInterval(i, i);
 //                acqSettingListBox.setSelectedValue(setting.getName(), true);
@@ -5027,7 +5025,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 recalculateTiles = false;
                 acqSettingTable.setRowSelectionInterval(i, i);
                 recalculateTiles = true;
-                controlTabbedPane.setSelectedIndex(2);
+                sequenceTabbedPane.setSelectedIndex(2);
                 processorTreeView.requestFocusInWindow();
                 return;
             }
@@ -5082,6 +5080,19 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             //try start new acquisition; if not successfull it returns null
             if (currentAcqSetting != null) {
                 isAborted = false;
+                for (AcqSetting setting:acqSettings) {
+                    if (setting.getFieldOfView().getFieldRotation() == FieldOfView.ROTATION_UNKNOWN) {
+                        JOptionPane.showMessageDialog(this,"Camera field rotation unknown");
+                        showCameraRotDlg(true);
+                        break;  
+                    }
+                }
+/*                double angle=0;
+                
+                currentDetector.setFieldRotation(angle);*/
+                for (AcqSetting setting:acqSettings) {
+                    setting.getFieldOfView().setFieldRotation(currentDetector.getFieldRotation());
+                }
                 isAcquiring = startAcquisition() != null;
             } else {
                 JOptionPane.showMessageDialog(this,"Undefined AcqSettings");
@@ -5119,6 +5130,18 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     }//GEN-LAST:event_browseImageDestPathButtonActionPerformed
 
     private void loadLayoutButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadLayoutButtonActionPerformed
+        if (acqLayout!=null && acqLayout.isModifed()) {
+            int result=JOptionPane.showConfirmDialog(this, "Acquisition layout "+acqLayout.getName()
+                    +" has been modified.\nDo you want to save it before opening a new layout?", 
+                    "Acquisition Layout",
+                    JOptionPane.YES_NO_CANCEL_OPTION);
+            if (result == JOptionPane.CANCEL_OPTION) {
+                return;
+            }
+            if (result == JOptionPane.YES_OPTION) {
+                saveLayout();
+            }
+        }
         JFileChooser fc = new JFileChooser();
         fc.setFileFilter(new javax.swing.filechooser.FileFilter() {
             @Override
@@ -5145,17 +5168,19 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 acqLayoutPanel.setCursor(normCursor);
                 recalculateTiles = false;
                 for (AcqSetting as : acqSettings) {
-                    as.enableClusterOverlap(true);
+                    as.enableSiteOverlap(true);
                     as.enableInsideOnly(false);
                 }
-                clusterOverlapCheckBox.setSelected(currentAcqSetting.isClusterOverlap());
+                siteOverlapCheckBox.setSelected(currentAcqSetting.isSiteOverlap());
                 insideOnlyCheckBox.setSelected(currentAcqSetting.isInsideOnly());
                 if (mergeAreasDialog != null) {
                     mergeAreasDialog.removeAllAreas();
+                    mergeAreasDialog.setAcquisitionLayout(acqLayout);
                 }
+                refPointListDialog = new RefPointListDialog(this, core, acqLayout, (LayoutPanel)acqLayoutPanel);
                 updatePixelSize(currentAcqSetting.getObjective());
                 recalculateTiles = true;
-                calcTilePositions(null, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+                calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
                 Rectangle r = layoutScrollPane.getVisibleRect();
                 ((LayoutPanel) acqLayoutPanel).calculateScale(r.width, r.height);
                 areaTable.revalidate();
@@ -5166,56 +5191,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             //            layoutScrollPane.setViewportView(acqLayoutPanel);
         }
     }//GEN-LAST:event_loadLayoutButtonActionPerformed
-
-    private void objectiveComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_objectiveComboBoxActionPerformed
-        if (evt.getSource() == objectiveComboBox) {
-            String selectedObjective = (String) objectiveComboBox.getSelectedItem();
-//            if (acqSettings!=null && acqSettings.size()>cAcqSettingIdx) {
-            if (currentAcqSetting != null) {
-//                AcqSetting setting=acqSettings.get(cAcqSettingIdx);
-                if (!currentAcqSetting.getObjective().equals(selectedObjective)) {
-                    if (!calculating) {
-                        prevObjLabel = currentAcqSetting.getObjective();
-                        prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
-                        currentAcqSetting.setObjective(selectedObjective, getPixelSize(selectedObjective));
-//                        IJ.log("objectiveComboBoxActionPerformed. "+selectedObjective);
-//                    try {
-                        updatePixelSize(selectedObjective); // calls updateFOVDimension, updateTileOverlap, updateTileSizeLabel
-                        //                updateFOVDimension();
-                        //                updateTileSizeLabel();
-                        //                updateTileOverlap();
-                        if (currentAcqSetting.getPixelSize() > 0 && recalculateTiles) {
-                            calcTilePositions(null, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
-                        } else if (currentAcqSetting.getPixelSize() <= 0) {
-                            for (Area a:acqLayout.getAreaArray()) {
-                                a.setUnknownTileNum(true);
-                            }
-                            currentAcqSetting.setTotalTiles(-1);
-                            ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.getSelectedRow());
-                            acqLayoutPanel.repaint();
-                        }
-                        //                Rectangle r=layoutScrollPane.getVisibleRect();
-                        //                ((LayoutPanel)acqLayoutPanel).calculateScale(r.width,r.height);
-//                    } catch (Exception ex) {
-//                        Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-//                    } 
-                    }
-                }
-            }
-        }
-    }//GEN-LAST:event_objectiveComboBoxActionPerformed
-
-    private void insideOnlyCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_insideOnlyCheckBoxActionPerformed
-        JComponent c = (JComponent) evt.getSource();
-        if (c.getVerifyInputWhenFocusTarget()) {
-//            c.requestFocusInWindow();
-            if (!c.hasFocus()) {
-                insideOnlyCheckBox.setSelected(!insideOnlyCheckBox.isSelected());
-                return;
-            }
-        }
-        setTilingInsideAreaOnly(insideOnlyCheckBox.isSelected());
-    }//GEN-LAST:event_insideOnlyCheckBoxActionPerformed
 
     private void updateTileOverlap() {
         String s = tileOverlapField.getText();
@@ -5244,69 +5219,12 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
             prevObjLabel = currentAcqSetting.getObjective();
             currentAcqSetting.setTileOverlap(o);
-            calcTilePositions(null, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+            calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
         }
         //            layoutScrollPane.getViewport().revalidate();
         //            layoutScrollPane.getViewport().repaint();
 /*        }     */
     }
-
-    private void tileOverlapFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_tileOverlapFieldFocusLost
-        JComponent source = (JComponent) evt.getSource();
-        if (source.getInputVerifier().verify(source)) {
-            updateTileOverlap();
-        }
-    }//GEN-LAST:event_tileOverlapFieldFocusLost
-
-    private void timelapseCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_timelapseCheckBoxItemStateChanged
-//        if (acqSettings!=null && acqSettings.size()>0) {
-//            AcqSetting setting = acqSettings.get(cAcqSettingIdx);
-        if (currentAcqSetting != null) {
-            currentAcqSetting.enableTimelapse(timelapseCheckBox.isSelected());
-        }
-        if (timelapseCheckBox.isSelected()) {
-            //           if (acqSettings!=null && acqSettings.size() > cAcqSettingIdx)
-            if (currentAcqSetting != null) {
-                calculateDuration(currentAcqSetting);
-            } else {
-                calculateDuration(null);
-            }
-        } else {
-            durationText.setText("No Time-lapse acquisition");
-        }
-        enableTimelapsePane(timelapseCheckBox.isSelected());
-    }//GEN-LAST:event_timelapseCheckBoxItemStateChanged
-
-    private void zStackCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_zStackCheckBoxItemStateChanged
-        if (currentAcqSetting != null) {
-            /*        if (acqSettings!=null && acqSettings.size()>0) {
-             AcqSetting setting = acqSettings.get(cAcqSettingIdx);*/
-            currentAcqSetting.enableZStack(zStackCheckBox.isSelected());
-        }
-        enableZStackPane(zStackCheckBox.isSelected());
-    }//GEN-LAST:event_zStackCheckBoxItemStateChanged
-
-    private void autofocusCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_autofocusCheckBoxItemStateChanged
-        /*        if (acqSettings!=null && acqSettings.size()>0) {
-         AcqSetting setting = acqSettings.get(cAcqSettingIdx);*/
-        if (currentAcqSetting != null) {
-            currentAcqSetting.enableAutofocus(autofocusCheckBox.isSelected());
-        }
-        if (autofocusCheckBox.isSelected()) {
-            zStackCenteredCheckBox.setText("Centered around autofocus Z-position");
-        } else {
-            zStackCenteredCheckBox.setText("Centered around reference Z-position");
-        }
-    }//GEN-LAST:event_autofocusCheckBoxItemStateChanged
-
-    private void acqOrderListActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_acqOrderListActionPerformed
-//        if (acqSettings!=null && acqSettings.size()>0) {
-        if (currentAcqSetting != null && acqSettings.size() > 0) {
-            int acqOrderIdx = acqOrderList.getSelectedIndex();
-            currentAcqSetting.setAcqOrder(acqOrderIdx);
-//            IJ.log("acqOrderListActionPerformed. "+Integer.toString(acqOrderIdx)+":, "+(String)acqOrderList.getSelectedItem());
-        }
-    }//GEN-LAST:event_acqOrderListActionPerformed
 
     private void setFrames() {
         /*        AcqSetting setting=null;
@@ -5333,10 +5251,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             calculateDuration(currentAcqSetting);
         }
     }
-
-    private void framesFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_framesFieldFocusLost
-        setFrames();
-    }//GEN-LAST:event_framesFieldFocusLost
 
     private void setSecInterval() {
         /*        AcqSetting setting=null;
@@ -5368,10 +5282,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         }
     }
 
-    private void intSecFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_intSecFieldFocusLost
-        setSecInterval();
-    }//GEN-LAST:event_intSecFieldFocusLost
-
     private void setMinInterval() {
         /*        AcqSetting setting=null;
          if (acqSettings!=null && acqSettings.size() > cAcqSettingIdx)
@@ -5399,14 +5309,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             }
         }
     }
-
-    private void intMinFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_intMinFieldFocusLost
-        setMinInterval();
-    }//GEN-LAST:event_intMinFieldFocusLost
-
-    private void intMinFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_intMinFieldActionPerformed
-        setMinInterval();
-    }//GEN-LAST:event_intMinFieldActionPerformed
 
     private void setHourInterval() {
         /*        AcqSetting setting=null;
@@ -5438,243 +5340,9 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         }
     }
 
-    private void intHourFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_intHourFieldFocusLost
-        setHourInterval();
-    }//GEN-LAST:event_intHourFieldFocusLost
-
-    private void reverseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_reverseButtonActionPerformed
-        /*        if (acqSettings!=null && acqSettings.size()>0) {
-         AcqSetting setting=acqSettings.get(cAcqSettingIdx);*/
-        if (currentAcqSetting != null) {
-            String tmpStr = zStackBeginField.getText();
-            zStackBeginField.setText(zStackEndField.getText());
-            zStackEndField.setText(tmpStr);
-            double temp = currentAcqSetting.getZBegin();
-            currentAcqSetting.setZBegin(currentAcqSetting.getZEnd());
-            currentAcqSetting.setZEnd(temp);
-        }
-    }//GEN-LAST:event_reverseButtonActionPerformed
-
-    private void zStackStepSizeFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_zStackStepSizeFieldFocusLost
-        String stepSizeStr = zStackStepSizeField.getText();
-        if (stepSizeStr.isEmpty()) {
-            stepSizeStr = "0";
-        }
-        double stepSize = Double.parseDouble(stepSizeStr);
-        DecimalFormat df = new DecimalFormat("0.00");
-        zStackStepSizeField.setValue(df.format(stepSize));
-//        if (stepSize<=0) {
-//            JOptionPane.showMessageDialog(null, "Error: Please enter a number bigger than 0", "Error Message", JOptionPane.ERROR_MESSAGE);
-//            zStackStepSizeField.requestFocus();
-//        } else {
-/*            if (acqSettings!=null && acqSettings.size()>0) {
-         AcqSetting setting = acqSettings.get(cAcqSettingIdx);*/
-        if (currentAcqSetting != null) {
-            currentAcqSetting.setZStepSize(stepSize);
-            if (zStackCenteredCheckBox.isSelected()) {
-                calculateTotalZDist(currentAcqSetting);
-            } else {
-                currentAcqSetting.setZSlices((int) Math.abs(Math.round(currentAcqSetting.getZBegin() - currentAcqSetting.getZEnd()) / currentAcqSetting.getZStepSize()) + 1);
-                zStackSlicesField.setValue(Integer.toString(currentAcqSetting.getZSlices()));
-                //                zStackSlicesField.setValue(Integer.toString(zStackSlices));
-//                    calculateTotalZDist(setting);
-            }
-            zStackTotalDistLabel.setText(df.format(currentAcqSetting.getZBegin() - currentAcqSetting.getZEnd()));
-        }
-//        }
-    }//GEN-LAST:event_zStackStepSizeFieldFocusLost
-
-    private void zStackSlicesFieldPropertyChange(java.beans.PropertyChangeEvent evt) {//GEN-FIRST:event_zStackSlicesFieldPropertyChange
-        //IJ.showMessage("zStackSlicesFieldPropertyChange");
-    }//GEN-LAST:event_zStackSlicesFieldPropertyChange
-
-    private void zStackSlicesFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_zStackSlicesFieldFocusLost
-        String sliceStr = zStackSlicesField.getText();
-        if (sliceStr.isEmpty()) {
-            sliceStr = "1";
-        }
-        int slices = Integer.parseInt(sliceStr);
-        if (slices <= 0) {
-            JOptionPane.showMessageDialog(null, "Error: Please enter a number larger than 0", "Error Message", JOptionPane.ERROR_MESSAGE);
-//            AcqSetting setting = acqSettings.get(cAcqSettingIdx);
-            currentAcqSetting.setZSlices(1);
-            zStackSlicesField.setText(Integer.toString(currentAcqSetting.getZSlices()));
-            zStackSlicesField.requestFocus();
-        } else {
-            /*            if (acqSettings!=null && acqSettings.size()>0) {
-             AcqSetting setting = acqSettings.get(cAcqSettingIdx);*/
-            if (currentAcqSetting != null) {
-                DecimalFormat df = new DecimalFormat("0.00");
-                currentAcqSetting.setZSlices(slices);
-                if (zStackCenteredCheckBox.isSelected()) {
-                    calculateTotalZDist(currentAcqSetting);
-                } else {
-                    if (slices > 1) {
-                        double stepSize = Math.abs((currentAcqSetting.getZBegin() - currentAcqSetting.getZEnd())) / (currentAcqSetting.getZSlices() - 1);
-                        currentAcqSetting.setZStepSize(stepSize);
-                        zStackStepSizeField.setValue(df.format(stepSize));
-                        //calculateTotalZDist(setting);
-                    } else {
-                        zStackTotalDistLabel.setText(df.format(0));
-                    }
-                    //                zStackStepSizeField.setValue(Double.toString(zStackStepSize));
-                }
-            }
-        }
-    }//GEN-LAST:event_zStackSlicesFieldFocusLost
-
-    private void zStackCenteredCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_zStackCenteredCheckBoxItemStateChanged
-    }//GEN-LAST:event_zStackCenteredCheckBoxItemStateChanged
-
-    private void channelDownButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_channelDownButtonActionPerformed
-        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-        int[] selRows = channelTable.getSelectedRows();
-        if (selRows.length > 0 & selRows[selRows.length - 1] < ctm.getRowCount() - 1) {
-            int newSelRow = ctm.rowDown(selRows);
-            channelTable.setRowSelectionInterval(newSelRow, newSelRow + selRows.length - 1);
-        }
-    }//GEN-LAST:event_channelDownButtonActionPerformed
-
-    private void channelUpButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_channelUpButtonActionPerformed
-        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-        int[] selRows = channelTable.getSelectedRows();
-        if (selRows.length > 0 & selRows[0] > 0) {
-            int newSelRow = ctm.rowUp(selRows);
-            ListSelectionModel lsm = areaTable.getSelectionModel();
-            channelTable.setRowSelectionInterval(newSelRow, newSelRow + selRows.length - 1);
-        }
-    }//GEN-LAST:event_channelUpButtonActionPerformed
-
-    private void removeChannelButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_removeChannelButtonActionPerformed
-        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-        int[] rows = channelTable.getSelectedRows();
-        ctm.removeRows(rows);
-    }//GEN-LAST:event_removeChannelButtonActionPerformed
-
-    private void addChannelButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addChannelButtonActionPerformed
-        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-        currentAcqSetting.setChannelGroupStr(loadAvailableChannelConfigs(currentAcqSetting.getChannelGroupStr()));
-        int index = -1;
-        if (ctm.getRowCount() > 0) {
-            for (int i = 0; i < availableChannels.size(); i++) {
-                for (int j = 0; j < ctm.getRowCount(); j++) {
-                    if (ctm.getRowData(j).getName().equals(availableChannels.get(i))) {
-                        index = -1;
-                        break;
-                    } else {
-                        index = i;
-                    }
-                }
-                if (index != -1) {
-                    break;
-                }
-            }
-            if (index != -1) {
-                ctm.addRow(new Channel(availableChannels.get(index), 100, 0, Color.GRAY));
-            } else {
-                JOptionPane.showMessageDialog(this,"All available channel configurations for group '"+currentAcqSetting.getChannelGroupStr()+"' have been added.");
-            }
-        } else {
-            if (availableChannels.size() > 0) {
-                ctm.addRow(new Channel(availableChannels.get(0), 100, 0, Color.GRAY));
-            } else {
-                JOptionPane.showMessageDialog(this,"No Channel configurations found.");
-            }
-        }
-    }//GEN-LAST:event_addChannelButtonActionPerformed
-
-    private void snapButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_snapButtonActionPerformed
-        AbstractCellEditor ae = (AbstractCellEditor) channelTable.getCellEditor();
-        if (ae != null) {
-            ae.stopCellEditing();
-        }
-        /*        AcqSetting setting=null;
-         if (acqSettings!=null && acqSettings.size()>cAcqSettingIdx) {
-         setting=acqSettings.get(cAcqSettingIdx);
-         }*/
-        if (channelTable.getSelectedRowCount() < 1) {
-            JOptionPane.showMessageDialog(this, "Select at least one channel");
-        } else {
-            if (setObjectiveAndBinning(currentAcqSetting, true)) {
-                String chGroupStr=loadAvailableChannelConfigs(currentAcqSetting.getChannelGroupStr());
-                if (!chGroupStr.equals(currentAcqSetting.getChannelGroupStr())) {
-                    currentAcqSetting.setChannelGroupStr(chGroupStr);
-                    initializeChannelTable(currentAcqSetting);
-                } else {    
-                    if (chGroupStr!=null) {
-                        int[] rows = channelTable.getSelectedRows();
-                        ImageStack stack = new ImageStack(cCameraPixX / currentAcqSetting.getBinning(), cCameraPixY / currentAcqSetting.getBinning());
-                        int i = 0;
-                        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-                        for (int row : rows) {
-                            Channel c = ctm.getRowData(row);
-                    //snapAndDisplayImage(c.getName(),c.getExposure(),c.getZOffset(),c.getColor());
-                            ImageProcessor ip = snapImage(c.getName(), c.getExposure(), c.getZOffset());
-                            stack.addSlice(c.getName(),ip, i);
-                            i++;
-                        }
-                        ImagePlus imp = new ImagePlus();
-                        imp.setStack(stack, rows.length, 1, 1);
-                        imp.setTitle("Snap");
-                        Calibration cal = imp.getCalibration();
-                        cal.setUnit("um");
-                        cal.pixelWidth = currentAcqSetting.getPixelSize();
-                        cal.pixelHeight = currentAcqSetting.getPixelSize();
-                        imp.setCalibration(cal);
-                        CompositeImage ci = new CompositeImage(imp);
-                        i = 0;
-                        LUT[] luts = new LUT[rows.length];
-                        for (int row : rows) {
-                            luts[i] = LUT.createLutFromColor(currentAcqSetting.getChannels().get(row).getColor());//ctm.getRowData(row).getColor());
-                            i++;
-                        }
-                        ci.setLuts(luts);
-                        ci.show();
-                        IJ.run("Channels Tool...");
-                    }
-                }
-            } else {
-                currentAcqSetting.setObjectiveDevStr(changeConfigGroupStr("Objective",""));
-            }    
-        }
-    }//GEN-LAST:event_snapButtonActionPerformed
-
-    private void liveButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_liveButtonActionPerformed
-        if (channelTable.getSelectedRowCount() != 1) {
-            JOptionPane.showMessageDialog(this, "Select one channel");
-        } else {
-            if (liveButton.getText().equals("Live")) {
-                if (gui.isLiveModeOn()) {
-                    JOptionPane.showMessageDialog(this, "Live Mode is already running.", "Live Mode", JOptionPane.ERROR_MESSAGE);
-                } else {
-                    int[] rows = channelTable.getSelectedRows();
-                    ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-                    Channel c = ctm.getRowData(rows[0]);
-                    if (setObjectiveAndBinning(currentAcqSetting, true)) {
-                        try {
-                            core.setExposure(c.getExposure());
-//                            core.setConfig(channelGroupStr, c.getName());
-                            core.setConfig(currentAcqSetting.getChannelGroupStr(), c.getName());
-                            //gui.setChannelExposureTime(channelGroupStr, c.getName(), c.getExposure());
-                            gui.refreshGUI();
-                            //gui.setConfigChanged(true);
-                        } catch (Exception e) {
-                        }
-                        gui.enableLiveMode(true);
-                    }
-                }
-                liveButton.setBackground(Color.RED);
-                liveButton.setText("Stop");
-            } else {
-                gui.enableLiveMode(false);
-            }
-
-        }
-    }//GEN-LAST:event_liveButtonActionPerformed
-
     private void mergeAreasButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_mergeAreasButtonActionPerformed
         if (mergeAreasDialog == null) {
-            mergeAreasDialog = new MergeAreasDlg(this, acqLayout, core, gui);
+            mergeAreasDialog = new MergeAreasDlg(this, acqLayout, gui);
             mergeAreasDialog.addWindowListener(this);
         } else {
             mergeAreasDialog.setAcquisitionLayout(acqLayout);
@@ -5710,26 +5378,28 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 
     private void newAreaButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_newAreaButtonActionPerformed
         RefArea rp = acqLayout.getLandmark(0);
-        if (rp == null || !landmarkFound) {
+        if (rp == null || acqLayout.getNoOfMappedStagePos() == 0) {
             JOptionPane.showMessageDialog(this,"At least one layout landmark needs to be set");
             return;
         } else {
             List<Area> areas = acqLayout.getAreaArray();
             double sX = 0;
             double sY = 0;
-            double sZ;
+            double sZ = 0;
             try {
                 sX = core.getXPosition(core.getXYStageDevice());
                 sY = core.getYPosition(core.getXYStageDevice());
+                sZ = core.getPosition(core.getFocusDevice());
             } catch (Exception ex) {
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             }
             /*            int id=1;
              if (areas!=null & areas.size()>0)
              id=areas.get(areas.size()-1).getId()+1;*/
-            double tileWidth = currentAcqSetting.getTileWidth();
-            double tileHeight = currentAcqSetting.getTileHeight();
-            Area a = new RectArea(createNewAreaName(), acqLayout.createUniqueAreaId(), rp.convertStagePosToLayoutCoord_X(sX) - tileWidth / 2, rp.convertStagePosToLayoutCoord_Y(sY) - tileHeight / 2, 0, tileWidth, tileHeight, false, "");
+            double tileWidth=currentAcqSetting.getTileWidth_UM();
+            double tileHeight = currentAcqSetting.getTileHeight_UM();
+            Vec3d lCoord = acqLayout.convertStagePosToLayoutPos(sX, sY, sZ);
+            Area a = new RectArea(createNewAreaName(), acqLayout.createUniqueAreaId(), lCoord.x - tileWidth / 2, lCoord.y - tileHeight / 2, lCoord.z, tileWidth, tileHeight, false, "");
             areas.add(a);
             initializeAreaTable();
             //            AreaTableModel atm=(AreaTableModel)areaTable.getModel();
@@ -5766,42 +5436,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         }
     }//GEN-LAST:event_areaUpButtonActionPerformed
 
-    private void clusterXFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clusterXFieldActionPerformed
-        JComponent source = (JComponent) evt.getSource();
-        if (source.getInputVerifier().shouldYieldFocus(source)) {
-            setClusterXField();
-        }
-    }//GEN-LAST:event_clusterXFieldActionPerformed
-
-    private void clusterCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clusterCheckBoxActionPerformed
-        JComponent c = (JComponent) evt.getSource();
-        if (c.getVerifyInputWhenFocusTarget()) {
-//            c.requestFocusInWindow();
-            if (!c.hasFocus()) {
-                clusterCheckBox.setSelected(!clusterCheckBox.isSelected());
-                return;
-            }
-        }
-        clusterXField.setEnabled(clusterCheckBox.isSelected());
-        clusterYField.setEnabled(clusterCheckBox.isSelected());
-        clusterLabel1.setEnabled(clusterCheckBox.isSelected());
-        clusterLabel2.setEnabled(clusterCheckBox.isSelected());
-        clusterOverlapCheckBox.setEnabled(clusterCheckBox.isSelected() && currentAcqSetting.getTilingMode() != TilingSetting.Mode.CENTER);        
-        if (!calculating && recalculateTiles) {
-//        if (recalculateTiles && acqSettings!=null && acqSettings.size()>0) {
-//            AcqSetting setting = acqSettings.get(cAcqSettingIdx);
-//            setting.enableCluster(clusterCheckBox.isSelected());
-            prevObjLabel = currentAcqSetting.getObjective();
-            prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
-            currentAcqSetting.enableCluster(clusterCheckBox.isSelected());
-            calcTilePositions(null, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
-        }
-    }//GEN-LAST:event_clusterCheckBoxActionPerformed
-
-    private void siteCoordFileButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_siteCoordFileButtonActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_siteCoordFileButtonActionPerformed
-
     private void acqSettingDownButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_acqSettingDownButtonActionPerformed
         AcqSettingTableModel ctm = (AcqSettingTableModel) acqSettingTable.getModel();
         int[] selRows = acqSettingTable.getSelectedRows();
@@ -5830,9 +5464,11 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     }
 
     private void addAcqSettingButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addAcqSettingButtonActionPerformed
-        AcqSetting setting = new AcqSetting(createAcqSettingName(), cCameraPixX, cCameraPixY, availableObjectives.get(0), getPixelSize(availableObjectives.get(0)), Integer.parseInt(binningOptions[0]), false);
+        AcqSetting setting = new AcqSetting(createAcqSettingName(), new FieldOfView(currentAcqSetting.getFieldOfView()), availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)), currentDetector.getBinningOption(0,1), false);
+        //passes on copy of currentAcq.fieldOfView, including currentROI setting
+//        AcqSetting setting = new AcqSetting(createAcqSettingName(), new FieldOfView(currentAcqSetting.getFieldOfView()), availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)), false);
         //let user select ChannelGroupStr. if aborted, return value is null --> no sequence added
-        String chGroupStr=loadAvailableChannelConfigs("");
+        String chGroupStr=MMCoreUtils.loadAvailableChannelConfigs(this,"",core);
         if (chGroupStr==null)
             return;
         setting.setChannelGroupStr(chGroupStr);
@@ -5862,15 +5498,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 
     }//GEN-LAST:event_addAcqSettingButtonActionPerformed
 
-    private void binningComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_binningComboBoxActionPerformed
-//        if (acqSettings!=null && acqSettings.size()>0) {
-        if (currentAcqSetting != null) {
-//            AcqSetting setting = acqSettings.get(cAcqSettingIdx);
-            currentAcqSetting.setBinning(Integer.parseInt((String) binningComboBox.getSelectedItem()));
-            updatePixelSize(currentAcqSetting.getObjective());
-        }
-    }//GEN-LAST:event_binningComboBoxActionPerformed
-
     private void setClusterXField() {
         /*        String s=clusterXField.getText();
          if (s.isEmpty())
@@ -5886,7 +5513,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 prevObjLabel = currentAcqSetting.getObjective();
                 prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
                 currentAcqSetting.setNrClusterX(nr);
-                calcTilePositions(null, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+                calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
             }
         } catch (NumberFormatException nfe) {
         }
@@ -5909,46 +5536,12 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 prevObjLabel = currentAcqSetting.getObjective();
                 prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
                 currentAcqSetting.setNrClusterY(nr);
-                calcTilePositions(null, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+                calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
             }
         } catch (NumberFormatException nfe) {
         }
         /*        }*/
     }
-
-    private void clusterXFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_clusterXFieldFocusLost
-//        IJ.log("XField Focus Lost");        
-        JComponent source = (JComponent) evt.getSource();
-        if (source.getInputVerifier().verify(source)) {
-            setClusterXField();
-        }
-    }//GEN-LAST:event_clusterXFieldFocusLost
-
-    private void clusterYFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_clusterYFieldFocusLost
-//        IJ.log("YField Focus Lost");
-        JComponent source = (JComponent) evt.getSource();
-        if (source.getInputVerifier().verify(source)) {
-            setClusterYField();
-        }
-    }//GEN-LAST:event_clusterYFieldFocusLost
-
-    private void clusterOverlapCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clusterOverlapCheckBoxActionPerformed
-//        IJ.log("overlap ActionPerformed");
-        JComponent c = (JComponent) evt.getSource();
-        if (c.getVerifyInputWhenFocusTarget()) {
-//            c.requestFocusInWindow();
-            if (!c.hasFocus()) {
-                clusterOverlapCheckBox.setSelected(!clusterOverlapCheckBox.isSelected());
-                return;
-            }
-        }
-        if (!calculating && recalculateTiles) {
-            prevObjLabel = currentAcqSetting.getObjective();
-            prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
-            currentAcqSetting.enableClusterOverlap(clusterOverlapCheckBox.isSelected());
-            calcTilePositions(null, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
-        }
-    }//GEN-LAST:event_clusterOverlapCheckBoxActionPerformed
 
     private void setMaxSites() {
         try {
@@ -5957,105 +5550,11 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 prevObjLabel = currentAcqSetting.getObjective();
                 prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
                 currentAcqSetting.setMaxSites(nr);
-                calcTilePositions(null, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+                calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
             }
         } catch (NumberFormatException nfe) {
         }
     }
-
-    private void maxSitesFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_maxSitesFieldFocusLost
-        JComponent source = (JComponent) evt.getSource();
-        if (source.getInputVerifier().verify(source)) {
-            setMaxSites();
-        }
-    }//GEN-LAST:event_maxSitesFieldFocusLost
-
-    private void zStackCenteredCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_zStackCenteredCheckBoxActionPerformed
-//        if (acqSettings!=null && acqSettings.size()>0) {
-        if (currentAcqSetting != null) {
-            currentAcqSetting.enableZStackCentered(zStackCenteredCheckBox.isSelected());
-        }
-        enableZStackBeginAndEndPos(!zStackCenteredCheckBox.isSelected());
-    }//GEN-LAST:event_zStackCenteredCheckBoxActionPerformed
-
-    private void zStackBeginFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_zStackBeginFieldFocusLost
-        String s = zStackBeginField.getText();
-        if (s.isEmpty()) {
-            s = "0";
-        }
-        double nr = Double.parseDouble(s);
-        DecimalFormat df = new DecimalFormat("0.00");
-        zStackBeginField.setText(df.format(nr));
-        /*        if (acqSettings!=null && acqSettings.size()>0) {
-         AcqSetting setting=acqSettings.get(cAcqSettingIdx);*/
-        if (currentAcqSetting != null) {
-            currentAcqSetting.setZBegin(nr);
-            int slices = currentAcqSetting.getZSlices();
-            if (currentAcqSetting.getZSlices() != 1) {
-                double zStep = Math.abs(currentAcqSetting.getZEnd() - nr) / slices;
-                zStackStepSizeField.setText(df.format(zStep));
-                zStackTotalDistLabel.setText(df.format(Math.abs(nr - currentAcqSetting.getZBegin())));
-            } else {
-                zStackTotalDistLabel.setText(df.format(0));
-            }
-        }
-    }//GEN-LAST:event_zStackBeginFieldFocusLost
-
-    private void zStackEndFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_zStackEndFieldFocusLost
-        String s = zStackEndField.getText();
-        if (s.isEmpty()) {
-            s = "0";
-        }
-        DecimalFormat df = new DecimalFormat("0.00");
-        double nr = Double.parseDouble(s);
-        zStackEndField.setText(df.format(nr));
-        /*        if (acqSettings!=null && acqSettings.size()>0) {
-         AcqSetting setting=acqSettings.get(cAcqSettingIdx);*/
-        if (currentAcqSetting != null) {
-            currentAcqSetting.setZEnd(nr);
-            int slices = currentAcqSetting.getZSlices();
-            if (currentAcqSetting.getZSlices() != 1) {
-                double zStep = Math.abs(currentAcqSetting.getZBegin() - nr) / slices;
-                zStackStepSizeField.setText(df.format(zStep));
-                zStackTotalDistLabel.setText(df.format(Math.abs(nr - currentAcqSetting.getZBegin())));
-            } else {
-                zStackTotalDistLabel.setText(df.format(0));
-            }
-        }
-    }//GEN-LAST:event_zStackEndFieldFocusLost
-
-    private void intHourFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_intHourFieldActionPerformed
-        setHourInterval();
-    }//GEN-LAST:event_intHourFieldActionPerformed
-
-    private void framesFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_framesFieldActionPerformed
-        setFrames();
-    }//GEN-LAST:event_framesFieldActionPerformed
-
-    private void intSecFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_intSecFieldActionPerformed
-        setSecInterval();
-    }//GEN-LAST:event_intSecFieldActionPerformed
-
-    private void tileOverlapFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_tileOverlapFieldActionPerformed
-        JComponent source = (JComponent) evt.getSource();
-        if (source.getInputVerifier().shouldYieldFocus(source)) {
-            updateTileOverlap();
-        }
-    }//GEN-LAST:event_tileOverlapFieldActionPerformed
-
-    private void clusterYFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clusterYFieldActionPerformed
-        JComponent source = (JComponent) evt.getSource();
-        if (source.getInputVerifier().shouldYieldFocus(source)) {
-            setClusterYField();
-        }
-    }//GEN-LAST:event_clusterYFieldActionPerformed
-
-    private void maxSitesFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_maxSitesFieldActionPerformed
-        JComponent source = (JComponent) evt.getSource();
-        if (source.getInputVerifier().shouldYieldFocus(source)) {
-            setMaxSites();
-        }
-    }//GEN-LAST:event_maxSitesFieldActionPerformed
 
     private void cancelThreadButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cancelThreadButtonActionPerformed
         if (retilingExecutor != null && !retilingExecutor.isTerminated()) {
@@ -6113,40 +5612,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         }
     }//GEN-LAST:event_acqSettingUpButtonActionPerformed
 
-    private void tilingDirComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_tilingDirComboBoxActionPerformed
-        if (!calculating && recalculateTiles) {
-            currentAcqSetting.setTilingDir((Byte) tilingDirComboBox.getSelectedItem());
-        }
-    }//GEN-LAST:event_tilingDirComboBoxActionPerformed
-
-    private void tilingModeComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_tilingModeComboBoxActionPerformed
-        TilingSetting.Mode newMode = (TilingSetting.Mode) tilingModeComboBox.getSelectedItem();
-        tilingFileLabel.setEnabled(newMode == TilingSetting.Mode.FILE);
-        siteCoordFileButton.setEnabled(newMode == TilingSetting.Mode.FILE);
-        clusterCheckBox.setEnabled(newMode != TilingSetting.Mode.FULL);
-        clusterXField.setEnabled(newMode != TilingSetting.Mode.FULL);
-        clusterYField.setEnabled(newMode != TilingSetting.Mode.FULL);
-        clusterLabel1.setEnabled(newMode != TilingSetting.Mode.FULL);
-        clusterLabel2.setEnabled(newMode != TilingSetting.Mode.FULL);
-        clusterOverlapCheckBox.setEnabled(newMode != TilingSetting.Mode.FULL);
-        maxSitesField.setEnabled(newMode != TilingSetting.Mode.FULL && newMode != TilingSetting.Mode.CENTER);
-        maxSitesLabel.setEnabled(newMode != TilingSetting.Mode.FULL && newMode != TilingSetting.Mode.CENTER);
-        if (!calculating && recalculateTiles) {
-            if (newMode != currentAcqSetting.getTilingMode()) {
-                prevObjLabel = currentAcqSetting.getObjective();
-                prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
-                currentAcqSetting.setTilingMode(newMode);
-                calcTilePositions(null, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
-            }
-        }
-    }//GEN-LAST:event_tilingModeComboBoxActionPerformed
-
-    private void acqSelector_AreasActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_acqSelector_AreasActionPerformed
-        int selRow=acqSelector_Areas.getSelectedIndex();
-        if (selRow>=0 && selRow!=acqSettingTable.getSelectedRow())
-            acqSettingTable.setRowSelectionInterval(selRow, selRow);
-    }//GEN-LAST:event_acqSelector_AreasActionPerformed
-
     private ImageTagFilter createImageTagFilter(String procName, String tag, List<String> args, boolean isFile) {
         if (procName==null)
             procName=tag;
@@ -6179,8 +5644,8 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         if (parent.getChildCount()>0) {
             lastChildDp=(DataProcessor)((DefaultMutableTreeNode)parent.getLastChild()).getUserObject();
         }
-        if (!(newDp instanceof TaggedImageAnalyzer) && !(newDp instanceof BranchedAnalyzer)
-                && lastChildDp!=null && !(lastChildDp instanceof TaggedImageAnalyzer) && !(lastChildDp instanceof BranchedAnalyzer)) {
+        if (!(newDp instanceof TaggedImageAnalyzer) && !(newDp instanceof BranchedProcessor)
+                && lastChildDp!=null && !(lastChildDp instanceof TaggedImageAnalyzer) && !(lastChildDp instanceof BranchedProcessor)) {
             tm.insertNodeInto(newNode,parent,parent.getChildCount()-1);
 //            for (int i=parent.getChildCount()-1;i>0;i--) {
                 DefaultMutableTreeNode chNode=(DefaultMutableTreeNode)parent.getLastChild();
@@ -6192,7 +5657,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             DataProcessor dp=(DataProcessor)parent.getUserObject();  
             int pos=0;
             if (parent.getChildCount()>0) {   
-                if (lastChildDp instanceof BranchedAnalyzer || lastChildDp instanceof TaggedImageAnalyzer) {
+                if (lastChildDp instanceof BranchedProcessor || lastChildDp instanceof TaggedImageAnalyzer) {
                  //   pos=0;
                     pos=parent.getChildCount();
                 }else {
@@ -6244,7 +5709,11 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 //        List<String> channels=new ArrayList<String>((int)availableChannels.size());
 //        for (String ch:availableChannels)
 //            channels.add(ch);
-        itf.setOptions(Arrays.asList(availableChannels.toArray()));
+        List<String> chList=new ArrayList<String>();
+        for (Channel ch:currentAcqSetting.getChannels())
+            chList.add(ch.getName());
+        itf.setOptions(chList);
+//        itf.setOptions(Arrays.asList(availableChannels.toArray()));
         itf.makeConfigurationGUI();
         itf.dispose();
         if (!"".equals(itf.getKey())) {
@@ -6377,7 +5846,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                         if (selectedNode.getParent().getChildCount()==1 
                                 || ((DefaultMutableTreeNode)selectedNode.getParent()).getLastChild()==selectedNode
                                 || dpOfLastChildInParentNode instanceof TaggedImageAnalyzer 
-                                || dpOfLastChildInParentNode instanceof BranchedAnalyzer) {
+                                || dpOfLastChildInParentNode instanceof BranchedProcessor) {
                             insertPos=selectedNode.getParent().getChildCount();
                             tm.insertNodeInto(node, 
                                     (DefaultMutableTreeNode)selectedNode.getParent(), 
@@ -6385,12 +5854,12 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                         } else {
                             insertPos=selectedNode.getParent().getChildCount()-1;                            
                             if ((DataProcessor)node.getUserObject() instanceof TaggedImageAnalyzer ||
-                                (DataProcessor)node.getUserObject() instanceof BranchedAnalyzer) {
+                                (DataProcessor)node.getUserObject() instanceof BranchedProcessor) {
                                 tm.insertNodeInto(node, 
                                     (DefaultMutableTreeNode)selectedNode.getParent(), 
                                     insertPos);
                             } else if (!(dpOfLastChildInParentNode instanceof TaggedImageAnalyzer) &&
-                                !(dpOfLastChildInParentNode instanceof BranchedAnalyzer)) {
+                                !(dpOfLastChildInParentNode instanceof BranchedProcessor)) {
                                 JOptionPane.showMessageDialog(null,"Conflict. Two DataProcessors at same hierarchy level. \nAdding branch point.");
                                 DefaultMutableTreeNode branchNode;
                                 if (isDescendantOfStorage) {
@@ -6474,7 +5943,11 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         if (dp instanceof ImageTagFilterOpt) {
             ImageTagFilterOpt itfo=(ImageTagFilterOpt)dp;
             if (itfo.getKey().equals(MMTags.Image.CHANNEL_NAME)) {
-                itfo.setOptions(Arrays.asList(availableChannels.toArray()));
+                List<String> chList=new ArrayList<String>();
+                for (Channel ch:currentAcqSetting.getChannels())
+                    chList.add(ch.getName());
+                itfo.setOptions(chList);
+                //itfo.setOptions(Arrays.asList(availableChannels.toArray()));
             } else if (itfo.getKey().equals("Area")) {
                 List<String> areas=new ArrayList<String>(acqLayout.getAreaArray().size());
                 for (Area a:acqLayout.getAreaArray())
@@ -6545,12 +6018,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             createAndAddProcessorNode(selectedNode,itf); 
         }    
     }//GEN-LAST:event_addAreaFilterButtonActionPerformed
-
-    private void acqSelector_ProcessorsActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_acqSelector_ProcessorsActionPerformed
-        int selRow=acqSelector_Processors.getSelectedIndex();
-        if (selRow>=0 && selRow!=acqSettingTable.getSelectedRow())
-            acqSettingTable.setRowSelectionInterval(selRow, selRow);
-    }//GEN-LAST:event_acqSelector_ProcessorsActionPerformed
 
     private void loadAcqSettingButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadAcqSettingButtonActionPerformed
         JFileChooser fc=new JFileChooser();
@@ -6675,7 +6142,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         }
         
         if (!new File(dataProcessorPath).isDirectory())
-            dataProcessorPath=Prefs.getHomeDir();
+            dataProcessorPath=Prefs.getImageJDir();
         JFileChooser fc=new JFileChooser(new File(dataProcessorPath));
 
         fc.showOpenDialog(fc);
@@ -6762,7 +6229,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                     List<DataProcessor<TaggedImage>> loadedDPs=gui.getImageProcessorPipeline();
                     for (DataProcessor<TaggedImage> ldp:loadedDPs) {
                         if (ldp.getClass().getName().equals(dp.getClass().getName())) {
-                            IJ.showMessage("dp already loaded");
+                            JOptionPane.showMessageDialog(null,"DataProcessor already loaded.");
                             dp=ldp;
                             try {
                                 Method guiMethod = dp.getClass().getDeclaredMethod("makeConfigurationGUI", new Class[]{});
@@ -6799,10 +6266,10 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                     } 
                     createAndAddProcessorNode(selectedNode,(DataProcessor)dp);
                 } else {
-                    JOptionPane.showMessageDialog(this,"The selected file is not a DataProcessor");                        
+                    JOptionPane.showMessageDialog(this,"Error: The selected file is not a DataProcessor");                        
                 }
             } catch (ClassNotFoundException ex) {
-                JOptionPane.showMessageDialog(this,"The selected class cannot be found.");                        
+                JOptionPane.showMessageDialog(this,"Error: The selected class cannot be found.");                        
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex+"2");
             } catch (InstantiationException ex) {
                 JOptionPane.showMessageDialog(this,"Error: Class instantiation.");                        
@@ -7156,7 +6623,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     }//GEN-LAST:event_zoomButtonActionPerformed
 
     private void moveToScreenCoordButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_moveToScreenCoordButtonActionPerformed
-        if (!landmarkFound) {
+        if (acqLayout.getNoOfMappedStagePos() == 0) {
             JOptionPane.showMessageDialog(this,"At least one layout landmark needs to be set first.");
             return;
         }
@@ -7224,16 +6691,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         }
     }//GEN-LAST:event_setLandmarkButtonActionPerformed
 
-    private void zStackCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_zStackCheckBoxActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_zStackCheckBoxActionPerformed
-
-    private void autofocusButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_autofocusButtonActionPerformed
-        gui.showAutofocusDialog();
-        IJ.showMessage(
-            gui.getAutofocusManager().getAfDevices().toString());
-    }//GEN-LAST:event_autofocusButtonActionPerformed
-
     private void loadImagePipelineButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadImagePipelineButtonActionPerformed
         try {
             if (gui.versionLessThan("1.4.18")) {
@@ -7277,6 +6734,631 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         for (int i=0; i<processorTreeView.getRowCount(); i++)
             processorTreeView.expandRow(i);
     }//GEN-LAST:event_loadImagePipelineButtonActionPerformed
+
+    private void siteOverlapCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_siteOverlapCheckBoxActionPerformed
+        //        IJ.log("overlap ActionPerformed");
+        JComponent c = (JComponent) evt.getSource();
+        if (c.getVerifyInputWhenFocusTarget()) {
+            //            c.requestFocusInWindow();
+            if (!c.hasFocus()) {
+                siteOverlapCheckBox.setSelected(!siteOverlapCheckBox.isSelected());
+                return;
+            }
+        }
+        if (!calculating && recalculateTiles) {
+            prevObjLabel = currentAcqSetting.getObjective();
+            prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
+            currentAcqSetting.enableSiteOverlap(siteOverlapCheckBox.isSelected());
+            calcTilePositions(null,currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+        }
+    }//GEN-LAST:event_siteOverlapCheckBoxActionPerformed
+
+    private void clusterXFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clusterXFieldActionPerformed
+        JComponent source = (JComponent) evt.getSource();
+        if (source.getInputVerifier().shouldYieldFocus(source)) {
+            setClusterXField();
+        }
+    }//GEN-LAST:event_clusterXFieldActionPerformed
+
+    private void clusterXFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_clusterXFieldFocusLost
+        //        IJ.log("XField Focus Lost");
+        JComponent source = (JComponent) evt.getSource();
+        if (source.getInputVerifier().verify(source)) {
+            setClusterXField();
+        }
+    }//GEN-LAST:event_clusterXFieldFocusLost
+
+    private void tilingModeComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_tilingModeComboBoxActionPerformed
+        TilingSetting.Mode newMode = (TilingSetting.Mode) tilingModeComboBox.getSelectedItem();
+        clusterCheckBox.setEnabled(newMode != TilingSetting.Mode.FULL);
+        clusterXField.setEnabled(newMode != TilingSetting.Mode.FULL);
+        clusterYField.setEnabled(newMode != TilingSetting.Mode.FULL);
+        clusterLabel1.setEnabled(newMode != TilingSetting.Mode.FULL);
+        clusterLabel2.setEnabled(newMode != TilingSetting.Mode.FULL);
+        siteOverlapCheckBox.setEnabled(newMode == TilingSetting.Mode.RANDOM);
+        maxSitesField.setEnabled(newMode != TilingSetting.Mode.FULL && newMode != TilingSetting.Mode.CENTER);
+        maxSitesLabel.setEnabled(newMode != TilingSetting.Mode.FULL && newMode != TilingSetting.Mode.CENTER);
+        if (!calculating && recalculateTiles) {
+            if (newMode != currentAcqSetting.getTilingMode()) {
+                prevObjLabel = currentAcqSetting.getObjective();
+                prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
+                currentAcqSetting.setTilingMode(newMode);
+                calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+            }
+        }
+    }//GEN-LAST:event_tilingModeComboBoxActionPerformed
+
+    private void autofocusButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_autofocusButtonActionPerformed
+        gui.showAutofocusDialog();
+        IJ.showMessage(
+            gui.getAutofocusManager().getAfDevices().toString());
+    }//GEN-LAST:event_autofocusButtonActionPerformed
+
+    private void acqOrderListActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_acqOrderListActionPerformed
+        //        if (acqSettings!=null && acqSettings.size()>0) {
+            if (currentAcqSetting != null && acqSettings.size() > 0) {
+                int acqOrderIdx = acqOrderList.getSelectedIndex();
+                currentAcqSetting.setAcqOrder(acqOrderIdx);
+                //            IJ.log("acqOrderListActionPerformed. "+Integer.toString(acqOrderIdx)+":, "+(String)acqOrderList.getSelectedItem());
+            }
+    }//GEN-LAST:event_acqOrderListActionPerformed
+
+    private void insideOnlyCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_insideOnlyCheckBoxActionPerformed
+        JComponent c = (JComponent) evt.getSource();
+        if (c.getVerifyInputWhenFocusTarget()) {
+            //            c.requestFocusInWindow();
+            if (!c.hasFocus()) {
+                insideOnlyCheckBox.setSelected(!insideOnlyCheckBox.isSelected());
+                return;
+            }
+        }
+        setTilingInsideAreaOnly(insideOnlyCheckBox.isSelected());
+    }//GEN-LAST:event_insideOnlyCheckBoxActionPerformed
+
+    private void clusterCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clusterCheckBoxActionPerformed
+        JComponent c = (JComponent) evt.getSource();
+        if (c.getVerifyInputWhenFocusTarget()) {
+            //            c.requestFocusInWindow();
+            if (!c.hasFocus()) {
+                clusterCheckBox.setSelected(!clusterCheckBox.isSelected());
+                return;
+            }
+        }
+        clusterXField.setEnabled(clusterCheckBox.isSelected());
+        clusterYField.setEnabled(clusterCheckBox.isSelected());
+        clusterLabel1.setEnabled(clusterCheckBox.isSelected());
+        clusterLabel2.setEnabled(clusterCheckBox.isSelected());
+        //        clusterOverlapCheckBox.setEnabled(clusterCheckBox.isSelected() && currentAcqSetting.getTilingMode() != TilingSetting.Mode.CENTER);
+        if (!calculating && recalculateTiles) {
+            //        if (recalculateTiles && acqSettings!=null && acqSettings.size()>0) {
+                //            AcqSetting setting = acqSettings.get(cAcqSettingIdx);
+                //            setting.enableCluster(clusterCheckBox.isSelected());
+                prevObjLabel = currentAcqSetting.getObjective();
+                prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
+                currentAcqSetting.enableCluster(clusterCheckBox.isSelected());
+                calcTilePositions(null,currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+            }
+    }//GEN-LAST:event_clusterCheckBoxActionPerformed
+
+    private void binningComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_binningComboBoxActionPerformed
+        //        if (acqSettings!=null && acqSettings.size()>0) {
+            if (currentAcqSetting != null) {
+                //            AcqSetting setting = acqSettings.get(cAcqSettingIdx);
+                currentAcqSetting.setBinning(Integer.parseInt((String) binningComboBox.getSelectedItem()));
+                updatePixelSize(currentAcqSetting.getObjective());
+            }
+    }//GEN-LAST:event_binningComboBoxActionPerformed
+
+    private void autofocusCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_autofocusCheckBoxItemStateChanged
+        /*        if (acqSettings!=null && acqSettings.size()>0) {
+            AcqSetting setting = acqSettings.get(cAcqSettingIdx);*/
+            if (currentAcqSetting != null) {
+                currentAcqSetting.enableAutofocus(autofocusCheckBox.isSelected());
+            }
+            if (autofocusCheckBox.isSelected()) {
+                zStackCenteredCheckBox.setText("Centered around autofocus Z-position");
+            } else {
+                zStackCenteredCheckBox.setText("Centered around reference Z-position");
+            }
+    }//GEN-LAST:event_autofocusCheckBoxItemStateChanged
+
+    private void tileOverlapFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_tileOverlapFieldActionPerformed
+        JComponent source = (JComponent) evt.getSource();
+        if (source.getInputVerifier().shouldYieldFocus(source)) {
+            updateTileOverlap();
+        }
+    }//GEN-LAST:event_tileOverlapFieldActionPerformed
+
+    private void tileOverlapFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_tileOverlapFieldFocusLost
+        JComponent source = (JComponent) evt.getSource();
+        if (source.getInputVerifier().verify(source)) {
+            updateTileOverlap();
+        }
+    }//GEN-LAST:event_tileOverlapFieldFocusLost
+
+    private void maxSitesFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_maxSitesFieldActionPerformed
+        JComponent source = (JComponent) evt.getSource();
+        if (source.getInputVerifier().shouldYieldFocus(source)) {
+            setMaxSites();
+        }
+    }//GEN-LAST:event_maxSitesFieldActionPerformed
+
+    private void maxSitesFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_maxSitesFieldFocusLost
+        JComponent source = (JComponent) evt.getSource();
+        if (source.getInputVerifier().verify(source)) {
+            setMaxSites();
+        }
+    }//GEN-LAST:event_maxSitesFieldFocusLost
+
+    private void zStackCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_zStackCheckBoxActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_zStackCheckBoxActionPerformed
+
+    private void zStackCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_zStackCheckBoxItemStateChanged
+        if (currentAcqSetting != null) {
+            /*        if (acqSettings!=null && acqSettings.size()>0) {
+                AcqSetting setting = acqSettings.get(cAcqSettingIdx);*/
+                currentAcqSetting.enableZStack(zStackCheckBox.isSelected());
+            }
+            enableZStackPane(zStackCheckBox.isSelected());
+    }//GEN-LAST:event_zStackCheckBoxItemStateChanged
+
+    private void objectiveComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_objectiveComboBoxActionPerformed
+        if (evt.getSource() == objectiveComboBox) {
+            String selectedObjective = (String) objectiveComboBox.getSelectedItem();
+            //            if (acqSettings!=null && acqSettings.size()>cAcqSettingIdx) {
+                if (currentAcqSetting != null) {
+                    //                AcqSetting setting=acqSettings.get(cAcqSettingIdx);
+                    if (!currentAcqSetting.getObjective().equals(selectedObjective)) {
+                        if (!calculating) {
+                            prevObjLabel = currentAcqSetting.getObjective();
+                            prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
+                            currentAcqSetting.setObjective(selectedObjective, getObjPixelSize(selectedObjective));
+                            //                        IJ.log("objectiveComboBoxActionPerformed. "+selectedObjective);
+                            //                    try {
+                                updatePixelSize(selectedObjective); // calls updateFOVDimension, updateTileOverlap, updateTileSizeLabel
+                                //                updateFOVDimension();
+                                //                updateTileSizeLabel();
+                                //                updateTileOverlap();
+                                if (currentAcqSetting.getImagePixelSize() > 0 && recalculateTiles) {
+                                    calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+                                } else if (currentAcqSetting.getImagePixelSize() <= 0) {
+                                    for (Area a:acqLayout.getAreaArray()) {
+                                        a.setUnknownTileNum(true);
+                                    }
+                                    currentAcqSetting.setTotalTiles(-1);
+                                    ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.getSelectedRow());
+                                    acqLayoutPanel.repaint();
+                                }
+                                //                Rectangle r=layoutScrollPane.getVisibleRect();
+                                //                ((LayoutPanel)acqLayoutPanel).calculateScale(r.width,r.height);
+                                //                    } catch (Exception ex) {
+                                //                        Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                                //                    }
+                        }
+                    }
+                }
+            }
+    }//GEN-LAST:event_objectiveComboBoxActionPerformed
+
+    private void tilingDirComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_tilingDirComboBoxActionPerformed
+        if (!calculating && recalculateTiles) {
+            currentAcqSetting.setTilingDir((Byte) tilingDirComboBox.getSelectedItem());
+        }
+    }//GEN-LAST:event_tilingDirComboBoxActionPerformed
+
+    private void clusterYFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clusterYFieldActionPerformed
+        JComponent source = (JComponent) evt.getSource();
+        if (source.getInputVerifier().shouldYieldFocus(source)) {
+            setClusterYField();
+        }
+    }//GEN-LAST:event_clusterYFieldActionPerformed
+
+    private void clusterYFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_clusterYFieldFocusLost
+        //        IJ.log("YField Focus Lost");
+        JComponent source = (JComponent) evt.getSource();
+        if (source.getInputVerifier().verify(source)) {
+            setClusterYField();
+        }
+    }//GEN-LAST:event_clusterYFieldFocusLost
+
+    private void timelapseCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_timelapseCheckBoxItemStateChanged
+        //        if (acqSettings!=null && acqSettings.size()>0) {
+            //            AcqSetting setting = acqSettings.get(cAcqSettingIdx);
+            if (currentAcqSetting != null) {
+                currentAcqSetting.enableTimelapse(timelapseCheckBox.isSelected());
+            }
+            if (timelapseCheckBox.isSelected()) {
+                //           if (acqSettings!=null && acqSettings.size() > cAcqSettingIdx)
+                if (currentAcqSetting != null) {
+                    calculateDuration(currentAcqSetting);
+                } else {
+                    calculateDuration(null);
+                }
+            } else {
+                durationText.setText("No Time-lapse acquisition");
+            }
+            enableTimelapsePane(timelapseCheckBox.isSelected());
+    }//GEN-LAST:event_timelapseCheckBoxItemStateChanged
+
+    private void framesFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_framesFieldFocusLost
+        setFrames();
+    }//GEN-LAST:event_framesFieldFocusLost
+
+    private void framesFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_framesFieldActionPerformed
+        setFrames();
+    }//GEN-LAST:event_framesFieldActionPerformed
+
+    private void intSecFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_intSecFieldFocusLost
+        setSecInterval();
+    }//GEN-LAST:event_intSecFieldFocusLost
+
+    private void intSecFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_intSecFieldActionPerformed
+        setSecInterval();
+    }//GEN-LAST:event_intSecFieldActionPerformed
+
+    private void intMinFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_intMinFieldFocusLost
+        setMinInterval();
+    }//GEN-LAST:event_intMinFieldFocusLost
+
+    private void intMinFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_intMinFieldActionPerformed
+        setMinInterval();
+    }//GEN-LAST:event_intMinFieldActionPerformed
+
+    private void intHourFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_intHourFieldFocusLost
+        setHourInterval();
+    }//GEN-LAST:event_intHourFieldFocusLost
+
+    private void intHourFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_intHourFieldActionPerformed
+        setHourInterval();
+    }//GEN-LAST:event_intHourFieldActionPerformed
+
+    private void reverseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_reverseButtonActionPerformed
+        /*        if (acqSettings!=null && acqSettings.size()>0) {
+            AcqSetting setting=acqSettings.get(cAcqSettingIdx);*/
+            if (currentAcqSetting != null) {
+                String tmpStr = zStackBeginField.getText();
+                zStackBeginField.setText(zStackEndField.getText());
+                zStackEndField.setText(tmpStr);
+                double temp = currentAcqSetting.getZBegin();
+                currentAcqSetting.setZBegin(currentAcqSetting.getZEnd());
+                currentAcqSetting.setZEnd(temp);
+            }
+    }//GEN-LAST:event_reverseButtonActionPerformed
+
+    private void zStackEndFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_zStackEndFieldFocusLost
+        String s = zStackEndField.getText();
+        if (s.isEmpty()) {
+            s = "0";
+        }
+        DecimalFormat df = new DecimalFormat("0.00");
+        double nr = Double.parseDouble(s);
+        zStackEndField.setText(df.format(nr));
+        /*        if (acqSettings!=null && acqSettings.size()>0) {
+            AcqSetting setting=acqSettings.get(cAcqSettingIdx);*/
+            if (currentAcqSetting != null) {
+                currentAcqSetting.setZEnd(nr);
+                int slices = currentAcqSetting.getZSlices();
+                if (currentAcqSetting.getZSlices() != 1) {
+                    double zStep = Math.abs(currentAcqSetting.getZBegin() - nr) / slices;
+                    zStackStepSizeField.setText(df.format(zStep));
+                    zStackTotalDistLabel.setText(df.format(Math.abs(nr - currentAcqSetting.getZBegin()))+" um");
+                } else {
+                    zStackTotalDistLabel.setText(df.format(0)+" um");
+                }
+            }
+    }//GEN-LAST:event_zStackEndFieldFocusLost
+
+    private void zStackBeginFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_zStackBeginFieldFocusLost
+        String s = zStackBeginField.getText();
+        if (s.isEmpty()) {
+            s = "0";
+        }
+        double nr = Double.parseDouble(s);
+        DecimalFormat df = new DecimalFormat("0.00");
+        zStackBeginField.setText(df.format(nr));
+        /*        if (acqSettings!=null && acqSettings.size()>0) {
+            AcqSetting setting=acqSettings.get(cAcqSettingIdx);*/
+            if (currentAcqSetting != null) {
+                currentAcqSetting.setZBegin(nr);
+                int slices = currentAcqSetting.getZSlices();
+                if (currentAcqSetting.getZSlices() != 1) {
+                    double zStep = Math.abs(currentAcqSetting.getZEnd() - nr) / slices;
+                    zStackStepSizeField.setText(df.format(zStep));
+                    zStackTotalDistLabel.setText(df.format(Math.abs(nr - currentAcqSetting.getZBegin()))+" um");
+                } else {
+                    zStackTotalDistLabel.setText(df.format(0)+" um");
+                }
+            }
+    }//GEN-LAST:event_zStackBeginFieldFocusLost
+
+    private void zStackStepSizeFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_zStackStepSizeFieldFocusLost
+        String stepSizeStr = zStackStepSizeField.getText();
+        if (stepSizeStr.isEmpty()) {
+            stepSizeStr = "0";
+        }
+        double stepSize = Double.parseDouble(stepSizeStr);
+        DecimalFormat df = new DecimalFormat("0.00");
+        zStackStepSizeField.setValue(df.format(stepSize));
+        //        if (stepSize<=0) {
+            //            JOptionPane.showMessageDialog(null, "Error: Please enter a number bigger than 0", "Error Message", JOptionPane.ERROR_MESSAGE);
+            //            zStackStepSizeField.requestFocus();
+            //        } else {
+            /*            if (acqSettings!=null && acqSettings.size()>0) {
+                AcqSetting setting = acqSettings.get(cAcqSettingIdx);*/
+                if (currentAcqSetting != null) {
+                    currentAcqSetting.setZStepSize(stepSize);
+                    if (zStackCenteredCheckBox.isSelected()) {
+                        calculateTotalZDist(currentAcqSetting);
+                    } else {
+                        currentAcqSetting.setZSlices((int) Math.abs(Math.round(currentAcqSetting.getZBegin() - currentAcqSetting.getZEnd()) / currentAcqSetting.getZStepSize()) + 1);
+                        zStackSlicesField.setValue(Integer.toString(currentAcqSetting.getZSlices()));
+                        //                zStackSlicesField.setValue(Integer.toString(zStackSlices));
+                        //                    calculateTotalZDist(setting);
+                    }
+                    zStackTotalDistLabel.setText(df.format(currentAcqSetting.getZBegin() - currentAcqSetting.getZEnd())+" um");
+                }
+                //        }
+    }//GEN-LAST:event_zStackStepSizeFieldFocusLost
+
+    private void zStackSlicesFieldPropertyChange(java.beans.PropertyChangeEvent evt) {//GEN-FIRST:event_zStackSlicesFieldPropertyChange
+        //IJ.showMessage("zStackSlicesFieldPropertyChange");
+    }//GEN-LAST:event_zStackSlicesFieldPropertyChange
+
+    private void zStackSlicesFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_zStackSlicesFieldFocusLost
+        String sliceStr = zStackSlicesField.getText();
+        if (sliceStr.isEmpty()) {
+            sliceStr = "1";
+        }
+        int slices = Integer.parseInt(sliceStr);
+        if (slices <= 0) {
+            JOptionPane.showMessageDialog(null, "Error: Please enter a number larger than 0", "Error Message", JOptionPane.ERROR_MESSAGE);
+            //            AcqSetting setting = acqSettings.get(cAcqSettingIdx);
+            currentAcqSetting.setZSlices(1);
+            zStackSlicesField.setText(Integer.toString(currentAcqSetting.getZSlices()));
+            zStackSlicesField.requestFocus();
+        } else {
+            /*            if (acqSettings!=null && acqSettings.size()>0) {
+                AcqSetting setting = acqSettings.get(cAcqSettingIdx);*/
+                if (currentAcqSetting != null) {
+                    DecimalFormat df = new DecimalFormat("0.00");
+                    currentAcqSetting.setZSlices(slices);
+                    if (zStackCenteredCheckBox.isSelected()) {
+                        calculateTotalZDist(currentAcqSetting);
+                    } else {
+                        if (slices > 1) {
+                            double stepSize = Math.abs((currentAcqSetting.getZBegin() - currentAcqSetting.getZEnd())) / (currentAcqSetting.getZSlices() - 1);
+                            currentAcqSetting.setZStepSize(stepSize);
+                            zStackStepSizeField.setValue(df.format(stepSize));
+                            //calculateTotalZDist(setting);
+                        } else {
+                            zStackTotalDistLabel.setText(df.format(0)+" um");
+                        }
+                        //                zStackStepSizeField.setValue(Double.toString(zStackStepSize));
+                    }
+                }
+            }
+    }//GEN-LAST:event_zStackSlicesFieldFocusLost
+
+    private void zStackCenteredCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_zStackCenteredCheckBoxActionPerformed
+        //        if (acqSettings!=null && acqSettings.size()>0) {
+            if (currentAcqSetting != null) {
+                currentAcqSetting.enableZStackCentered(zStackCenteredCheckBox.isSelected());
+            }
+            enableZStackBeginAndEndPos(!zStackCenteredCheckBox.isSelected());
+    }//GEN-LAST:event_zStackCenteredCheckBoxActionPerformed
+
+    private void zStackCenteredCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_zStackCenteredCheckBoxItemStateChanged
+
+    }//GEN-LAST:event_zStackCenteredCheckBoxItemStateChanged
+
+    private void liveButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_liveButtonActionPerformed
+        if (liveButton.getText().equals("Live")) {
+            if (gui.isLiveModeOn()) {
+                JOptionPane.showMessageDialog(this, "Live Mode is already running.", "Live Mode", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (channelTable.getSelectedRowCount() != 1) {
+                JOptionPane.showMessageDialog(this, "Select one channel");
+                return;
+            }    
+            int[] rows = channelTable.getSelectedRows();
+            ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
+            Channel c = ctm.getRowData(rows[0]);
+            if (setObjectiveAndBinning(currentAcqSetting, true)) {
+                try {
+                    core.setExposure(c.getExposure());
+                    //                            core.setConfig(channelGroupStr, c.getName());
+                    core.setConfig(currentAcqSetting.getChannelGroupStr(), c.getName());
+                    //gui.setChannelExposureTime(channelGroupStr, c.getName(), c.getExposure());
+                    gui.refreshGUI();
+                    //gui.setConfigChanged(true);
+                } catch (Exception e) {
+                }
+                gui.enableLiveMode(true);
+            }
+//            liveButton.setText("Stop");
+        } else {
+            gui.enableLiveMode(false);
+        }      
+    }//GEN-LAST:event_liveButtonActionPerformed
+
+    private void snapButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_snapButtonActionPerformed
+        AbstractCellEditor ae = (AbstractCellEditor) channelTable.getCellEditor();
+        if (ae != null) {
+            ae.stopCellEditing();
+        }
+        /*        AcqSetting setting=null;
+        if (acqSettings!=null && acqSettings.size()>cAcqSettingIdx) {
+            setting=acqSettings.get(cAcqSettingIdx);
+        }*/
+        if (channelTable.getSelectedRowCount() < 1) {
+            JOptionPane.showMessageDialog(this, "Select at least one channel");
+        } else {
+            if (setObjectiveAndBinning(currentAcqSetting, true)) {
+                String chGroupStr=MMCoreUtils.loadAvailableChannelConfigs(this,currentAcqSetting.getChannelGroupStr(),core);
+                if (!chGroupStr.equals(currentAcqSetting.getChannelGroupStr())) {
+                    currentAcqSetting.setChannelGroupStr(chGroupStr);
+                    initializeChannelTable(currentAcqSetting);
+                } else {
+                    if (chGroupStr!=null) {
+                        int[] rows = channelTable.getSelectedRows();
+//                        ImageStack stack = new ImageStack(cCameraPixX / currentAcqSetting.getBinning(), cCameraPixY / currentAcqSetting.getBinning());
+                        
+                        //read out currentROI setting and update ROI in detector of current AcqSetting
+                        FieldOfView fov=currentAcqSetting.getFieldOfView();
+                        Rectangle snapROI=fov.getROI_Pixel(currentAcqSetting.getBinning());
+                        Rectangle coreROI=null;
+                        boolean updatedROI=false;
+                        
+                        try {
+                            coreROI=core.getROI();
+                            if (coreROI !=null 
+                                    && coreROI.width == fov.getROI_Pixel(currentAcqSetting.getBinning()).width 
+                                    && coreROI.height == fov.getROI_Pixel(currentAcqSetting.getBinning()).height) {
+                                JOptionPane.showMessageDialog(this, "ROIs are not supported. Clearing ROI.");
+                                fov.clearROI();
+                                core.clearROI();
+                            }    
+                        } catch (Exception ex) {
+                            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+
+                        /*
+                        // for future: handle ROIs
+                        try {
+                            coreROI=core.getROI();
+                            IJ.showMessage("coreROI: "+coreROI.toString()+ ", snapROI: "+(snapROI==null ? "null" : snapROI.toString()));
+                            if (coreROI!=null && !coreROI.equals(snapROI) && JOptionPane.showConfirmDialog(this,"The current camera ROI set in Micro-Manager is different then the ROI \n"
+                                        + "defined for this acquisition setting.\n"
+                                        + "Do you want to use the Micro-Manager camera ROI for this setting?","",JOptionPane.YES_NO_OPTION)==JOptionPane.YES_OPTION) {
+                                snapROI=coreROI;
+                                updatedROI=true;
+                            }
+                        } catch (Exception ex) {
+                            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                        try {
+                            IJ.showMessage("coreROI: "+coreROI.toString()+ ", snapROI: "+(snapROI==null ? "null" : snapROI.toString()));
+                            if (snapROI!=null) {
+                                core.clearROI();
+                                core.setROI(snapROI.x, snapROI.y, snapROI.width, snapROI.height);
+                            } else {
+                                core.clearROI();
+                                stack = new ImageStack(fov.fullChipWidth_Pixel, fov.fullChipHeight_Pixel);
+                            }
+                            IJ.showMessage("coreROI: "+coreROI.toString()+ ", snapROI: "+(snapROI==null ? "null" : snapROI.toString()));
+                        } catch (Exception ex) {
+                            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                        }*/
+                        ImageStack stack=null;
+                        int i = 0;
+                        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
+                        for (int row : rows) {
+                            Channel c = ctm.getRowData(row);
+                            //snapAndDisplayImage(c.getName(),c.getExposure(),c.getZOffset(),c.getColor());
+                            ImageProcessor ip = snapImage(c.getName(), c.getExposure(), c.getZOffset());
+                            if (stack==null)
+                                stack = new ImageStack(ip.getWidth(),ip.getHeight());
+                            stack.addSlice(c.getName(),ip, i);
+                            i++;
+                        }
+                        ImagePlus imp = new ImagePlus();
+                        imp.setStack(stack, rows.length, 1, 1);
+                        imp.setTitle("Snap");
+                        Calibration cal = imp.getCalibration();
+                        cal.setUnit("um");
+                        cal.pixelWidth = currentAcqSetting.getImagePixelSize();
+                        cal.pixelHeight = currentAcqSetting.getImagePixelSize();
+                        imp.setCalibration(cal);
+                        CompositeImage ci = new CompositeImage(imp);
+                        i = 0;
+                        LUT[] luts = new LUT[rows.length];
+                        for (int row : rows) {
+                            luts[i] = LUT.createLutFromColor(currentAcqSetting.getChannels().get(row).getColor());//ctm.getRowData(row).getColor());
+                            i++;
+                        }
+                        ci.setLuts(luts);
+                        ci.show();
+                        IJ.run("Channels Tool...");
+                        
+                        /* for future: handle ROIs
+                        if (updatedROI && JOptionPane.showConfirmDialog(this,"Do you want to keep this camera ROI for acquisition setting '"
+                                +currentAcqSetting.getName()+"'?","",JOptionPane.YES_NO_OPTION)==JOptionPane.YES_OPTION) {
+                            fov.setRoi_Pixel(snapROI);
+                            calcTilePositions(null,fov, currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+                        }
+                        
+                        if (coreROI != null)
+                            try {
+                                core.setROI(coreROI.x,coreROI.y,coreROI.width,coreROI.height);
+                        } catch (Exception ex) {
+                            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                        }*/
+                    }
+                }  
+            } else {
+                currentAcqSetting.setObjectiveDevStr(changeConfigGroupStr("Objective",""));
+            }
+        }
+    }//GEN-LAST:event_snapButtonActionPerformed
+
+    private void channelDownButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_channelDownButtonActionPerformed
+        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
+        int[] selRows = channelTable.getSelectedRows();
+        if (selRows.length > 0 & selRows[selRows.length - 1] < ctm.getRowCount() - 1) {
+            int newSelRow = ctm.rowDown(selRows);
+            channelTable.setRowSelectionInterval(newSelRow, newSelRow + selRows.length - 1);
+        }
+    }//GEN-LAST:event_channelDownButtonActionPerformed
+
+    private void channelUpButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_channelUpButtonActionPerformed
+        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
+        int[] selRows = channelTable.getSelectedRows();
+        if (selRows.length > 0 & selRows[0] > 0) {
+            int newSelRow = ctm.rowUp(selRows);
+            ListSelectionModel lsm = areaTable.getSelectionModel();
+            channelTable.setRowSelectionInterval(newSelRow, newSelRow + selRows.length - 1);
+        }
+    }//GEN-LAST:event_channelUpButtonActionPerformed
+
+    private void removeChannelButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_removeChannelButtonActionPerformed
+        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
+        int[] rows = channelTable.getSelectedRows();
+        ctm.removeRows(rows);
+    }//GEN-LAST:event_removeChannelButtonActionPerformed
+
+    private void addChannelButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addChannelButtonActionPerformed
+        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
+        currentAcqSetting.setChannelGroupStr(MMCoreUtils.loadAvailableChannelConfigs(this,currentAcqSetting.getChannelGroupStr(),core));
+        int index = -1;
+        if (ctm.getRowCount() > 0) {
+            for (int i = 0; i < MMCoreUtils.availableChannelList.size(); i++) {
+                for (int j = 0; j < ctm.getRowCount(); j++) {
+                    if (ctm.getRowData(j).getName().equals(MMCoreUtils.availableChannelList.get(i))) {
+                        index = -1;
+                        break;
+                    } else {
+                        index = i;
+                    }
+                }
+                if (index != -1) {
+                    break;
+                }
+            }
+            if (index != -1) {
+                ctm.addRow(new Channel(MMCoreUtils.availableChannelList.get(index), 100, 0, Color.GRAY));
+            } else {
+                JOptionPane.showMessageDialog(this,"All available channel configurations for group '"+currentAcqSetting.getChannelGroupStr()+"' have been added.");
+            }
+        } else {
+            if (MMCoreUtils.availableChannelList.size() > 0) {
+                ctm.addRow(new Channel(MMCoreUtils.availableChannelList.get(0), 100, 0, Color.GRAY));
+            } else {
+                JOptionPane.showMessageDialog(this,"No Channel configurations found.");
+            }
+        }
+    }//GEN-LAST:event_addChannelButtonActionPerformed
 
     private String getExtension(File f) {
         return f.getName().substring(f.getName().lastIndexOf("."));
@@ -7384,10 +7466,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     private javax.swing.JPanel acqLayoutPanel;
     private javax.swing.JTabbedPane acqModePane;
     private javax.swing.JComboBox acqOrderList;
-    private javax.swing.JComboBox acqSelector_Areas;
-    private javax.swing.JComboBox acqSelector_Processors;
     private javax.swing.JButton acqSettingDownButton;
-    private javax.swing.JPanel acqSettingPanel;
     private javax.swing.JTable acqSettingTable;
     private javax.swing.JButton acqSettingUpButton;
     private javax.swing.JButton acquireButton;
@@ -7420,11 +7499,9 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     private javax.swing.JCheckBox clusterCheckBox;
     private javax.swing.JLabel clusterLabel1;
     private javax.swing.JLabel clusterLabel2;
-    private javax.swing.JCheckBox clusterOverlapCheckBox;
     private javax.swing.JTextField clusterXField;
     private javax.swing.JTextField clusterYField;
     private javax.swing.JToggleButton commentButton;
-    private javax.swing.JTabbedPane controlTabbedPane;
     private javax.swing.JLabel cursorLabel;
     private javax.swing.JButton deleteAcqSettingButton;
     private javax.swing.JLabel durationText;
@@ -7438,7 +7515,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     private javax.swing.JTextField intSecField;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel10;
-    private javax.swing.JLabel jLabel11;
     private javax.swing.JLabel jLabel12;
     private javax.swing.JLabel jLabel13;
     private javax.swing.JLabel jLabel14;
@@ -7455,7 +7531,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     private javax.swing.JLabel jLabel24;
     private javax.swing.JLabel jLabel25;
     private javax.swing.JLabel jLabel26;
-    private javax.swing.JLabel jLabel27;
     private javax.swing.JLabel jLabel28;
     private javax.swing.JLabel jLabel29;
     private javax.swing.JLabel jLabel3;
@@ -7464,7 +7539,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     private javax.swing.JLabel jLabel32;
     private javax.swing.JLabel jLabel33;
     private javax.swing.JLabel jLabel34;
-    private javax.swing.JLabel jLabel35;
     private javax.swing.JLabel jLabel36;
     private javax.swing.JLabel jLabel37;
     private javax.swing.JLabel jLabel4;
@@ -7473,20 +7547,18 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     private javax.swing.JLabel jLabel7;
     private javax.swing.JLabel jLabel8;
     private javax.swing.JPanel jPanel1;
+    private javax.swing.JPanel jPanel10;
+    private javax.swing.JPanel jPanel11;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
     private javax.swing.JPanel jPanel4;
     private javax.swing.JPanel jPanel5;
     private javax.swing.JPanel jPanel6;
-    private javax.swing.JPanel jPanel7;
-    private javax.swing.JPanel jPanel8;
     private javax.swing.JPanel jPanel9;
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JScrollPane jScrollPane3;
     private javax.swing.JScrollPane jScrollPane4;
     private javax.swing.JScrollPane jScrollPane7;
-    private javax.swing.JSeparator jSeparator2;
-    private javax.swing.JSeparator jSeparator3;
     private javax.swing.JLabel layoutFileLabel;
     private javax.swing.JScrollPane layoutScrollPane;
     private javax.swing.JButton liveButton;
@@ -7515,10 +7587,12 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     private javax.swing.JButton saveLayoutButton;
     private javax.swing.JButton saveProcTreeButton;
     private javax.swing.JToggleButton selectButton;
+    private javax.swing.JPanel sequenceListPanel;
+    private javax.swing.JTabbedPane sequenceTabbedPane;
     private javax.swing.JButton setLandmarkButton;
     private javax.swing.JPanel settingsPanel;
     private javax.swing.JCheckBox showZProfileCheckBox;
-    private javax.swing.JButton siteCoordFileButton;
+    private javax.swing.JCheckBox siteOverlapCheckBox;
     private javax.swing.JButton snapButton;
     private javax.swing.JLabel stagePosXLabel;
     private javax.swing.JLabel stagePosYLabel;
@@ -7527,7 +7601,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     private javax.swing.JTextField tileOverlapField;
     private javax.swing.JLabel tileSizeLabel;
     private javax.swing.JComboBox tilingDirComboBox;
-    private javax.swing.JLabel tilingFileLabel;
     private javax.swing.JComboBox tilingModeComboBox;
     private javax.swing.JCheckBox timelapseCheckBox;
     private javax.swing.JLabel timepointLabel;
@@ -7587,9 +7660,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         return !acqLayout.isEmpty();
     }
 
-    public byte getTilingMode() {
-        return tilingDir;
-    }
 
     private void setTilingInsideAreaOnly(boolean b) {
 //        if (acqSettings!=null && acqSettings.size()>cAcqSettingIdx) {
@@ -7597,36 +7667,11 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 //        if (currentAcqSetting!=null) {
         currentAcqSetting.enableInsideOnly(b);
         if (!calculating && recalculateTiles) {
-            calcTilePositions(null, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+            calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
         }
 //        }
     }
-    /*
-     private void setTilingDirection(byte td) {//only sets flags affecting tiling direction (bits 0-3); bits 4-7 (flag TILING_INSIDE_ONLY) remain unchanged
-     td=(byte) (td&7);
-     byte otherFlags = (byte) (tilingDir&~7);
-     tilingDir=(byte) (otherFlags | td);
-     //        IJ.log("AcqFrame.setTilingDirection: tilingMode:"+tilingDir);
-     DR_Button.setSelected(false);
-     DL_Button.setSelected(false);
-     UR_Button.setSelected(false);
-     UL_Button.setSelected(false);
-     RD_Button.setSelected(false);
-     RU_Button.setSelected(false);
-     LD_Button.setSelected(false);
-     LU_Button.setSelected(false);
-     switch (td) {
-     case TilingSetting.DR_TILING: DR_Button.setSelected(true); break;
-     case TilingSetting.DL_TILING: DL_Button.setSelected(true); break;
-     case TilingSetting.UR_TILING: UR_Button.setSelected(true); break;
-     case TilingSetting.UL_TILING: UL_Button.setSelected(true); break;
-     case TilingSetting.RD_TILING: RD_Button.setSelected(true); break;
-     case TilingSetting.RU_TILING: RU_Button.setSelected(true); break;
-     case TilingSetting.LD_TILING: LD_Button.setSelected(true); break;
-     case TilingSetting.LU_TILING: LU_Button.setSelected(true); break;
-     }                
-     }
-     */
+    
 
     private String createChannelNamePrefString() {
         String str = "";
@@ -7770,18 +7815,22 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         for (int i=0; i<acqSettingArray.length(); i++) {
             JSONObject acqSettingObj=acqSettingArray.getJSONObject(i);
             try {
+                IJ.log("Loading setting "+i+1);
                 AcqSetting setting=new AcqSetting(acqSettingObj);
                 IJ.log("Name: "+setting.getName());
-                setting.setCameraChipSize(cCameraPixX, cCameraPixY);
+//                setting.setCameraChipSize(cCameraPixX, cCameraPixY);
+//                setting.setCameraChipSize(currentDetector.getFullWidth_Pixel(), currentDetector.getFullDetectorPixelY());
+                setting.getFieldOfView().setFullSize_Pixel(currentDetector.getFullWidth_Pixel(),currentDetector.getFullHeight_Pixel());
+                setting.getFieldOfView().setFieldRotation(currentDetector.getFieldRotation());
                 if (setting.getChannelGroupStr() == null 
                         || !groupStr.contains(setting.getChannelGroupStr())) {
                     setting.setChannelGroupStr(changeConfigGroupStr("Channel",""));
                 }        
                 if (!availableObjectives.contains(setting.getObjective())) {
                     JOptionPane.showMessageDialog(this, "Objective "+setting.getObjective()+" not found. Choosing alternative.");
-                    setting.setObjective(availableObjectives.get(0), getPixelSize(availableObjectives.get(0)));
+                    setting.setObjective(availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)));
                 } else {
-                    setting.setObjective(setting.getObjective(), getPixelSize(setting.getObjective()));
+                    setting.setObjective(setting.getObjective(), getObjPixelSize(setting.getObjective()));
                 }
                 settings.add(setting);
             } catch (ClassNotFoundException ex) {
@@ -7812,7 +7861,13 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                     sb.append(line);
                 }
                 JSONObject expSettingsObj=new JSONObject(sb.toString());
-                settings=loadAcquisitionSettings(expSettingsObj.getJSONArray(AcqSetting.TAG_ACQ_SETTING_ARRAY));           
+                settings=loadAcquisitionSettings(expSettingsObj.getJSONArray(AcqSetting.TAG_ACQ_SETTING_ARRAY));
+                IJ.log(settings.size()+ " acquisition settings found and loaded.");
+                if (settings.size() == 0) {
+                    FieldOfView fov=new FieldOfView(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel(),currentDetector.getFieldRotation());
+                    AcqSetting setting = new AcqSetting("Seq_1", fov, availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)),currentDetector.getBinningOption(0,1), false);
+                    settings.add(setting);
+                }
             } catch (FileNotFoundException ex) {
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             } catch (IOException ex) {
@@ -7838,54 +7893,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         }
     }
 
-    /*
-    private List<AcqSetting> loadAcquisitionSettingsOld(File file) {
-        List<AcqSetting> settings=null;
-        if (expSettingsFile.exists()) {
-            settings=AcqSetting.readFromXMLFile(file.getAbsolutePath());//returns null if error occurs
-            //need to check params
-            // - objective
-            // - pixel calib
-            // - binning options 
-            // - channels
-            // - tilingmode (in particular random)
-            //  
-
-        } else {
-            JOptionPane.showMessageDialog(this, "Acquisition Setting "+file.getAbsolutePath()+" not found.");   
-        }
-        
-        List<String> groupStr=Arrays.asList(core.getAvailableConfigGroups().toArray());
-        if (settings!=null && settings.size()>0) {            
-            for (AcqSetting setting:settings) {
-                setting.setCameraChipSize(cCameraPixX, cCameraPixY);
-                if (setting.getChannelGroupStr() == null 
-                        //|| !setting.getChannelGroupStr().equals(channelGroupStr)
-                        || !groupStr.contains(setting.getChannelGroupStr())) {
-//                    channelGroupStr=changeConfigGroupStr("Channel",channelGroupStr);
-//                    String channelGroupStr=changeConfigGroupStr("Channel",channelGroupStr);
-                    setting.setChannelGroupStr(changeConfigGroupStr("Channel",""));
-                }        
-//                if (setting.getObjectiveDevStr() == null 
-//                        || !groupStr.contains(setting.getObjectiveDevStr())) {
-//                    setting.setObjectiveDevStr(changeConfigGroupStr("Objective",""));
-//                }
-                if (!availableObjectives.contains(setting.getObjective())) {
-                    JOptionPane.showMessageDialog(this, "Objective "+setting.getObjective()+" not found. Choosing alternative.");
-                    setting.setObjective(availableObjectives.get(0), getPixelSize(availableObjectives.get(0)));
-                } else
-                    setting.setObjective(setting.getObjective(), getPixelSize(setting.getObjective()));
-            }
-        }
-        //update Model for AcqSetting Tables
-//        DefaultListModel lm = new DefaultListModel();
-//        for (AcqSetting setting : settings) {
-//            lm.addElement(setting.getName());
-//        }
-        deleteAcqSettingButton.setEnabled(settings!=null && settings.size() > 1);
-        return settings;
-    }
-*/
 
     private void updateAcqSettingTab(AcqSetting setting) {
         recalculateTiles = false;
@@ -7898,8 +7905,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
          randomTilingButton.setSelected(setting.getTilingMode()==TilingSetting.Mode.RANDOM);
          runtimeTilingButton.setSelected(setting.getTilingMode()==TilingSetting.Mode.RUNTIME);
          fileTilingButton.setSelected(setting.getTilingMode()==TilingSetting.Mode.FILE);*/
-        tilingFileLabel.setEnabled(currentAcqSetting.getTilingMode() == TilingSetting.Mode.FILE);
-        siteCoordFileButton.setEnabled(tilingFileLabel.isEnabled());
         clusterCheckBox.setSelected(setting.isCluster());
         clusterCheckBox.setEnabled(currentAcqSetting.getTilingMode() != TilingSetting.Mode.FULL);
         clusterXField.setText(Integer.toString(setting.getNrClusterX()));
@@ -7908,12 +7913,13 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         clusterYField.setEnabled(setting.isCluster() & clusterCheckBox.isEnabled());
         clusterLabel1.setEnabled(setting.isCluster() & clusterCheckBox.isEnabled());
         clusterLabel2.setEnabled(setting.isCluster() & clusterCheckBox.isEnabled());
-        clusterOverlapCheckBox.setSelected(setting.isClusterOverlap());
-        clusterOverlapCheckBox.setEnabled(setting.isCluster() & clusterCheckBox.isEnabled());
+        siteOverlapCheckBox.setSelected(setting.isSiteOverlap());
+//        clusterOverlapCheckBox.setEnabled(setting.isCluster() & clusterCheckBox.isEnabled());
+        siteOverlapCheckBox.setEnabled(currentAcqSetting.getTilingMode() == TilingSetting.Mode.RANDOM);
         tileOverlapField.setText(Integer.toString((int) (setting.getTileOverlap() * 100)));
         maxSitesField.setText(Integer.toString(setting.getMaxSites()));
-        maxSitesField.setEnabled(setting.getTilingMode() == TilingSetting.Mode.RANDOM | setting.getTilingMode() == TilingSetting.Mode.RUNTIME);
-        maxSitesLabel.setEnabled(setting.getTilingMode() == TilingSetting.Mode.RANDOM | setting.getTilingMode() == TilingSetting.Mode.RUNTIME);
+        maxSitesField.setEnabled(setting.getTilingMode() == TilingSetting.Mode.RANDOM || setting.getTilingMode() == TilingSetting.Mode.RUNTIME);
+        maxSitesLabel.setEnabled(setting.getTilingMode() == TilingSetting.Mode.RANDOM || setting.getTilingMode() == TilingSetting.Mode.RUNTIME);
         insideOnlyCheckBox.setSelected(setting.isInsideOnly());
         acqOrderList.setSelectedItem(AcqSetting.ACQ_ORDER_LIST[setting.getAcqOrder()]);
         autofocusCheckBox.setSelected(setting.isAutofocus());
@@ -7933,8 +7939,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         framesField.setText(Integer.toString(setting.getFrames()));
         calculateDuration(setting);
         //updatePixelSize(setting.getObjective());
-        acqSettingPanel.setBorder(BorderFactory.createTitledBorder(setting.getName()));
-        acqSettingPanel.repaint();
         recalculateTiles = true;
     }
 
@@ -7991,17 +7995,21 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 JOptionPane.showMessageDialog(this, "Last used layout definition could not be found or read!");                
             }    
         }
-        if (settings==null) {
+        IJ.log("Layout "+layout.getName()+" loaded.");
+        if (settings==null || settings.size()==0) {
             JOptionPane.showMessageDialog(this,"Could not read acquisition settings from file '"+expSettingsFile.getName()+"'.");
             //set up a default acquisition setting
             if (revertToDefault) {
                 settings = new ArrayList<AcqSetting>();
-                AcqSetting setting = new AcqSetting("Seq_1", cCameraPixX, cCameraPixY, availableObjectives.get(0), getPixelSize(availableObjectives.get(0)), Integer.parseInt(binningOptions[0]), false);
+//                AcqSetting setting = new AcqSetting("Seq_1", cCameraPixX, cCameraPixY, availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)), Integer.parseInt(binningOptions[0]), false);
+                FieldOfView fov=new FieldOfView(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel(),currentDetector.getFieldRotation());
+                AcqSetting setting = new AcqSetting("Seq_1", fov, availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)),currentDetector.getBinningOption(0,1), false);
                 settings.add(setting);
                 expSettingsFile=new File(Prefs.getHomeDir(),"not found");
                 expSettingsFileLabel.setToolTipText("");    
             } 
         }
+        IJ.log(settings.size()+ " acquisition setting initialized.");
         if (settings!=null) {
             acqSettings=settings;
             for (AcqSetting setting:acqSettings) {
@@ -8037,17 +8045,17 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             acqLayoutPanel.setCursor(normCursor);
             recalculateTiles = false;
             for (AcqSetting as : acqSettings) {
-                as.enableClusterOverlap(true);
+                as.enableSiteOverlap(true);
                 as.enableInsideOnly(false);
             }
-            clusterOverlapCheckBox.setSelected(currentAcqSetting.isClusterOverlap());
+            siteOverlapCheckBox.setSelected(currentAcqSetting.isSiteOverlap());
             insideOnlyCheckBox.setSelected(currentAcqSetting.isInsideOnly());
             if (mergeAreasDialog != null) {
                 mergeAreasDialog.removeAllAreas();
             }
             updatePixelSize(currentAcqSetting.getObjective());
             recalculateTiles = true;
-            calcTilePositions(null, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+            calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
             Rectangle r = layoutScrollPane.getVisibleRect();
             ((LayoutPanel) acqLayoutPanel).calculateScale(r.width, r.height);
             areaTable.revalidate();
@@ -8073,7 +8081,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         }
         updatePixelSize(selObjective); //calls updateFOVDimension, updateTileOverlap, updateTileSizeLabel 
             
-        calcTilePositions(acqLayout.getAreaArray(), currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight(), currentAcqSetting.getTilingSetting(), SELECTING_AREA);
+        calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), SELECTING_AREA);
         
     }    
     
@@ -8112,11 +8120,11 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 
     private double getMaxFOV() { //searches for largest pixel size calibration and multiplies it with horiz and vert detector pixel # (for objective with lowest mag)
         double maxFOV = -1;
-        if ((cCameraPixX > 0) && (cCameraPixY > 0)) {
+        if (currentDetector != null && currentDetector.getFullWidth_Pixel() > 0 && currentDetector.getFullHeight_Pixel() > 0) {
             for (String objLabel:availableObjectives) {
-                double ps = getPixelSize(objLabel);
+                double ps = getObjPixelSize(objLabel);
                 if (ps > 0) {
-                    maxFOV = Math.max(Math.max(ps * cCameraPixX, ps * cCameraPixY), maxFOV);
+                    maxFOV = Math.max(Math.max(ps * currentDetector.getFullWidth_Pixel(), ps * currentDetector.getFullHeight_Pixel()), maxFOV);
                 }
             }
         }
@@ -8125,10 +8133,10 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
 
     private void updatePixelSize(String objectiveLabel) {  //updates currentPixSize, FOV (tileSize) and their GUI labels
         if (currentAcqSetting != null) {
-            currentAcqSetting.setObjective(objectiveLabel, getPixelSize(objectiveLabel));
-            double fovWidth = currentAcqSetting.getTileWidth();
-            double fovHeight = currentAcqSetting.getTileHeight();
-            double pixSize = currentAcqSetting.getPixelSize();
+            currentAcqSetting.setObjective(objectiveLabel, getObjPixelSize(objectiveLabel));
+            double fovWidth = currentAcqSetting.getTileWidth_UM();
+            double fovHeight = currentAcqSetting.getTileHeight_UM();
+            double pixSize = currentAcqSetting.getImagePixelSize();//considers binning
             if ((fovWidth < 0) || (fovHeight < 0)) {
                 tileSizeLabel.setText(NOT_CALIBRATED);
             } else {
@@ -8225,10 +8233,10 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         } else {
             zTotalDist = Math.abs(setting.getZEnd() - setting.getZBegin());
         }
-        zStackTotalDistLabel.setText(df.format(zTotalDist));
+        zStackTotalDistLabel.setText(df.format(zTotalDist)+" um");
     }
 
-    boolean isInChannelList(String s, StrVector list) {
+    boolean isInChannelList(String s, List<String> list) {
         boolean b = false;
         if (list != null) //            for (int i=0; i<list.size(); i++) {
         {
@@ -8246,11 +8254,11 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         boolean error = false;
 //        int count=0;
         
-        setting.setChannelGroupStr(loadAvailableChannelConfigs(setting.getChannelGroupStr()));
+        setting.setChannelGroupStr(MMCoreUtils.loadAvailableChannelConfigs(this,setting.getChannelGroupStr(),core));
 
         ChannelTableModel model = (ChannelTableModel) channelTable.getModel();
         for (int i = setting.getChannels().size() - 1; i >= 0; i--) {
-            if (!isInChannelList(setting.getChannels().get(i).getName(), availableChannels)) {
+            if (!isInChannelList(setting.getChannels().get(i).getName(), MMCoreUtils.availableChannelList)) {
                 JOptionPane.showMessageDialog(this, "'" + setting.getChannels().get(i).getName() + "' is not available in configuration '"+setting.getChannelGroupStr()+"'.");
                 setting.getChannels().remove(i);
                 error = true;
@@ -8259,7 +8267,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         channelTable.setModel(new ChannelTableModel(setting.getChannels()));
         TableColumn channelColumn = channelTable.getColumnModel().getColumn(0);
         JComboBox comboBox = new JComboBox();
-        for (String chStr : availableChannels) {
+        for (String chStr : MMCoreUtils.availableChannelList) {
             comboBox.addItem(chStr);
 //            IJ.log("availableChannel: "+chStr);
         }
@@ -8322,55 +8330,8 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     } 
 
     
-    private String loadAvailableChannelConfigs(String cGroupStr) {
-//        availableChannels = core.getAvailableConfigs(channelGroupStr);
-        availableChannels = core.getAvailableConfigs(cGroupStr);
-        if ((availableChannels == null) || availableChannels.isEmpty()) {
-            StrVector configs = core.getAvailableConfigGroups();
-            String[] options = new String[(int) configs.size()];
-            for (int i = 0; i < configs.size(); i++) {
-                options[i] = configs.get(i);
-            }
-            String s = (String) JOptionPane.showInputDialog(
-                    this,
-                    "Could not find Configuration Group '" + cGroupStr + "'.\n\nChoose Channel Configuration Group:",
-                    "Error",
-                    JOptionPane.PLAIN_MESSAGE,
-                    null,
-                    options,
-                    configs.get(0));
-            if ((s != null) && (s.length() > 0)) {
-//                channelGroupStr = s;
-                cGroupStr=s;
-                availableChannels = core.getAvailableConfigs(cGroupStr);
-                if ((availableChannels == null) || availableChannels.isEmpty()) {
-                    JOptionPane.showMessageDialog(this, "No Channel configurations found.\n\nPresets need to be defined in the Channel group!");
-                }
-                return cGroupStr;
-            } else {
-                return null;
-            }
-        } 
-        return cGroupStr;
-        /*
-         for (int j=0; j<availableChannelList.size(); j++) {
-         try {
-         PropertySetting s = cdata.getSetting(j);
-         System.out.println(" " + s.getDeviceLabel() + ", " + s.getPropertyName() + ", " + s.getPropertyValue());
-         } catch (Exception ex) {
-         Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-         }
-         }
-         }
-         StrVector channelList=core.getAvailableConfigs("Channels");
-         String channelList = core.getChannelGroup();
-         for (int i=0; i<channelList.size(); i++)
-         IJ.showMessage("core.getChannelGroup",channelList.get(i));
 
-         */
-    }
-
-    private double getPixelSize(String objectiveLabel) {
+    private double getObjPixelSize(String objectiveLabel) {
         double pSize = -1;
         StrVector resolutionName = core.getAvailablePixelSizeConfigs();
         Configuration pConfig;
@@ -8396,7 +8357,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             }
         }
 //      IJ.log("AcqFrame.getPixelSize(): pSize="+Double.toString(pSize*currentBinning));
-        return pSize * currentBinning;
+        return pSize; //pSize * currentBinning
     }
 
     private void initializeAcqSettingTable() {
@@ -8411,12 +8372,6 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 acqSettingSelectionChanged(e);
             }
         });
-        acqSelector_Areas.removeAllItems();
-        acqSelector_Processors.removeAllItems();
-        for (AcqSetting setting:acqSettings) {
-            acqSelector_Areas.addItem(setting.getName());
-            acqSelector_Processors.addItem(setting.getName());
-        }
     }
 
     private void initializeAreaTable() {
@@ -8500,6 +8455,11 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         try {
             String cCameraLabel = core.getCameraDevice();
             StrVector props = core.getDevicePropertyNames(cCameraLabel);
+            int currentBinning=1;
+            int cCameraPixX=-1;
+            int cCameraPixY=-1;
+            int bitDepth=-1;
+            String[] binningOptions= new String[] {"1"};
 //            for (int i=0; i<props.size(); i++) {
             for (String propsStr : props) {
                 StrVector allowedVals = core.getAllowedPropertyValues(cCameraLabel, propsStr);
@@ -8518,9 +8478,19 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                         binningComboBox.addItem(binningOptions[i]);
                     }
                 }
-                cCameraPixX = currentBinning * (int) core.getImageWidth();
-                cCameraPixY = currentBinning * (int) core.getImageHeight();
             }
+            if (cCameraPixX == -1 || cCameraPixY == -1) {//can't read OnCameraCCD chip size
+                core.clearROI();
+                core.snapImage();
+                Object img=core.getImage();
+                bitDepth = (int)core.getBytesPerPixel();                
+                if (cCameraPixX==-1 || cCameraPixY==-1) {
+                    cCameraPixX = currentBinning * (int) core.getImageWidth();
+                    cCameraPixY = currentBinning * (int) core.getImageHeight();
+                }
+            }                
+//            IJ.showMessage(Integer.toString(cCameraPixX)+", "+Integer.toString(cCameraPixY));
+            currentDetector=new Detector(cCameraLabel, cCameraPixX, cCameraPixY, bitDepth, binningOptions, FieldOfView.ROTATION_UNKNOWN);
 //            IJ.log("cameraLabel: "+cCameraLabel);
 //            IJ.log("cameraPixelX: "+Integer.toString(cCameraPixX));
 //            IJ.log("cameraPixelY: "+Integer.toString(cCameraPixY));
@@ -8653,28 +8623,28 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
         Vec3d normVec = acqLayout.getNormalVector();
         if (rp != null) {
 //            AcqSetting setting=acqSettings.get(cAcqSettingIdx);
-            Area a = acqLayout.getFirstContainingArea(lx, ly, currentAcqSetting.getTileWidth(), currentAcqSetting.getTileHeight());
+            Area a = acqLayout.getFirstContainingArea(lx, ly, currentAcqSetting.getTileWidth_UM(), currentAcqSetting.getTileHeight_UM());
             double areaRelPosZ;
             if (a != null) {
                 areaRelPosZ = a.getRelPosZ();
             } else {
                 areaRelPosZ = 0;
             }
-            double x = rp.convertLayoutCoordToStageCoord_X(lx);
-            double y = rp.convertLayoutCoordToStageCoord_Y(ly);
-            double z = ((-normVec.x * (x - rp.getStageCoordX()) - normVec.y * (y - rp.getStageCoordY())) / normVec.z) + rp.getStageCoordZ() - rp.getLayoutCoordZ() + areaRelPosZ;
             try {
+            Vec3d stage;
+                stage = acqLayout.convertLayoutToStagePos(lx, ly, areaRelPosZ);
                 String xyStageName = core.getXYStageDevice();
 //                if (!core.deviceBusy(xyStageName))
                 String zStageName = core.getFocusDevice();
                 core.waitForDevice(zStageName);
                 core.setPosition(zStageName, acqLayout.getEscapeZPos());
                 core.waitForDevice(xyStageName);
-                core.setXYPosition(xyStageName, x, y);
+                core.setXYPosition(xyStageName, stage.x, stage.y);
                 core.waitForDevice(zStageName);
-                core.setPosition(zStageName, z);
+                core.setPosition(zStageName, stage.z);
             } catch (Exception ex) {
                 gui.logError(ex);
+                IJ.log("AcqFrame.moveToLayoutPos: "+ex.getMessage());
             }
         }
     }
@@ -8682,49 +8652,23 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
     private void moveToArea(int index) {
         Area area = acqLayout.getAreaByIndex(index);
         if (area != null) {
-            /*double layoutX=a.getTopLeftX();
-             double layoutY=a.getTopLeftY();
-             double absX=acqLayout.getLandmark(0).convertLayoutCoordToStageCoord_X(layoutX);
-             double absY=acqLayout.getLandmark(0).convertLayoutCoordToStageCoord_Y(layoutY);
-             moveToAbsoluteXYPos(absX,absY);
-             */
-            RefArea rp = acqLayout.getLandmark(0);
-            if (rp != null) {
-                Vec3d normVec = acqLayout.getNormalVector();
-                double x = rp.convertLayoutCoordToStageCoord_X(area.getCenterX());
-                double y = rp.convertLayoutCoordToStageCoord_Y(area.getCenterY());
-                double z = ((-normVec.x * (x - rp.getStageCoordX()) - normVec.y * (y - rp.getStageCoordY())) / normVec.z) + rp.getStageCoordZ() - rp.getLayoutCoordZ() + area.getRelPosZ();
-                JOptionPane.showMessageDialog(this,area.getName() + ", " + Double.toString(x) + ", " + Double.toString(y) + ", " + Double.toString(z));
-                try {
-                    String xyStageName = core.getXYStageDevice();
-                    String zStageName = core.getFocusDevice();
-                    core.waitForDevice(zStageName);
-                    core.setPosition(zStageName, acqLayout.getEscapeZPos());
-                    core.waitForDevice(xyStageName);
-                    core.setXYPosition(xyStageName, x, y);
-                    core.waitForDevice(xyStageName);
-                    core.setPosition(zStageName, z);
-                } catch (Exception ex) {
-                    gui.logError(ex);
-                }
+            try {
+                Vec3d stage = acqLayout.convertLayoutToStagePos(area.getCenterX(),area.getCenterY(),area.getRelPosZ());
+                String xyStageName = core.getXYStageDevice();
+                String zStageName = core.getFocusDevice();
+                core.waitForDevice(zStageName);
+                core.setPosition(zStageName, acqLayout.getEscapeZPos());
+                core.waitForDevice(xyStageName);
+                core.setXYPosition(xyStageName, stage.x, stage.y);
+                core.waitForDevice(xyStageName);
+                core.setPosition(zStageName, stage.z);
+            } catch (Exception ex) {
+                gui.logError(ex);
+                IJ.log("AcqFrame.moveToArea: "+ex.getMessage());
             }
         } else {
-//            IJ.log("ArrayList<Area> out of bounds. StageXY not moved");
         }
     }
-    /*
-     private void moveToArea(String areaStr) {
-     ArrayList<Area> as=acqLayout.getAreaArray();
-     if (as!=null) {
-     Area a=new Area(areaStr);
-     int index=as.indexOf(a);
-     moveToArea(index);
-     } else {
-     //            IJ.log("Area "+areaStr+" not found!");
-     } 
-        
-     }
-     */
 
     private void moveToLandmark(int index) {
         RefArea lm = acqLayout.getLandmark(index);
@@ -8739,16 +8683,15 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                 core.setPosition(zStageName, lm.getStageCoordZ());
             } catch (Exception ex) {
                 gui.logError(ex);
+                IJ.log("AcqFrame.moveToLandmark: "+ex.getMessage());
             }
-//            IJ.log("StageXY Pos: "+Double.toString(lm.getStageCoordX())+", "+Double.toString(lm.getStageCoordY()));
         } else {
-//            IJ.log("AcqFrame.moveToLandmark "+Integer.toString(index)+": "+Double.toString(lm.getStageCoordX())+", "+Double.toString(lm.getStageCoordY()));
         }
     }
 
     //starts calculation of tile positions in new thread(s) 
-    public void calcTilePositions(List<Area> areas, final double fovX, final double fovY, final TilingSetting setting, String cmd) {
-        if (currentAcqSetting.getPixelSize()<=0) {
+    public void calcTilePositions(List<Area> areas, final FieldOfView fov, final TilingSetting setting, String cmd) {
+        if (currentAcqSetting.getImagePixelSize()<=0) {
             for (Area a:acqLayout.getAreaArray()) {
                 a.setUnknownTileNum(true);
             }
@@ -8764,24 +8707,7 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
             retilingAborted = false;
 
             enableGUI(false);
-            //           long start=System.currentTimeMillis();
-/* ORIGINAL
-            
-             RejectedExecutionHandlerImpl rejectionHandler = new RejectedExecutionHandlerImpl();
-             ThreadFactory threadFactory = Executors.defaultThreadFactory();
-             retilingExecutor = new ThreadPoolExecutor(2,4,10,TimeUnit.SECONDS,
-             new ArrayBlockingQueue<Runnable>(areas.size()), threadFactory, rejectionHandler);
-             Thread retilingMonitorThread = new Thread(new TileCalcMonitor(retilingExecutor,processProgressBar,cmd, areas));
-             retilingMonitorThread.start();
 
-             for (Area a:areas) {
-             if (a.isSelectedForAcq()) {
-             Runnable retilingThread = new TilingThread(a,fovX, fovY, setting);
-             retilingExecutor.execute(retilingThread);
-             }    
-             }                        
-             retilingExecutor.shutdown();
-             END ORIGINAL            */
             RejectedExecutionHandlerImpl rejectionHandler = new RejectedExecutionHandlerImpl();
             ThreadFactory threadFactory = Executors.defaultThreadFactory();
             retilingExecutor = new ThreadPoolExecutor(2, 4, 10, TimeUnit.SECONDS,
@@ -8798,7 +8724,9 @@ public class AcqFrame extends javax.swing.JFrame implements TableModelListener, 
                         @Override
                         public Integer call() {
                             try {
-                                return a.calcTilePositions(currentAcqSetting.getTileManager(),fovX, fovY, setting);
+                                return a.calcTilePositions(currentAcqSetting.getTileManager(),
+                                        fov.getRoiWidth_UM(currentAcqSetting.getObjPixelSize()), 
+                                        fov.getRoiHeight_UM(currentAcqSetting.getObjPixelSize()), setting);
                             } catch (InterruptedException ex) {
                                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                                 return -1;

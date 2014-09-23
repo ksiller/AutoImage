@@ -5,20 +5,11 @@
 package autoimage;
 
 import ij.IJ;
-import java.awt.Color;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.tree.DefaultMutableTreeNode;
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLOutputFactory;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamReader;
-import javax.xml.stream.XMLStreamWriter;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -50,6 +41,8 @@ public class AcqSetting {
     
     public static final String TAG_OBJ_LABEL = "OBJECTIVE_LABEL";
     public static final String TAG_BINNING = "BINNING";
+    public static final String TAG_FIELD_OF_VIEW = "FIELD_OF_VIEW";
+//    public static final String TAG_DETECTOR = "DETECTOR";
     public static final String TAG_AUTOFOCUS = "AUTOFOCUS";
     public static final String TAG_Z_STACK = "Z_STACK";
     public static final String TAG_Z_STACK_CENTERED = "Z_STACK_CENTERED";
@@ -72,16 +65,12 @@ public class AcqSetting {
     private String channelGroupStr;
     private String objLabel;        //visible in GUI
     private double objPixSize;      //internal based on existing MM calibration
-    private int cameraPixX;
-    private int cameraPixY;
+    private FieldOfView fieldOfView;
     private int binning;            //visible in GUI 
-    private double pixelSize;       //visible, calculated
-    private double tileWidth;
-    private double tileHeight;
     private TilingSetting tiling;
     //private String path;
     private boolean isModified;
-    protected RuntimeTileManager tileManager;
+    protected TileManager tileManager;
 
     private boolean autofocus;      //visible
     private boolean zStack;         //visible
@@ -104,19 +93,30 @@ public class AcqSetting {
     private long totalTiles;
     
     public AcqSetting(String n) {
-        this(n, -1, -1,"", -1d);
+        this(n, null,"", -1d);
     }
-    
+
+/*    
     public AcqSetting(String n, int camPixX, int camPixY, String objective, double oPixSize) {
         this(n, camPixX, camPixY, objective, oPixSize, 1, false);
     }
+*/
+    public AcqSetting(String n, FieldOfView fov, String objective, double oPixSize) {
+        this(n, fov, objective, oPixSize, 1, false);
+    }
 
-    public AcqSetting(String n, int camPixX, int camPixY, String objective, double oPixSize, int bin, boolean autof) {
+//    public AcqSetting(String n, FieldOfView fov, String objective, double oPixSize, double bin, boolean autof) {
+    public AcqSetting(String n, FieldOfView fov, String objective, double oPixSize, int bin, boolean autof) {
         name=n;                     
  //       path="";
         binning=bin;
         objectiveDevStr="";
-        setCameraChipSize(camPixX, camPixY);
+        
+        if (fov == null)
+            fieldOfView = new FieldOfView(1,1,FieldOfView.ROTATION_UNKNOWN);
+        else
+            fieldOfView=fov;
+//        setCameraChipSize(detector.getFullDetectorPixelX(), detector.getFullDetectorPixelY());
         setObjective(objective,oPixSize);        
         autofocus=autof;
         channelGroupStr="";
@@ -137,7 +137,7 @@ public class AcqSetting {
         tiling=new TilingSetting();
         totalTiles=0;
         isModified=false;
-        tileManager = new RuntimeTileManager(null);
+        tileManager = new TileManager(null, this);
     }
         
     public AcqSetting (JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
@@ -146,8 +146,15 @@ public class AcqSetting {
             name=obj.getString(TAG_NAME);
             objectiveDevStr=obj.getString(TAG_OBJ_GROUP_STR);
             channelGroupStr=obj.getString(TAG_CHANNEL_GROUP_STR);
-            setObjective(obj.getString(TAG_OBJ_LABEL),-1);
             binning=obj.getInt(TAG_BINNING);
+            try {
+                JSONObject fovObj=obj.getJSONObject(TAG_FIELD_OF_VIEW);
+                fieldOfView = new FieldOfView(fovObj);
+            } catch (JSONException e) {
+                IJ.log("Cannot load detector from acquisition settings. Instantiating standard detector");
+                fieldOfView = new FieldOfView(1,1,-1);
+            }    
+            setObjective(obj.getString(TAG_OBJ_LABEL),-1);
             autofocus=obj.getBoolean(TAG_AUTOFOCUS);
             zStack=obj.getBoolean(TAG_Z_STACK);
             zStackCentered=obj.getBoolean(TAG_Z_STACK_CENTERED);
@@ -189,6 +196,7 @@ public class AcqSetting {
         obj.put(TAG_CHANNEL_GROUP_STR, channelGroupStr);
         obj.put(TAG_OBJ_LABEL, objLabel);
         obj.put(TAG_BINNING, binning);
+        obj.put(TAG_FIELD_OF_VIEW, fieldOfView.toJSONObject());
         obj.put(TAG_AUTOFOCUS, autofocus);
         obj.put(TAG_Z_STACK, zStack);
         obj.put(TAG_Z_STACK_CENTERED, zStackCentered);
@@ -215,7 +223,8 @@ public class AcqSetting {
     
     
     public AcqSetting duplicate() {
-        AcqSetting copy = new AcqSetting(this.name, this.cameraPixX, this.cameraPixY, this.objLabel, this.objPixSize, this.binning, this.autofocus);
+//        AcqSetting copy = new AcqSetting(this.name, this.cameraPixX, this.cameraPixY, this.objLabel, this.objPixSize, this.binning, this.autofocus);
+        AcqSetting copy = new AcqSetting(this.name, new FieldOfView(fieldOfView), this.objLabel, this.objPixSize, this.binning, this.autofocus);
         for (Channel c:channels)
             copy.getChannels().add(c.duplicate());
         copy.setStartTime(this.startTime);
@@ -250,12 +259,19 @@ public class AcqSetting {
         return copy;
     }
     
+    protected FieldOfView getFieldOfView() {
+        return fieldOfView;
+    }
     
-    protected RuntimeTileManager getTileManager() {
+    protected void setFieldOfView(FieldOfView fov) {
+        fieldOfView=fov;
+    }
+    
+    protected TileManager getTileManager() {
         return tileManager;
     }
     
-     protected void setTileManager (RuntimeTileManager tManager) {
+     protected void setTileManager (TileManager tManager) {
         tileManager=tManager;
     }
     
@@ -307,64 +323,83 @@ public class AcqSetting {
     public String getName() {
         return name;
     }
-    
+
+/*    
     public void setCameraChipSize(int pixX, int pixY) {
-        cameraPixX=pixX;
-        cameraPixY=pixY;
-        calcTileSize();
+//        cameraPixX=pixX;
+//        cameraPixY=pixY;
+        detector.setFullDetectorPixelX(pixX);
+        detector.setFullDetectorPixelY(pixY);
+//        calcTileSize();
+    }
+*/
+    
+/*    
+    public long getCameraChipWidth() {
+//        return cameraPixX;
+        return detector.getImagePixel_X();
     }
     
-    public int getCameraChipWidth() {
-        return cameraPixX;
+    public long getCameraChipHeight() {
+//        return cameraPixY;
+        return detector.getImagePixel_Y();
     }
+*/
     
-    public int getCameraChipHeight() {
-        return cameraPixY;
-    }
-    
+/*
+    //obsolete?
     public void setTileWidth(double tw) {
         tileWidth=tw;
     }
-    
-    public double getTileWidth() {
-        return tileWidth;
+*/    
+    public double getTileWidth_UM() {
+//        return tileWidth;
+        return fieldOfView.getRoiWidth_UM(objPixSize);
     }
-    
+/*    
+    //obsolete?
     public void setTileHeight(double th) {
         tileHeight=th;
     }
+*/    
     
-    public double getTileHeight() {
-        return tileHeight;
+    public double getTileHeight_UM() {
+//        return tileHeight;
+        return fieldOfView.getRoiHeight_UM(objPixSize);    
     }
     
-    private void calcPixelSize() {
-        pixelSize=objPixSize*binning;
-    }
     
+/*
+    //obsolete ?
     private void calcTileSize() {
-        tileWidth=cameraPixX*objPixSize;
-        tileHeight=cameraPixY*objPixSize;
+//        tileWidth=cameraPixX*objPixSize;
+//        tileHeight=cameraPixY*objPixSize;
+        tileWidth=detector.getDetectorROIPixel_X() * objPixSize;
+        tileHeight=detector.getDetectorROIPixel_Y() * objPixSize;
     }
+*/
     
     public void setObjective(String label, double oPixSize) {
         objLabel=label;
         objPixSize=oPixSize;
-        calcPixelSize();
-        calcTileSize();
+//        calcTileSize();
     }
     
     public String getObjective() {
         return objLabel;
     }
     
-    public double getPixelSize() {
-        return pixelSize;
+    public double getObjPixelSize() {
+        return objPixSize;
+    }
+    
+    public double getImagePixelSize() {
+//        return fieldOfView.getPixelSize();
+        return objPixSize*binning;
     }
     
     public void setBinning(int b) {
         binning=b;
-        calcPixelSize();
     }
 
     public int getBinning() {
@@ -411,12 +446,12 @@ public class AcqSetting {
         return tiling.nrClusterTileY;
     }
     
-    public void enableClusterOverlap(boolean b) {
-        tiling.clusterOverlap=b;
+    public void enableSiteOverlap(boolean b) {
+        tiling.siteOverlap=b;
     }
     
-    public boolean isClusterOverlap() {
-        return tiling.clusterOverlap;
+    public boolean isSiteOverlap() {
+        return tiling.siteOverlap;
     }
     
     public void setTileOverlap(double to) {
