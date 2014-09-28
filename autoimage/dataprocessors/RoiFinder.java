@@ -4,9 +4,11 @@
  */
 package autoimage.dataprocessors;
 
+import autoimage.ExtImageTags;
+import autoimage.ImgRoi;
 import autoimage.TileManager;
-import autoimage.Tile;
 import autoimage.Utils;
+import autoimage.Vec3d;
 import bsh.EvalError;
 import bsh.Interpreter;
 import ij.IJ;
@@ -14,6 +16,8 @@ import ij.Prefs;
 import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.Point2D;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,7 +46,7 @@ import org.micromanager.api.MMTags;
  */
 public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<String> {
     
-    protected List<Tile> tileList;
+    protected List<Point2D> roiList;
     protected List<String> options_;
     protected List<String> selectedSeq;
     private final List<TileManager> tileManagerList;
@@ -102,19 +106,19 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
     }
     @Override
     public void setScriptVariables(Interpreter interpreter) throws EvalError {
-        tileList= new ArrayList<Tile>();
-        interpreter.set("tileList",tileList);
+        roiList= new ArrayList<Point2D>();
+        interpreter.set("roiList",roiList);
     }
 
-    public void addRuntimeTileManager(TileManager tileManager) {
+    public void addTileManager(TileManager tileManager) {
         tileManagerList.add(tileManager);
     }
     
-    public void removeRuntimeTileManager(TileManager tileManager) {
+    public void removeTileManager(TileManager tileManager) {
         tileManagerList.remove(tileManager);
     }
     
-    public void removeAllRuntimeTimeManagers() {
+    public void removeAllTileManagers() {
         tileManagerList.clear();
     }
     
@@ -129,33 +133,41 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
             int imgHeight=meta.getInt(MMTags.Image.HEIGHT);
             JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
             double pixSize=summary.getDouble(MMTags.Summary.PIXSIZE);
-            double stageX=meta.getDouble(MMTags.Image.XUM);
-            double stageY=meta.getDouble(MMTags.Image.YUM);
+            double detectorAngle=summary.getDouble(ExtImageTags.DETECTOR_ROTATION);
+            double stageCenterX=meta.getDouble(MMTags.Image.XUM);
+            double stageCenterY=meta.getDouble(MMTags.Image.YUM);
             double stageZ=meta.getDouble(MMTags.Image.ZUM);
-            final String area=meta.getString("Area");
-            if (tileList.size()>0){
-                for (final Tile tile:tileList) {
-                    tile.name=name;
-                    tile.centerX=stageX-pixSize*imgWidth/2+tile.centerX;
-                    tile.centerY=stageY-pixSize*imgHeight/2+tile.centerY;
-                    tile.relZPos=stageZ;
-//                    for (TileManager rtm:tileManagerList)
-//                        rtm.addStagePosToTileList(area,tile);
+            final String area=meta.getString(ExtImageTags.AREA_NAME);
+            double cosinus=Math.cos(detectorAngle);
+            double sinus=Math.sin(detectorAngle);
+            if (roiList.size()>0){
+                final List<Vec3d> stagePosList=new ArrayList<Vec3d>(roiList.size());
+                for (final Point2D point:roiList) {
+                    //correct for detector rotation relative to stage
+                    //1. translate to center -> dx/dy
+                    double dx=point.getX()-pixSize*imgWidth/2;
+                    double dy=point.getY()-pixSize*imgHeight/2;
+                    //2. rotate
+                    double x = (cosinus * dx) - (sinus * dy);
+                    double y = (sinus * dx) + (cosinus * dy);
+                    //3. translate to stage position of image center
+                    stagePosList.add(new Vec3d(stageCenterX + x,stageCenterY + y,stageZ));
+                }
+                roiList.clear();
                     
-                    synchronized (tileManagerList) {
-                        for (final TileManager rtm : tileManagerList) {
-                            listenerExecutor.submit(
-	                       new Runnable() {
-	                          @Override
-	                          public void run() {
-                                    rtm.addStagePosToTileList(area,tile);
-	                          }
-	                       });
-                        }
+                synchronized (tileManagerList) {
+                    for (final TileManager rtm : tileManagerList) {
+                        listenerExecutor.submit(
+                           new Runnable() {
+                              @Override
+                              public void run() {
+                                rtm.stagePosListAdded(area,stagePosList,this);
+                              }
+                           });
                     }
+                }
       
-                    IJ.log("    ROIs for "+area+", "+tile.name+", "+tile.centerX+", "+tile.centerY+", "+tile.relZPos);
-                }    
+                IJ.log("    "+Integer.toString(stagePosList.size())+" ROIs added for area "+area);
             } else {
                 IJ.log("    no ROIs found");
             }    

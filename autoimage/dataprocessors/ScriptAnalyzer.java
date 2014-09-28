@@ -4,6 +4,7 @@
  */
 package autoimage.dataprocessors;
 
+import autoimage.ExtImageTags;
 import autoimage.ImageFileQueue;
 import autoimage.Utils;
 import bsh.EvalError;
@@ -132,9 +133,9 @@ public class ScriptAnalyzer extends BranchedProcessor<File>  {
         File rtFile=null;
         try {
             JSONObject meta=Utils.parseMetadata(modFile);
-            String area = meta.getString("Area");
-            String cluster=Long.toString(meta.getLong("ClusterIndex"));
-            String site=Long.toString(meta.getLong("SiteIndex"));
+            String area = meta.getString(ExtImageTags.AREA_NAME);
+            String cluster=Long.toString(meta.getLong(ExtImageTags.CLUSTER_INDEX));
+            String site=Long.toString(meta.getLong(ExtImageTags.SITE_INDEX));
             String channel=meta.getString(MMTags.Image.CHANNEL_NAME);
             String cFrame=Long.toString(meta.getLong(MMTags.Image.FRAME_INDEX));
             String cSlice=Long.toString(meta.getLong(MMTags.Image.SLICE_INDEX));

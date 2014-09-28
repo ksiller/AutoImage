@@ -40,15 +40,25 @@ class LiveModeMonitor extends SwingWorker<Void, Boolean> {
             this(gui,100);
         }
 
+        synchronized
         public void addListener(ILiveListener listener) {
             if (listeners==null)
                 listeners=new ArrayList<ILiveListener>();
-            listeners.add(listener);
+            if (!listeners.contains(listener))
+                listeners.add(listener);
         }
         
+        synchronized
         public void removeListener(ILiveListener listener) {
             if (listeners != null)
                 listeners.remove(listener);
+        }
+        
+        public int getNoOfListeners() {
+            if (listeners != null)
+                return listeners.size();
+            else
+                return 0;
         }
         
         @Override

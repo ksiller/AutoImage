@@ -4,6 +4,7 @@
  */
 package autoimage.dataprocessors;
 
+import autoimage.ExtImageTags;
 import autoimage.Utils;
 import ij.IJ;
 import java.io.File;
@@ -115,8 +116,8 @@ public class AreaProcessor extends BranchedProcessor<File> {
              Long clusterIndex;
              try {
                 List<File> returnValue;
-                    area = meta.getString("Area");
-                    clusterIndex = meta.getLong("ClusterIndex");
+                    area = meta.getString(ExtImageTags.AREA_NAME);
+                    clusterIndex = meta.getLong(ExtImageTags.CLUSTER_INDEX);
                 if ((!currentArea.equals("") && !area.equals(currentArea)) || (currentCluster!=-1 && clusterIndex!=currentCluster)) {//element group set complete
                     List<File> modifiedElements=analyzeGroup(imageList);
                     imageList.clear();

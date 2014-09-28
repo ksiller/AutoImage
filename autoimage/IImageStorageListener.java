@@ -10,7 +10,7 @@ import java.io.File;
  *
  * @author Karsten
  */
-public interface ImageStorageListener {
+public interface IImageStorageListener {
     
     public void storedImageReceived(File fn);
     

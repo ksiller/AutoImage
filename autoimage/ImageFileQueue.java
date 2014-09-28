@@ -1,7 +1,4 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
+
 package autoimage;
 
 import java.io.File;
@@ -13,10 +10,11 @@ import java.util.concurrent.LinkedBlockingQueue;
  */
 public class ImageFileQueue extends LinkedBlockingQueue<File> {
 
-    public static File POISON = new File("FILE_POISON");
+    public final static String POISON_NAME = "FILE_POISON";
+    public final static File POISON = new File(POISON_NAME);
 
     public static boolean isPoison(File f) {
-        return (f!=null && f.getName().equals("FILE_POISON"));
+        return (f!=null && f.getName().equals(POISON_NAME));
     }
     
 }

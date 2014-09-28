@@ -6,6 +6,7 @@
 
 package autoimage.dataprocessors;
 
+import autoimage.ExtImageTags;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.Prefs;
@@ -56,9 +57,9 @@ public class ImageLoader extends ExtDataProcessor<TaggedImage> {
                     int z=meta.getInt(MMTags.Image.SLICE_INDEX);
                     int t=meta.getInt(MMTags.Image.FRAME_INDEX);
 
-                    String area = meta.getString("Area");
-                    String cluster=Integer.toString(meta.getInt("ClusterIndex"));
-                    String site= String.format("%06d", meta.getInt("SiteIndex"));
+                    String area = meta.getString(ExtImageTags.AREA_NAME);
+                    String cluster=Integer.toString(meta.getInt(ExtImageTags.CLUSTER_INDEX));
+                    String site= String.format("%06d", meta.getInt(ExtImageTags.SITE_INDEX));
                     File path;
                     if (!cluster.equals("-1"))
                         path=new File(new File(imagePath,area+"-Cluster"+cluster+"-Site"+site),"img_"+String.format("%09d",t)+"_"+ch+"_"+String.format("%03d",z)+".tif");
@@ -71,7 +72,7 @@ public class ImageLoader extends ExtDataProcessor<TaggedImage> {
                     element=org.micromanager.utils.ImageUtils.makeTaggedImage(ip);
                     element.tags=new JSONObject(metaStr);
                 } catch (JSONException ex) {
-                    IJ.log(ex.getMessage());
+                    IJ.log(this.getClass().getName()+": "+ex.getMessage());
                     Logger.getLogger(ImageLoader.class.getName()).log(Level.SEVERE, null, ex);
                 }
                 produce(element);

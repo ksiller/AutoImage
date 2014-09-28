@@ -9,18 +9,16 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  *
  * @author Karsten
  */
-public class TileManager {
+public class TileManager implements IStagePosListener {
     
-    protected Map<String,List<Tile>> areaMap;
-    protected AcquisitionLayout acqLayout;
-    protected AcqSetting acqSetting;
+    private Map<String,List<Tile>> areaMap;
+    private AcquisitionLayout acqLayout;
+    private AcqSetting acqSetting;
 //    protected boolean finalized;
     
     public TileManager (AcquisitionLayout aLayout, AcqSetting aSetting) {
@@ -45,7 +43,7 @@ public class TileManager {
     public void setAcquisitionSetting(AcqSetting aSetting) {
         acqSetting=aSetting;
     }
-    
+/*    
     //expects Tile with stage coordinates and places them in map binned by area name
     public synchronized void addStagePosToTileList(String areaName, Tile sTile) {
 //        RefArea rp = acqLayout.getLandmark(0);
@@ -67,12 +65,12 @@ public class TileManager {
 //            IJ.log("RuntimeTileManager: refArea==null");
 //        }
     }
-    
+*/    
     public synchronized Map<String,List<Tile>> getAreaMap() {
         return areaMap;
     }
     
-    public synchronized void clearAllSeeds() {
+    public synchronized void clearList() {
         areaMap.clear();
     }
     /*
@@ -96,5 +94,27 @@ public class TileManager {
             }
         }
     }*/
+
+    @Override
+    public void stagePosAdded(String areaName, Vec3d stagePos, Object source) {
+        Vec3d lCoord = acqLayout.convertStagePosToLayoutPos(stagePos.x, stagePos.y, stagePos.z);
+        Tile lTile=new Tile(areaName,lCoord.x,lCoord.y,lCoord.z);
+        List roiList=areaMap.get(areaName);
+        if (roiList!=null) {
+            roiList.add(lTile);
+        } else {
+            roiList=new ArrayList();
+            roiList.add(lTile);
+            areaMap.put(areaName,roiList);
+        }    
+        IJ.log("add to tileList for area: "+areaName+", stage:"+stagePos.x+","+stagePos.y+", "+stagePos.z+" layout:"+lCoord.x+", "+lCoord.y+", "+lCoord.z);
+    }
+
+    @Override
+    public void stagePosListAdded(String area, List<Vec3d> stagePosList, Object source) {
+        for (Vec3d stagePos:stagePosList) {
+            stagePosAdded(area, stagePos,source);
+        }
+    }
 
 }

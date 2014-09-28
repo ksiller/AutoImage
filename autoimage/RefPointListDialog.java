@@ -5,16 +5,13 @@
 package autoimage;
 
 import ij.IJ;
-import java.awt.Graphics;
 import java.awt.event.WindowEvent;
 import java.awt.geom.AffineTransform;
-import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.JOptionPane;
-import javax.swing.JPanel;
 import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
@@ -41,7 +38,7 @@ public class RefPointListDialog extends javax.swing.JDialog {
     private boolean modified;
     
     
-    
+    private final static double TOLERANCE_SCALE_FACTOR = 0.05;
     
     public RefPointListDialog(java.awt.Frame parent, CMMCore core, AcquisitionLayout aLayout, LayoutPanel acqLP) {
         super(parent, false);
@@ -49,6 +46,7 @@ public class RefPointListDialog extends javax.swing.JDialog {
         acqLayout=aLayout;
         acqLayoutPanel=acqLP;
         initComponents();
+        messageLabel.setText("");
         setRefPointList(acqLayout.getLandmarks());
         refPointTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);        
         ListSelectionModel lsm = refPointTable.getSelectionModel();
@@ -111,7 +109,6 @@ public class RefPointListDialog extends javax.swing.JDialog {
                 acqLayoutPanel.repaint();
             }});
         modified=false;
-        setAlwaysOnTop(true);
     }
 
     /**
@@ -137,10 +134,11 @@ public class RefPointListDialog extends javax.swing.JDialog {
         tiltLabel = new javax.swing.JLabel();
         jLabel2 = new javax.swing.JLabel();
         rotationLabel = new javax.swing.JLabel();
+        messageLabel = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("Set Landmarks");
-        setPreferredSize(new java.awt.Dimension(550, 237));
+        setMinimumSize(new java.awt.Dimension(0, 290));
         setResizable(false);
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowClosing(java.awt.event.WindowEvent evt) {
@@ -203,7 +201,7 @@ public class RefPointListDialog extends javax.swing.JDialog {
             }
         });
 
-        jLabel1.setText("Stage Position:");
+        jLabel1.setText("Stage position:");
 
         stagePosLabel.setText("jLabel2");
 
@@ -225,45 +223,50 @@ public class RefPointListDialog extends javax.swing.JDialog {
 
         tiltLabel.setText("jLabel5");
 
-        jLabel2.setText("Rotation (x-y axis):");
+        jLabel2.setText("Rotation (x-y plane):");
 
         rotationLabel.setText("jLabel3");
+
+        messageLabel.setForeground(new java.awt.Color(255, 0, 0));
+        messageLabel.setText("jLabel3");
 
         org.jdesktop.layout.GroupLayout layout = new org.jdesktop.layout.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(layout.createSequentialGroup()
-                .add(6, 6, 6)
-                .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 508, Short.MAX_VALUE)
-                .add(6, 6, 6))
-            .add(layout.createSequentialGroup()
-                .add(20, 20, 20)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(layout.createSequentialGroup()
-                        .add(addButton)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(removeButton)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(moveToButton))
-                    .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
-                        .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                            .add(jLabel4)
-                            .add(jLabel2))
+                        .add(6, 6, 6)
+                        .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 515, Short.MAX_VALUE))
+                    .add(layout.createSequentialGroup()
+                        .add(20, 20, 20)
+                        .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                            .add(layout.createSequentialGroup()
+                                .add(addButton)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(removeButton)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(moveToButton))
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
+                                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
+                                    .add(jLabel4)
+                                    .add(jLabel2))
+                                .add(6, 6, 6)
+                                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                                    .add(rotationLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 207, Short.MAX_VALUE)
+                                    .add(tiltLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
+                                .add(jLabel1)
+                                .add(6, 6, 6)
+                                .add(stagePosLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 207, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                            .add(messageLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                         .add(6, 6, 6)
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                            .add(rotationLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 207, Short.MAX_VALUE)
-                            .add(tiltLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
-                    .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
-                        .add(jLabel1)
-                        .add(6, 6, 6)
-                        .add(stagePosLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 207, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                    .add(org.jdesktop.layout.GroupLayout.TRAILING, okButton, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .add(org.jdesktop.layout.GroupLayout.TRAILING, updateStagePosButton, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .add(cancelButton, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addContainerGap())
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, okButton, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, updateStagePosButton, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .add(cancelButton, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
+                .add(6, 6, 6))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
@@ -282,16 +285,18 @@ public class RefPointListDialog extends javax.swing.JDialog {
                     .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                         .add(jLabel1)
                         .add(stagePosLabel)))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(6, 6, 6)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel2)
                     .add(rotationLabel)
                     .add(cancelButton))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(6, 6, 6)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel4)
                     .add(tiltLabel))
-                .add(6, 6, 6))
+                .add(6, 6, 6)
+                .add(messageLabel)
+                .add(27, 27, 27))
         );
 
         pack();
@@ -307,11 +312,88 @@ public class RefPointListDialog extends javax.swing.JDialog {
         } else {
             try {    
                 acqLayout.calcStageToLayoutTransform();
-                tiltLabel.setText(String.format("%1$,.2f",acqLayout.getTilt())+" degree");
+                tiltLabel.setText(String.format("%1$,.1f",acqLayout.getTilt())+" degree");
                 AffineTransform at=acqLayout.getStageToLayoutTransform();
-                double angle=Math.atan2(at.getShearY(), at.getScaleY())/Math.PI*360;
+                double angle=Math.atan2(at.getShearY(), at.getScaleY());
+                Area.setStageToLayoutRot(angle);
+                RefArea.setStageToLayoutRot(angle);
+                angle=angle/Math.PI*180;
                 if (angle > 180) angle=angle-360;
-                rotationLabel.setText(String.format("%1$,.2f",angle)+" degree");
+                rotationLabel.setText(String.format("%1$,.1f",angle)+" degree");
+                String message="";
+                List<RefArea> mappedList=acqLayout.getMappedLandmarks();
+                if (mappedPos == 2) {
+/*                    RefArea r0=mappedList.get(0);
+                    RefArea r1=mappedList.get(1);
+                    double sx=r1.getStageCoordX()-r0.getStageCoordX();
+                    double sy=r1.getStageCoordX()-r0.getStageCoordX();
+                    double sl=Math.sqrt(sx*sx+sy*sy);
+                    double dx=r1.getLayoutCoordX()-r0.getLayoutCoordX();
+                    double dy=r1.getLayoutCoordX()-r0.getLayoutCoordX();
+                    double dl=Math.sqrt(dx*dx+dy*dy);
+                    if (Math.abs(dl/sl - 1) > TOLERANCE_SCALE_FACTOR) {
+                        message="Warning: Uniform scaling "+String.format("%1$,.2f",dl/sl);
+                    }    */
+                    if (Math.abs(at.getScaleX()/at.getScaleY() - 1) > TOLERANCE_SCALE_FACTOR) {
+                        message="Warning: Non-uniform scaling (x:y ratio="+String.format("%1$,.2f",at.getScaleX()/at.getScaleY());
+                    }
+                } else if (mappedPos==3) {
+/*                    RefArea r0=mappedList.get(0);
+                    RefArea r1=mappedList.get(1);
+                    RefArea r2=mappedList.get(2);
+                    double s01x=r1.getStageCoordX()-r0.getStageCoordX();
+                    double s01y=r1.getStageCoordX()-r0.getStageCoordX();
+                    double s01l=Math.sqrt(s01x*s01x+s01y*s01y);
+                    double d01x=r1.getLayoutCoordX()-r0.getLayoutCoordX();
+                    double d01y=r1.getLayoutCoordX()-r0.getLayoutCoordX();
+                    double d01l=Math.sqrt(d01x*d01x+d01y*d01y);
+
+                    double s02x=r2.getStageCoordX()-r0.getStageCoordX();
+                    double s02y=r2.getStageCoordX()-r0.getStageCoordX();
+                    double s02l=Math.sqrt(s02x*s02x+s02y*s02y);
+                    double d02x=r2.getLayoutCoordX()-r0.getLayoutCoordX();
+                    double d02y=r2.getLayoutCoordX()-r0.getLayoutCoordX();
+                    double d02l=Math.sqrt(d02x*d02x+d02y*d02y);
+
+                    double s21x=r1.getStageCoordX()-r2.getStageCoordX();
+                    double s21y=r1.getStageCoordX()-r2.getStageCoordX();
+                    double s21l=Math.sqrt(s21x*s21x+s21y*s21y);
+                    double d21x=r1.getLayoutCoordX()-r2.getLayoutCoordX();
+                    double d21y=r1.getLayoutCoordX()-r2.getLayoutCoordX();
+                    double d21l=Math.sqrt(d21x*d21x+d21y*d21y);
+                    if (Math.abs(d01l/s01l - 1) > TOLERANCE_SCALE_FACTOR
+                            || Math.abs(d21l/s21l - 1) > TOLERANCE_SCALE_FACTOR
+                            ||Math.abs(d02l/s02l - 1) > TOLERANCE_SCALE_FACTOR) {
+                        if (Math.abs(d01l/s01l - d21l/s21l) < 0.01
+                               && Math.abs(d01l/s01l - d02l/s02l) < 0.01
+                               && Math.abs(d02l/s02l - d21l/s21l) < 0.01) {
+                            message="Warning: Uniform scaling "+String.format("%1$,.2f",d01l/s01l)
+                            +", "+String.format("%1$,.2f",d02l/s02l)
+                            +", "+String.format("%1$,.2f",d21l/s21l);    
+                        } else {
+                            message="Warning: Non-uniform scaling and shearing.";                              
+                        }
+                    }*/
+                    if (Math.abs(at.getScaleX()/at.getScaleY() - 1) > TOLERANCE_SCALE_FACTOR
+                            && at.getShearX() == -at.getShearY()) {
+                        message="Warning: Non-uniform scaling (x:y ratio="+String.format("%1$,.2f",at.getScaleX()/at.getScaleY());
+                    }
+                    if (Math.abs(at.getScaleX()/at.getScaleY() - 1) <= TOLERANCE_SCALE_FACTOR
+                            && at.getShearX() != -at.getShearY()) {
+                        message="Warning: Shearing (x:y ratio="+String.format("%1$,.2f",at.getShearX()/at.getShearY());
+                    }
+                    if (Math.abs(at.getScaleX()/at.getScaleY() - 1) > TOLERANCE_SCALE_FACTOR
+                            && at.getShearX() != -at.getShearY()) {
+                        message="Warning: Non-uniform scaling (x:y ratio="+String.format("%1$,.2f",at.getScaleX()/at.getScaleY())+"Shearing (x:y ratio="+String.format("%1$,.2f",at.getShearX()/at.getShearY());
+                    }
+
+                }
+/*                messageLabel.setText("Shear X: "+String.format("%1$,.2f",at.getShearX())
+                        +", Shear Y: "+String.format("%1$,.2f",at.getShearY())
+                        +", Scale X: "+String.format("%1$,.2f",at.getScaleX())
+                        +", Scale Y: "
+                        +message);*/
+                messageLabel.setText(message);
             } catch (Exception ex) {
                 tiltLabel.setText("Error");
                 rotationLabel.setText("Error");
@@ -577,6 +659,7 @@ public class RefPointListDialog extends javax.swing.JDialog {
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JScrollPane jScrollPane1;
+    private javax.swing.JLabel messageLabel;
     private javax.swing.JButton moveToButton;
     private javax.swing.JButton okButton;
     private javax.swing.JTable refPointTable;

@@ -117,7 +117,7 @@ class RectArea extends Area{
     
     @Override
     public void drawTiles(Graphics2D g2d, int bdPix, double physToPixelRatio, double fovX, double fovY, TilingSetting setting) {
-        drawTileByTileOvl(g2d, bdPix, physToPixelRatio, fovX, fovY, setting);
+        drawTileByTileOvl(g2d, bdPix, physToPixelRatio, fovX, fovY,setting);
     }
     
     @Override

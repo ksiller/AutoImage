@@ -208,7 +208,10 @@ class AcquisitionLayout  implements PropertyChangeListener {
         return obj;
     }
     
-
+    //in radians
+    public double getStageToLayoutRot() {
+        return Math.atan2(stageToLayoutTransform.getShearY(), stageToLayoutTransform.getScaleY());
+    }
   
     public File getFile() {
         return file;
@@ -407,7 +410,8 @@ class AcquisitionLayout  implements PropertyChangeListener {
         if (getNoOfMappedStagePos() == 0)
             throw new Exception("Converting z position: no Landmarks defined");
         RefArea rp=getMappedLandmarks().get(0);
-        double z=((-normalVec.x*(layoutX-rp.getStageCoordX())-normalVec.y*(layoutY-rp.getStageCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
+//        double z=((-normalVec.x*(layoutX-rp.getStageCoordX())-normalVec.y*(layoutY-rp.getStageCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
+        double z=((-normalVec.x*(layoutX-rp.getLayoutCoordX())-normalVec.y*(layoutY-rp.getLayoutCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
         return z;
     }
     
@@ -589,7 +593,7 @@ class AcquisitionLayout  implements PropertyChangeListener {
     }
     
         
-    public int getNumOfSelectedAreas() {
+    public int getNoOfSelectedAreas() {
         int sel=0;
         for (int i=0; i<areas.size(); i++)
             if (areas.get(i).isSelectedForAcq())

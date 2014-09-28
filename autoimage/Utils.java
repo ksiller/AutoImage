@@ -258,9 +258,9 @@ public class Utils {
         JSONObject meta=parseMetadata(f);
         if (meta==null)
             return null;
-        String area = meta.getString("Area");
-        String cluster=Long.toString(meta.getLong("ClusterIndex"));
-        String site=Long.toString(meta.getLong("SiteIndex"));
+        String area = meta.getString(ExtImageTags.AREA_NAME);
+        String cluster=Long.toString(meta.getLong(ExtImageTags.CLUSTER_INDEX));
+        String site=Long.toString(meta.getLong(ExtImageTags.SITE_INDEX));
         File path;
         if (!cluster.equals("-1"))
             path=new File(workDir,area+"-Cluster"+cluster+"-Site"+site);
@@ -432,7 +432,6 @@ public class Utils {
             Point2D.Double v2=new Point2D.Double(dst[1].x-dst[0].x, dst[1].y-dst[0].y);
             IJ.log("v1: "+v1.toString()+", v2:"+v2.toString());
             at = new AffineTransform();
-            at.translate(dst[0].x - src[0].x, dst[0].y - src[0].y);
             double angleRad=0;
             double scale=1.0;
             if (!v1.equals(v2)) {
@@ -448,8 +447,27 @@ public class Utils {
                 at.rotate(angleRad);
                 //uniform scale
                 at.scale(scale,scale);
+                at.translate(dst[0].x - src[0].x, dst[0].y - src[0].y);
             }
-            IJ.log("angle: "+angleRad/Math.PI*360+", scale: "+scale+", translate: "+(dst[0].x-src[0].x)+"/"+(dst[0].y-src[0].y));
+            IJ.log("1. angle: "+angleRad/Math.PI*180+", scale: "+scale+", translate: "+(dst[0].x-src[0].x)+"/"+(dst[0].y-src[0].y));
+            IJ.log("1. "+at.toString());
+            
+            double dx=-(src[1].getY()-src[0].getY());
+            double dy=src[1].getX()-src[0].getX();
+            Point2D src2=new Point2D.Double(src[0].getX()+dx,src[0].getY()+dy);
+            dx=-(dst[1].getY()-dst[0].getY());
+            dy=(dst[1].getX()-dst[0].getX());
+            Point2D dst2=new Point2D.Double(dst[0].getX()+dx,dst[0].getY()+dy);
+            Array2DRowRealMatrix x = new Array2DRowRealMatrix(new double[][] {
+            { src[0].getX(), src[1].getX(), src2.getX() }, { src[0].getY(), src[1].getY(), src2.getY() },{ 1, 1, 1 } });
+            Array2DRowRealMatrix y = new Array2DRowRealMatrix(new double[][] {
+            { dst[0].getX(), dst[1].getX(), dst2.getX() }, { dst[0].getY(), dst[1].getY(), dst2.getY() },{ 0, 0, 0 } });
+            double determinant=new LUDecompositionImpl(x).getDeterminant();
+            RealMatrix inv_x=new LUDecompositionImpl(x).getSolver().getInverse();
+            double[][] matrix = y.multiply(inv_x).getData();
+            at = new AffineTransform(new double[] { matrix[0][0], matrix[1][0], matrix[0][1], matrix[1][1], matrix[0][2], matrix[1][2] });
+            IJ.log("1mod. angle: "+angleRad/Math.PI*180+", scale: "+scale+", translate: "+(dst[0].x-src[0].x)+"/"+(dst[0].y-src[0].y));
+            IJ.log("1mod. "+at.toString());
         }
         //three points: translation, scale, rotation, shear
         if (src.length > 2) {
@@ -474,5 +492,21 @@ public class Utils {
             double upper = values.get(values.size()/2);
             return (lower + upper) / 2.0;
         }	
+    }
+    
+    public static boolean isNaN(Object x) {
+        return x!=x;
+    }
+    
+    public static Point2D rotatePoint(Point2D point, double rad) {
+        double x = (Math.cos(rad) * (point.getX()) - Math.sin(rad) * (point.getY()));
+        double y = (Math.sin(rad) * (point.getX()) + Math.cos(rad) * (point.getY()));
+        return new Point2D.Double(x,y);
+    }
+
+    public static Point2D rotatePoint(Point2D point, Point2D anchor, double rad) {
+        double x = (int)(anchor.getX() + Math.cos(rad) * (point.getX() - anchor.getX()) - Math.sin(rad) * (point.getY() - anchor.getY()));
+        double y = (int)(anchor.getY() + Math.sin(rad) * (point.getX() - anchor.getX()) + Math.cos(rad) * (point.getY() - anchor.getY()));
+        return new Point2D.Double(x,y);
     }
 }

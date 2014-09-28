@@ -4,6 +4,7 @@
  */
 package autoimage.dataprocessors;
 
+import autoimage.ExtImageTags;
 import autoimage.Utils;
 import autoimage.Vec3d;
 import ij.IJ;
@@ -236,8 +237,8 @@ public class StitchCluster extends AreaProcessor {
             try {
                 meta=Utils.parseMetadata(elements.get(0));
                 JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
-                String prefix = meta.getString("Area");
-                long clusterIdx=meta.getLong("ClusterIndex");
+                String prefix = meta.getString(ExtImageTags.AREA_NAME);
+                long clusterIdx=meta.getLong(ExtImageTags.CLUSTER_INDEX);
                 if (clusterIdx != -1)
                     prefix=prefix+"-Cluster"+Long.toString(clusterIdx);
                 IJ.log("StitchCluster: "+prefix);

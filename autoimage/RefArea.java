@@ -31,7 +31,8 @@ class RefArea {
     private boolean changed;
     private boolean stagePosMapped; //false unless stagePos mapped to Layout; currently via RefPointListDialog
     private boolean selected; //used to highlight landmark in LayoutPanel
-    private static double cameraRot; //in radians relative to x-y staga axis, NOT layout 
+    private static double cameraRot=FieldOfView.ROTATION_UNKNOWN; //in radians relative to x-y staga axis, NOT layout 
+    private static double stageToLayoutRot=0;//in radians
     
     public final static String TAG_NAME="NAME";
     public final static String TAG_STAGE_X="STAGE_X";
@@ -61,7 +62,7 @@ class RefArea {
         changed=false;
         stagePosMapped=false;
         selected=false;
-        cameraRot=0;
+//        cameraRot=FieldOfView.ROTATION_UNKNOWN;
     }
     
     public RefArea(RefArea rp) {
@@ -79,7 +80,7 @@ class RefArea {
         changed=rp.isChanged();
         selected=rp.isSelected();
         stagePosMapped=rp.isStagePosFound();
-        cameraRot=0;
+//        cameraRot=FieldOfView.ROTATION_UNKNOWN;
     }
     
     public JSONObject toJSONObject() throws JSONException {
@@ -114,7 +115,7 @@ class RefArea {
         changed=false;
         selected=false;
         stagePosMapped=false;
-        cameraRot=0;
+        cameraRot=FieldOfView.ROTATION_UNKNOWN;
         IJ.log("initialization completed: "+this.getClass().getName());
     }
     
@@ -129,6 +130,14 @@ class RefArea {
     public static double getCameraRot() {
         return cameraRot;
     }
+   
+    public static void setStageToLayoutRot(double rot) {
+        stageToLayoutRot=rot;
+    }
+    
+    public static double getStageToLayoutRot() {
+        return stageToLayoutRot;
+    }     
     
     public void setStagePosMapped(boolean b) {
         stagePosMapped=b;

@@ -43,12 +43,14 @@ public abstract class Area {
     static final String TAG_CLUSTER = "CLUSTER";
     
     protected String name;
-    protected static double cameraRot;//in radians relative to x-y stage axis, NOT layout
+    protected static double cameraRot = FieldOfView.ROTATION_UNKNOWN;//in radians relative to x-y stage axis, NOT layout
+    protected static double stageToLayoutRot = 0; //in radians
 //    protected static String shape;
 //    protected TilingSetting tiling;
     protected List<Tile> tilePosList;
     protected int tileNumber;
     protected int id;
+    protected int areaIndex;
     protected double topLeftX; //in um
     protected double topLeftY; //in um
     protected double relPosZ; //in um relative to flat layout bottom
@@ -86,6 +88,7 @@ public abstract class Area {
     public Area(String n, int id, double ox, double oy, double oz, double w, double h, boolean s, String anot) {
         name=n;
         this.id=id;
+        areaIndex=-1;
         topLeftX=ox;
         topLeftY=oy;
         relPosZ=oz;
@@ -98,21 +101,33 @@ public abstract class Area {
 //        tiling=new TilingSetting();
         tilePosList=null;
         unknownTileNum=true;
-        cameraRot=0;
+//        cameraRot=0;
     }
 
-/*    
-    public String getClassName() {
-        return this.getClass().getName();
+    public void setAreaIndex(int index) {
+        areaIndex=index;
     }
-*/
-  
+    
+    public int getAreaIndex() {
+        return areaIndex;
+    }
+    
+    //in radians
     public static void setCameraRot(double rot) {
         cameraRot=rot;
     }
     
+    //in radians
     public static double getCameraRot() {
         return cameraRot;
+    } 
+    
+    public static void setStageToLayoutRot(double rot) {
+        stageToLayoutRot=rot;
+    }
+    
+    public static double getStageToLayoutRot() {
+        return stageToLayoutRot;
     } 
     
     public Tile createTile(String n, double x, double y, double z) {
@@ -542,7 +557,6 @@ public abstract class Area {
     }
     //NEED TO SET RELZPOS
     private int calcRuntimeTilePositions(TileManager tileManager,double fovX, double fovY, TilingSetting tSetting) throws InterruptedException {
-        IJ.log("Area.calcRuntimeTilePosition: "+name);
         if (tileManager==null || tileManager.getAreaMap().isEmpty()) {
             IJ.log("    Area.calcRuntimeTilePosition: tileManager==null or no ROIs");
             
@@ -552,19 +566,23 @@ public abstract class Area {
         }
         Map<String,List<Tile>> roiMap=tileManager.getAreaMap();
         if (roiMap.containsKey(name)) {
-            IJ.log("    Area.calcRuntimeTilePosition, "+name+", ROIs: "+roiMap.get(name).size());
             List<Tile> seedList=(List<Tile>)roiMap.get(name);
+            IJ.log("    Area.calcRuntimeTilePosition, "+name+", ROIs: "+seedList.size());
             int size=Math.max(seedList.size(),tSetting.getMaxSites());
             if (tSetting.isCluster())
                 size=size*tSetting.getNrClusterTileX()*tSetting.getNrClusterTileY();
             tilePosList = new ArrayList<Tile>(size);
-            int nr=1;
+    //        int nr=1;
             int acceptedNr=0;
 //            while (!Thread.currentThread().isInterrupted() && nr<seedList.size() && acceptedNr <= tSetting.getMaxSites()) {// && !abortTileCalc) {
-            while (!Thread.currentThread().isInterrupted() && nr<seedList.size() && acceptedNr <= tSetting.getMaxSites()) {// && !abortTileCalc) {
-                if (addTilesAroundSeed(seedList.get(nr).centerX, seedList.get(nr).centerY, fovX, fovY, tSetting) > 0)
+            while (!Thread.currentThread().isInterrupted() && seedList.size()>0 && acceptedNr <= tSetting.getMaxSites()) {// && !abortTileCalc) {
+                //use random index in seedList
+                int index=(int)Math.round(Math.random()*(seedList.size()-1));
+                if (addTilesAroundSeed(seedList.get(index).centerX, seedList.get(index).centerY, fovX, fovY, tSetting) > 0) {
                     acceptedNr++;
-                nr++;
+                }    
+                seedList.remove(index);
+                //nr++;
             }
             for (Tile t:tilePosList) {
                 IJ.log("Area.calcRuntimeTilePositions: layout: "+t.centerX+", "+t.centerY+", "+t.relZPos);
@@ -643,7 +661,10 @@ public abstract class Area {
                 
                 AffineTransform at=g2d.getTransform();
                 g2d.translate(xCenter,yCenter);
-                g2d.rotate(cameraRot);                        
+                g2d.rotate(stageToLayoutRot);
+                if (cameraRot != FieldOfView.ROTATION_UNKNOWN) {
+                    g2d.rotate(cameraRot);                        
+                }
                 g2d.translate(-xCenter,-yCenter);
                 g2d.fillRect(xo,yo,w,h);
                 g2d.setTransform(at);
@@ -757,16 +778,17 @@ public abstract class Area {
     public JSONObject createSiteInfo(String tileName) {
         JSONObject info=new JSONObject();
         try {
-            info.put("Area",name);
+            info.put(ExtImageTags.AREA_NAME,name);
+            info.put(ExtImageTags.AREA_INDEX,areaIndex);
             if (tileName.indexOf("Cluster")!=-1) {
                 int startIndex=tileName.indexOf("Cluster")+7;
                 int endIndex=tileName.indexOf("Site")-1;
-                info.put("ClusterIndex", Long.parseLong(tileName.substring(startIndex,endIndex)));
+                info.put(ExtImageTags.CLUSTER_INDEX, Long.parseLong(tileName.substring(startIndex,endIndex)));
             } else
-                info.put("ClusterIndex", "-1");
+                info.put(ExtImageTags.CLUSTER_INDEX, "-1");
             int startIndex=tileName.indexOf("Site")+4;
-            info.put("SiteIndex", Long.parseLong(tileName.substring(startIndex)));
-            info.put("Comment", comment);
+            info.put(ExtImageTags.SITE_INDEX, Long.parseLong(tileName.substring(startIndex)));
+            info.put(ExtImageTags.AREA_COMMENT, comment);
         } catch (JSONException ex) {
             Logger.getLogger(Area.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -876,6 +898,28 @@ public abstract class Area {
             return doesFovTouchArea(x,y,fovX,fovY);
     }
 
+    public static Area createFromJSONObject(JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+        String className=obj.getString(TAG_CLASS);
+        Class clazz=Class.forName(className);
+        Area area=(Area) clazz.newInstance();
+        area.initializeFromJSONObject(obj);
+        return area;
+    }
+    
+    //derived classes should override this to initialize all fields
+    public void initializeFromJSONObject(JSONObject obj) throws JSONException {
+        name=obj.getString(TAG_NAME);
+        width=obj.getDouble(TAG_WIDTH);
+        height=obj.getDouble(TAG_HEIGHT);
+        topLeftX=obj.getDouble(TAG_TOP_LEFT_X);
+        topLeftY=obj.getDouble(TAG_TOP_LEFT_Y);
+        relPosZ=obj.getDouble(TAG_REL_POS_Z);
+        selectedForAcq=obj.getBoolean(TAG_SELECTED);
+        comment=obj.getString(TAG_COMMENT);
+        cameraRot=0;
+    }
+
+    //derived classes should overwrite this to save all fields
     public JSONObject toJSONObject() throws JSONException {
         JSONObject obj=new JSONObject();
         obj.put(TAG_CLASS,this.getClass().getName());
@@ -890,26 +934,6 @@ public abstract class Area {
         return obj;
     }
     
-    public void initializeFromJSONObject(JSONObject obj) throws JSONException {
-        name=obj.getString(TAG_NAME);
-        width=obj.getDouble(TAG_WIDTH);
-        height=obj.getDouble(TAG_HEIGHT);
-        topLeftX=obj.getDouble(TAG_TOP_LEFT_X);
-        topLeftY=obj.getDouble(TAG_TOP_LEFT_Y);
-        relPosZ=obj.getDouble(TAG_REL_POS_Z);
-        selectedForAcq=obj.getBoolean(TAG_SELECTED);
-        comment=obj.getString(TAG_COMMENT);
-        cameraRot=0;
-    }
-    
-    public static Area createFromJSONObject(JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
-        String className=obj.getString(TAG_CLASS);
-        Class clazz=Class.forName(className);
-        Area area=(Area) clazz.newInstance();
-        area.initializeFromJSONObject(obj);
-        return area;
-    }
-    
     public abstract String getShape();
     
     public abstract double getCenterX();
@@ -922,9 +946,9 @@ public abstract class Area {
     
     public abstract boolean isInArea(double x, double y);
 
-    public abstract boolean isFovInsideArea(double x, double y, double fovX, double fovY);
+    public abstract boolean isFovInsideArea(double centerX, double centerY, double fovWidth, double fovHeight);
     
-    public abstract boolean doesFovTouchArea(double x, double y, double fovX, double fovY);
+    public abstract boolean doesFovTouchArea(double centerX, double centerY, double fovWidth, double fovHeight);
 
     public abstract boolean isInsideRect(Rectangle2D.Double r);
     

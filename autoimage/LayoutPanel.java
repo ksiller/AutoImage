@@ -17,6 +17,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.LinearGradientPaint;
+import static java.awt.PageAttributes.ColorType.COLOR;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.Stroke;
@@ -54,6 +55,7 @@ class LayoutPanel extends JPanel implements Scrollable {
     private static Color COLOR_LANDMARK = Color.GREEN;
     private static Color COLOR_SEL_LANDMARK = Color.MAGENTA;
     private static Color COLOR_LAYOUT_BACKGR = Color.BLACK;
+    private static Color COLOR_STAGE_GRID = Color.DARK_GRAY;
     private static Stroke SOLID_STROKE = new BasicStroke(1.0f);
     private static Stroke DASHED_STROKE = new BasicStroke(1.0f, // line width
       /* cap style */BasicStroke.CAP_BUTT,
@@ -142,12 +144,14 @@ class LayoutPanel extends JPanel implements Scrollable {
         layoutTransform=at;
     }
     
-    public double convertPixToPhysCoord(int pix) {
+    //receives screen coordinate
+    public double convertPixToLayoutCoord(int pix) {
         return (pix/physToPixelRatio/scale/zoom)-borderDim;
     }
     
-    public Point2D.Double convertPixToPhysCoord(Point p) {
-        return new Point2D.Double(convertPixToPhysCoord(p.x),convertPixToPhysCoord(p.y));
+    //receives screen coordinate
+    public Point2D.Double convertPixToLayoutCoord(Point p) {
+        return new Point2D.Double(convertPixToLayoutCoord(p.x),convertPixToLayoutCoord(p.y));
     }
     
     public int getBorderDimPix() {
@@ -422,10 +426,30 @@ class LayoutPanel extends JPanel implements Scrollable {
                 } 
                 AffineTransform at=g2d.getTransform();
                 g2d.translate(xCenter,yCenter);
-                g2d.rotate(RefArea.getCameraRot());                        
+//                    double stageRotAngle=Math.atan2(acqLayout.getStageToLayoutTransform().getShearY(), acqLayout.getStageToLayoutTransform().getScaleY());
+                g2d.rotate(RefArea.getStageToLayoutRot());
+                if (RefArea.getCameraRot() != FieldOfView.ROTATION_UNKNOWN) {
+                    g2d.rotate(RefArea.getCameraRot());                        
+                }
                 g2d.translate(-xCenter,-yCenter);
                 g2d.drawRect(xo,yo,w,h);
                 g2d.setTransform(at);
+            /*    
+                Point2D p=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(lm.getStageCoordX(),lm.getStageCoordY()));
+                xo = bdPix + (int) Math.round((p.getX()-lm.getPhysWidth()/2)*physToPixelRatio);
+                yo = bdPix + (int) Math.round((p.getY()-lm.getPhysHeight()/2)*physToPixelRatio);
+                xCenter = bdPix + (int) Math.round(p.getX()*physToPixelRatio);
+                yCenter = bdPix + (int) Math.round(p.getY()*physToPixelRatio);
+                w = (int) Math.round(lm.getPhysWidth()*physToPixelRatio);
+                h = (int) Math.round(lm.getPhysHeight()*physToPixelRatio);
+//                IJ.log("drawLandmark "+Integer.toString(i)+": "+Integer.toString(x)+" "+Integer.toString(y)+" "+Integer.toString(w)+" "+Integer.toString(h));
+                g2d.setColor(Color.BLUE);       
+                at=g2d.getTransform();
+                g2d.translate(xCenter,yCenter);
+                g2d.rotate(RefArea.getCameraRot());                        
+                g2d.translate(-xCenter,-yCenter);
+                g2d.drawRect(xo,yo,w,h);
+                g2d.setTransform(at);*/
             }
         }
     }
@@ -473,35 +497,42 @@ class LayoutPanel extends JPanel implements Scrollable {
             double objPixSize=cAcqSetting.getObjPixelSize();
             
             FieldOfView fov=cAcqSetting.getFieldOfView();
+            AffineTransform oldTransform=g2d.getTransform();
 
             Point2D fullChipOrigin=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(
-                    currentStagePos_X - fov.getFullWidth_UM(objPixSize)/2,
-                    currentStagePos_Y - fov.getFullHeight_UM(objPixSize)/2));            
-            int x=bdPix+(int)Math.round(physToPixelRatio*(fullChipOrigin.getX()));
-            int y=bdPix+(int)Math.round(physToPixelRatio*(fullChipOrigin.getY()));
+                    currentStagePos_X ,
+                    currentStagePos_Y ));            
+            int x=bdPix+(int)Math.round(physToPixelRatio*(fullChipOrigin.getX()- fov.getFullWidth_UM(objPixSize)/2));
+            int y=bdPix+(int)Math.round(physToPixelRatio*(fullChipOrigin.getY()- fov.getFullHeight_UM(objPixSize)/2));
             int w=(int)Math.ceil(fov.getFullWidth_UM(objPixSize)*physToPixelRatio);
             int h=(int)Math.ceil(fov.getFullHeight_UM(objPixSize)*physToPixelRatio);
+
+            g2d.translate(x+w/2, y+h/2);
+//                double stageRotAngle=Math.atan2(acqLayout.getStageToLayoutTransform().getShearY(), acqLayout.getStageToLayoutTransform().getScaleY());
+            g2d.rotate(Area.getStageToLayoutRot());
+            if (fov.getFieldRotation() != FieldOfView.ROTATION_UNKNOWN) {
+                g2d.rotate(fov.getFieldRotation()/180*Math.PI);
+            }
+            g2d.translate(-x-w/2, -y-h/2);
             g2d.setColor(COLOR_FOV);
             g2d.drawRect(x,y,w,h);
             
             Point2D offset_UM=fov.getRoiOffset_UM(objPixSize);
             Point2D roiOrigin=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(
-                    currentStagePos_X - fov.getFullWidth_UM(objPixSize)/2 + offset_UM.getX(),
-                    currentStagePos_Y - fov.getFullHeight_UM(objPixSize)/2 + offset_UM.getY()));
+                    currentStagePos_X ,
+                    currentStagePos_Y ));
             Composite oldComposite=g2d.getComposite();
             g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.5f));
-            Point2D lpoint=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(currentStagePos_X,currentStagePos_Y));
-            x=bdPix+(int)Math.round(physToPixelRatio*(roiOrigin.getX()));
-            y=bdPix+(int)Math.round(physToPixelRatio*(roiOrigin.getY()));
+            Point2D lpoint=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(currentStagePos_X- fov.getFullWidth_UM(objPixSize)/2 + offset_UM.getX()
+                    ,currentStagePos_Y- fov.getFullHeight_UM(objPixSize)/2 + offset_UM.getY()));
+            x=bdPix+(int)Math.round(physToPixelRatio*(roiOrigin.getX()- fov.getFullWidth_UM(objPixSize)/2 + offset_UM.getX()));
+            y=bdPix+(int)Math.round(physToPixelRatio*(roiOrigin.getY()- fov.getFullHeight_UM(objPixSize)/2 + offset_UM.getY()));
             w=(int)Math.ceil(fov.getRoiWidth_UM(objPixSize) * physToPixelRatio);
             h=(int)Math.ceil(fov.getRoiHeight_UM(objPixSize) * physToPixelRatio);
 
-//            g2d.translate(x, y);
-//            g2d.rotate(15);
-//            g2d.translate(-x, -y);
-
             g2d.fillRect(x,y,w,h);
             g2d.setComposite(oldComposite);
+            g2d.setTransform(oldTransform);
             g2d.setStroke(SOLID_STROKE);
 //            g2d.drawRect(x,y,w,h);
             //g2d.rotate(-45);
@@ -555,27 +586,65 @@ class LayoutPanel extends JPanel implements Scrollable {
         showZProfile=b;
     }
     
+    private void drawStageGrid(Graphics2D g2d) {
+        Rectangle2D layoutRect=new Rectangle2D.Double(0,0,acqLayout.getWidth(),acqLayout.getHeight());
+        java.awt.geom.Area a = new java.awt.geom.Area(layoutRect);
+        a.transform(acqLayout.getLayoutToStageTransform());
+        Rectangle2D stageRect=a.getBounds();
+        
+        //vertical stage grid lines
+        Point2D stageStart=new Point2D.Double(stageRect.getX(),stageRect.getY());
+        Point2D stageEnd=new Point2D.Double(stageRect.getX(),stageRect.getY()+stageRect.getHeight());
+        while (stageStart.getX() < stageRect.getX()+stageRect.getWidth()) {
+            Point2D layoutStart=acqLayout.convertStageToLayoutPos_XY(stageStart);
+            Point2D layoutEnd=acqLayout.convertStageToLayoutPos_XY(stageEnd);
+            g2d.setColor(COLOR_STAGE_GRID);
+            g2d.drawLine(
+                    (int)Math.round(layoutStart.getX()),
+                    (int)Math.round(layoutStart.getY()),
+                    (int)Math.round(layoutEnd.getX()),
+                    (int)Math.round(layoutEnd.getY()));
+            stageStart=new Point2D.Double(stageStart.getX()+1000,stageStart.getY());
+            stageEnd=new Point2D.Double(stageStart.getX(),stageEnd.getY());
+        }
+        //vertical stage grid lines
+        stageStart=new Point2D.Double(stageRect.getX(),stageRect.getY());
+        stageEnd=new Point2D.Double(stageRect.getX()+stageRect.getWidth(),stageRect.getY());
+        while (stageStart.getY() < stageRect.getY()+stageRect.getHeight()) {
+            Point2D layoutStart=acqLayout.convertStageToLayoutPos_XY(stageStart);
+            Point2D layoutEnd=acqLayout.convertStageToLayoutPos_XY(stageEnd);
+            g2d.drawLine(
+                    (int)Math.round(layoutStart.getX()),
+                    (int)Math.round(layoutStart.getY()),
+                    (int)Math.round(layoutEnd.getX()),
+                    (int)Math.round(layoutEnd.getY()));
+            stageStart=new Point2D.Double(stageStart.getX(),stageStart.getY()+1000);
+            stageEnd=new Point2D.Double(stageEnd.getX(),stageStart.getY());
+        }        
+    }
+    
     @Override
     public void paintComponent(final Graphics g) {
         super.paintComponent(g);
 //        Graphics2D g2d = (Graphics2D) g;
         Graphics2D g2d = (Graphics2D)g.create();
-
-        //save original affineTransform, needed ???
+        //save original g2d settings
         AffineTransform oldTransform=g2d.getTransform();
-        
+        Composite oldComposite=g2d.getComposite();
+//        Color oldColor=g2d.getColor();
+//        Stroke oldStroke=g2d.getStroke();
+
+        //ensure that Area and RefArea work with current layout rotation value
+        Area.setStageToLayoutRot(acqLayout.getStageToLayoutRot());
+        RefArea.setStageToLayoutRot(acqLayout.getStageToLayoutRot());
+
         //bounding rectangle of panel;
         Rectangle panelR=getBounds();
 
         //clear: fill panel with Border color
         g2d.setColor(COLOR_BORDER);
         g2d.fillRect(panelR.x, panelR.y, panelR.width, panelR.height); 
-
-        Composite oldComposite=g2d.getComposite();
-//        Color oldColor=g2d.getColor();
-//        Stroke oldStroke=g2d.getStroke();
         
-
         borderDim=10;
 
         int bdPix=getBorderDimPix();
@@ -589,20 +658,18 @@ class LayoutPanel extends JPanel implements Scrollable {
 
         g2d.scale(scale*zoom, scale*zoom);
 
-        g2d.translate(dimRot.width/2,dimRot.height/2);
+/*        g2d.translate(dimRot.width/2,dimRot.height/2);
         IJ.log(layoutTransform.toString());
         AffineTransform newTransform=g2d.getTransform();
         newTransform.concatenate(layoutTransform);
-        IJ.log("oldTransform: "+oldTransform.toString());
-        IJ.log("layoutTransform: "+layoutTransform.toString());
-        IJ.log("newTransform: "+newTransform.toString());
+        IJ.log("layoutPanel.paintComponent:oldTransform: "+oldTransform.toString());
+        IJ.log("layoutPanel.paintComponent:layoutTransform: "+layoutTransform.toString());
+        IJ.log("layoutPanel.paintComponent:newTransform: "+newTransform.toString());
         g2d.setTransform(newTransform);
         //g2d.rotate(Math.PI/180*10);
         g2d.translate(-dimRot.width/2,-dimRot.height/2);
-
-       
-        
-        
+*/ 
+        //draw background
         Point2D.Double[] p=calcGradientVector();
         if (showZProfile & p!=null) {
             Point2D start = new Point2D.Double(bdPix+p[0].x,bdPix+p[0].y);
@@ -617,6 +684,9 @@ class LayoutPanel extends JPanel implements Scrollable {
             g2d.fillRect(bdPix, bdPix, w-2*bdPix, h-2*bdPix); //getWidth(), getHeight());
         }
         
+        //draw stage grid
+        drawStageGrid(g2d);
+
         if ((acqLayout!=null) && !acqLayout.isEmpty()) {
             drawAllAreas(g2d);
             drawLandmarks(g2d);
@@ -648,8 +718,10 @@ class LayoutPanel extends JPanel implements Scrollable {
         if (acqLayout.getNoOfMappedStagePos()>0) {
 //            g2d.setTransform(newTransform);
             drawFovAtCurrentStagePos(g2d);
-        }    
-//        g2d.setComposite(oldComposite);
+        }
+        
+        //restore original g2d parameters
+        g2d.setComposite(oldComposite);
 //        g2d.setColor(oldColor);
 //        g2d.setStroke(oldStroke);
         g2d.setTransform(oldTransform);

@@ -13,10 +13,12 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import javax.swing.JButton;
+import javax.swing.JFrame;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
@@ -30,14 +32,28 @@ import org.micromanager.api.ScriptInterface;
 
 public class MergeAreasDlg extends javax.swing.JDialog implements TableModelListener {
 
-   private JTable areaTable;
-   private AcqFrame acqFrame;
-   private AcquisitionLayout acqLayout;
+    private JTable areaTable;
+//    private AcqFrame acqFrame;
+    private AcquisitionLayout acqLayout;
+    private List<IMergeAreaListener> listeners;
+    private ExecutorService listenerExecutor;
 
    //implementation of TableModelListener
     @Override
     public void tableChanged(TableModelEvent tme) {
-        acqFrame.setMergeAreasBounds(calcMergeAreasBounds());
+//        acqFrame.setMergeAreasBounds(calcMergeAreasBounds());
+//        IJ.showMessage("tableChanged: "+Boolean.toString(SwingUtilities.isEventDispatchThread()));
+        synchronized (listeners) {
+            for (final IMergeAreaListener l : listeners) {
+                listenerExecutor.submit(new Runnable (){
+                    @Override
+                    public void run() {
+                        for (IMergeAreaListener l:listeners)
+                            l.mergeAreaSelectionChanged(((AreaTableModel)areaTable.getModel()).getAreaList());
+                    }
+                });
+            }
+        }    
     }
 
 /*    
@@ -153,31 +169,26 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
       
    }
 
-
    public MergeAreasDlg(AcqFrame aFrame, AcquisitionLayout al, ScriptInterface gui) {
       super();
+      listenerExecutor = Executors.newFixedThreadPool(1);
       addWindowListener(new WindowAdapter() {
          @Override
          public void windowClosing(WindowEvent arg0) {
 //            savePosition();
 //            IJ.showMessage("window closing");
+             IJ.log("MergeAreasDlg.windowClosing");
             removeAllAreas();
          }
       });
-      acqFrame=aFrame;
+//      acqFrame=aFrame;
       acqLayout=al;
       setTitle("Merge Areas");
       SpringLayout springLayout = new SpringLayout();
       getContentPane().setLayout(springLayout);
       setBounds(100, 100, 362, 595);
-/*
-      Preferences root = Preferences.userNodeForPackage(this.getClass());
-      prefs_ = root.node(root.absolutePath() + "/XYPositionListDlg");
-      setPrefsNode(prefs_);
+      setMinimumSize(new Dimension(362,595));
 
-      Rectangle r = getBounds();
-      GUIUtils.recallPosition(this);
-*/
       setBackground(gui.getBackgroundColor());
       gui.addMMBackgroundListener(this);
 
@@ -240,8 +251,24 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
         mergeButton.setFont(new Font("Arial", Font.PLAIN, 10));
         mergeButton.addActionListener(new ActionListener() {
             @Override
-            public void actionPerformed(ActionEvent arg0) {
-                mergeAreas();
+            public void actionPerformed(ActionEvent e) {
+//                mergeAreas();
+                List<Area> selectedAreas=((AreaTableModel)areaTable.getModel()).getAreaList();
+                final List<Area> mergingAreas=new ArrayList<Area>(selectedAreas.size());
+                for (Area area:selectedAreas)
+                    mergingAreas.add(area);
+                synchronized (listeners) {
+	            for (final IMergeAreaListener l : listeners) {
+                        listenerExecutor.submit(new Runnable (){
+                            @Override
+                            public void run() {
+                                for (IMergeAreaListener l:listeners)
+                                    l.mergeAreas(mergingAreas);
+                            }
+                        });
+                    }
+                }    
+                removeAllAreas();
 //                savePosition();
                 dispose();
             }
@@ -255,8 +282,21 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
         springLayout.putConstraint(SpringLayout.WEST, mergeButton, 0, SpringLayout.WEST, removeButton);      
       
         setAlwaysOnTop(true);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
     }
    
+    synchronized public void addListener(IMergeAreaListener listener) {
+        if (listeners==null)
+            listeners=new ArrayList<IMergeAreaListener>();
+        if (!listeners.contains(listener))
+            listeners.add(listener);
+    }
+        
+    synchronized public void removeListener(IMergeAreaListener listener) {
+        if (listeners != null)
+            listeners.remove(listener);
+    }
+
     public void setAcquisitionLayout(AcquisitionLayout acqL) {
         acqLayout=acqL;
     }    
@@ -299,7 +339,7 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
         }
     }
    
-
+/*
    private String createNewAreaName() {
        String s="";
        boolean exists=true;
@@ -317,12 +357,12 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
        }
        return s;
    }   
-   
-   
-   private Rectangle2D.Double calcMergeAreasBounds() { 
+*/
+    
+/*   
+   private Rectangle2D.Double calcMergeAreasBoundss() { 
        AreaTableModel atm=(AreaTableModel)areaTable.getModel();
        List<Area> mergingAreas=atm.getAreaList();
-       Rectangle2D.Double r;
        if (mergingAreas!=null & mergingAreas.size()>1) {
             double minX=(Double)atm.getValueAt(0,1);
             double maxX=minX+(Double)atm.getValueAt(0,3);
@@ -339,10 +379,9 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
                 if ((Double)atm.getValueAt(row,2)+(Double)atm.getValueAt(row,4)>maxY)
                     maxY=(Double)atm.getValueAt(row,2)+(Double)atm.getValueAt(row,4);    
             }
-           r=new Rectangle2D.Double(minX,minY,maxX-minX,maxY-minY);
+           return new Rectangle2D.Double(minX,minY,maxX-minX,maxY-minY);
        } else
-           r=null;
-       return r;
+           return null;
    }
    
    
@@ -357,8 +396,8 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
             removeAllAreas();//in MergeAreasDlg
             acqLayout.setModified(true);
        } else 
-           IJ.showMessage("empty");
+           IJ.log(getClass().getName()+": mergeAreaBounds == null");
    } 
-   
+*/   
 
 }
