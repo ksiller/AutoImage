@@ -35,7 +35,7 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
     private JTable areaTable;
 //    private AcqFrame acqFrame;
     private AcquisitionLayout acqLayout;
-    private List<IMergeAreaListener> listeners;
+    private final List<IMergeAreaListener> listeners;
     private ExecutorService listenerExecutor;
 
    //implementation of TableModelListener
@@ -44,15 +44,15 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
 //        acqFrame.setMergeAreasBounds(calcMergeAreasBounds());
 //        IJ.showMessage("tableChanged: "+Boolean.toString(SwingUtilities.isEventDispatchThread()));
         synchronized (listeners) {
-            for (final IMergeAreaListener l : listeners) {
-                listenerExecutor.submit(new Runnable (){
+/*            for (final IMergeAreaListener l : listeners) {
+               listenerExecutor.submit(new Runnable (){
                     @Override
-                    public void run() {
+                    public void run() {*/
                         for (IMergeAreaListener l:listeners)
                             l.mergeAreaSelectionChanged(((AreaTableModel)areaTable.getModel()).getAreaList());
-                    }
+/*                    }
                 });
-            }
+            }*/
         }    
     }
 
@@ -171,6 +171,7 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
 
    public MergeAreasDlg(AcqFrame aFrame, AcquisitionLayout al, ScriptInterface gui) {
       super();
+      listeners=new ArrayList<IMergeAreaListener>();
       listenerExecutor = Executors.newFixedThreadPool(1);
       addWindowListener(new WindowAdapter() {
          @Override
@@ -189,13 +190,14 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
       setBounds(100, 100, 362, 595);
       setMinimumSize(new Dimension(362,595));
 
-      setBackground(gui.getBackgroundColor());
-      gui.addMMBackgroundListener(this);
+//      setBackground(gui.getBackgroundColor());
+//      gui.addMMBackgroundListener(this);
 
       final JScrollPane scrollPane = new JScrollPane();
       getContentPane().add(scrollPane);
 
       areaTable = new JTable();// {
+      areaTable.getTableHeader().setReorderingAllowed(false);
       areaTable.setFont(new Font("Arial", Font.PLAIN, 10));
       AreaTableModel model = new AreaTableModel();
       model.setData(new ArrayList<Area>());
@@ -259,13 +261,12 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
                     mergingAreas.add(area);
                 synchronized (listeners) {
 	            for (final IMergeAreaListener l : listeners) {
-                        listenerExecutor.submit(new Runnable (){
+/*                        listenerExecutor.submit(new Runnable (){
                             @Override
-                            public void run() {
-                                for (IMergeAreaListener l:listeners)
-                                    l.mergeAreas(mergingAreas);
-                            }
-                        });
+                            public void run() {*/
+                                l.mergeAreas(mergingAreas);
+/*                            }
+                        });*/
                     }
                 }    
                 removeAllAreas();
@@ -286,15 +287,15 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
     }
    
     synchronized public void addListener(IMergeAreaListener listener) {
-        if (listeners==null)
-            listeners=new ArrayList<IMergeAreaListener>();
         if (!listeners.contains(listener))
             listeners.add(listener);
+        IJ.log(getClass().getName()+": "+listeners.size()+" listeners");
     }
         
     synchronized public void removeListener(IMergeAreaListener listener) {
         if (listeners != null)
             listeners.remove(listener);
+        IJ.log(getClass().getName()+": "+listeners.size()+" listeners");
     }
 
     public void setAcquisitionLayout(AcquisitionLayout acqL) {

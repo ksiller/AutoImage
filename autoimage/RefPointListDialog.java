@@ -19,12 +19,13 @@ import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableModel;
 import mmcorej.CMMCore;
+import org.micromanager.api.ScriptInterface;
 
 /**
  *
  * @author Karsten
  */
-public class RefPointListDialog extends javax.swing.JDialog {
+public class RefPointListDialog extends javax.swing.JDialog implements IStageMonitorListener {
 
     private CMMCore core;
     private AcquisitionLayout acqLayout;
@@ -33,37 +34,41 @@ public class RefPointListDialog extends javax.swing.JDialog {
     private AffineTransform layoutTransform;
     private String xyStageName;
     private String zStageName;
-   // private boolean landmarkFound;
     private LayoutPanel acqLayoutPanel;
     private boolean modified;
     
     
     private final static double TOLERANCE_SCALE_FACTOR = 0.05;
     
-    public RefPointListDialog(java.awt.Frame parent, CMMCore core, AcquisitionLayout aLayout, LayoutPanel acqLP) {
+    public RefPointListDialog(java.awt.Frame parent, ScriptInterface gui, AcquisitionLayout aLayout, LayoutPanel acqLP) {
         super(parent, false);
-        this.core=core;
+        this.core=gui.getMMCore();
         acqLayout=aLayout;
         acqLayoutPanel=acqLP;
         initComponents();
         messageLabel.setText("");
         setRefPointList(acqLayout.getLandmarks());
         refPointTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);        
+        refPointTable.getTableHeader().setReorderingAllowed(false);        
         ListSelectionModel lsm = refPointTable.getSelectionModel();
         lsm.addListSelectionListener(new SharedListSelectionHandler());
         refPointTable.setSelectionModel(lsm);
+
         try {
             xyStageName=core.getXYStageDevice();
             zStageName=core.getFocusDevice();
             double stageX=core.getXPosition(xyStageName);
             double stageY=core.getYPosition(xyStageName);
             double stageZ=core.getPosition(zStageName);
-            updateStagePosLabel(stageX,stageY,stageZ);
+            stagePositionChanged(new Double[]{stageX, stageY, stageZ});
+//            updateStagePosLabel(stageX,stageY,stageZ);
+
             updateStageRotAndTilt();
 //            stagePosLabel.setText(Double.toString(stageX)+"; "+Double.toString(stageY)+"; "+Double.toString(stageZ));            
         } catch (Exception ex) {
             Logger.getLogger(RefPointListDialog.class.getName()).log(Level.SEVERE, null, ex);
         } 
+
         int mappedPos = acqLayout.getNoOfMappedStagePos();
         moveToButton.setEnabled(mappedPos > 0 );
         ((AcqFrame)getParent()).setLandmarkFound(mappedPos > 0);
@@ -73,7 +78,7 @@ public class RefPointListDialog extends javax.swing.JDialog {
 
             @Override
             public void tableChanged(TableModelEvent e) {
-                IJ.log("tableChanged");
+//                IJ.log("tableChanged");
                 DefaultTableModel model=(DefaultTableModel)refPointTable.getModel();
 /*                if (e.getType() == TableModelEvent.UPDATE && e.getColumn()==4 && e.getFirstRow()==0) {
                     double refLayoutX=(Double)model.getValueAt(0, 4);
@@ -109,6 +114,7 @@ public class RefPointListDialog extends javax.swing.JDialog {
                 acqLayoutPanel.repaint();
             }});
         modified=false;
+        
     }
 
     /**
@@ -304,7 +310,7 @@ public class RefPointListDialog extends javax.swing.JDialog {
 
 
     private void updateStageRotAndTilt() {
-        IJ.log("updateStagePosAndTilt");
+        IJ.log(getClass().getName()+".updateStagePosAndTilt");
         int mappedPos=acqLayout.getNoOfMappedStagePos();
         if (mappedPos == 0) {
             tiltLabel.setText("unknown");
@@ -398,7 +404,7 @@ public class RefPointListDialog extends javax.swing.JDialog {
                 tiltLabel.setText("Error");
                 rotationLabel.setText("Error");
                 Logger.getLogger(RefPointListDialog.class.getName()).log(Level.SEVERE, null, ex);
-                IJ.log("affineTransform: "+ex.getMessage());
+                IJ.log(getClass().getName()+": affineTransform: "+ex.getMessage());
                 JOptionPane.showMessageDialog(null, ex.getMessage());
             }
         }
@@ -412,13 +418,13 @@ public class RefPointListDialog extends javax.swing.JDialog {
         return clonedList;
     }
     
-    public void updateStagePosLabel(double x, double y, double z) {
+/*    public void updateStagePosLabel(double x, double y, double z) {
         stagePosLabel.setText(
                   String.format("%1$,.2f",x)+"; "
                 + String.format("%1$,.2f",y)+"; "
                 + String.format("%1$,.2f",z));
     }
-    
+*/    
     private void updateStagePosButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_updateStagePosButtonActionPerformed
         int row=refPointTable.getSelectedRow();
         if (row>=0) {
@@ -443,17 +449,11 @@ public class RefPointListDialog extends javax.swing.JDialog {
                 model.setValueAt(new Double(stageY),row,2);
                 model.setValueAt(new Double(stageZ),row,3);
                 model.setValueAt(new String("mapped"), row,7);
+                //leads to call of tableChanged() --> updateRotAndTilt()
                 
-// called via tablechanged                calcLayoutAffineTransform();
-/*                model.setValueAt(new Double(stageX),row,1);
-                model.setValueAt(new Double(stageY),row,2);
-                model.setValueAt(new Double(stageZ),row,3);*/
-                IJ.log("updateStagePos: before setLandmark");
-//                updateStageRotAndTilt();
                 acqLayoutPanel.repaint();
                 modified=true;
             } catch (Exception ex) {
-                IJ.log("updateLandmark: "+ex.getMessage());
                 Logger.getLogger(RefPointListDialog.class.getName()).log(Level.SEVERE, null, ex);
             }
         } else
@@ -492,7 +492,6 @@ public class RefPointListDialog extends javax.swing.JDialog {
             JOptionPane.showMessageDialog(this, "Cannot create more than three Reference Points.");
             return;
         }    
-            IJ.log("addButton: start");
         try {
             double stageX=core.getXPosition(xyStageName);
             double stageY=core.getYPosition(xyStageName);
@@ -531,15 +530,15 @@ public class RefPointListDialog extends javax.swing.JDialog {
                     newRP.getLayoutCoordZ(),
                     new String(newRP.isStagePosFound() ? "mapped":"not mapped")
             });
-            updateStagePosLabel(stageX, stageY, stageZ);
+            
+//            updateStagePosLabel(stageX, stageY, stageZ);
             //change setLandmarkFound flag in AcqFrame and acqLayout 
             
-            IJ.log("addButton: before setLandmark");
 //            updateStageRotAndTilt();
             acqLayoutPanel.repaint();
             modified=true;
         } catch (Exception ex) {
-                IJ.log("addLandmark: "+ex.getMessage());
+            IJ.log(getClass().getName()+": addLandmark: "+ex.getMessage());
             Logger.getLogger(RefPointListDialog.class.getName()).log(Level.SEVERE, null, ex);
         }
     }//GEN-LAST:event_addButtonActionPerformed
@@ -551,18 +550,18 @@ public class RefPointListDialog extends javax.swing.JDialog {
         int mappedPos = acqLayout.getNoOfMappedStagePos();
         moveToButton.setEnabled(mappedPos > 0 );
         ((AcqFrame)getParent()).setLandmarkFound(mappedPos > 0);
-        acqLayoutPanel.getAcqLayout().deselectAllLandmarks();
+        acqLayout.deselectAllLandmarks();
         acqLayoutPanel.repaint();
         dispose();
     }//GEN-LAST:event_cancelButtonActionPerformed
 
     private void okButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_okButtonActionPerformed
         try {
-            acqLayoutPanel.getAcqLayout().calcStageToLayoutTransform();
+            acqLayout.calcStageToLayoutTransform();
         } catch (Exception ex) {
             Logger.getLogger(RefPointListDialog.class.getName()).log(Level.SEVERE, null, ex);
         }
-        acqLayoutPanel.getAcqLayout().deselectAllLandmarks();
+        acqLayout.deselectAllLandmarks();
         acqLayoutPanel.repaint();
         if (modified) 
             acqLayout.setModified(true);
@@ -575,18 +574,11 @@ public class RefPointListDialog extends javax.swing.JDialog {
             try {
                 DefaultTableModel model=(DefaultTableModel)refPointTable.getModel();
                 RefArea removedRefArea = rpList.remove(row);
-                
-                //change setLandmarkFound flag in AcqFrame and acqLayout
-/*                if (refPointTable.getRowCount() < 1) {
-                    ((AcqFrame)getParent()).setLandmarkFound(false);
-                }*/
-            IJ.log("removeButton: before setLandmark");
                 model.removeRow(row);
-//                updateStageRotAndTilt();
                 acqLayoutPanel.repaint();
                 modified=true;
             } catch (Exception ex) {
-                IJ.log("removeLandmark: "+ex.getMessage());
+                IJ.log(getClass().getName()+": removeLandmark: "+ex.getMessage());
                 Logger.getLogger(RefPointListDialog.class.getName()).log(Level.SEVERE, null, ex);
             }
         }            
@@ -609,49 +601,7 @@ public class RefPointListDialog extends javax.swing.JDialog {
         WindowEvent wev = new WindowEvent(this, WindowEvent.WINDOW_CLOSING);
         this.dispatchEvent(wev);
     }    
-    /**
-     * @param args the command line arguments
-     */
     
-    /*public static void main(String args[]) {
-        /* Set the Nimbus look and feel */
-        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
-        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
-         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
-         */
-/*        try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
-            }
-        } catch (ClassNotFoundException ex) {
-            java.util.logging.Logger.getLogger(RefPointListDialog.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (InstantiationException ex) {
-            java.util.logging.Logger.getLogger(RefPointListDialog.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (IllegalAccessException ex) {
-            java.util.logging.Logger.getLogger(RefPointListDialog.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
-            java.util.logging.Logger.getLogger(RefPointListDialog.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        }
-        //</editor-fold>
-
-        /* Create and display the dialog */
-    /*    java.awt.EventQueue.invokeLater(new Runnable() {
-            public void run() {
-                RefPointListDialog dialog;
-                dialog = new RefPointListDialog(new javax.swing.JFrame(), core, rpList);
-                dialog.addWindowListener(new java.awt.event.WindowAdapter() {
-                    @Override
-                    public void windowClosing(java.awt.event.WindowEvent e) {
-                        System.exit(0);
-                    }
-                });
-                dialog.setVisible(true);
-            }
-        });
-    }*/
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton addButton;
     private javax.swing.JButton cancelButton;
@@ -691,6 +641,15 @@ public class RefPointListDialog extends javax.swing.JDialog {
                 });
             }            
         }
+    }
+
+    @Override
+    public void stagePositionChanged(Double[] stagePos) {
+//        updateStagePosLabel(stageX,stageY,stageZ);
+        stagePosLabel.setText(
+                  (stagePos[0]!=null ? String.format("%1$,.2f",stagePos[0]) : "???") + "; "
+                + (stagePos[1]!=null ? String.format("%1$,.2f",stagePos[1]) : "???") + "; "
+                + (stagePos[2]!=null ? String.format("%1$,.2f",stagePos[2]) : "???"));
     }
 
     

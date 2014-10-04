@@ -15,11 +15,9 @@ import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
 import ij.process.ShortProcessor;
 import java.awt.Color;
-import java.awt.Rectangle;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.awt.event.WindowListener;
 import java.awt.geom.Point2D;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -27,7 +25,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.SwingWorker;
@@ -36,7 +33,6 @@ import mmcorej.CMMCore;
 import mmcorej.StrVector;
 import org.micromanager.api.MMListenerInterface;
 import org.micromanager.api.ScriptInterface;
-import org.micromanager.internalinterfaces.AcqSettingsListener;
 
 /**
  *
@@ -45,7 +41,7 @@ import org.micromanager.internalinterfaces.AcqSettingsListener;
 public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, MMListenerInterface {
 
     private CMMCore core;
-    private ScriptInterface gui;
+    private final ScriptInterface gui;
     private static String channelGroupStr ="";
     private static String channelName = "";
     private static double exposure;
@@ -53,7 +49,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
     private static int iterations;
     private boolean isMeasuring;
     private CameraRotationTask rotMeasureTask;
-    private LiveModeMonitor liveModeMonitor =null;
+//    private LiveModeMonitor liveModeMonitor =null;
 //    private Rectangle oldRoi; //stores cameraROI so it can be rstored when closing
     private Measurement measurement;//stores camera rotation(in rad) and pixelsize
 //    private Measurement returnResult;
@@ -260,6 +256,14 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     roi2.setName("Roi 2");
                     overlay_h.add(roi2);
 
+                    //store values in resultTable
+                    Object[] data=new Object[9];
+                    data[0]=new Integer(index);
+                    data[1]=new Double(angleH);
+                    data[3]=new Double(pixSizeH);
+                    data[5]=new Double(deltaX);
+                    data[6]=new Double(deltaY);
+
                     if (isCancelled()) return null;
                     //vertical step along y-axis down
                     core.setXYPosition(xyStageName, stagePos.getX(),stagePos.getY());
@@ -315,6 +319,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     if (deltaX>=0) {
                         roi1x = 0;
                         roi2x=deltaX;
+                        angleV=-angleV;
                     } else {
                         roi1x = -deltaX;
                         roi2x = 0;
@@ -325,7 +330,6 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     } else {
                         roi1y = -deltaY;
                         roi2y = 0;
-                        angleV=-angleV;
                     }    
                     roi1=new Roi(roi1x,roi1y,ip1.getWidth(),ip1.getHeight());
                     roi1.setPosition(iteration);
@@ -339,12 +343,10 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     overlay_v.add(roi2);
 
                     //store values in resultTable
-                    Object[] data=new Object[5];
-                    data[0]=new Integer(index);
-                    data[1]=new Double(angleH);
                     data[2]=new Double(angleV);
-                    data[3]=new Double(pixSizeH);
                     data[4]=new Double(pixSizeV);
+                    data[7]=new Double(deltaX);
+                    data[8]=new Double(deltaY);
                     publish(data);
                     index++;
                     iteration++;
@@ -388,8 +390,18 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         @Override
         protected void process(List<Object[]> measurements) {
             DefaultTableModel model=(DefaultTableModel)resultTable.getModel();
-            for (Object[] row:measurements)
+            for (Object[] row:measurements) {
                 model.addRow(row);
+                String s=Integer.toString((Integer)row[0])+";"
+                        +Double.toString((Double)row[1])+";"
+                        +Double.toString((Double)row[2])+";"
+                        +Double.toString((Double)row[3])+";"
+                        +Double.toString((Double)row[4])+";"
+                        +Double.toString((Double)row[5])+";"
+                        +Double.toString((Double)row[6])+";"
+                        +Double.toString((Double)row[7])+";"
+                        +Double.toString((Double)row[8])+";";
+            }    
             int progress=progressBar.getValue()+1;
             progressBar.setValue(progress);
             progressBar.setString(Integer.toString(progress)+"/"+Integer.toString(progressBar.getMaximum()));
@@ -417,71 +429,40 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                 angleHList.add(angleH);
                 angleVList.add(angleV);
             }
-            double medianAngleH=Utils.MedianDouble(angleHList);
-            double medianAngleV=Utils.MedianDouble(angleVList);
+            List<Double> radHList=new ArrayList<Double>();
+            for (Double angle:angleHList) {
+                radHList.add(new Double(angle/180*Math.PI));
+            }
+            List<Double> radVList=new ArrayList<Double>();
+            for (Double angle:angleVList) {
+                radVList.add(new Double(angle/180*Math.PI));
+            }
+            double medianAngleH=Utils.MedianDouble(radHList)/Math.PI*180;
+            if (medianAngleH>180) medianAngleH=medianAngleH-360;
+            double medianAngleV=Utils.MedianDouble(radVList)/Math.PI*180;
+            if (medianAngleV>180) medianAngleV=medianAngleV-360;
             minAngleLabel.setText(String.format("%1$,.1f",minH)+" (H); "+String.format("%1$,.1f",minV)+" (V)");
             maxAngleLabel.setText(String.format("%1$,.1f",maxH)+" (H); "+String.format("%1$,.1f",maxV)+" (V)");
             medianAngleLabel.setText(String.format("%1$,.1f",medianAngleH)+" (H); "+String.format("%1$,.1f",medianAngleV)+" (V)");
             
             String result="";
             measurement = new Measurement();
-            if (medianAngleH < 0) medianAngleH=medianAngleH+360;
-            if (medianAngleV < 0) medianAngleV=medianAngleV+360;
-            if (Math.abs(medianAngleH - medianAngleV) > toleratedAngleDisp || Utils.isNaN(medianAngleH) || Utils.isNaN(medianAngleV)) {
+            double difference = Math.abs((medianAngleH - medianAngleV + 180) % 360) - 180;
+            if (Math.abs(difference) > toleratedAngleDisp || Utils.isNaN(medianAngleH) || Utils.isNaN(medianAngleV)) {
+         //   if (Math.abs(medianAngleH - medianAngleV) > toleratedAngleDisp || Utils.isNaN(medianAngleH) || Utils.isNaN(medianAngleV)) {
                 result="<html><p>Warning: Angles not defined or measured angles using horizontal and vertical stage displacement show more than "+toleratedAngleDisp+" degree disparity.</p></html>";
                 measurement.cameraAngle=FieldOfView.ROTATION_UNKNOWN;
             } else {
                 measurement.cameraAngle=((medianAngleH + medianAngleV) / 2)/180*Math.PI;
                 double cameraAngleDeg=(medianAngleH + medianAngleV) / 2;
                 if (cameraAngleDeg > 180) cameraAngleDeg=cameraAngleDeg-360;
-                result = "<html><p>Camera rotation angle: "+String.format("%1$,.1f",measurement.cameraAngle/180*Math.PI)+" degree.</p></html>";
+                result = "<html><p>Camera rotation angle: "+String.format("%1$,.1f",cameraAngleDeg)+" degree.</p></html>";
             }
             messageLabel.setText(result);
         }
         
         @Override
         protected void done() {
-/*            DefaultTableModel model=(DefaultTableModel)resultTable.getModel();
-            double minH=0;
-            double minV=0;
-            double maxH=0;
-            double maxV=0;
-            List<Double> angleHList=new ArrayList<Double>();
-            List<Double> angleVList=new ArrayList<Double>();
-            for (int row=0; row<model.getRowCount(); row++) {
-                double angleH=(Double)model.getValueAt(row, 1);
-                double angleV=(Double)model.getValueAt(row, 2);        
-                if (row==0) {
-                    minH=angleH;
-                    maxH=angleH;
-                    minV=angleV;
-                    maxV=angleV;
-                } else {
-                    minH=Math.min(minH,angleH);
-                    maxH=Math.max(maxH,angleH);
-                    minV=Math.min(minV,angleV);
-                    maxV=Math.max(maxV,angleV);
-                }
-                angleHList.add(angleH);
-                angleVList.add(angleV);
-            }
-            double medianAngleH=Utils.MedianDouble(angleHList);
-            double medianAngleV=Utils.MedianDouble(angleVList);
-            minAngleLabel.setText(String.format("%1$,.1f",minH)+" (H); "+String.format("%1$,.1f",minV)+" (V)");
-            maxAngleLabel.setText(String.format("%1$,.1f",maxH)+" (H); "+String.format("%1$,.1f",maxV)+" (V)");
-            medianAngleLabel.setText(String.format("%1$,.1f",medianAngleH)+" (H); "+String.format("%1$,.1f",medianAngleV)+" (V)");
-            
-            String result="";
-            measurement = new Measurement();
-            if (Math.abs(medianAngleH - medianAngleV) > toleratedAngleDisp || Utils.isNaN(medianAngleH) || Utils.isNaN(medianAngleV)) {
-                result="<html><p>Warning: Angles not defined or measured angles using horizontal and vertical stage displacement show more than "+toleratedAngleDisp+" degree disparity.</p></html>";
-                measurement.cameraAngle=FieldOfView.ROTATION_UNKNOWN;
-            } else {
-                measurement.cameraAngle=((medianAngleH + medianAngleV) / 2)/180*Math.PI;
-                result = "<html><p>Camera rotation angle: "+String.format("%1$,.1f",measurement.cameraAngle)+" degree.</p></html>";
-            }
-            messageLabel.setText(result);
-*/
             isMeasuring=false;
             progressBar.setValue(0);
             progressBar.setString("");
@@ -490,26 +471,17 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         }
     }
     
-    public CameraRotDlg(java.awt.Frame parent, ScriptInterface gui, LiveModeMonitor lm, String chGroupStr, double stepSize, boolean modal) {
+    public CameraRotDlg(java.awt.Frame parent, final ScriptInterface gui, String chGroupStr, double stepSize, boolean modal) {
         super(parent, modal);
         initComponents();
+        resultTable.getTableHeader().setReorderingAllowed(false);
         setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
         measurement=null;
 //        returnResult=null;
         rotMeasureTask=null;
         this.gui=gui;
         core=gui.getMMCore();
-        if (lm==null) {
-            liveModeMonitor=new LiveModeMonitor(gui);
-            liveModeMonitor.execute();
-        } else
-            liveModeMonitor=lm;
-        liveModeMonitor.addListener(this);
 
-/*        //load available channels
-        this.channelGroupStr=MMCoreUtils.loadAvailableChannelConfigs(null, chGroupStr, core);
-        setChannelList(MMCoreUtils.availableChannelList);
-*/        
         //load available config groups
         channelGroupStr="";
         configComboBox.removeAllItems();
@@ -549,28 +521,24 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                 } catch (Exception ex) {
                     Logger.getLogger(CameraRotDlg.class.getName()).log(Level.SEVERE, null, ex);
                 }*/
-                if (liveModeMonitor != null)
-                    liveModeChanged(liveModeMonitor.isLive());
+                liveModeChanged(gui.isLiveModeOn());
             }
         });
-        IJ.log("CamerRotDlg.constructor");
+    }
+
+    public CameraRotDlg(java.awt.Frame parent, ScriptInterface gui, boolean modal) {
+        this(parent,gui,channelGroupStr,0, modal);
     }
 
     @Override
     public void dispose() {
         super.dispose();
-        IJ.log("CameraRotDlg.dispose");
-        if (liveModeMonitor != null) {
-            liveModeMonitor.removeListener(this);
-            IJ.log("   liveModeMonitor != null");
-        } else 
-            IJ.log("   liveModeMonitor == null");
     }
     
-    public CameraRotDlg(java.awt.Frame parent, ScriptInterface gui, LiveModeMonitor lm, boolean modal) {
-        this(parent,gui,lm,channelGroupStr,0, modal);
+    public void setTolerance(double angle) {
+        toleratedAngleDisp=angle;
     }
-
+    
     public void addOkListener(ActionListener listener) {
         okButton.addActionListener(listener);
     }

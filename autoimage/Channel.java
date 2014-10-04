@@ -25,7 +25,7 @@ class Channel {
     public final static String TAG_NAME = "NAME";
     public final static String TAG_EXPOSURE = "EXPOSURE";
     public final static String TAG_Z_OFFSET = "Z_OFFSET";
-    public final static String TAG_STITCH = "STITCH";
+//    public final static String TAG_STITCH = "STITCH";
     public final static String TAG_COLOR = "COLOR";
     
     
@@ -33,7 +33,6 @@ class Channel {
         name=ch;
         exposure=exp;
         zOffset=zo;
- //       stitch=st;
         color=c;
     }
     

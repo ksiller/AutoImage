@@ -9,7 +9,6 @@ import org.micromanager.api.ScriptInterface;
 public class Auto_Image implements org.micromanager.api.MMPlugin{
    public static String MENU_NAME = "AutoImage";
    public static String TOOL_DESCR = "AutoImage: Automatic Image Acquisition and Processing";
- //  private ScriptInterface gui;
    private AcqFrame acqFrame;
     
     @Override
@@ -23,7 +22,7 @@ public class Auto_Image implements org.micromanager.api.MMPlugin{
       //  gui = app;                                        
         if (acqFrame == null) {
             acqFrame = new AcqFrame(app);//gui);
-        }    
+        }
         acqFrame.setVisible(true);
     }
 

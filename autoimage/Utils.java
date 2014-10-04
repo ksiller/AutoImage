@@ -488,10 +488,8 @@ public class Utils {
         if (values.size() % 2 == 1)
             return values.get((values.size()+1)/2-1);
         else {
-            double lower = values.get(values.size()/2-1);
-            double upper = values.get(values.size()/2);
-            return (lower + upper) / 2.0;
-        }	
+            return (values.get(values.size()/2-1) + values.get(values.size()/2)) / 2.0;
+        }
     }
     
     public static boolean isNaN(Object x) {
@@ -508,5 +506,32 @@ public class Utils {
         double x = (int)(anchor.getX() + Math.cos(rad) * (point.getX() - anchor.getX()) - Math.sin(rad) * (point.getY() - anchor.getY()));
         double y = (int)(anchor.getY() + Math.sin(rad) * (point.getX() - anchor.getX()) + Math.cos(rad) * (point.getY() - anchor.getY()));
         return new Point2D.Double(x,y);
+    }
+    
+    public static double distance(Point2D l1start, Point2D l1end, Point2D l2start, Point2D l2end) {
+        double dist=0;
+        double m1=0;
+        double m2=0;
+        double mi=0;
+        double b1;
+        double b2;
+        double bi;
+        if (l1end.getX() == l1start.getX() && l2end.getX() == l2start.getX()) {
+            dist=Math.abs(l2start.getX() - l1start.getX());
+        }
+        if (l1end.getX() != l1start.getX() && l2end.getX() != l2start.getX()) {
+            m1=(l1end.getY()-l1start.getY())/(l1end.getX()-l1start.getX());
+    //        b1=l1start.getY()-m1*l1start.getX();
+            m2=(l2end.getY()-l2start.getY())/(l2end.getX()-l2start.getX());
+            b2=l2start.getY()-m2*l2start.getX();
+            
+            mi=-1/m1;
+            bi=l1end.getY()-mi*l1end.getX();
+            double xi=(m2-mi)/(bi-b2);
+            double yi=mi*xi+bi;
+            
+            dist=Math.sqrt((xi-l1end.getX()) * (xi-l1end.getX()) + (yi-l1end.getY()) * (yi-l1end.getY()));
+        }    
+        return dist;
     }
 }

@@ -6,6 +6,7 @@
 
 package autoimage;
 
+import ij.IJ;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
 import ij.process.ShortProcessor;
@@ -64,23 +65,12 @@ public class MMCoreUtils {
                 return null;
             }
         }
-        return cGroupStr;
-        /*
-         for (int j=0; j<availableChannelList.size(); j++) {
-         try {
-         PropertySetting s = cdata.getSetting(j);
-         System.out.println(" " + s.getDeviceLabel() + ", " + s.getPropertyName() + ", " + s.getPropertyValue());
-         } catch (Exception ex) {
-         Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-         }
-         }
-         }
-         StrVector channelList=core.getAvailableConfigs("Channels");
-         String channelList = core.getChannelGroup();
-         for (int i=0; i<channelList.size(); i++)
-         IJ.showMessage("core.getChannelGroup",channelList.get(i));
+        String c="";
+        for (String ch:availableChannelList)
+            c=c+ch+", ";         
+        IJ.log("Channels found: cGroupStr="+cGroupStr+"; "+c);
 
-         */
+        return cGroupStr;
     }
 
     public static ImageProcessor snapImage(CMMCore core, String chGroupStr, String ch, double exp) {

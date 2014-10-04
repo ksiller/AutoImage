@@ -6,6 +6,8 @@ import java.awt.Color;
 import java.awt.Composite;
 import java.awt.Graphics2D;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.PathIterator;
+import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,6 +47,7 @@ public abstract class Area {
     protected String name;
     protected static double cameraRot = FieldOfView.ROTATION_UNKNOWN;//in radians relative to x-y stage axis, NOT layout
     protected static double stageToLayoutRot = 0; //in radians
+    protected static boolean optimizedForCameraRotation = true;
 //    protected static String shape;
 //    protected TilingSetting tiling;
     protected List<Tile> tilePosList;
@@ -104,6 +107,14 @@ public abstract class Area {
 //        cameraRot=0;
     }
 
+    public void enableOptimizedForCameraRotation(boolean b) {
+        optimizedForCameraRotation=true;
+    }
+    
+    public boolean isOptimizedForCameraRotation() {
+        return optimizedForCameraRotation;
+    }
+    
     public void setAreaIndex(int index) {
         areaIndex=index;
     }
@@ -194,15 +205,38 @@ public abstract class Area {
         return false;
     }
     
+    public static Point2D calculateTileOffset(double fovX, double fovY, double overlap) {
+        if (optimizedForCameraRotation && cameraRot!=FieldOfView.ROTATION_UNKNOWN) {
+            double tileOffsetX;
+            double tileOffsetY;
+            double xFlipAngle=Math.atan2(fovY,fovX);
+            double yFlipAngle=Math.atan2(fovX,fovY);
+            if (Math.abs(cameraRot) < xFlipAngle || Math.abs(cameraRot) > (Math.PI -xFlipAngle)) {
+               tileOffsetX=(1-overlap) * fovX / Math.abs(Math.cos(cameraRot));
+            } else {
+               tileOffsetX=(1-overlap) * fovY / Math.abs(Math.sin(cameraRot));
+            }    
+            if (Math.abs(cameraRot) < yFlipAngle || Math.abs(cameraRot) > (Math.PI -yFlipAngle)) {
+               tileOffsetY=(1-overlap) * fovY / Math.abs(Math.cos(cameraRot));           
+            } else {
+               tileOffsetY=(1-overlap) * fovX / Math.abs(Math.sin(cameraRot));
+            }    
+            return new Point2D.Double(tileOffsetX, tileOffsetY);
+        } else {
+            return new Point2D.Double((1-overlap) * fovX,(1-overlap) * fovY);
+        }
+    }
+    
     private int createCluster(int clusterNr,double seedX, double seedY, double fovX, double fovY, TilingSetting setting ) {
         double tileOverlap=setting.getTileOverlap();
         int tilingDir=setting.getTilingDirection();
-        double tileOffsetX=(1-tileOverlap)*fovX;
-        double tileOffsetY=(1-tileOverlap)*fovY;
+
+        Point2D tileOffset=Area.calculateTileOffset(fovX, fovY, setting.getTileOverlap());
+
         int xTiles=setting.getNrClusterTileX();
         int yTiles=setting.getNrClusterTileY();
-        double clusterW=fovX+(xTiles-1)*tileOffsetX;
-        double clusterH=fovY+(yTiles-1)*tileOffsetY;
+        double clusterW=fovX+(xTiles-1)*tileOffset.getX();
+        double clusterH=fovY+(yTiles-1)*tileOffset.getY();
         double startx=seedX-(clusterW/2)+fovX/2;//*physToPixelRatio;
         double starty=seedY-(clusterH/2)+fovY/2;//*physToPixelRatio;
 
@@ -291,10 +325,10 @@ public abstract class Area {
 //                    IJ.log("Area.createCluster: interrupted, Area "+name);
                     break;
                 }    
-                x = startx+tileOffsetX*col;
+                x = startx+tileOffset.getX()*col;
                 row=vDir == 1 ? 0 : yTiles-1;
                 for (int j=0; j<yTiles; j++) {   
-                    y = starty+tileOffsetY*row;
+                    y = starty+tileOffset.getY()*row;
     //                IJ.log(name+", test Tile: "+Integer.toString(i*yTiles+j)+", "+Double.toString(x)+","+Double.toString(y));
                     siteCounter++;
                     Tile t=new Tile(createTileName(clusterNr,siteCounter), x, y, relPosZ);                
@@ -311,10 +345,10 @@ public abstract class Area {
 //                    IJ.log("Area.createCluster: interrupted, Area "+name);
                     break;
                 }    
-                y = starty+tileOffsetY*row;
+                y = starty+tileOffset.getY()*row;
                 col=hDir == 1 ? 0 : xTiles-1;
                 for (int i=0; i<xTiles; i++) {  
-                    x = startx+tileOffsetX*col;
+                    x = startx+tileOffset.getX()*col;
   //                  IJ.log(name+", test Tile: "+Integer.toString(i*yTiles+j)+", "+Double.toString(x)+","+Double.toString(y));
                     siteCounter++;
                     Tile t=new Tile(createTileName(clusterNr,siteCounter), x, y, relPosZ);                
@@ -334,24 +368,25 @@ public abstract class Area {
         double tileOverlap=setting.getTileOverlap();
         boolean insideOnly=setting.isInsideOnly();
         int tilingDir=setting.getTilingDirection();
-        double tileOffsetX=(1-tileOverlap)*fovX;
-        double tileOffsetY=(1-tileOverlap)*fovY;
+        
+        Point2D tileOffset=calculateTileOffset(fovX, fovY, setting.getTileOverlap());
+
         int xTiles;
         int yTiles;
         double startx;
         double starty;
         
         if (insideOnly) {
-            xTiles=(int)Math.floor((width-fovX)/tileOffsetX)+1;
-            yTiles=(int)Math.floor((height-fovY)/tileOffsetY)+1;
+            xTiles=(int)Math.floor((width-fovX)/tileOffset.getX())+1;
+            yTiles=(int)Math.floor((height-fovY)/tileOffset.getY())+1;
         } else {
 //            xTiles=(int)Math.ceil(width/tileOffsetX);
 //            yTiles=(int)Math.ceil(height/tileOffsetY);
-            xTiles=(int)Math.ceil((width-fovX)/tileOffsetX)+1;
-            yTiles=(int)Math.ceil((height-fovY)/tileOffsetY)+1;
+            xTiles=(int)Math.ceil((width-fovX)/tileOffset.getX())+1;
+            yTiles=(int)Math.ceil((height-fovY)/tileOffset.getY())+1;
         }
-        startx=fovX/2+(topLeftX-((fovX+(xTiles-1)*tileOffsetX-width)/2));//*physToPixelRatio;
-        starty=fovY/2+(topLeftY-((fovY+(yTiles-1)*tileOffsetY-height)/2));//*physToPixelRatio;
+        startx=fovX/2+(topLeftX-((fovX+(xTiles-1)*tileOffset.getX()-width)/2));//*physToPixelRatio;
+        starty=fovY/2+(topLeftY-((fovY+(yTiles-1)*tileOffset.getY()-height)/2));//*physToPixelRatio;
         if (xTiles==0) xTiles=1;
         if (yTiles==0) yTiles=1;
         double x;
@@ -439,10 +474,10 @@ public abstract class Area {
 //                    IJ.log("Area.calcFullTilePositions: interrupted, Area "+name);
                     break;
                 }    
-                x = startx+tileOffsetX*col;
+                x = startx+tileOffset.getX()*col;
                 row=vDir == 1 ? 0 : yTiles-1;
                 for (int j=0; j<yTiles; j++) {   
-                    y = starty+tileOffsetY*row;
+                    y = starty+tileOffset.getY()*row;
 //                    IJ.log(name+", test Tile: "+Integer.toString(i*yTiles+j)+", "+Double.toString(x)+","+Double.toString(y));
                     if (acceptTilePos(x,y,fovX,fovY,insideOnly)) {
                         siteCounter++;
@@ -462,10 +497,10 @@ public abstract class Area {
 //                    IJ.log("Area.calcFullTilePositions: interrupted, Area "+name);
                     break;
                 }    
-                y = starty+tileOffsetY*row;
+                y = starty+tileOffset.getY()*row;
                 col=hDir == 1 ? 0 : xTiles-1;
                 for (int i=0; i<xTiles; i++) {  
-                    x = startx+tileOffsetX*col;
+                    x = startx+tileOffset.getX()*col;
  //                   IJ.log(name+", test Tile: "+Integer.toString(i*yTiles+j)+", "+Double.toString(x)+","+Double.toString(y));
                     if (acceptTilePos(x,y,fovX,fovY,insideOnly)) {
                         siteCounter++;
@@ -663,7 +698,7 @@ public abstract class Area {
                 g2d.translate(xCenter,yCenter);
                 g2d.rotate(stageToLayoutRot);
                 if (cameraRot != FieldOfView.ROTATION_UNKNOWN) {
-                    g2d.rotate(cameraRot);                        
+                    g2d.rotate(-cameraRot);                        
                 }
                 g2d.translate(-xCenter,-yCenter);
                 g2d.fillRect(xo,yo,w,h);
@@ -916,7 +951,7 @@ public abstract class Area {
         relPosZ=obj.getDouble(TAG_REL_POS_Z);
         selectedForAcq=obj.getBoolean(TAG_SELECTED);
         comment=obj.getString(TAG_COMMENT);
-        cameraRot=0;
+//        cameraRot=0;
     }
 
     //derived classes should overwrite this to save all fields

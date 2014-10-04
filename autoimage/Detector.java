@@ -89,6 +89,20 @@ public class Detector  {
         this (det.label,det.width_Pixel, det.height_Pixel, det.bitDepth, det.binningOptions.clone(), det.fieldRotation);
     }
     
+    @Override
+    public String toString() {
+        String bin="";
+        for (int i=0; i<binningOptions.length; i++)
+            bin=bin+binningOptions[i]+", ";
+        return "Type: "+type
+                +"; Label: "+label
+                +"; Chip width: "+Integer.toString(width_Pixel)+" px"
+                +"; Chip height: "+Integer.toString(height_Pixel)+" px"
+                +"; Bit depth: "+Integer.toString(bitDepth)
+                +"; Binning options: "+bin
+                +"; Field rotation (rad): "+(fieldRotation == FieldOfView.ROTATION_UNKNOWN ? "unknown" :Double.toString(fieldRotation));
+    }
+    
     public void setBinningOptions(String[] binOpt) {
         binningOptions=binOpt;
     }

@@ -6,6 +6,7 @@
 
 package autoimage;
 
+import ij.IJ;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -24,12 +25,13 @@ class LiveModeMonitor extends SwingWorker<Void, Boolean> {
     private ScriptInterface gui;
     private int interval_ms;//interval for polling live mode in millisecond
     private boolean currentMode;
-    private List<ILiveListener> listeners;
+    private final List<ILiveListener> listeners;
     private final ExecutorService listenerExecutor;
     
         
         public LiveModeMonitor(ScriptInterface gui, int interval) {
             this.gui=gui;
+            listeners=new ArrayList<ILiveListener>();
             interval_ms=interval;
             currentMode=!gui.isLiveModeOn();
             listenerExecutor = Executors.newFixedThreadPool(1);
@@ -42,16 +44,16 @@ class LiveModeMonitor extends SwingWorker<Void, Boolean> {
 
         synchronized
         public void addListener(ILiveListener listener) {
-            if (listeners==null)
-                listeners=new ArrayList<ILiveListener>();
             if (!listeners.contains(listener))
                 listeners.add(listener);
+            IJ.log("LiveModeMonitor: "+listeners.size()+" listeners");
         }
         
         synchronized
         public void removeListener(ILiveListener listener) {
             if (listeners != null)
                 listeners.remove(listener);
+            IJ.log("LiveModeMonitor: "+listeners.size()+" listeners");
         }
         
         public int getNoOfListeners() {
@@ -87,13 +89,17 @@ class LiveModeMonitor extends SwingWorker<Void, Boolean> {
                 currentMode=b;
                 synchronized (listeners) {
 	            for (final ILiveListener l : listeners) {
-	               listenerExecutor.submit(
-	                       new Runnable() {
-	                          @Override
-	                          public void run() {
-	                             l.liveModeChanged(currentMode);
-	                          }
-	                       });
+/*                      listenerExecutor.submit(new Runnable() {
+	                    @Override
+	                    public void run() {*/
+                                try {
+	                            l.liveModeChanged(currentMode);
+                                } catch (RuntimeException e) {
+                                    IJ.log(getClass().getName()+": Error in listener. "+e.getMessage());
+                                    listeners.remove(l);
+                                }    
+/*	                    }
+	                });*/
 	            }
 	         }
             }    

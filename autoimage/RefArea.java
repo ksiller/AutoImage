@@ -4,7 +4,7 @@
  */
 package autoimage;
 
-import ij.IJ;
+//import ij.IJ;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -100,7 +100,7 @@ class RefArea {
     }
 
     public void initializeFromJSONObject(JSONObject obj) throws JSONException {
-        IJ.log("initializing: "+this.getClass().getName());
+//        IJ.log("initializing: "+this.getClass().getName());
         name=obj.getString(TAG_NAME);
         stageX=obj.getDouble(TAG_STAGE_X);
         stageY=obj.getDouble(TAG_STAGE_Y);
@@ -116,7 +116,7 @@ class RefArea {
         selected=false;
         stagePosMapped=false;
         cameraRot=FieldOfView.ROTATION_UNKNOWN;
-        IJ.log("initialization completed: "+this.getClass().getName());
+//        IJ.log("initialization completed: "+this.getClass().getName());
     }
     
     public RefArea (JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
