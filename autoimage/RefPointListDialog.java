@@ -17,7 +17,7 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
-import javax.swing.table.DefaultTableModel;
+import javax.swing.table.AbstractTableModel;
 import mmcorej.CMMCore;
 import org.micromanager.api.ScriptInterface;
 
@@ -31,20 +31,189 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
     private AcquisitionLayout acqLayout;
     private List<RefArea> rpList;
     private List<RefArea> rpBackup;
-    private AffineTransform layoutTransform;
+//    private AffineTransform layoutTransform;
     private String xyStageName;
     private String zStageName;
-    private LayoutPanel acqLayoutPanel;
     private boolean modified;
-    
-    
+    private List<IRefPointListener> listeners;
+       
     private final static double TOLERANCE_SCALE_FACTOR = 0.05;
     
-    public RefPointListDialog(java.awt.Frame parent, ScriptInterface gui, AcquisitionLayout aLayout, LayoutPanel acqLP) {
+    private class RefAreaTableModel extends AbstractTableModel {
+        public final String[] COLUMN_NAMES = new String[]{"Name", "Stage X", "Stage Y", "Stage Z", "Layout X", "Layout Y", "Layout Z", "Status"};
+        private List<RefArea> refAreas;
+
+        public RefAreaTableModel(List<RefArea> al) {
+            super();
+            if (al == null) {
+                al = new ArrayList<RefArea>();
+            }
+            this.refAreas = al;
+        }
+
+        public List<RefArea> getAreaList() {
+            return refAreas;
+        }
+
+        @Override
+        public int getRowCount() {
+            return refAreas.size();
+        }
+
+        @Override
+        public int getColumnCount() {
+            return COLUMN_NAMES.length;
+        }
+
+        @Override
+        public String getColumnName(int columnIndex) {
+            return COLUMN_NAMES[columnIndex];
+        }
+
+        @Override
+        public Class getColumnClass(int colIndex) {
+            return getValueAt(0, colIndex).getClass();
+        }
+
+        @Override
+        public Object getValueAt(int rowIndex, int colIndex) {
+            RefArea a;
+            if (refAreas != null & rowIndex < refAreas.size()) {
+                a = refAreas.get(rowIndex);
+                switch (colIndex) {
+                    case 0: {
+                        return a.getName();
+                    }
+                    case 1: {
+                        return a.getStageCoordX();
+                    }
+                    case 2: {
+                        return a.getStageCoordY();
+                    }
+                    case 3: {
+                        return a.getStageCoordZ();
+                    }
+                    case 4: {
+                        return a.getLayoutCoordX();
+                    }
+                    case 5: {
+                        return a.getLayoutCoordY();
+                    }
+                    case 6: {
+                        return a.getLayoutCoordZ();
+                    }
+                    case 7: {
+                        return (a.isStagePosFound() ? "mapped" : "not mapped");
+                    }
+                } 
+                return null;
+            } else {
+                return null;
+            }
+        }
+
+        @Override
+        public boolean isCellEditable(int rowIndex, int colIndex) {
+            return (colIndex == 0 || colIndex == 4 || colIndex == 5 || colIndex == 6);
+        }
+
+        public void setStagePos(int row, double x, double y, double z) {
+            if (row < getRowCount()) {
+                refAreas.get(row).setStageCoord(x, y, z);
+                refAreas.get(row).setStagePosMapped(true);
+                fireTableRowsUpdated(row,row);
+            }
+        }
+        
+        @Override
+        public void setValueAt(Object value, int rowIndex, int colIndex) {
+            RefArea area;
+            if (refAreas != null & rowIndex < refAreas.size()) {
+                area = refAreas.get(rowIndex);
+                switch (colIndex) {
+                    case 0: {
+                        area.setName((String) value);
+                        fireTableCellUpdated(rowIndex, colIndex);
+                        break;
+                    }
+                    case 1: {
+                        area.setStageCoordX((Double) value);
+                        fireTableCellUpdated(rowIndex, colIndex);
+                        break;
+                    }
+                    case 2: {
+                        area.setStageCoordY((Double) value);
+                        fireTableCellUpdated(rowIndex, colIndex);
+                        break;
+                    }
+                    case 3: {
+                        area.setStageCoordZ((Double) value);
+                        fireTableCellUpdated(rowIndex, colIndex);
+                        break;
+                    }
+                    case 4: {
+                        area.setLayoutCoordX((Double) value);
+                        fireTableCellUpdated(rowIndex, colIndex);
+                        break;
+                    }
+                    case 5: {
+                        area.setLayoutCoordY((Double) value);
+                        fireTableCellUpdated(rowIndex, colIndex);
+                        break;
+                    }
+                    case 6: {
+                        area.setLayoutCoordZ((Double) value);
+                        fireTableCellUpdated(rowIndex, colIndex);
+                        break;
+                    }
+                    case 7: {
+                        area.setStagePosMapped(((String) value).equals("mapped"));
+                        fireTableCellUpdated(rowIndex, colIndex);
+                        break;
+                    }
+                }
+            }
+        }
+
+        public void addRow(Object value) {
+            RefArea a = (RefArea) value;
+            refAreas.add(a);
+            fireTableRowsInserted(getRowCount(), getRowCount());
+        }
+
+        public RefArea getRowData(int rowIdx) {
+            if (rowIdx >= 0 && rowIdx < refAreas.size()) {
+                return refAreas.get(rowIdx);
+            } else {
+                return null;
+            }
+        }
+
+        public void removeRow(int index) {
+            if (index < getRowCount()) {
+                refAreas.remove(index);
+                fireTableRowsDeleted(index, index);
+            }
+        }
+
+        public void removeRows(int[] rowIdx) {
+            for (int i = rowIdx[rowIdx.length - 1]; i >= rowIdx[0]; i--) {
+                refAreas.remove(i);
+            }
+            fireTableRowsDeleted(rowIdx[0], rowIdx[rowIdx.length - 1]);
+        }
+
+    }
+    // end RefAreaTableModel
+        
+
+    
+    public RefPointListDialog(java.awt.Frame parent, ScriptInterface gui, AcquisitionLayout aLayout) {
         super(parent, false);
+        listeners = new ArrayList<IRefPointListener>();
         this.core=gui.getMMCore();
         acqLayout=aLayout;
-        acqLayoutPanel=acqLP;
+//        acqLayoutPanel=acqLP;
         initComponents();
         messageLabel.setText("");
         setRefPointList(acqLayout.getLandmarks());
@@ -73,13 +242,12 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
         moveToButton.setEnabled(mappedPos > 0 );
         ((AcqFrame)getParent()).setLandmarkFound(mappedPos > 0);
 
-        DefaultTableModel model=(DefaultTableModel) refPointTable.getModel();
+        RefAreaTableModel model=(RefAreaTableModel) refPointTable.getModel();
         model.addTableModelListener(new TableModelListener() {
 
             @Override
             public void tableChanged(TableModelEvent e) {
-//                IJ.log("tableChanged");
-                DefaultTableModel model=(DefaultTableModel)refPointTable.getModel();
+                RefAreaTableModel model=(RefAreaTableModel)refPointTable.getModel();
 /*                if (e.getType() == TableModelEvent.UPDATE && e.getColumn()==4 && e.getFirstRow()==0) {
                     double refLayoutX=(Double)model.getValueAt(0, 4);
                     double refStageX=(Double)model.getValueAt(0, 1);
@@ -104,19 +272,49 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
 */
                 if (e.getType() == TableModelEvent.UPDATE && (e.getColumn() >= 4 || e.getColumn() <= 6)) {
                     int row=e.getFirstRow();
-                    rpList.get(row).setLayoutCoord((Double)model.getValueAt(row,4),(Double)model.getValueAt(row,5),(Double)model.getValueAt(row, 6));
+//                    rpList.get(row).setLayoutCoord((Double)model.getValueAt(row,4),(Double)model.getValueAt(row,5),(Double)model.getValueAt(row, 6));
                 }
                 updateStageRotAndTilt();    
                 int mappedPos = acqLayout.getNoOfMappedStagePos();
                 moveToButton.setEnabled(mappedPos > 0 );
                 ((AcqFrame)getParent()).setLandmarkFound(mappedPos > 0);
                 modified=true;
-                acqLayoutPanel.repaint();
+                                
+//                acqLayoutPanel.repaint();
+                notifyRefAreaListeners(rpList);
             }});
         modified=false;
         
     }
 
+    synchronized public void addListener(IRefPointListener listener) {
+        if (!listeners.contains(listener))
+            listeners.add(listener);
+        IJ.log(getClass().getName()+": "+listeners.size()+" listeners");
+    }
+        
+    synchronized public void removeListener(IRefPointListener listener) {
+        if (listeners != null)
+            listeners.remove(listener);
+        IJ.log(getClass().getName()+": "+listeners.size()+" listeners");
+    }
+    
+    private void notifySelectionListeners(RefArea refArea) {
+        synchronized (listeners) {
+            for (IRefPointListener l:listeners) {
+                l.selectedRefPointChanged(refArea);
+            }
+        }
+    }
+    
+    private void notifyRefAreaListeners(List<RefArea> refAreas) {
+        synchronized (listeners) {
+            for (IRefPointListener l:listeners) {
+                l.referencePointsChanged(refAreas);
+            }
+        }
+    }
+    
     /**
      * This method is called from within the constructor to initialize the form.
      * WARNING: Do NOT modify this code. The content of this method is always
@@ -152,31 +350,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
             }
         });
 
-        refPointTable.setModel(new javax.swing.table.DefaultTableModel(
-            new Object [][] {
-                {null, null, null, null, null, null, null, null},
-                {null, null, null, null, null, null, null, null},
-                {null, null, null, null, null, null, null, null}
-            },
-            new String [] {
-                "Name", "Stage X", "Stage Y", "Stage Z", "Layout X", "Layout Y", "Layout Z", "Status"
-            }
-        ) {
-            Class[] types = new Class [] {
-                java.lang.String.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.Double.class, java.lang.String.class
-            };
-            boolean[] canEdit = new boolean [] {
-                true, false, false, false, true, true, true, false
-            };
-
-            public Class getColumnClass(int columnIndex) {
-                return types [columnIndex];
-            }
-
-            public boolean isCellEditable(int rowIndex, int columnIndex) {
-                return canEdit [columnIndex];
-            }
-        });
+        refPointTable.setModel(new RefAreaTableModel(null));
         jScrollPane1.setViewportView(refPointTable);
 
         addButton.setText("+");
@@ -320,9 +494,15 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
                 acqLayout.calcStageToLayoutTransform();
                 tiltLabel.setText(String.format("%1$,.1f",acqLayout.getTilt())+" degree");
                 AffineTransform at=acqLayout.getStageToLayoutTransform();
-                double angle=Math.atan2(at.getShearY(), at.getScaleY());
+                //double angle=Math.atan2(at.getShearY(), at.getScaleY());
+                double angle=acqLayout.getStageToLayoutRot();
+                
+                
+                //move to listener?
                 Area.setStageToLayoutRot(angle);
                 RefArea.setStageToLayoutRot(angle);
+                
+                
                 angle=angle/Math.PI*180;
                 if (angle > 180) angle=angle-360;
                 rotationLabel.setText(String.format("%1$,.1f",angle)+" degree");
@@ -428,7 +608,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
     private void updateStagePosButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_updateStagePosButtonActionPerformed
         int row=refPointTable.getSelectedRow();
         if (row>=0) {
-            DefaultTableModel model=(DefaultTableModel)refPointTable.getModel();
+            RefAreaTableModel model=(RefAreaTableModel)refPointTable.getModel();
             try {
                 double stageX=core.getXPosition(xyStageName);
                 double stageY=core.getYPosition(xyStageName);
@@ -441,18 +621,20 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
                 }
                 RefArea rp=rpList.get(row);
                 //set coordinates and stagePosFound=true;
-                rp.setStageCoord(stageX, stageY, stageZ);
-                rp.setStagePosMapped(true);
-//                double deltaSX=stageX-rpList.get(row).getStageCoordX();
-//                double deltaSY=stageY-rpList.get(row).getStageCoordY();
-                model.setValueAt(new Double(stageX),row,1);
+//                rp.setStageCoord(stageX, stageY, stageZ);
+//                rp.setStagePosMapped(true);
+
+                model.setStagePos(row, stageX, stageY, stageZ);
+
+                /*                model.setValueAt(new Double(stageX),row,1);
                 model.setValueAt(new Double(stageY),row,2);
                 model.setValueAt(new Double(stageZ),row,3);
-                model.setValueAt(new String("mapped"), row,7);
+                model.setValueAt(new String("mapped"), row,7);*/
                 //leads to call of tableChanged() --> updateRotAndTilt()
                 
-                acqLayoutPanel.repaint();
+//                acqLayoutPanel.repaint();
                 modified=true;
+                notifyRefAreaListeners(rpList);
             } catch (Exception ex) {
                 Logger.getLogger(RefPointListDialog.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -463,7 +645,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
     private void moveToButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_moveToButtonActionPerformed
         int row=refPointTable.getSelectedRow();
         if (row>=0) {
-            DefaultTableModel model=(DefaultTableModel)refPointTable.getModel();
+            RefAreaTableModel model=(RefAreaTableModel)refPointTable.getModel();
             try {
                 double stageX=(Double)model.getValueAt(row,1);
                 double stageY=(Double)model.getValueAt(row,2);
@@ -477,7 +659,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
 //                stageXPosLabel.setText(Double.toString(stageX));
 //                stageYPosLabel.setText(Double.toString(stageY));
 //                stageZPosLabel.setText(Double.toString(stageZ));            
-                acqLayoutPanel.repaint();
+//                acqLayoutPanel.repaint();
             } catch (Exception ex) {
                 Logger.getLogger(RefPointListDialog.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -487,7 +669,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
     }//GEN-LAST:event_moveToButtonActionPerformed
 
     private void addButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addButtonActionPerformed
-        DefaultTableModel model=(DefaultTableModel)refPointTable.getModel();
+        RefAreaTableModel model=(RefAreaTableModel)refPointTable.getModel();
         if (model.getRowCount()>=3) {
             JOptionPane.showMessageDialog(this, "Cannot create more than three Reference Points.");
             return;
@@ -519,7 +701,8 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
                 newRP=new RefArea("Landmark", stageX, stageY, stageZ, 0,0,0, core.getPixelSizeUm()*core.getImageWidth(),core.getPixelSizeUm()*core.getImageHeight(), "" );    
             }
             newRP.setStagePosMapped(true);
-            rpList.add(newRP);
+            model.addRow(newRP);
+/*            rpList.add(newRP);
             model.addRow(new Object[]{
                     newRP.getName(),
                     newRP.getStageCoordX(),
@@ -529,14 +712,19 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
                     newRP.getLayoutCoordY(),
                     newRP.getLayoutCoordZ(),
                     new String(newRP.isStagePosFound() ? "mapped":"not mapped")
-            });
+            });*/
             
 //            updateStagePosLabel(stageX, stageY, stageZ);
             //change setLandmarkFound flag in AcqFrame and acqLayout 
             
 //            updateStageRotAndTilt();
-            acqLayoutPanel.repaint();
+            int mappedPos = acqLayout.getNoOfMappedStagePos();
+            moveToButton.setEnabled(mappedPos > 0 );
+            ((AcqFrame)getParent()).setLandmarkFound(mappedPos > 0);
+
+//            acqLayoutPanel.repaint();
             modified=true;
+            notifyRefAreaListeners(rpList);
         } catch (Exception ex) {
             IJ.log(getClass().getName()+": addLandmark: "+ex.getMessage());
             Logger.getLogger(RefPointListDialog.class.getName()).log(Level.SEVERE, null, ex);
@@ -551,7 +739,8 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
         moveToButton.setEnabled(mappedPos > 0 );
         ((AcqFrame)getParent()).setLandmarkFound(mappedPos > 0);
         acqLayout.deselectAllLandmarks();
-        acqLayoutPanel.repaint();
+//        acqLayoutPanel.repaint();
+        notifyRefAreaListeners(rpList);
         dispose();
     }//GEN-LAST:event_cancelButtonActionPerformed
 
@@ -562,7 +751,8 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
             Logger.getLogger(RefPointListDialog.class.getName()).log(Level.SEVERE, null, ex);
         }
         acqLayout.deselectAllLandmarks();
-        acqLayoutPanel.repaint();
+//        acqLayoutPanel.repaint();
+        notifyRefAreaListeners(rpList);
         if (modified) 
             acqLayout.setModified(true);
         dispose();
@@ -572,16 +762,21 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
         int row=refPointTable.getSelectedRow();
         if (row>=0) {
             try {
-                DefaultTableModel model=(DefaultTableModel)refPointTable.getModel();
-                RefArea removedRefArea = rpList.remove(row);
+                RefAreaTableModel model=(RefAreaTableModel)refPointTable.getModel();
+//                RefArea removedRefArea = rpList.remove(row);
                 model.removeRow(row);
-                acqLayoutPanel.repaint();
+//                acqLayoutPanel.repaint();
                 modified=true;
             } catch (Exception ex) {
                 IJ.log(getClass().getName()+": removeLandmark: "+ex.getMessage());
                 Logger.getLogger(RefPointListDialog.class.getName()).log(Level.SEVERE, null, ex);
             }
-        }            
+        } 
+        int mappedPos = acqLayout.getNoOfMappedStagePos();
+        moveToButton.setEnabled(mappedPos > 0 );
+        notifyRefAreaListeners(rpList);
+//        ((AcqFrame)getParent()).setLandmarkFound(mappedPos > 0);
+
 //        ((AcqFrame)getParent()).setLandmarkFound(acqLayout.getNoOfMappedStagePos() > 0);
     }//GEN-LAST:event_removeButtonActionPerformed
 
@@ -589,10 +784,11 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
         int answer = JOptionPane.showConfirmDialog(this, "Do you want to keep the modified Landmark definitions?","", JOptionPane.YES_NO_OPTION);
         if (answer==JOptionPane.NO_OPTION) {
             acqLayout.setLandmarks(rpBackup);
+            notifyRefAreaListeners(rpBackup);
         }
         acqLayout.deselectAllLandmarks();
-//        dispose();
-        acqLayoutPanel.repaint();
+        notifySelectionListeners(null);
+//        acqLayoutPanel.repaint();
     }//GEN-LAST:event_formWindowClosing
 
     
@@ -623,7 +819,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
     protected void setRefPointList(List<RefArea> rpl) {
         rpList=rpl;
         rpBackup=cloneRefPointList(rpl);    
-        DefaultTableModel model=(DefaultTableModel) refPointTable.getModel();
+/*        RefAreaTableModel model=(RefAreaTableModel) refPointTable.getModel();
         int r=model.getRowCount();
         for (int i=r-1; i>=0; i--)
             model.removeRow(i);
@@ -640,7 +836,49 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
                     new String(rp.isStagePosFound() ? "mapped":"not mapped")
                 });
             }            
-        }
+        }*/
+        RefAreaTableModel model=new RefAreaTableModel(rpList);
+        refPointTable.setModel(model);
+        model.addTableModelListener(new TableModelListener() {
+            @Override
+            public void tableChanged(TableModelEvent e) {
+                RefAreaTableModel model=(RefAreaTableModel)refPointTable.getModel();
+/*                if (e.getType() == TableModelEvent.UPDATE && e.getColumn()==4 && e.getFirstRow()==0) {
+                    double refLayoutX=(Double)model.getValueAt(0, 4);
+                    double refStageX=(Double)model.getValueAt(0, 1);
+                    for (int i=1; i<model.getRowCount(); i++) {
+                        double sX=(Double)model.getValueAt(i, 1);
+                        model.setValueAt(refLayoutX+sX-refStageX,i,4);
+                    }
+                    for (int i=0; i<model.getRowCount(); i++)
+                        rpList.get(i).setLayoutCoordX((Double)model.getValueAt(i,4));
+                } else if (e.getType() == TableModelEvent.UPDATE & e.getColumn()==5 & e.getFirstRow()==0) {
+                    double refLayoutY=(Double)model.getValueAt(0, 5);
+                    double refStageY=(Double)model.getValueAt(0, 2);
+                    for (int i=1; i<model.getRowCount(); i++) {
+                        double sY=(Double)model.getValueAt(i, 2);
+                        model.setValueAt(refLayoutY+sY-refStageY,i,5);
+                    }
+                    for (int i=0; i<model.getRowCount(); i++)
+                        rpList.get(i).setLayoutCoordY((Double)model.getValueAt(i,5));
+                } else if (e.getType() == TableModelEvent.UPDATE & e.getColumn()==6) {
+                    rpList.get(e.getFirstRow()).setLayoutCoordZ((Double)model.getValueAt(e.getFirstRow(),6));
+                }
+*/
+                if (e.getType() == TableModelEvent.UPDATE && (e.getColumn() >= 4 || e.getColumn() <= 6)) {
+                    int row=e.getFirstRow();
+//                    rpList.get(row).setLayoutCoord((Double)model.getValueAt(row,4),(Double)model.getValueAt(row,5),(Double)model.getValueAt(row, 6));
+                }
+                updateStageRotAndTilt();    
+                int mappedPos = acqLayout.getNoOfMappedStagePos();
+                moveToButton.setEnabled(mappedPos > 0 );
+                ((AcqFrame)getParent()).setLandmarkFound(mappedPos > 0);
+                modified=true;
+                                
+//                acqLayoutPanel.repaint();
+                notifyRefAreaListeners(rpList);
+            }});
+        modified=false;
     }
 
     @Override
@@ -659,14 +897,17 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
         public void valueChanged(ListSelectionEvent e) {  
                 ListSelectionModel lsm = (ListSelectionModel)e.getSource();
  
-            for (RefArea rpList1 : rpList) {
-                rpList1.setSelected(false);
+            for (RefArea rp : rpList) {
+                rp.setSelected(false);
             }
-                if (!lsm.isSelectionEmpty()) {
-                    rpList.get(lsm.getMinSelectionIndex()).setSelected(true);
+            RefArea selectedRefArea=null;
+            if (!lsm.isSelectionEmpty()) {
+                selectedRefArea=rpList.get(lsm.getMinSelectionIndex());
+                selectedRefArea.setSelected(true);
 //                    int maxIndex = lsm.getMaxSelectionIndex();
-                }
-                acqLayoutPanel.repaint();
+            }
+            notifySelectionListeners(selectedRefArea);
+//            acqLayoutPanel.repaint();
          }   
     }
 }

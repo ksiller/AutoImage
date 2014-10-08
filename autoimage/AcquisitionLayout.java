@@ -208,11 +208,126 @@ class AcquisitionLayout  implements PropertyChangeListener {
         return obj;
     }
     
+    //is true if no gaps exist between tiles
+    //considers camera field rotation and stage-to-layout rotation
+    public boolean hasGaps(FieldOfView fov, double tileOverlap) {
+        Rectangle2D fovROI=fov.getROI_Pixel(1);
+        Point2D tileOffset=Area.calculateTileOffset(fovROI.getWidth(), fovROI.getHeight(), tileOverlap);
+        AffineTransform rot=new AffineTransform();
+        rot.rotate(fov.getFieldRotation()-getStageToLayoutRot(),fovROI.getWidth()/2,fovROI.getHeight()/2);
+        AffineTransform tOrigin=new AffineTransform();
+        tOrigin.translate(-fovROI.getWidth()/2,-fovROI.getHeight()/2);
+        java.awt.geom.Area[] a=new java.awt.geom.Area[4];
+        for (int i=0; i<4; i++) {
+            a[i]=new java.awt.geom.Area(fovROI);
+            a[i].transform(rot);
+            a[i].transform(tOrigin);
+            switch (i) {
+                case 1: {
+                    AffineTransform transl=new AffineTransform();
+                    transl.translate(tileOffset.getX(), 0);
+                    a[i].transform(transl);
+                    break;
+                }    
+                case 2: {
+                    AffineTransform transl=new AffineTransform();
+                    transl.translate(0,tileOffset.getY());
+                    a[i].transform(transl);
+                    break;
+                }    
+                case 3: {
+                    AffineTransform transl=new AffineTransform();
+                    transl.translate(tileOffset.getX(), tileOffset.getY());
+                    a[i].transform(transl);
+                    break;
+                }    
+            }
+        }
+
+        double centerX=tileOffset.getX()/2;
+        double centerY=tileOffset.getY()/2;
+        return (!(a[0].contains(centerX, centerY) && a[3].contains(centerX, centerY)) 
+                                        || (a[1].contains(centerX, centerY) && a[2].contains(centerX, centerY)));
+    }
+    
+    //returns minimal realtive tile overlap (0 <= tileOverlap <=1) to eliminate all gaps
+    //considers camera field rotation and stage-to-layout rotation
+    public double closeTilingGaps(FieldOfView fov, double accuracy) {
+        double newOverlap=0;
+        double lowOverlap=0;
+        double highOverlap=1;
+        Rectangle2D fovROI=fov.getROI_Pixel(1);
+        while (highOverlap-lowOverlap > accuracy) {
+            newOverlap=(highOverlap-lowOverlap)/2+lowOverlap;
+
+//            IJ.log("AcquisitionLayout.closingTilingGaps: while loop, before Area.calulateTileOffset: angle: "+Double.toString(fov.getFieldRotation()/Math.PI*180)+"new overlap: "+Double.toString(newOverlap));
+            Point2D tileOffset=Area.calculateTileOffset(fovROI.getWidth(), fovROI.getHeight(), newOverlap);
+            double centerX=tileOffset.getX()/2;
+            double centerY=tileOffset.getY()/2;
+//            IJ.log("AcquisitionLayout.closingTilingGaps: while loop, after Area.calulateTileOffset, tileOffset: "+tileOffset.toString());
+
+            AffineTransform rot=new AffineTransform();
+            rot.rotate(fov.getFieldRotation()-getStageToLayoutRot(),fovROI.getWidth()/2,fovROI.getHeight()/2);
+            AffineTransform tOrigin=new AffineTransform();
+            tOrigin.translate(-fovROI.getWidth()/2,-fovROI.getHeight()/2);
+            java.awt.geom.Area[] a=new java.awt.geom.Area[4];            
+            for (int i=0; i<4; i++) {
+                a[i]=new java.awt.geom.Area(fovROI);
+                a[i].transform(rot);
+                a[i].transform(tOrigin);
+                switch (i) {
+                    case 1: {
+                        AffineTransform transl=new AffineTransform();
+                        transl.translate(tileOffset.getX(), 0);
+                        a[i].transform(transl);
+//                      a[i]=a[0].createTransformedArea(transl);
+                        break;
+                    }    
+                    case 2: {
+                        AffineTransform transl=new AffineTransform();
+                        transl.translate(0,tileOffset.getY());
+                        a[i].transform(transl);
+                        break;
+                    }    
+                    case 3: {
+                        AffineTransform transl=new AffineTransform();
+                        transl.translate(tileOffset.getX(), tileOffset.getY());
+                        a[i].transform(transl);
+                        break;
+                    }
+                }
+//                IJ.log("a["+i+"].centerX: "+Double.toString(a[i].getBounds2D().getCenterX())+", centerY: "+Double.toString(a[i].getBounds2D().getCenterY()));    
+
+            }
+//            IJ.log("centerX: "+Double.toString(centerX)+", centerY: "+Double.toString(centerY));    
+
+            if ((a[0].contains(centerX, centerY) && a[3].contains(centerX, centerY)) 
+                    || (a[1].contains(centerX, centerY) && a[2].contains(centerX, centerY))) {
+                highOverlap=newOverlap;
+            } else {//tiling gap
+                lowOverlap=newOverlap;
+            }
+        }
+        return newOverlap;
+    }
+    
+    
     //in radians
     public double getStageToLayoutRot() {
-        return Math.atan2(stageToLayoutTransform.getShearY(), stageToLayoutTransform.getScaleY());
+        if (stageToLayoutTransform!=null)
+            return Math.atan2(stageToLayoutTransform.getShearY(), stageToLayoutTransform.getScaleY());
+        else
+            return 0;
     }
-  
+    
+    //in radians
+    public double getLayoutToStageRot() {
+        if (layoutToStageTransform!=null)
+            return Math.atan2(layoutToStageTransform.getShearY(), layoutToStageTransform.getScaleY());
+        else
+            return 0;
+    }
+    
     public File getFile() {
         return file;
     }
@@ -244,7 +359,18 @@ class AcquisitionLayout  implements PropertyChangeListener {
        }
        return id;
     }   
-    
+
+/*    
+    public static int getNoOfMappedStagePos(List<RefArea> refList) {
+        int mappedPoints=0;
+        if (refList!=null) {
+            for (RefArea rp:refList)
+                if (rp.isStagePosFound())
+                    mappedPoints++;
+        }
+        return mappedPoints;
+    }
+*/    
     public int getNoOfMappedStagePos() {
         int mappedPoints=0;
         if (landmarks!=null) {
@@ -254,7 +380,6 @@ class AcquisitionLayout  implements PropertyChangeListener {
         }
         return mappedPoints;
     }
-    
     
     // calculates 2D affine transform and normal vector for layout
     public void calcStageToLayoutTransform() {
@@ -427,6 +552,7 @@ class AcquisitionLayout  implements PropertyChangeListener {
         return layoutToStageTransform;
     }
     
+
     public Vec3d getNormalVector() {
         return normalVec;
     }

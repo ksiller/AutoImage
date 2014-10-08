@@ -182,7 +182,7 @@ public class FieldOfView {
     
     
     public void clearROI() {
-        roi_Pixel_Unbinned=null;
+        roi_Pixel_Unbinned=new Rectangle(0,0,fullChipWidth_Pixel,fullChipHeight_Pixel);
     }
     
     //x-y dist of ROI origin from full chip origin in um

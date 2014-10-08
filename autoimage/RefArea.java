@@ -170,6 +170,21 @@ class RefArea {
         name=n;
     }
     
+    public void setStageCoordX(double x) {
+        stageX=x;
+        changed=true;
+    }
+    
+    public void setStageCoordY(double y) {
+        stageY=y;
+        changed=true;
+    }
+    
+    public void setStageCoordZ(double z) {
+        stageZ=z;
+        changed=true;
+    }
+    
     public double getStageCoordX() {
         return stageX;
     }
@@ -209,17 +224,20 @@ class RefArea {
     public void setLayoutCoordX(double lx) {
         layoutCoordX=lx;
         layoutCoordOrigX=lx-physWidth/2;
+        changed=true;
     }
     
 
     public void setLayoutCoordY(double ly) {
         layoutCoordY=ly;
         layoutCoordOrigY=ly-physHeight/2;
+        changed=true;
     }
     
 
     public void setLayoutCoordZ(double lz) {
         layoutCoordZ=lz;
+        changed=true;
     }
     
     public void setLayoutCoord(double lX, double lY, double lZ) {

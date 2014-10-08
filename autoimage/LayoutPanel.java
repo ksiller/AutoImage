@@ -722,7 +722,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
             bounds=g2d.getFontMetrics().getStringBounds(s, g2d);
             g2d.drawString(s, Math.round((w-bounds.getWidth())/2), Math.round((h-bounds.getHeight())/2));
         }    
-        if (acqLayout.getNoOfMappedStagePos()>0) {
+        if (acqLayout.getNoOfMappedStagePos() > 0) {
 //            g2d.setTransform(newTransform);
             drawFovAtCurrentStagePos(g2d);
         }

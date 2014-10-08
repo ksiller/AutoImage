@@ -165,7 +165,7 @@ import org.micromanager.utils.ReportingUtils;
  *
  * @author Karsten Siller
  */
-public class AcqFrame extends javax.swing.JFrame implements ActionListener, TableModelListener, WindowListener, IStageMonitorListener, ILiveListener, IMergeAreaListener, MMListenerInterface, AcqSettingsListener, ImageCacheListener, IDataProcessorListener {//, LiveModeListener {
+public class AcqFrame extends javax.swing.JFrame implements ActionListener, TableModelListener, WindowListener, IStageMonitorListener, ILiveListener, IRefPointListener, IMergeAreaListener, MMListenerInterface, AcqSettingsListener, ImageCacheListener, IDataProcessorListener {//, LiveModeListener {
 
     //gui, core, acqEngine
     private final ScriptInterface gui;
@@ -492,15 +492,20 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     CameraRotDlg.Measurement m=cameraRotDialog.getResult();
                     if (m!=null) {
                         
-                       //m.cameraAngle=Math.PI*10/180;
-                       m.cameraAngle=Math.PI/180*Double.parseDouble(JOptionPane.showInputDialog(durationText, m, currentDetector.getFieldRotation()));
+//                       m.cameraAngle=Math.PI/180*Double.parseDouble(JOptionPane.showInputDialog(durationText, m, currentDetector.getFieldRotation()));
                         
                         if (m.cameraAngle == FieldOfView.ROTATION_UNKNOWN) {
-                            int result=JOptionPane.showConfirmDialog(null, "Camera rotation not defined.\nDo you want to reset the camera rotation to 0 degree?", "Camera rotation", JOptionPane.YES_NO_OPTION);
-                            if (result==JOptionPane.YES_OPTION)
-                                m.cameraAngle=0;
+                            String angleStr=JOptionPane.showInputDialog(null, "Enter camera field rotation angle. Press 'Cancel' to leave current camera field rotation angle.", 
+                                    (currentDetector.getFieldRotation() == FieldOfView.ROTATION_UNKNOWN ? 0 :currentDetector.getFieldRotation()/Math.PI*180));
+                            if (!angleStr.equals("")) //ok button
+                                try {
+                                    m.cameraAngle=Math.PI/180*Double.parseDouble(angleStr);
+                                } catch (NumberFormatException ex) {
+                                    JOptionPane.showMessageDialog(null,"Invalid number.");
+                                    return;
+                                }
                             else
-                                return;
+                                return;  // cancel button
                         }
                         currentDetector.setFieldRotation(m.cameraAngle);
                         for (AcqSetting setting:acqSettings) {
@@ -517,64 +522,112 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                     || (setting.getTilingMode()!=TilingSetting.Mode.FULL && (!setting.isCluster() || (setting.getNrClusterX()==1 && setting.getNrClusterY()==1)))) {
                                 message=message+"Setting '"+setting.getName()+"': Ok\n";
                             } else {    
+/*
                                 Rectangle2D cameraROI=setting.getFieldOfView().getROI_Pixel(1);
-                                IJ.log("before Area.calulateTileOffset: "+Double.toString(m.cameraAngle/Math.PI*180));
+   //                             cameraROI.setRect(-cameraROI.getWidth()/2, -cameraROI.getHeight()/2, cameraROI.getWidth(), cameraROI.getHeight());
+                                IJ.log("before Area.calulateTileOffset: angle: "+Double.toString(m.cameraAngle/Math.PI*180));
                                 Point2D tileOffset=Area.calculateTileOffset(cameraROI.getWidth(), cameraROI.getHeight(), setting.getTileOverlap());
-                                IJ.log("after Area.calulateTileOffset, "+tileOffset.toString());
-                                IJ.log("Initial Seq"+setting.getName()+": "+Double.toString(tileOffset.getX())+", "+Double.toString(tileOffset.getY()));
+                                IJ.log("after Area.calulateTileOffset, tileOffset: "+tileOffset.toString());
+                                IJ.log("Initial Seq"+setting.getName()+": tileOffset: "+Double.toString(tileOffset.getX())+", "+Double.toString(tileOffset.getY()));
                                 
 //                                double xdisplace=cameraROI.getWidth()*(1-setting.getTileOverlap());
 //                                double ydisplace=cameraROI.getHeight()*(1-setting.getTileOverlap());
-                                java.awt.geom.Area a1=new java.awt.geom.Area(cameraROI);
-                                java.awt.geom.Area a2=new java.awt.geom.Area(cameraROI);
                                 AffineTransform rot=new AffineTransform();
-                                rot.rotate(m.cameraAngle,cameraROI.getWidth()/2,cameraROI.getHeight()/2);
-                                a1.transform(rot);//rotation
-                                a2.transform(rot);//rotation
-                                AffineTransform transl=new AffineTransform();
-                                transl.translate(tileOffset.getX(), tileOffset.getY());
-                                a2.transform(transl);//translation
-                                try {
-                                    a1.intersect(a2);//according to some java doc it throws null pointer excpetion if areas don't overlap
-                                } catch (NullPointerException ne) {
-                                    a1=null;
+//                                rot.rotate(m.cameraAngle-Area.getStageToLayoutRot(),cameraROI.getWidth()/2,cameraROI.getHeight()/2);
+                                rot.rotate(m.cameraAngle-Area.getStageToLayoutRot(),cameraROI.getWidth()/2,cameraROI.getHeight()/2);
+                                AffineTransform tOrigin=new AffineTransform();
+                                tOrigin.translate(-cameraROI.getWidth()/2,-cameraROI.getHeight()/2);
+                                java.awt.geom.Area[] a=new java.awt.geom.Area[4];
+//                                AffineTransform[] transl=new AffineTransform[3];
+                                for (int i=0; i<4; i++) {
+                                    a[i]=new java.awt.geom.Area(cameraROI);
+                                    a[i].transform(rot);
+                                    a[i].transform(tOrigin);
+                                    switch (i) {
+                                        case 1: {
+                                            AffineTransform transl=new AffineTransform();
+                                            transl.translate(tileOffset.getX(), 0);
+                                            a[i].transform(transl);
+                                            break;
+                                        }    
+                                        case 2: {
+                                            AffineTransform transl=new AffineTransform();
+                                            transl.translate(0,tileOffset.getY());
+                                            a[i].transform(transl);
+                                            break;
+                                        }    
+                                        case 3: {
+                                            AffineTransform transl=new AffineTransform();
+                                            transl.translate(tileOffset.getX(), tileOffset.getY());
+                                            a[i].transform(transl);
+                                            break;
+                                        }    
+                                    }
+                                    IJ.log("a["+i+"].centerX: "+Double.toString(a[i].getBounds2D().getCenterX())+", a["+i+"].centerY: "+Double.toString(a[i].getBounds2D().getCenterY()));    
                                 }
-                                if (a1==null || (a1.getBounds().width == 0 && a1.getBounds().height == 0)) {
-                                    double newOverlap=setting.getTileOverlap();
-                                    double lowOverlap=newOverlap;
-                                    double highOverlap=0.5;
+                                
+                                double centerX=tileOffset.getX()/2;
+                                double centerY=tileOffset.getY()/2;
+*/
+                                if (!acqLayout.hasGaps(setting.getFieldOfView(),setting.getTileOverlap())) {
+                                    message=message+"Setting '"+setting.getName()+"': Ok.\n";
+                                } else {//tiling gap
+/*                                    double newOverlap=setting.getTileOverlap();
+                                    double lowOverlap=setting.getTileOverlap();
+                                    double highOverlap=1;
                                     while (highOverlap-lowOverlap > 0.005) {
                                         newOverlap=(highOverlap-lowOverlap)/2+lowOverlap;
 
-                                        IJ.log("Seq"+setting.getName()+":while loop, before Area.calulateTileOffset: "+Double.toString(m.cameraAngle/Math.PI*180)+Double.toString(newOverlap));
+                                        IJ.log("Seq"+setting.getName()+":while loop, before Area.calulateTileOffset: angle: "+Double.toString(m.cameraAngle/Math.PI*180)+"new overlap: "+Double.toString(newOverlap));
                                         tileOffset=Area.calculateTileOffset(cameraROI.getWidth(), cameraROI.getHeight(), newOverlap);
-                                        IJ.log("Seq"+setting.getName()+":while loop, after Area.calulateTileOffset, "+tileOffset.toString());
+                                        centerX=tileOffset.getX()/2;
+                                        centerY=tileOffset.getY()/2;
+                                        IJ.log("Seq"+setting.getName()+":while loop, after Area.calulateTileOffset, tileOffset: "+tileOffset.toString());
 
-                                        a1=new java.awt.geom.Area(cameraROI);
-                                        a2=new java.awt.geom.Area(cameraROI);
-                                        a1.transform(rot);//rotation
-                                        a2.transform(rot);//rotation
-                                        transl=new AffineTransform();
-                                        transl.translate(tileOffset.getX(), tileOffset.getY());
-                                        a2.transform(transl);//translation
-                                        try {
-                                            a1.intersect(a2);//according to some java doc it throws null pointer excpetion if areas don't overlap
-                                        } catch (NullPointerException ne) {
-                                            a1=null;
+                                        
+                                        for (int i=0; i<4; i++) {
+                                            a[i]=new java.awt.geom.Area(cameraROI);
+                                            a[i].transform(rot);
+                                            a[i].transform(tOrigin);
+                                            switch (i) {
+                                                case 1: {
+                                                    AffineTransform transl=new AffineTransform();
+                                                    transl.translate(tileOffset.getX(), 0);
+                                                    a[i].transform(transl);
+//                                                    a[i]=a[0].createTransformedArea(transl);
+                                                    break;
+                                                }    
+                                                case 2: {
+                                                    AffineTransform transl=new AffineTransform();
+                                                    transl.translate(0,tileOffset.getY());
+                                                    a[i].transform(transl);
+                                                    break;
+                                                }    
+                                                case 3: {
+                                                    AffineTransform transl=new AffineTransform();
+                                                    transl.translate(tileOffset.getX(), tileOffset.getY());
+                                                    a[i].transform(transl);
+                                                    break;
+                                                }
+                                            }
+                                            IJ.log("a["+i+"].centerX: "+Double.toString(a[i].getBounds2D().getCenterX())+", centerY: "+Double.toString(a[i].getBounds2D().getCenterY()));    
+
                                         }
-                                        if (a1==null || (a1.getBounds().width == 0 && a1.getBounds().height == 0)) {
-                                            lowOverlap=newOverlap;
-                                        } else {
+                                        IJ.log("centerX: "+Double.toString(centerX)+", centerY: "+Double.toString(centerY));    
+                                        
+                                        if ((a[0].contains(centerX, centerY) && a[3].contains(centerX, centerY)) 
+                                                || (a[1].contains(centerX, centerY) && a[2].contains(centerX, centerY))) {
                                             highOverlap=newOverlap;
+                                        } else {//tiling gap
+                                            lowOverlap=newOverlap;
                                         }
                                     }
-                                    newOverlap=Math.ceil(newOverlap*100)/100;
+                                */
+                                    double newOverlap=acqLayout.closeTilingGaps(setting.getFieldOfView(), 0.005);
                                 
                                     settingsToUpdate.add(setting);
                                     newTileOverlaps.add(newOverlap);
                                     message=message+"Setting '"+setting.getName()+"': Tiling gaps, suggested tile overlap: "+Integer.toString((int)Math.ceil(newOverlap*100))+"%.\n";
-                                } else {
-                                    message=message+"Setting '"+setting.getName()+"': Ok.\n";
                                 } 
                             }
                         }    
@@ -815,6 +868,22 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 //        acqLayoutPanel.repaint();
     }
 
+    @Override
+    public void referencePointsChanged(List<RefArea> refAreas) {
+//        IJ.showMessage("AcqFrame.referencePointChanged");
+        setLandmarkFound(acqLayout.getNoOfMappedStagePos() > 0);
+        calcTilePositions(
+                null, 
+                currentAcqSetting.getFieldOfView(), 
+                currentAcqSetting.getTilingSetting(), 
+                "Adjusting...");        
+        acqLayoutPanel.repaint();
+    }
+
+    @Override
+    public void selectedRefPointChanged(RefArea refArea) {
+        acqLayoutPanel.repaint();
+    }
 
     public class DisplayUpdater extends SwingWorker<Void, TaggedImage> implements ImageCacheListener {
 
@@ -2150,6 +2219,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         siteOverlapCheckBox = new javax.swing.JCheckBox();
         clusterLabel1 = new javax.swing.JLabel();
         clearRoiButton = new javax.swing.JButton();
+        closeGapsButton = new javax.swing.JButton();
         acqModePane = new javax.swing.JTabbedPane();
         jPanel4 = new javax.swing.JPanel();
         jScrollPane3 = new javax.swing.JScrollPane();
@@ -2178,6 +2248,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         jLabel25 = new javax.swing.JLabel();
         jLabel26 = new javax.swing.JLabel();
         reverseButton = new javax.swing.JButton();
+        jLabel9 = new javax.swing.JLabel();
         jPanel3 = new javax.swing.JPanel();
         jLabel13 = new javax.swing.JLabel();
         intHourField = new javax.swing.JTextField();
@@ -2401,7 +2472,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         .add(areaDownButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(mergeAreasButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                    .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 322, Short.MAX_VALUE))
+                    .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 324, Short.MAX_VALUE))
                 .add(3, 3, 3))
         );
 
@@ -2597,10 +2668,19 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         clusterLabel1.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         clusterLabel1.setText("x");
 
-        clearRoiButton.setText("R");
+        clearRoiButton.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
+        clearRoiButton.setText("ROI");
         clearRoiButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 clearRoiButtonActionPerformed(evt);
+            }
+        });
+
+        closeGapsButton.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
+        closeGapsButton.setText("Close Gaps");
+        closeGapsButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                closeGapsButtonActionPerformed(evt);
             }
         });
 
@@ -2611,76 +2691,74 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             .add(jPanel10Layout.createSequentialGroup()
                 .add(3, 3, 3)
                 .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel10Layout.createSequentialGroup()
+                    .add(jPanel10Layout.createSequentialGroup()
                         .add(autofocusCheckBox)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(autofocusButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .add(35, 35, 35)
+                        .add(26, 26, 26)
                         .add(zStackCheckBox)
                         .add(26, 26, 26)
-                        .add(timelapseCheckBox)
-                        .add(15, 15, 15))
+                        .add(timelapseCheckBox))
                     .add(jPanel10Layout.createSequentialGroup()
+                        .add(jLabel6)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(acqOrderList, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 216, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(jPanel10Layout.createSequentialGroup()
+                        .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                            .add(jPanel10Layout.createSequentialGroup()
+                                .add(jLabel12)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(pixelSizeLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 70, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .add(jLabel5))
+                            .add(jPanel10Layout.createSequentialGroup()
+                                .add(jLabel33)
+                                .add(2, 2, 2)
+                                .add(tilingModeComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 111, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                        .add(6, 6, 6)
                         .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(jPanel10Layout.createSequentialGroup()
-                                .add(jLabel6)
+                                .add(tileSizeLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 154, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(acqOrderList, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 216, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                                .add(clearRoiButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 43, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                             .add(jPanel10Layout.createSequentialGroup()
-                                .add(jLabel4)
-                                .add(2, 2, 2)
-                                .add(tileOverlapField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 49, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(29, 29, 29)
-                                .add(maxSitesLabel)
+                                .add(jLabel34)
+                                .add(3, 3, 3)
+                                .add(tilingDirComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 61, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(maxSitesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 58, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                            .add(jPanel10Layout.createSequentialGroup()
-                                .add(clusterCheckBox)
-                                .add(0, 0, 0)
-                                .add(clusterXField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 48, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(1, 1, 1)
-                                .add(clusterLabel1)
-                                .add(0, 0, 0)
-                                .add(clusterYField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 18, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(0, 0, 0)
-                                .add(clusterLabel2)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                                .add(siteOverlapCheckBox))
-                            .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                                .add(jPanel10Layout.createSequentialGroup()
-                                    .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                                        .add(jPanel10Layout.createSequentialGroup()
-                                            .add(jLabel12)
-                                            .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                            .add(pixelSizeLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 102, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                                        .add(jPanel10Layout.createSequentialGroup()
-                                            .add(jLabel33)
-                                            .add(2, 2, 2)
-                                            .add(tilingModeComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 111, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
-                                    .add(6, 6, 6)
-                                    .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                                        .add(jPanel10Layout.createSequentialGroup()
-                                            .add(jLabel5)
-                                            .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                            .add(tileSizeLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 144, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                            .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                            .add(clearRoiButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                                        .add(jPanel10Layout.createSequentialGroup()
-                                            .add(jLabel34)
-                                            .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                            .add(tilingDirComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 61, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                            .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                            .add(insideOnlyCheckBox)
-                                            .add(0, 0, Short.MAX_VALUE))))
-                                .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel10Layout.createSequentialGroup()
-                                    .add(jLabel1)
-                                    .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                    .add(objectiveComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 189, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                    .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                    .add(jLabel10)
-                                    .add(0, 0, 0)
-                                    .add(binningComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 59, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))))
-                        .add(9, 9, 9))))
+                                .add(insideOnlyCheckBox))))
+                    .add(jPanel10Layout.createSequentialGroup()
+                        .add(jLabel1)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(objectiveComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 189, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(jLabel10)
+                        .add(0, 0, 0)
+                        .add(binningComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 59, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
+                        .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel10Layout.createSequentialGroup()
+                            .add(jLabel4)
+                            .add(3, 3, 3)
+                            .add(tileOverlapField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 49, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(3, 3, 3)
+                            .add(closeGapsButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 86, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(3, 3, 3)
+                            .add(siteOverlapCheckBox, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                        .add(org.jdesktop.layout.GroupLayout.LEADING, jPanel10Layout.createSequentialGroup()
+                            .add(clusterCheckBox)
+                            .add(0, 0, 0)
+                            .add(clusterXField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 48, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(1, 1, 1)
+                            .add(clusterLabel1)
+                            .add(0, 0, 0)
+                            .add(clusterYField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 18, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(0, 0, 0)
+                            .add(clusterLabel2)
+                            .add(18, 18, 18)
+                            .add(maxSitesLabel)
+                            .add(3, 3, 3)
+                            .add(maxSitesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 58, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))))
+                .addContainerGap(9, Short.MAX_VALUE))
         );
 
         jPanel10Layout.linkSize(new java.awt.Component[] {clusterXField, clusterYField}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
@@ -2700,8 +2778,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     .add(pixelSizeLabel)
                     .add(jLabel5)
                     .add(tileSizeLabel)
-                    .add(clearRoiButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(6, 6, 6)
+                    .add(clearRoiButton))
+                .add(0, 0, 0)
                 .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
                     .add(jLabel33)
                     .add(tilingModeComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
@@ -2711,10 +2789,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(3, 3, 3)
                 .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(jPanel10Layout.createSequentialGroup()
-                        .add(1, 1, 1)
+                        .add(0, 0, 0)
                         .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                             .add(clusterLabel2)
-                            .add(siteOverlapCheckBox)))
+                            .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                                .add(maxSitesLabel)
+                                .add(maxSitesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))))
                     .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                         .add(clusterXField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .add(clusterCheckBox))
@@ -2725,9 +2805,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel4)
                     .add(tileOverlapField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(maxSitesLabel)
-                    .add(maxSitesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(6, 6, 6)
+                    .add(closeGapsButton)
+                    .add(siteOverlapCheckBox))
+                .add(4, 4, 4)
                 .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel6)
                     .add(acqOrderList, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
@@ -2873,19 +2953,19 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
         acqModePane.addTab("Channels", jPanel4);
 
-        jLabel19.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel19.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel19.setText("Begin:");
 
-        jLabel20.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel20.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel20.setText("End:");
 
-        jLabel21.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel21.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel21.setText("Slices:");
 
-        jLabel22.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel22.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel22.setText("Step size:");
 
-        zStackCenteredCheckBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        zStackCenteredCheckBox.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         zStackCenteredCheckBox.setText("Centered around reference Z-position");
         zStackCenteredCheckBox.addItemListener(new java.awt.event.ItemListener() {
             public void itemStateChanged(java.awt.event.ItemEvent evt) {
@@ -2899,6 +2979,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         });
 
         zStackSlicesField.setText("1");
+        zStackSlicesField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         zStackSlicesField.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusLost(java.awt.event.FocusEvent evt) {
                 zStackSlicesFieldFocusLost(evt);
@@ -2911,6 +2992,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         });
 
         zStackStepSizeField.setText("0");
+        zStackStepSizeField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         zStackStepSizeField.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusLost(java.awt.event.FocusEvent evt) {
                 zStackStepSizeFieldFocusLost(evt);
@@ -2918,6 +3000,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         });
 
         zStackBeginField.setText("0.00");
+        zStackBeginField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         zStackBeginField.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusLost(java.awt.event.FocusEvent evt) {
                 zStackBeginFieldFocusLost(evt);
@@ -2925,41 +3008,45 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         });
 
         zStackEndField.setText("0.00");
+        zStackEndField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         zStackEndField.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusLost(java.awt.event.FocusEvent evt) {
                 zStackEndFieldFocusLost(evt);
             }
         });
 
-        jLabel23.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel23.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel23.setText("Total Z Dist:");
 
-        zStackTotalDistLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        zStackTotalDistLabel.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         zStackTotalDistLabel.setText("0.00");
 
-        jLabel24.setFont(new java.awt.Font("Symbol", 0, 12)); // NOI18N
+        jLabel24.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel24.setText("um");
         jLabel24.setMaximumSize(new java.awt.Dimension(18, 15));
         jLabel24.setMinimumSize(new java.awt.Dimension(18, 15));
 
-        jLabel25.setFont(new java.awt.Font("Symbol", 0, 12)); // NOI18N
+        jLabel25.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel25.setText("um");
         jLabel25.setMaximumSize(new java.awt.Dimension(18, 15));
         jLabel25.setMinimumSize(new java.awt.Dimension(18, 15));
         jLabel25.setPreferredSize(new java.awt.Dimension(18, 15));
 
-        jLabel26.setFont(new java.awt.Font("Symbol", 0, 12)); // NOI18N
+        jLabel26.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel26.setText("um");
         jLabel26.setMaximumSize(new java.awt.Dimension(18, 15));
         jLabel26.setMinimumSize(new java.awt.Dimension(18, 15));
 
-        reverseButton.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        reverseButton.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         reverseButton.setText("Reverse");
         reverseButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 reverseButtonActionPerformed(evt);
             }
         });
+
+        jLabel9.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        jLabel9.setText("um");
 
         org.jdesktop.layout.GroupLayout jPanel1Layout = new org.jdesktop.layout.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
@@ -2984,27 +3071,29 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                     .add(zStackBeginField)
                                     .add(zStackEndField))))
                         .add(6, 6, 6)
-                        .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                        .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
                             .add(jPanel1Layout.createSequentialGroup()
                                 .add(jLabel23)
-                                .add(17, 17, 17)
-                                .add(zStackTotalDistLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
+                                .add(zStackTotalDistLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 69, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                             .add(jPanel1Layout.createSequentialGroup()
-                                .add(jLabel25, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                .add(jLabel21)
-                                .add(6, 6, 6)
-                                .add(zStackSlicesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 77, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                            .add(jPanel1Layout.createSequentialGroup()
-                                .add(jLabel26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
+                                    .add(jLabel25, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 24, Short.MAX_VALUE)
+                                    .add(jLabel26, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                                 .add(18, 18, 18)
-                                .add(jLabel22)
-                                .add(6, 6, 6)
-                                .add(zStackStepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 77, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
-                        .add(6, 6, 6)
-                        .add(jLabel24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
+                                    .add(jLabel21)
+                                    .add(jLabel22))
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                                    .add(zStackSlicesField, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 77, Short.MAX_VALUE)
+                                    .add(zStackStepSizeField))))
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(jLabel24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(jLabel9)))
                     .add(zStackCenteredCheckBox))
-                .addContainerGap(29, Short.MAX_VALUE))
+                .addContainerGap(18, Short.MAX_VALUE))
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
@@ -3017,98 +3106,100 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     .add(jLabel19)
                     .add(jLabel21, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 16, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(zStackSlicesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(3, 3, 3)
-                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(zStackEndField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(jLabel26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(jLabel20)
-                    .add(jLabel22)
-                    .add(zStackStepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(jLabel24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(3, 3, 3)
+                .add(2, 2, 2)
+                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jLabel26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 14, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                        .add(zStackEndField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(jLabel20)
+                        .add(jLabel22)
+                        .add(zStackStepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(jLabel24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                .add(2, 2, 2)
                 .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel23)
                     .add(zStackTotalDistLabel)
-                    .add(reverseButton))
+                    .add(reverseButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 14, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(jLabel9))
                 .add(143, 143, 143))
         );
 
         acqModePane.addTab("Z-Stack", jPanel1);
 
-        jLabel13.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel13.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel13.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
         jLabel13.setText("Interval:");
 
-        intHourField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        intHourField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         intHourField.setText("0");
-        intHourField.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                intHourFieldActionPerformed(evt);
-            }
-        });
         intHourField.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusLost(java.awt.event.FocusEvent evt) {
                 intHourFieldFocusLost(evt);
             }
         });
-
-        intMinField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        intMinField.setText("0");
-        intMinField.addActionListener(new java.awt.event.ActionListener() {
+        intHourField.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                intMinFieldActionPerformed(evt);
+                intHourFieldActionPerformed(evt);
             }
         });
+
+        intMinField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        intMinField.setText("0");
         intMinField.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusLost(java.awt.event.FocusEvent evt) {
                 intMinFieldFocusLost(evt);
             }
         });
-
-        intSecField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        intSecField.setText("0");
-        intSecField.addActionListener(new java.awt.event.ActionListener() {
+        intMinField.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                intSecFieldActionPerformed(evt);
+                intMinFieldActionPerformed(evt);
             }
         });
+
+        intSecField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        intSecField.setText("0");
         intSecField.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusLost(java.awt.event.FocusEvent evt) {
                 intSecFieldFocusLost(evt);
             }
         });
+        intSecField.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                intSecFieldActionPerformed(evt);
+            }
+        });
 
-        jLabel14.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel14.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel14.setText("h");
 
-        jLabel15.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel15.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel15.setText("min");
 
-        jLabel16.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel16.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel16.setText("s");
 
-        jLabel17.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel17.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel17.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
         jLabel17.setText("Timepoints:");
 
-        framesField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        framesField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         framesField.setText("1");
-        framesField.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                framesFieldActionPerformed(evt);
-            }
-        });
         framesField.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusLost(java.awt.event.FocusEvent evt) {
                 framesFieldFocusLost(evt);
             }
         });
+        framesField.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                framesFieldActionPerformed(evt);
+            }
+        });
 
-        jLabel18.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel18.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel18.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
         jLabel18.setText("Duration:");
 
-        durationText.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        durationText.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         durationText.setText("jLabel19");
         durationText.setVerticalAlignment(javax.swing.SwingConstants.TOP);
 
@@ -3414,7 +3505,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(jLabel28)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jScrollPane4, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 319, Short.MAX_VALUE)
+                    .add(jScrollPane4, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 321, Short.MAX_VALUE)
                     .add(jPanel9Layout.createSequentialGroup()
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(addZFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
@@ -3735,7 +3826,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(sequenceListPanel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(sequenceTabbedPane, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 421, Short.MAX_VALUE)
+                .add(sequenceTabbedPane, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 423, Short.MAX_VALUE)
                 .add(3, 3, 3)
                 .add(settingsPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
                     .add(acquireButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
@@ -4146,6 +4237,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         maxSitesField.setEnabled(maxSitesLabel.isEnabled());
         tileOverlapField.setEnabled(b);
         autofocusButton.setEnabled(b);
+        clearRoiButton.setEnabled(b);
+        closeGapsButton.setEnabled(b);
         
         addImageTagFilterButton.setEnabled(b);
         addChannelFilterButton.setEnabled(b);
@@ -5453,8 +5546,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     }
                     refPointListDialog.dispose();
                 }                
-                refPointListDialog = new RefPointListDialog(this, gui, acqLayout, (LayoutPanel)acqLayoutPanel);
+                refPointListDialog = new RefPointListDialog(this, gui, acqLayout);
                 refPointListDialog.addWindowListener(this);
+                refPointListDialog.addListener(this);
                 stageMonitor.addListener(refPointListDialog);
                 updatePixelSize(currentAcqSetting.getObjective());
                 recalculateTiles = true;
@@ -6944,11 +7038,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             RefArea oldLm = acqLayout.getLandmark(0);
             //            ArrayList<RefArea> oldRPList=cloneRefPointList(acqLayout.getLandmarks());
             if (refPointListDialog == null) {
-                refPointListDialog = new RefPointListDialog(this, gui, acqLayout, ((LayoutPanel) acqLayoutPanel));
+                refPointListDialog = new RefPointListDialog(this, gui, acqLayout);
                 if (stageMonitor!=null) {
                     stageMonitor.addListener(refPointListDialog);
                 }
                 refPointListDialog.addWindowListener(this);
+                refPointListDialog.addListener(this);
             } else {
                 refPointListDialog.setRefPointList(acqLayout.getLandmarks());
             }
@@ -7664,7 +7759,17 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.getSelectedRow());
             acqLayoutPanel.repaint();
         }
+        updatePixelSize(currentAcqSetting.getObjective());
     }//GEN-LAST:event_clearRoiButtonActionPerformed
+
+    private void closeGapsButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_closeGapsButtonActionPerformed
+        double newTileOverlap=acqLayout.closeTilingGaps(currentAcqSetting.getFieldOfView(), 0.005);
+        if (newTileOverlap!=currentAcqSetting.getTileOverlap()) {
+            tileOverlapField.setText(Integer.toString((int)Math.round(newTileOverlap*100)));
+            currentAcqSetting.setTileOverlap(Double.parseDouble(tileOverlapField.getText())/100);
+            calcTilePositions(null,currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(),"Adjusting...");
+        }
+    }//GEN-LAST:event_closeGapsButtonActionPerformed
 
     private String getExtension(File f) {
         return f.getName().substring(f.getName().lastIndexOf("."));
@@ -7803,6 +7908,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JTable channelTable;
     private javax.swing.JButton channelUpButton;
     private javax.swing.JButton clearRoiButton;
+    private javax.swing.JButton closeGapsButton;
     private javax.swing.JCheckBox clusterCheckBox;
     private javax.swing.JLabel clusterLabel1;
     private javax.swing.JLabel clusterLabel2;
@@ -7853,6 +7959,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JLabel jLabel6;
     private javax.swing.JLabel jLabel7;
     private javax.swing.JLabel jLabel8;
+    private javax.swing.JLabel jLabel9;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel10;
     private javax.swing.JPanel jPanel11;
@@ -8682,6 +8789,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     private void initializeAcqSettingTable() {
         acqSettingTable.setModel(new AcqSettingTableModel(acqSettings));
+        TableColumn colorColumn = acqSettingTable.getColumnModel().getColumn(1);
+        colorColumn.setCellEditor(new StartTimeEditor());
+
 //        cAcqSettingIdx = 0;
         currentAcqSetting = acqSettings.get(0);
         acqSettingTable.getModel().addTableModelListener(this);
