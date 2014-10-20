@@ -68,7 +68,7 @@ public class MMCoreUtils {
         String c="";
         for (String ch:availableChannelList)
             c=c+ch+", ";         
-        IJ.log("Channels found: cGroupStr="+cGroupStr+"; "+c);
+//        IJ.log("MMCoreUtils.loadAvailableChannelConfigs: Channels found: cGroupStr="+cGroupStr+"; "+c);
 
         return cGroupStr;
     }

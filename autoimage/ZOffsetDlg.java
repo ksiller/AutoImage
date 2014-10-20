@@ -21,21 +21,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.AbstractCellEditor;
 import javax.swing.DefaultCellEditor;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
 import javax.swing.JOptionPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.AbstractTableModel;
-//import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
-import javax.swing.table.TableColumn;
 import mmcorej.CMMCore;
 import mmcorej.StrVector;
 import org.micromanager.api.ScriptInterface;
@@ -48,7 +47,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
 
     private CMMCore core;
     private Frame parent;
-    private final ScriptInterface gui;
+    private ScriptInterface gui;
     private String channelGroupStr;
     private String xyStageName;
     private String focusDeviceName;
@@ -57,18 +56,35 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
     
     public final static double DEFAULT_EXPOSURE = 100.0;
     public final static double DEFAULT_Z_OFFSET = 0.0;
+    
+    public void dispose() {
+        super.dispose();
+        core=null;
+        parent=null;
+        gui=null;
+        channelGroupStr=null;
+        xyStageName=null;
+        focusDeviceName=null;
+        groupMap=null;
+    }
 
     @Override
-    public void stagePositionChanged(Double[] stagePos) {
-        stagePosLabel.setText(
+    public void stagePositionChanged(final Double[] stagePos) {
+        SwingUtilities.invokeLater(new Runnable() {
+                
+            @Override
+            public void run() {    
+                stagePosLabel.setText(
                   (stagePos[0]!=null ? String.format("%1$,.2f",stagePos[0]) : "???") + "; "
                 + (stagePos[1]!=null ? String.format("%1$,.2f",stagePos[1]) : "???") + "; "
-                + (stagePos[2]!=null ? String.format("%1$,.2f",stagePos[2]) : "???"));        
+                + (stagePos[2]!=null ? String.format("%1$,.2f",stagePos[2]) : "???")); 
+            }
+        });        
     }
 
     @Override
     public void tableChanged(TableModelEvent e) {
-        IJ.log(Integer.toString(e.getColumn())+", "+Integer.toString(e.getFirstRow())+", "+Integer.toString(e.getLastRow()));
+//        IJ.log(Integer.toString(e.getColumn())+", "+Integer.toString(e.getFirstRow())+", "+Integer.toString(e.getLastRow()));
     }
 
     
@@ -242,7 +258,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
 
         @Override
         public boolean isCellEditable(int rowIndex, int colIndex) {
-            return (colIndex == 0 || colIndex==2 || colIndex==3 || colIndex == 5 || colIndex==6);
+            return (colIndex == 0 || colIndex==2 || colIndex == 5 || colIndex==6);
         }
 
         @Override
@@ -515,10 +531,15 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                IJ.log("zOffsetDlg.windowClosing");
+//                IJ.log("zOffsetDlg.windowClosing");
+                AbstractCellEditor ace = (AbstractCellEditor) channelTable.getCellEditor();
+                if (ace != null) {
+                    ace.stopCellEditing();
+                }
                 int result=JOptionPane.showConfirmDialog(null, "Do you want to discard the z-offset settings?", "Z-Offset Settings", JOptionPane.YES_NO_OPTION);
                 if (result==JOptionPane.YES_OPTION) {
-                    setVisible(false);                
+//                    setVisible(false);
+                    dispose();                
                 }
 //                result=null;
 /*                if (oldRoi!=null && core!=null) {
@@ -532,7 +553,6 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
 
             @Override
             public void windowActivated(WindowEvent e) {
-                IJ.log("zOffsetDlg.windowActivated");
 /*                try {
                     oldRoi=core.getROI();
                 } catch (Exception ex) {
@@ -562,11 +582,18 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
     }
     
     @Override
-    public void liveModeChanged(boolean isLive) {
-        ConfigTableModel model=(ConfigTableModel)channelTable.getModel();
-        for (int row=0; row<model.getRowCount(); row++) {
-            model.setValueAt((isLive ? "Stop Live" : "Live"),row,5);
-        }
+    public void liveModeChanged(final boolean isLive) {
+        SwingUtilities.invokeLater(new Runnable() {
+            
+            @Override
+            public void run() {
+
+                ConfigTableModel model=(ConfigTableModel)channelTable.getModel();
+                for (int row=0; row<model.getRowCount(); row++) {
+                    model.setValueAt((isLive ? "Stop Live" : "Live"),row,5);
+                }
+            }
+        });    
     }
     
     public void addApplyListener(ActionListener listener) {
@@ -597,7 +624,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
     //NOTE: does not add ChannelData list to map unless groupName is in map [call updateGroupMap() first]
     //if no config is found by core under groupName, groupName key is removed from map
     public void updateConfigData(String groupName, List<ChannelData> cdList) {
-        IJ.log("updateConfigData "+groupName+" ....cdList.size="+cdList.size());
+        IJ.log(getClass().getName()+".updateConfigData: "+groupName+" ....cdList.size="+cdList.size());
         if (!groupMap.containsKey(groupName)) {
             return;
         }
@@ -629,7 +656,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
             newcdList.add(newcd);
         }        
         groupMap.put(groupName, newcdList);
-        IJ.log("updateConfigData "+groupName+" ...completed. cdList.size()="+newcdList.size());
+//        IJ.log("updateConfigData "+groupName+" ...completed. cdList.size()="+newcdList.size());
     }
     /*  
         - loads available ConfigGroups from core
@@ -639,7 +666,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
     */
     public boolean updateGroupMap() {
         List<String> keysToRemove=new ArrayList<String>();
-        IJ.log("updateGroupMap....");
+//        IJ.log("updateGroupMap....");
         StrVector availableGroups=core.getAvailableConfigGroups();
         List<String> availableGroupList=new ArrayList<String>();
         for (String group:availableGroups) {
@@ -652,10 +679,10 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
                 Map.Entry<String, List<ChannelData>> entry = entries.next();
                 String mapKey = entry.getKey();
                 if (!availableGroupList.contains(mapKey)) {//not found
-                    IJ.log("updateGroupMap.before remove mapKey "+mapKey);
+//                    IJ.log("updateGroupMap.before remove mapKey "+mapKey);
                     //groupMap.remove(mapKey);
                     keysToRemove.add(mapKey);
-                    IJ.log("updateGroupMap.mapKey "+mapKey+" removed.");
+//                    IJ.log("updateGroupMap.mapKey "+mapKey+" removed.");
                 } else {//found
                     //remove group from list --> remaining list items need to be added to map
                     availableGroupList.remove(mapKey);
@@ -686,12 +713,12 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
         groupComboBox.setModel(new DefaultComboBoxModel(availableGroups.toArray()));
         if (currentGroupRemoved)
             groupComboBox.setSelectedItem(0);
-        IJ.log("updateGroupMap....completed: "+groupMap.size()+" groups");
+//        IJ.log("updateGroupMap....completed: "+groupMap.size()+" groups");
         return (keysToRemove.size() > 0 || availableGroupList.size() > 0);
     }
     
     public void setGroupData(String groupStr,List<ChannelData> channelList, boolean reloadGroups) {
-        IJ.log("setGroupData....");
+//        IJ.log("setGroupData....");
         if (groupMap==null) {
             groupMap=new HashMap<String,List<ChannelData>>();
         }
@@ -705,13 +732,13 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
         if (groupMapModified) {
             groupComboBox.setSelectedIndex(0);
         }
-        IJ.log("setGroupData....completed: "+groupMap.size()+" groups");
+//        IJ.log("setGroupData....completed: "+groupMap.size()+" groups");
     }
 
     
     private void setChannelConfigs(String group, List<ChannelData> channelList) {
         ConfigTableModel dm = (ConfigTableModel)channelTable.getModel();
-        IJ.log("setChannelConfigs... "+dm.getRowCount()+" rows");
+//        IJ.log("setChannelConfigs... "+dm.getRowCount()+" rows");
         channelTable.setModel(new ConfigTableModel(channelList));
         
         ButtonRenderer br=new ButtonRenderer();
@@ -722,7 +749,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
         channelTable.getColumnModel().getColumn(6).setCellEditor(be);
 
         channelTable.getModel().addTableModelListener(this);
-        IJ.log("setChannelConfigs... completed. "+dm.getRowCount()+" rows");
+//        IJ.log("setChannelConfigs... completed. "+dm.getRowCount()+" rows");
         
     }
 
@@ -748,6 +775,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
         setTitle("Z-Offset");
+        setMinimumSize(new java.awt.Dimension(480, 200));
 
         jLabel1.setText("Channel group:");
 
@@ -833,7 +861,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
                     .add(groupComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(refreshButton))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jScrollPane1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 110, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 110, Short.MAX_VALUE)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel2)
@@ -851,7 +879,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
     private void groupComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_groupComboBoxActionPerformed
         if (groupComboBox.getSelectedItem() != null) {
             ConfigTableModel model=(ConfigTableModel)channelTable.getModel();
-            IJ.log("groupComboBoxActionPerformed.... "+model.getRowCount()+" rows");
+//            IJ.log("groupComboBoxActionPerformed.... "+model.getRowCount()+" rows");
             channelGroupStr=(String)groupComboBox.getSelectedItem();
             StrVector availableGroups=core.getAvailableConfigGroups();
             if (!Arrays.asList(availableGroups.toArray()).contains(channelGroupStr)) {
@@ -867,7 +895,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
 //                IJ.log("groupComboBoxActionPerformed. after setChannelConfigs. "+model.getRowCount()+" rows");
 
             }    
-            IJ.log("groupComboBoxActionPerformed....completed. "+model.getRowCount()+" rows");
+//            IJ.log("groupComboBoxActionPerformed....completed. "+model.getRowCount()+" rows");
         }
     }//GEN-LAST:event_groupComboBoxActionPerformed
 
@@ -877,12 +905,22 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
 
     private void applyButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_applyButtonActionPerformed
 //        result=((ConfigTableModel)channelTable.getModel()).getData();
-        setVisible(false);
+//        setVisible(false);
+        AbstractCellEditor ace = (AbstractCellEditor) channelTable.getCellEditor();
+        if (ace != null) {
+            ace.stopCellEditing();
+        }
+        dispose();
     }//GEN-LAST:event_applyButtonActionPerformed
 
     private void cancelButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cancelButtonActionPerformed
 //        result=null;
-        setVisible(false);
+//        setVisible(false);
+        AbstractCellEditor ace = (AbstractCellEditor) channelTable.getCellEditor();
+        if (ace != null) {
+            ace.stopCellEditing();
+        }
+        dispose();
     }//GEN-LAST:event_cancelButtonActionPerformed
 
 

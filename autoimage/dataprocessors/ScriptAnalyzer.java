@@ -35,6 +35,7 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.micromanager.api.MMTags;
@@ -180,9 +181,18 @@ public class ScriptAnalyzer extends BranchedProcessor<File>  {
     
     private boolean executePy(File f) {
         IJ.log(    "Excuting Py script:"+script_+"; args="+args_);
-
+        JSONObject params = new JSONObject();
         try {
-           Process process = Runtime.getRuntime().exec("python "+script_+" "+args_);
+            params.put("workdir",workDir);
+            JSONArray fileArray=new JSONArray();
+            fileArray.put(f.getAbsolutePath());
+            params.put("imageFiles",f);
+            params.put("args", args_);
+        } catch (JSONException ex) {
+            Logger.getLogger(ScriptAnalyzer.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        try {
+           Process process = Runtime.getRuntime().exec("python "+script_+" "+params.toString());
 //                process.waitFor();
                 BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                 String returnStr;

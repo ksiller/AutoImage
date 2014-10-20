@@ -92,14 +92,17 @@ class StagePosMonitor extends SwingWorker<Void, Double[]> {
     public void addListener(IStageMonitorListener listener) {
         if (!listeners.contains(listener))
             listeners.add(listener);
-        IJ.log(getClass().getName()+": "+listeners.size()+" listeners");
+        IJ.log("StagePosMonitor.addListener: "+listener.getClass().getName()+", "+listeners.size()+" listeners");
     }
 
     synchronized
     public void removeListener(IStageMonitorListener listener) {
+        if (listener==null) {
+            IJ.log("StagePosMonitor.removeListener: listener==null");
+        }
         if (listeners != null)
             listeners.remove(listener);
-        IJ.log(getClass().getName()+": "+listeners.size()+" listeners");
+        IJ.log("StagePosMonitor.removeListener: "+listener.getClass().getName()+", "+listeners.size()+" listeners remaining");
     }
 
     public int getNoOfListeners() {

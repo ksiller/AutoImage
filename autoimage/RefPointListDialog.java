@@ -13,6 +13,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.JOptionPane;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.event.TableModelEvent;
@@ -882,12 +883,18 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
     }
 
     @Override
-    public void stagePositionChanged(Double[] stagePos) {
+    public void stagePositionChanged(final Double[] stagePos) {
 //        updateStagePosLabel(stageX,stageY,stageZ);
-        stagePosLabel.setText(
-                  (stagePos[0]!=null ? String.format("%1$,.2f",stagePos[0]) : "???") + "; "
-                + (stagePos[1]!=null ? String.format("%1$,.2f",stagePos[1]) : "???") + "; "
-                + (stagePos[2]!=null ? String.format("%1$,.2f",stagePos[2]) : "???"));
+        SwingUtilities.invokeLater(new Runnable() {
+            
+            @Override
+            public void run() {
+                stagePosLabel.setText(
+                      (stagePos[0]!=null ? String.format("%1$,.2f",stagePos[0]) : "???") + "; "
+                    + (stagePos[1]!=null ? String.format("%1$,.2f",stagePos[1]) : "???") + "; "
+                    + (stagePos[2]!=null ? String.format("%1$,.2f",stagePos[2]) : "???"));
+            }
+        });    
     }
 
     

@@ -45,7 +45,11 @@ public class FieldOfView {
         fullChipWidth_Pixel=fullPixX;
         fullChipHeight_Pixel=fullPixY;
         fieldRotation=fieldRot;
-        roi_Pixel_Unbinned=roiPixUnbinned;
+        if (roiPixUnbinned==null) {
+            clearROI();
+        } else {
+            roi_Pixel_Unbinned=roiPixUnbinned;
+        }
     }
     
     //loads Roi for field of view from file. 

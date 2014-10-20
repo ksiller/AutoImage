@@ -7,7 +7,9 @@
 package autoimage;
 
 import java.awt.event.ActionListener;
+import java.util.Calendar;
 import java.util.Date;
+import java.util.TimeZone;
 
 /**
  *
@@ -15,28 +17,71 @@ import java.util.Date;
  */
 public class TimeChooserDlg extends javax.swing.JDialog {
 
-    private long startTime;
-    private boolean deltaAllowed;
+//    private AcqSetting.ScheduledTime startTime;
+    private final Calendar cachedDelta;
+   // private final Calendar cachedAbsolute;
     
     /**
      * Creates new form TimeChooserDlg
      */
     public TimeChooserDlg(java.awt.Frame parent, boolean modal) {
         super(parent, modal);
-//        startTime=time;
         initComponents();
-//        deltaButton.setEnabled(deltaAllowed);
+        okButton.setActionCommand("Ok");
+        cancelButton.setActionCommand("Cancel");
+        cachedDelta=Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+//        cachedAbsolute=Calendar.getInstance(TimeZone.getTimeZone("UTC"));
     }
 
-    public void addOkListener(ActionListener al) {
+    public void addOkCancelListener(ActionListener al) {
         okButton.addActionListener(al);
+        cancelButton.addActionListener(al);
     }
     
-    public void setStartTime(long time) {
-        startTime=time;
+    public void setStartTime(AcqSetting.ScheduledTime time) {
+        Calendar absTime=Calendar.getInstance();
+        switch (time.type) {
+            case AcqSetting.ScheduledTime.ASAP: {
+                asapButton.setSelected(true);
+                cachedDelta.setTimeInMillis(time.startTimeMS);
+//                cachedAbsolute.setTimeInMillis(time.startTimeMS);
+                break;
+            }
+            case AcqSetting.ScheduledTime.DELAY: {
+                cachedDelta.setTimeInMillis(time.startTimeMS);
+                deltaHSpinner.setValue(cachedDelta.get(Calendar.HOUR));
+                deltaMinSpinner.setValue(cachedDelta.get(Calendar.MINUTE));
+                deltaSecSpinner.setValue(cachedDelta.get(Calendar.SECOND));
+                deltaButton.setSelected(true);
+                break;
+            }
+            case AcqSetting.ScheduledTime.ABSOLUTE: {
+//                cachedAbsolute.setTimeInMillis(time.startTimeMS);
+                
+//                Calendar absTime=Calendar.getInstance();
+                absTime.setTimeInMillis(time.startTimeMS);
+//                monthSpinner.setValue(absTime.getTime());
+                absoluteButton.setSelected(true);
+                break;
+            }
+        }
+        monthSpinner.setValue(absTime.getTime());
     }
     
-    public long getStartTime() {
+    public AcqSetting.ScheduledTime getStartTime() {
+        AcqSetting.ScheduledTime startTime=new AcqSetting.ScheduledTime(0,0);
+        if (asapButton.isSelected()) {
+            startTime.type=AcqSetting.ScheduledTime.ASAP;
+            startTime.startTimeMS=0;
+        } else if (deltaButton.isSelected()) {
+            startTime.type=AcqSetting.ScheduledTime.DELAY;
+            startTime.startTimeMS=cachedDelta.getTimeInMillis();
+        } else if (absoluteButton.isSelected()) {
+            startTime.type=AcqSetting.ScheduledTime.ABSOLUTE;
+//            startTime.startTimeMS=cachedAbsolute.getTimeInMillis();
+            Date d=(Date)monthSpinner.getValue();
+            startTime.startTimeMS=d.getTime();
+        }
         return startTime;
     }
     /**
@@ -51,9 +96,17 @@ public class TimeChooserDlg extends javax.swing.JDialog {
         buttonGroup1 = new javax.swing.ButtonGroup();
         okButton = new javax.swing.JButton();
         cancelButton = new javax.swing.JButton();
-        immediateButton = new javax.swing.JRadioButton();
+        asapButton = new javax.swing.JRadioButton();
         deltaButton = new javax.swing.JRadioButton();
         absoluteButton = new javax.swing.JRadioButton();
+        deltaHSpinner = new javax.swing.JSpinner();
+        jLabel1 = new javax.swing.JLabel();
+        jLabel2 = new javax.swing.JLabel();
+        deltaMinSpinner = new javax.swing.JSpinner();
+        jLabel3 = new javax.swing.JLabel();
+        deltaSecSpinner = new javax.swing.JSpinner();
+        monthSpinner = new javax.swing.JSpinner();
+        nowButton = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
 
@@ -71,53 +124,135 @@ public class TimeChooserDlg extends javax.swing.JDialog {
             }
         });
 
-        buttonGroup1.add(immediateButton);
-        immediateButton.setText("Immediately");
-        immediateButton.addActionListener(new java.awt.event.ActionListener() {
+        buttonGroup1.add(asapButton);
+        asapButton.setText("As soon as possible");
+        asapButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                immediateButtonActionPerformed(evt);
+                asapButtonActionPerformed(evt);
             }
         });
 
         buttonGroup1.add(deltaButton);
-        deltaButton.setText("After start of previous sequence");
+        deltaButton.setText("Delay after start of previous sequence");
+        deltaButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                deltaButtonActionPerformed(evt);
+            }
+        });
 
         buttonGroup1.add(absoluteButton);
         absoluteButton.setText("At specific time");
+        absoluteButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                absoluteButtonActionPerformed(evt);
+            }
+        });
+
+        deltaHSpinner.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        deltaHSpinner.setModel(new javax.swing.SpinnerNumberModel(0, 0, 24, 1));
+        deltaHSpinner.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                deltaHSpinnerStateChanged(evt);
+            }
+        });
+
+        jLabel1.setText("h");
+
+        jLabel2.setText("min");
+
+        deltaMinSpinner.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        deltaMinSpinner.setModel(new javax.swing.SpinnerNumberModel(0, 0, 59, 1));
+        deltaMinSpinner.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                deltaMinSpinnerStateChanged(evt);
+            }
+        });
+
+        jLabel3.setText("s");
+
+        deltaSecSpinner.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        deltaSecSpinner.setModel(new javax.swing.SpinnerNumberModel(0, 0, 59, 1));
+        deltaSecSpinner.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                deltaSecSpinnerStateChanged(evt);
+            }
+        });
+
+        monthSpinner.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        monthSpinner.setModel(new javax.swing.SpinnerDateModel(new java.util.Date(1413403440000L), new java.util.Date(1413403440000L), new java.util.Date(1421355840000L), java.util.Calendar.MINUTE));
+
+        nowButton.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        nowButton.setText("Now");
+        nowButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                nowButtonActionPerformed(evt);
+            }
+        });
 
         org.jdesktop.layout.GroupLayout layout = new org.jdesktop.layout.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(layout.createSequentialGroup()
+                .add(6, 6, 6)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(deltaButton)
+                    .add(asapButton)
+                    .add(absoluteButton)
                     .add(layout.createSequentialGroup()
-                        .add(139, 139, 139)
-                        .add(okButton)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(cancelButton))
-                    .add(layout.createSequentialGroup()
-                        .add(26, 26, 26)
+                        .add(29, 29, 29)
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(deltaButton)
-                            .add(immediateButton)
-                            .add(absoluteButton))))
-                .addContainerGap(94, Short.MAX_VALUE))
+                            .add(layout.createSequentialGroup()
+                                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
+                                    .add(org.jdesktop.layout.GroupLayout.LEADING, monthSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE)
+                                    .add(layout.createSequentialGroup()
+                                        .add(jLabel1)
+                                        .add(6, 6, 6)
+                                        .add(deltaHSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                        .add(12, 12, 12)
+                                        .add(jLabel2)
+                                        .add(6, 6, 6)
+                                        .add(deltaMinSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                                .add(12, 12, 12)
+                                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                                    .add(layout.createSequentialGroup()
+                                        .add(jLabel3)
+                                        .add(6, 6, 6)
+                                        .add(deltaSecSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                                    .add(nowButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE)))
+                            .add(layout.createSequentialGroup()
+                                .add(14, 14, 14)
+                                .add(okButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 98, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(cancelButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 98, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))))
+                .add(12, 12, 12))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
-                .add(38, 38, 38)
-                .add(immediateButton)
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
+                .add(6, 6, 6)
+                .add(asapButton)
+                .add(12, 12, 12)
                 .add(deltaButton)
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, 77, Short.MAX_VALUE)
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
+                    .add(jLabel1)
+                    .add(deltaHSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(jLabel2)
+                    .add(deltaMinSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(jLabel3)
+                    .add(deltaSecSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .add(12, 12, 12)
                 .add(absoluteButton)
-                .add(49, 49, 49)
+                .add(6, 6, 6)
+                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(monthSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(nowButton))
+                .add(24, 24, 24)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(okButton)
                     .add(cancelButton))
-                .add(26, 26, 26))
+                .add(12, 12, 12))
         );
 
         pack();
@@ -131,17 +266,59 @@ public class TimeChooserDlg extends javax.swing.JDialog {
         dispose();
     }//GEN-LAST:event_cancelButtonActionPerformed
 
-    private void immediateButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_immediateButtonActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_immediateButtonActionPerformed
+    private void asapButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_asapButtonActionPerformed
+        deltaHSpinner.setEnabled(false);
+        deltaMinSpinner.setEnabled(false);
+        deltaSecSpinner.setEnabled(false);
+        monthSpinner.setEnabled(false);
+    }//GEN-LAST:event_asapButtonActionPerformed
+
+    private void deltaButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deltaButtonActionPerformed
+        deltaHSpinner.setEnabled(true);
+        deltaMinSpinner.setEnabled(true);
+        deltaSecSpinner.setEnabled(true);
+        monthSpinner.setEnabled(false);
+    }//GEN-LAST:event_deltaButtonActionPerformed
+
+    private void absoluteButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_absoluteButtonActionPerformed
+        deltaHSpinner.setEnabled(false);
+        deltaMinSpinner.setEnabled(false);
+        deltaSecSpinner.setEnabled(false);
+        monthSpinner.setEnabled(true);
+    }//GEN-LAST:event_absoluteButtonActionPerformed
+
+    private void deltaHSpinnerStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_deltaHSpinnerStateChanged
+        cachedDelta.set(Calendar.HOUR, (Integer)deltaHSpinner.getValue());
+    }//GEN-LAST:event_deltaHSpinnerStateChanged
+
+    private void deltaMinSpinnerStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_deltaMinSpinnerStateChanged
+        cachedDelta.set(Calendar.MINUTE, (Integer)deltaMinSpinner.getValue());
+    }//GEN-LAST:event_deltaMinSpinnerStateChanged
+
+    private void deltaSecSpinnerStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_deltaSecSpinnerStateChanged
+        cachedDelta.set(Calendar.SECOND, (Integer)deltaSecSpinner.getValue());
+    }//GEN-LAST:event_deltaSecSpinnerStateChanged
+
+    private void nowButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_nowButtonActionPerformed
+        Calendar now=Calendar.getInstance();
+        monthSpinner.setValue(now.getTime());
+    }//GEN-LAST:event_nowButtonActionPerformed
 
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JRadioButton absoluteButton;
+    private javax.swing.JRadioButton asapButton;
     private javax.swing.ButtonGroup buttonGroup1;
     private javax.swing.JButton cancelButton;
     private javax.swing.JRadioButton deltaButton;
-    private javax.swing.JRadioButton immediateButton;
+    private javax.swing.JSpinner deltaHSpinner;
+    private javax.swing.JSpinner deltaMinSpinner;
+    private javax.swing.JSpinner deltaSecSpinner;
+    private javax.swing.JLabel jLabel1;
+    private javax.swing.JLabel jLabel2;
+    private javax.swing.JLabel jLabel3;
+    private javax.swing.JSpinner monthSpinner;
+    private javax.swing.JButton nowButton;
     private javax.swing.JButton okButton;
     // End of variables declaration//GEN-END:variables
 }

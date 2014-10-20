@@ -4,6 +4,7 @@
  */
 package autoimage;
 
+import autoimage.AcqSetting.ScheduledTime;
 import autoimage.dataprocessors.ExtDataProcessor;
 import autoimage.dataprocessors.SiteInfoUpdater;
 import ij.IJ;
@@ -534,4 +535,5 @@ public class Utils {
         }    
         return dist;
     }
+    
 }

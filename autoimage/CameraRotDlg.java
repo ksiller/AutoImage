@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.AbstractCellEditor;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.SwingWorker;
@@ -93,6 +94,10 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
 
     @Override
     public void exposureChanged(String string, double d) {
+    }
+
+    @Override
+    public void slmExposureChanged(String string, double d) {
     }
     
     public class Measurement {
@@ -475,7 +480,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         super(parent, modal);
         initComponents();
         resultTable.getTableHeader().setReorderingAllowed(false);
-        setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         measurement=null;
 //        returnResult=null;
         rotMeasureTask=null;
@@ -502,25 +507,21 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
 
         addWindowListener(new WindowAdapter() {
             @Override
-            public void windowClosed(WindowEvent e) {
-                IJ.log("CameraRotDlg.windowClosed");
-/*                if (oldRoi!=null && core!=null) {
-                    try {
-                        core.setROI(oldRoi.x, oldRoi.y, oldRoi.width, oldRoi.height);
-                    } catch (Exception ex) {
-                        Logger.getLogger(CameraRotDlg.class.getName()).log(Level.SEVERE, null, ex);
+            public void windowClosing(WindowEvent e) {
+                IJ.log("CameraRotDlg.windowClosing");
+                if (resultTable.getRowCount() > 0) {
+                    int result=JOptionPane.showConfirmDialog(null, "Do you want to discard measurments?", "Camera Rotation Measurements", JOptionPane.YES_NO_OPTION);
+                    if (result==JOptionPane.NO_OPTION) {
+    //                    setVisible(false);
+                        return;                
                     }
-                }    */            
+                }
+                dispose();
             }
 
             @Override
             public void windowActivated(WindowEvent e) {
                 IJ.log("CameraRotDlg.windowActivated");
-/*                try {
-                    oldRoi=core.getROI();
-                } catch (Exception ex) {
-                    Logger.getLogger(CameraRotDlg.class.getName()).log(Level.SEVERE, null, ex);
-                }*/
                 liveModeChanged(gui.isLiveModeOn());
             }
         });
@@ -539,8 +540,12 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         toleratedAngleDisp=angle;
     }
     
-    public void addOkListener(ActionListener listener) {
+    public void addOkButtonListener(ActionListener listener) {
         okButton.addActionListener(listener);
+    }
+    
+    public void addCancelButtonListener(ActionListener listener) {
+        cancelButton.addActionListener(listener);
     }
     
     public Measurement getResult() {
@@ -620,7 +625,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
             .add(0, 300, Short.MAX_VALUE)
         );
 
-        setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
+        setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
         setTitle("Camera Rotation");
         setMinimumSize(new java.awt.Dimension(603, 380));
         setResizable(false);
@@ -926,8 +931,8 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
     }//GEN-LAST:event_measureButtonActionPerformed
 
     private void okButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_okButtonActionPerformed
-        setVisible(false);
-//        dispose();
+//        setVisible(false);
+        dispose();
     }//GEN-LAST:event_okButtonActionPerformed
 
     private void configComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_configComboBoxActionPerformed
@@ -995,8 +1000,8 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
     }//GEN-LAST:event_liveButtonActionPerformed
 
     private void cancelButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cancelButtonActionPerformed
-        setVisible(false);
-//        dispose();
+//        setVisible(false);
+        dispose();
     }//GEN-LAST:event_cancelButtonActionPerformed
 
     

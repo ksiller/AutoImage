@@ -52,7 +52,7 @@ class DonutArea extends Area {
     
     @Override
     public String getShape() {
-        return "donut";
+        return "Donut";
     }
     
     
@@ -118,19 +118,30 @@ class DonutArea extends Area {
         }
     }    
     
+    @Override
     public void initializeFromJSONObject(JSONObject obj) throws JSONException {
         IJ.log("initializing: "+this.getClass().getName());
-        super.initializeFromJSONObject(obj);
-        ringWidth=obj.getDouble(TAG_RING_WIDTH);
+//        super.initializeFromJSONObject(obj);
+//      initialize 'Donut' specific fields, inherited fields initialized by parent class
+        if (obj!=null)
+            ringWidth=obj.getDouble(TAG_RING_WIDTH);
+        else
+            ringWidth=1;
     }
 
     @Override
+    protected void addFieldsToJSONObject(JSONObject obj) throws JSONException {
+        if (obj!=null)
+            obj.put(TAG_RING_WIDTH,ringWidth);
+    }
+    
+/*    @Override
     public JSONObject toJSONObject() throws JSONException {
         JSONObject obj=super.toJSONObject();
         if (obj!=null)
             obj.put(TAG_RING_WIDTH,ringWidth);
         return obj;
-    }
+    }*/
     
     @Override
     public double getCenterX () {
@@ -237,4 +248,5 @@ class DonutArea extends Area {
         newArea.setRingWidth(this.ringWidth);
         return newArea;
     }
+
 }

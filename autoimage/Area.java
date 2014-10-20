@@ -956,29 +956,25 @@ public abstract class Area {
             return doesFovTouchArea(x,y,fovX,fovY);
     }
 
-    public static Area createFromJSONObject(JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    //used to initialize Area from layout file
+    public final static Area createFromJSONObject(JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         String className=obj.getString(TAG_CLASS);
         Class clazz=Class.forName(className);
         Area area=(Area) clazz.newInstance();
+        area.name=obj.getString(TAG_NAME);
+        area.width=obj.getDouble(TAG_WIDTH);
+        area.height=obj.getDouble(TAG_HEIGHT);
+        area.topLeftX=obj.getDouble(TAG_TOP_LEFT_X);
+        area.topLeftY=obj.getDouble(TAG_TOP_LEFT_Y);
+        area.relPosZ=obj.getDouble(TAG_REL_POS_Z);
+        area.selectedForAcq=obj.getBoolean(TAG_SELECTED);
+        area.comment=obj.getString(TAG_COMMENT);
         area.initializeFromJSONObject(obj);
         return area;
     }
     
-    //derived classes should override this to initialize all fields
-    public void initializeFromJSONObject(JSONObject obj) throws JSONException {
-        name=obj.getString(TAG_NAME);
-        width=obj.getDouble(TAG_WIDTH);
-        height=obj.getDouble(TAG_HEIGHT);
-        topLeftX=obj.getDouble(TAG_TOP_LEFT_X);
-        topLeftY=obj.getDouble(TAG_TOP_LEFT_Y);
-        relPosZ=obj.getDouble(TAG_REL_POS_Z);
-        selectedForAcq=obj.getBoolean(TAG_SELECTED);
-        comment=obj.getString(TAG_COMMENT);
-//        cameraRot=0;
-    }
-
-    //derived classes should overwrite this to save all fields
-    public JSONObject toJSONObject() throws JSONException {
+    //used to create JSONObject descriptionm of Area to write to Layout file
+    public final JSONObject toJSONObject() throws JSONException {
         JSONObject obj=new JSONObject();
         obj.put(TAG_CLASS,this.getClass().getName());
         obj.put(TAG_NAME,name);
@@ -989,9 +985,16 @@ public abstract class Area {
         obj.put(TAG_REL_POS_Z,relPosZ);
         obj.put(TAG_SELECTED,selectedForAcq);
         obj.put(TAG_COMMENT,comment);
+        addFieldsToJSONObject(obj);
         return obj;
     }
     
+    //derived classes should override this to initialize fields that are not part of Area class
+    abstract protected void initializeFromJSONObject(JSONObject obj) throws JSONException;
+
+    //derived classes should overwrite this to save fields that are not part of Area class
+    abstract protected void addFieldsToJSONObject(JSONObject obj) throws JSONException;
+
     public abstract String getShape();
     
     public abstract double getCenterX();

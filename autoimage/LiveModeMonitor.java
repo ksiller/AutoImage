@@ -46,14 +46,17 @@ class LiveModeMonitor extends SwingWorker<Void, Boolean> {
         public void addListener(ILiveListener listener) {
             if (!listeners.contains(listener))
                 listeners.add(listener);
-            IJ.log("LiveModeMonitor: "+listeners.size()+" listeners");
+            IJ.log("LiveModeMonitor.addListener: "+listener.getClass().getName()+", "+listeners.size()+" listeners");
         }
         
         synchronized
         public void removeListener(ILiveListener listener) {
+            if (listener==null) {
+                IJ.log("LiveModeMonitor.removeListener: listener==null");
+            }
             if (listeners != null)
                 listeners.remove(listener);
-            IJ.log("LiveModeMonitor: "+listeners.size()+" listeners");
+            IJ.log("LiveModeMonitor.removeListener: "+listener.getClass().getName()+", "+listeners.size()+" listeners remaining");
         }
         
         public int getNoOfListeners() {

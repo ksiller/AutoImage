@@ -6,7 +6,10 @@ package autoimage;
 
 import ij.IJ;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -89,8 +92,76 @@ public class AcqSetting {
     private int acqOrder;           //visible
     private List<Runnable> runnables;
     private DefaultMutableTreeNode imageProcRoot;
-    private long startTime;         //visible
+    private ScheduledTime startTime;         //visible
+    private Calendar absoluteStart;
     private long totalTiles;
+    
+    
+    public static class ScheduledTime {
+        protected final static int ASAP = 0;
+        protected final static int DELAY = 1;
+        protected final static int ABSOLUTE = 2;
+        
+        private final static String TAG_TYPE = "TYPE";
+        private final static String TAG_START_TIME = "START_TIME";
+                
+        protected int type;
+        protected long startTimeMS;
+        
+        public ScheduledTime (int type, long startMS) {
+            this.type=type;
+            this.startTimeMS=startMS;
+        }
+
+        public ScheduledTime (JSONObject obj) throws JSONException {
+            type=obj.getInt(TAG_TYPE);
+            startTimeMS=obj.getLong(TAG_START_TIME);
+        }
+
+        public JSONObject toJSONObject () throws JSONException {
+            JSONObject obj=new JSONObject();
+            obj.put(TAG_TYPE, type);
+            obj.put(TAG_START_TIME, startTimeMS);
+            return obj;
+        }
+/*        
+        public int getType() {
+            return type;
+        }
+        
+        public long getStartTimeMS() {
+            return startTimeMS;
+        }
+*/        
+        public String toString() {
+            String s="";
+            switch (type) {
+                case AcqSetting.ScheduledTime.ASAP: {
+                    s="As soon as possible";
+                    break;
+                }
+                case AcqSetting.ScheduledTime.DELAY: {
+                    Calendar cal=Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+                    cal.setTimeInMillis(startTimeMS);
+                    s="+ "
+                            + Integer.toString(cal.get(Calendar.HOUR))+"h "
+                            + Integer.toString(cal.get(Calendar.MINUTE))+"min "
+                            + Integer.toString(cal.get(Calendar.SECOND))+"s ";
+                    break;
+                }
+                case AcqSetting.ScheduledTime.ABSOLUTE: {
+                    GregorianCalendar cal=new GregorianCalendar();
+//                    cal.clear();
+                    cal.setTimeInMillis(startTimeMS);
+                    s=cal.getTime().toString();
+                    break;
+                }
+                    
+            }
+            return s;
+        }
+    }
+    
     
     public AcqSetting(String n) {
         this(n, null,"", -1d);
@@ -121,7 +192,7 @@ public class AcqSetting {
         autofocus=autof;
         channelGroupStr="";
         channels=new ArrayList<Channel>();
-        startTime=0;
+        startTime=new ScheduledTime(ScheduledTime.ASAP,0);
         zStack=false;
         zStackCentered=true;
         zBegin=0;
@@ -169,7 +240,7 @@ public class AcqSetting {
             intervalInMS=hours*3600000+minutes*60000+seconds*1000;
             frames=obj.getInt(TAG_FRAMES);                    
             acqOrder=obj.getInt(TAG_ACQ_ORDER);                    
-            startTime=obj.getLong(TAG_START_TIME);
+            startTime=new ScheduledTime(obj.getJSONObject(TAG_START_TIME));
             tiling=new TilingSetting(obj.getJSONObject(TilingSetting.TAG_TILING));    
             JSONArray channelArray=obj.getJSONArray(Channel.TAG_CHANNEL_ARRAY);
             channels=new ArrayList<Channel>();
@@ -210,7 +281,7 @@ public class AcqSetting {
         obj.put(TAG_SECOND_INTERVAL, seconds);                    
         obj.put(TAG_FRAMES, frames);                    
         obj.put(TAG_ACQ_ORDER, acqOrder);                    
-        obj.put(TAG_START_TIME, startTime);
+        obj.put(TAG_START_TIME, startTime.toJSONObject());
         obj.put(TilingSetting.TAG_TILING, tiling.toJSONObject());
         JSONArray channelArray=new JSONArray();
         for (int i=0; i<channels.size(); i++) {
@@ -221,13 +292,24 @@ public class AcqSetting {
         return obj;
     }
     
+    public static AcqSetting.ScheduledTime createScheduledTime (int type, long start) {
+        return new AcqSetting.ScheduledTime(type,start);
+    }
+    
+    public void setAbsoluteStart(Calendar cal) {
+        absoluteStart=cal;
+    }
+    
+    public Calendar getAbsoluteStart() {
+        return absoluteStart;
+    }
     
     public AcqSetting duplicate() {
 //        AcqSetting copy = new AcqSetting(this.name, this.cameraPixX, this.cameraPixY, this.objLabel, this.objPixSize, this.binning, this.autofocus);
         AcqSetting copy = new AcqSetting(this.name, new FieldOfView(fieldOfView), this.objLabel, this.objPixSize, this.binning, this.autofocus);
         for (Channel c:channels)
             copy.getChannels().add(c.duplicate());
-        copy.setStartTime(this.startTime);
+        copy.setStartTime(new ScheduledTime(this.startTime.type,this.startTime.startTimeMS));
         copy.enableZStack(this.zStack);
         copy.setZBegin(this.zBegin);
         copy.setZEnd(this.zEnd);
@@ -300,11 +382,11 @@ public class AcqSetting {
         return path;
     }
    */
-    public void setStartTime(long start) {
+    public void setStartTime(ScheduledTime start) {
         startTime=start;
     }
     
-    public long getStartTime() {
+    public ScheduledTime getStartTime() {
         return startTime;
     }
     

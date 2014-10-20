@@ -6,13 +6,13 @@
 
 package autoimage;
 
+import ij.IJ;
 import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import javax.swing.AbstractCellEditor;
 import javax.swing.JButton;
 import javax.swing.JDialog;
-import javax.swing.JOptionPane;
 import javax.swing.JTable;
 import javax.swing.table.TableCellEditor;
 
@@ -22,7 +22,7 @@ import javax.swing.table.TableCellEditor;
  */
 public class StartTimeEditor extends AbstractCellEditor
                          implements TableCellEditor, ActionListener {
-    long startTime;
+    AcqSetting.ScheduledTime startTime;
     JButton button;//component in table
     TimeChooserDlg timeChooser;
     JDialog dialog;
@@ -41,7 +41,7 @@ public class StartTimeEditor extends AbstractCellEditor
                     //The user has clicked the cell, so
                     //bring up the dialog.
 
-                    timeChooser.setStartTime(startTime);
+                    timeChooser.setStartTime(new AcqSetting.ScheduledTime(startTime.type,startTime.startTimeMS));
                     timeChooser.setVisible(true);
 
                     //Make the renderer reappear.
@@ -52,31 +52,33 @@ public class StartTimeEditor extends AbstractCellEditor
         button.setBorderPainted(false);
  
         timeChooser = new TimeChooserDlg(null,true);
-        timeChooser.addOkListener(this);
+        timeChooser.addOkCancelListener(this);
     }
  
  
     @Override
     public void actionPerformed(ActionEvent e) {
-        //User pressed dialog's "OK" button.
-        JOptionPane.showMessageDialog(null,"Ok pressed");
-        startTime = timeChooser.getStartTime();
+        if (e.getActionCommand().equals("Ok")) {
+            startTime = timeChooser.getStartTime();
+        }
+        if (e.getActionCommand().equals("Cancel")) {
+        }
     }
     
-    //Implement the one CellEditor method that AbstractCellEditor doesn't.
+    //AbstractCellEditor
     @Override
     public Object getCellEditorValue() {
         return startTime;
     }
  
-    //Implement the one method defined by TableCellEditor.
+    //TableCellEditor
     @Override
     public Component getTableCellEditorComponent(JTable table,
                                                  Object value,
                                                  boolean isSelected,
                                                  int row,
                                                  int column) {
-        startTime = (Long)value;
+        startTime = (AcqSetting.ScheduledTime)value;
         return button;
     }
 }    
