@@ -506,7 +506,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         clearList();
 
         addWindowListener(new WindowAdapter() {
-            @Override
+/*            @Override
             public void windowClosing(WindowEvent e) {
                 IJ.log("CameraRotDlg.windowClosing");
                 if (resultTable.getRowCount() > 0) {
@@ -517,7 +517,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     }
                 }
                 dispose();
-            }
+            }*/
 
             @Override
             public void windowActivated(WindowEvent e) {
@@ -989,6 +989,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     } catch (Exception e) {
                     }
                     gui.enableLiveMode(true);
+                    gui.getSnapLiveWin().toFront();                
                 } catch (ParseException ex) {
                     Logger.getLogger(CameraRotDlg.class.getName()).log(Level.SEVERE, null, ex);
                 }

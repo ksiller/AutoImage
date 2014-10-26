@@ -24,7 +24,7 @@ public class FieldOfView {
     protected final static String TAG_ROI_Y_PIXEL = "FOV_ROI_Y";
     protected final static String TAG_ROI_WIDTH_PIXEL = "FOV_ROI_WIDTH";
     protected final static String TAG_ROI_HEIGHT_PIXEL = "FOV_ROI_HEIGHT";
-    protected final static double ROTATION_UNKNOWN = 10*Math.PI;
+    public final static double ROTATION_UNKNOWN = 10*Math.PI;
     
     protected int fullChipWidth_Pixel;  //camera: full chip pixel x
     protected int fullChipHeight_Pixel; //camera: full chip pixel y

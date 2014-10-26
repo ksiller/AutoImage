@@ -420,16 +420,32 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 /*        if (we.getSource() == mergeAreasDialog) {
             IJ.showMessage("mergeAreasDialog closing");
         }        
-        if (we.getSource() == cameraRotDialog) {
-            IJ.showMessage("cameraRotDialog closing");
-        }
         if (we.getSource() == refPointListDialog) {
             IJ.showMessage("refPointListDialog closing");
         }
         if (we.getSource() == zOffsetDialog) {
             IJ.showMessage("zOffsetDialog closing");
         }*/
-    }
+        if (we.getSource() == cameraRotDialog) {
+            CameraRotDlg.Measurement m=cameraRotDialog.getResult();
+            if (m!=null) {                        
+                int result=JOptionPane.showConfirmDialog(null, "Do you want to discard measurements?","Camera Rotation Measurement",JOptionPane.YES_NO_OPTION);
+                if (result==JOptionPane.NO_OPTION) {    
+//                    setCameraRotation(m.cameraAngle);
+//                    cameraRotDialog.dispose();
+//                    acqLayoutPanel.repaint();        
+
+//                        } else {
+//                            JOptionPane.showMessageDialog(null, "Camera rotation angle could not be determined.");
+                } else {
+                    cameraRotDialog.dispose();
+                }    
+                IJ.log("AcqFrame: currentDetector.fieldRotation="+currentDetector.fieldRotation);
+            } else {
+                cameraRotDialog.dispose();
+            }
+        }
+    }    
 
     @Override
     public void windowClosed(WindowEvent we) {
@@ -707,14 +723,17 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     if (m!=null) {                        
                         int result=JOptionPane.showConfirmDialog(null, "Do you want to discard measurements?","Camera Rotation Measurement",JOptionPane.YES_NO_OPTION);
                         if (result==JOptionPane.NO_OPTION) {    
-                            setCameraRotation(m.cameraAngle);
-                            acqLayoutPanel.repaint();        
+//                            setCameraRotation(m.cameraAngle);
+//                            acqLayoutPanel.repaint();        
 
 //                        } else {
 //                            JOptionPane.showMessageDialog(null, "Camera rotation angle could not be determined.");
+                        } else {
+                            cameraRotDialog.dispose();
                         }    
                         IJ.log("AcqFrame: currentDetector.fieldRotation="+currentDetector.fieldRotation);
-                    }    
+                    }
+                    cameraRotDialog.dispose();
                 }
             });
             cameraRotDialog.addOkButtonListener(new ActionListener() {
@@ -727,7 +746,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
                     } else {
                         JOptionPane.showMessageDialog(null, "Camera rotation angle could not be determined.");
-                    }    
+                    }
+                    cameraRotDialog.dispose();
                     IJ.log("AcqFrame: currentDetector.fieldRotation="+currentDetector.fieldRotation);
                 }
             });
@@ -4231,6 +4251,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 ((LayoutPanel) acqLayoutPanel).setAcqSetting(currentAcqSetting, true);
                 updateAcqSettingTab(currentAcqSetting);
                 updateProcessorTreeView(currentAcqSetting);
+                acqSettingTable.requestFocusInWindow();
             }
         }
     }
@@ -7693,6 +7714,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 } catch (Exception e) {
                 }
                 gui.enableLiveMode(true);
+                gui.getSnapLiveWin().toFront();            
             }
 //            liveButton.setText("Stop");
         } else {

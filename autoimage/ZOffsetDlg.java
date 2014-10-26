@@ -459,6 +459,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
                         } catch (Exception e) {
                         }
                         gui.enableLiveMode(true);
+                        gui.getSnapLiveWin().toFront();
                     } else {
                         gui.enableLiveMode(false);
                     }

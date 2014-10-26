@@ -30,7 +30,7 @@ public class AreaProcessor extends BranchedProcessor<File> {
 //    private final int totalImages_;
 //    private int imagesAcquired_;
     protected String currentArea="";
-    protected long currentCluster=-1;
+    protected long currentClusterIndex=-1;
 //    private long currentFrame=-1;
     protected List<File> imageList;
     protected JSONObject meta; 
@@ -81,7 +81,7 @@ public class AreaProcessor extends BranchedProcessor<File> {
         }
         imageList.clear();
         currentArea="";
-        currentCluster=-1;
+        currentClusterIndex=-1;
 
     }
     
@@ -102,7 +102,7 @@ public class AreaProcessor extends BranchedProcessor<File> {
     }
 
     protected List<File> analyzeGroup(List<File> elements) {
-        IJ.log("    analyzing area group: "+currentArea+", "+Long.toString(currentCluster)+", files:"+elements.size());
+        IJ.log("    analyzing area group: "+currentArea+", "+Long.toString(currentClusterIndex)+", files:"+elements.size());
         for (File f:elements)
             IJ.log("      File: "+f.getAbsolutePath());
         return elements;
@@ -118,7 +118,7 @@ public class AreaProcessor extends BranchedProcessor<File> {
                 List<File> returnValue;
                     area = meta.getString(ExtImageTags.AREA_NAME);
                     clusterIndex = meta.getLong(ExtImageTags.CLUSTER_INDEX);
-                if ((!currentArea.equals("") && !area.equals(currentArea)) || (currentCluster!=-1 && clusterIndex!=currentCluster)) {//element group set complete
+                if ((!currentArea.equals("") && !area.equals(currentArea)) || (currentClusterIndex!=-1 && clusterIndex!=currentClusterIndex)) {//element group set complete
                     List<File> modifiedElements=analyzeGroup(imageList);
                     imageList.clear();
 //                    currentPos=-1;
@@ -127,7 +127,7 @@ public class AreaProcessor extends BranchedProcessor<File> {
                 } else
                     returnValue=null;
                 currentArea=area;
-                currentCluster=clusterIndex;
+                currentClusterIndex=clusterIndex;
                 imageList.add(element);
                 return returnValue;
              } catch (JSONException ex) {
