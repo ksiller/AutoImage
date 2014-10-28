@@ -295,7 +295,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 if (a.isSelectedForAcq()) {                   
               //      try {
                         //a.calcTilePositions(tManager,tileWidth, tileHeight, tSetting);
-                        a.setAreaIndex(++index);
+                        a.setAreaIndex(index++);
                         posList = a.addTilePositions(posList, posInfoList, xyStageLabel, zStageLabel, layout);
               //      } catch (InterruptedException ie) {
               //      }
@@ -363,6 +363,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 BlockingQueue<TaggedImage> engineOutputQueue = acqEng2010.run(mdaSettings, false, posList, gui.getAutofocusManager().getDevice());
                 JSONObject summaryMetadata = acqEng2010.getSummaryMetadata();
                 summaryMetadata.put(ExtImageTags.AREAS,acqLayout.getNoOfSelectedAreas());
+                summaryMetadata.put(ExtImageTags.CLUSTERS,acqLayout.getNoOfSelectedClusters());
                 summaryMetadata.put(ExtImageTags.STAGE_TO_LAYOUT_TRANSFORM,acqLayout.getStageToLayoutTransform().toString());
                 summaryMetadata.put(ExtImageTags.DETECTOR_ROTATION,currentAcqSetting.getFieldOfView().getFieldRotation());
                 // Set up the DataProcessor<TaggedImage> sequence                    

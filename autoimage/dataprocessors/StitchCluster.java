@@ -28,6 +28,11 @@ import java.lang.reflect.Field;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.BorderFactory;
@@ -58,11 +63,16 @@ public class StitchCluster extends AreaProcessor {
     private boolean addTilesAsROIs;
     private boolean computeOverlap;
     private boolean subpixelAccuracy;
+    private boolean downSample;
+    private boolean invertX;
+    private boolean invertY;
     private String compParams;
     private static PlugIn stitch_grid=null;
     
-    private static boolean stitchingInProgress=false;
+//    private static boolean stitchingInProgress=false;
+    private static long jobNumber = 0;
     private static String outputDir="";
+    private static ExecutorService executor=Executors.newSingleThreadExecutor();
     
     public StitchCluster() {
         super ("Stitching");
@@ -72,7 +82,10 @@ public class StitchCluster extends AreaProcessor {
         absDisplaceTh=3.5;
         addTilesAsROIs=false;
         computeOverlap=true;
+        invertX=false;
+        invertY=false;
         subpixelAccuracy=true;
+        downSample=false;
         compParams="Save memory (but be slower)";
         Class<? extends PlugIn> stitchClass;
         try {
@@ -100,7 +113,10 @@ public class StitchCluster extends AreaProcessor {
         obj.put("AbsDisplaceTh", absDisplaceTh);
         obj.put("AddTilesAsROIs", addTilesAsROIs);
         obj.put("ComputeOverlap", computeOverlap);
+        obj.put("InvertX", invertX);
+        obj.put("InvertY", invertY);
         obj.put("SubpixelAccuracy", subpixelAccuracy);
+        obj.put("DownSample", downSample);
         obj.put("ComputationParams", compParams);
         return obj;
     }
@@ -114,7 +130,10 @@ public class StitchCluster extends AreaProcessor {
         absDisplaceTh=obj.getDouble("AbsDisplaceTh");
         addTilesAsROIs=obj.getBoolean("AddTilesAsROIs");
         computeOverlap=obj.getBoolean("ComputeOverlap");
+        invertX=obj.getBoolean("InvertX");
+        invertY=obj.getBoolean("InvertY");
         subpixelAccuracy=obj.getBoolean("SubpixelAccuracy");
+        downSample=obj.getBoolean("DownSample");
         compParams=obj.getString("ComputationParams");
     }
             
@@ -221,314 +240,344 @@ public class StitchCluster extends AreaProcessor {
     }
 */    
     @Override
-    public List<File> analyzeGroup(List<File> elements) {
-        List<File> stitchedFiles=new ArrayList<File>();
-        IJ.log("-----");
-        IJ.log("analyzeGroup");
+    public List<File> analyzeGroup(final List<File> elements) {
         if (elements!=null && elements.size()>1) {
-            while (stitchingInProgress) {
+/*            while (stitchingInProgress) {
                 IJ.log("waiting for stitch to finish");
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException ex) {
                     Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
                 }
-            }
-            stitchingInProgress=true;
-            String sourceImagePath=elements.get(0).getParent();
-            sourceImagePath=new File (sourceImagePath).getParent();
-            try {
-                meta=Utils.parseMetadata(elements.get(0));
-                JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
-                double cameraRot=summary.getDouble(ExtImageTags.DETECTOR_ROTATION);
-                String prefix = meta.getString(ExtImageTags.AREA_NAME);
-                long clusterIdx=meta.getLong(ExtImageTags.CLUSTER_INDEX);
-                if (clusterIdx != -1)
-                    prefix=prefix+"-Cluster"+Long.toString(clusterIdx);
-                IJ.log("StitchCluster: "+prefix);
-                IJ.log("StitchCluster element(0) FileName: "+meta.getString("FileName"));
-             
-                String frame="t"+Long.toString(meta.getLong(MMTags.Image.FRAME_INDEX))+"-";
-                String channel=meta.getString(MMTags.Image.CHANNEL_NAME)+"-";
-                Long noOfCh=summary.getLong(MMTags.Summary.CHANNELS);
-                Long noOfSlices=summary.getLong(MMTags.Summary.SLICES);
-                Long noOfFrames=summary.getLong(MMTags.Summary.FRAMES);
-                
-                int dim=noOfSlices < 2 ? 2 : 3;
-                
-                List<String> chNames=new ArrayList<String>();
-                JSONArray chN=meta.getJSONObject(MMTags.Root.SUMMARY).getJSONArray(MMTags.Summary.NAMES);
-                for (int i=0; i<chN.length(); i++)
-                    chNames.add(chN.getString(i));
-                String slice="z"+Long.toString(meta.getLong(MMTags.Image.SLICE_INDEX));
-                Double pixSize=meta.getJSONObject(MMTags.Root.SUMMARY).getDouble(MMTags.Summary.PIXSIZE);
-                File configFile = new File(sourceImagePath, "StitchConfig-"+prefix+"-"+frame+channel+slice+".txt");
-                File registerFile = new File(sourceImagePath, "StitchConfig-"+prefix+"-"+frame+channel+slice+".registered.txt");
+            }*/
 
-                double xMin=0;
-                double xMax=0;
-                double yMin=0;
-                double yMax=0;
-                List<String> foundCh=new ArrayList<String>();
-                try {
-                    BufferedWriter writer;
-                    
-                    writer = new BufferedWriter(new FileWriter(configFile));
-                    String line = "# Define the number of dimensions we are working on\n"
-                            + "dim = " + Integer.toString(dim)
-                            + "\n\n"
-                            + "# Define the image coordinates\n";
-                    writer.write(line);
-                    int i=1;
-                    Point2D.Double refPoint=null;
-                    for (File e:elements) {
-                        IJ.log(Integer.toString(i)+": "+e.getAbsolutePath());
-                        meta=Utils.parseMetadata(e);
-                        //need to convert from um into pixel coords if using grid stitching plugin
+            Callable stitchingTask=new Callable<List<File>>() {
 
-                        double xUM=meta.getDouble(MMTags.Image.XUM)/pixSize;
-                        double yUM=meta.getDouble(MMTags.Image.YUM)/pixSize;
-                        double zUM=meta.getDouble(MMTags.Image.ZUM)/pixSize;
-                        String ch=meta.getString((MMTags.Image.CHANNEL_NAME));
-                        if (!foundCh.contains(ch))
-                            foundCh.add(ch);
-                        if (i==1) {
-                            xMin=xUM;
-                            xMax=xUM;
-                            yMin=yUM;
-                            yMax=yUM;
-                            refPoint=new Point2D.Double(xUM,yUM);
-                        } else {
-                            if (cameraRot != FieldOfView.ROTATION_UNKNOWN) {
-                                Point2D p=Utils.rotatePoint(new Point2D.Double(xUM,yUM), refPoint, cameraRot);
-                                xUM=p.getX();
-                                yUM=p.getY();
-                            }
-                            xMin=xUM < xMin?xUM:xMin;
-                            xMax=xUM > xMax?xUM:xMax;
-                            yMin=yUM < yMin?yUM:yMin;
-                            yMax=yUM > yMax?yUM:yMax;
-                        }
-//                        double x=xUM/pixSize;
-//                        double y=yUM/pixSize;
-//                        double z=zUM/pixSize;
-                        String path=e.getParent();
-                      //  renameMetadataFile(path,"metadata.txt","metadata_backup");
-                        path=new File(path).getName();
-                        if (dim==2) {
-                            line = new File(path,e.getName()).getPath() + "; ; (" + Double.toString(xUM) + ", " + Double.toString(yUM) + ")\n";
-                        } else {
-                            line = new File(path,e.getName()).getPath() + "; ; (" + Double.toString(xUM) + ", " + Double.toString(yUM) + ", " + Double.toString(zUM)+ ")\n";
-                            
-                        }
-                        writer.write(line);
-                        i++;
-
-                    }    
-                    writer.close();
-                } catch (IOException ex) {
-                    Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
-                    IJ.log(this.getClass().getName()+": Error creating stitch config file");
-                }
-                
-                IJ.log("sourceImagePath: "+sourceImagePath);
-                IJ.log("workDir: "+workDir);
-
-                    //this is a hack to change the output directory for saving fused image and ROIs
-                String defaultDirectory="";
-                if (outputDir==null)
-                    outputDir=sourceImagePath;
-                if (stitch_grid!=null) {
+                @Override
+                public List<File> call() {
+                    jobNumber++;
+                    IJ.log("-----");
+                    IJ.log(this.getClass().getName()+".analyzeGroup: starting job # "+jobNumber);
+            
+                    List<File> stitchedFiles=new ArrayList<File>();
+//                    stitchingInProgress=true;
+                    String sourceImagePath=elements.get(0).getParent();
+                    sourceImagePath=new File (sourceImagePath).getParent();
                     try {
-                        Field f=stitch_grid.getClass().getDeclaredField("defaultOutputDirectory");
-                        String lastDefaultOutputDirectory=(String)f.get(stitch_grid);
-                        IJ.log("defaultOutputDirectory: "+lastDefaultOutputDirectory);
-                        f.set(null,"");
-                        f=stitch_grid.getClass().getDeclaredField("defaultDirectory");
-                        defaultDirectory=(String)f.get(stitch_grid);
-                        IJ.log("defaultDirectory: "+defaultDirectory);
-                        f.set(null, outputDir);
+                        meta=Utils.parseMetadata(elements.get(0));
+                        JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
+                        double cameraRot=summary.getDouble(ExtImageTags.DETECTOR_ROTATION);
+                        String prefix = meta.getString(ExtImageTags.AREA_NAME);
+                        long clusterIdx=meta.getLong(ExtImageTags.CLUSTER_INDEX);
+                        if (clusterIdx != -1)
+                            prefix=prefix+"-Cluster"+Long.toString(clusterIdx);
+                        IJ.log("StitchCluster: "+prefix);
+                        IJ.log("StitchCluster element(0) FileName: "+meta.getString("FileName"));
 
-                    } catch (NoSuchFieldException ex) {
-                        IJ.showMessage("cannot find field"+ex);
-                        Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (SecurityException ex) {
-                        IJ.showMessage("security field"+ex);
-                        Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (IllegalArgumentException ex) {
-                        IJ.showMessage("illegal arg field"+ex);
-                        Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (IllegalAccessException ex) {
-                        IJ.showMessage("illegal access field"+ex);
-                        Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
-                    }                     
-                } else {
-                    IJ.log("stitch_grid == null");  
-                }    
-             //   IJ.runMacroFile("scripts/setOutput.bsh", sourceImagePath);
-                try {
-                    String compOverlap=computeOverlap?"compute_overlap ":""; 
-                    String subpix=subpixelAccuracy?"subpixel_accuracy ":"";
-                    String rois=addTilesAsROIs?"add_tiles_as_rois ":"";
-/*                    Thread thread=Thread.currentThread();
-                    Macro.setOptions(thread, "type=[Positions from file] "
-                                    + "order=[Defined by TileConfiguration] "
-                                    + "directory=["+sourceImagePath+"] "
-                                    + "layout_file=["+configFile.getName()+"] "
-                                    + "fusion_method=["+fusionMethod+"] "
-                                    + "regression_threshold="+Double.toString(regressionTh)+" "
-                                    + "max/avg_displacement_threshold="+Double.toString(maxAvgDisplaceTh)+ " "
-                                    + "absolute_displacement_threshold="+Double.toString(absDisplaceTh)+ " "
-                                    + rois
-                                    + subpix
-                                    + compOverlap
-                                    + "ignore_z_stage"
-                                    + "computation_parameters=["+compParams+"] "
-                                    + "image_output=[Write to disk]");
-                    Object runPlugIn = IJ.runPlugIn("Grid/Collection stitching","");
-                    IJ.log("after call runPlugin");
-                    Macro.setOptions(thread,null);*/
-                    IJ.run("Grid/Collection stitching",
-                    "type=[Positions from file] "
-                    + "order=[Defined by TileConfiguration] "
-                    + "directory=["+sourceImagePath+"] "
-                    + "layout_file=["+configFile.getName()+"] "
-                    + "fusion_method=["+fusionMethod+"] "
-                    + "regression_threshold="+Double.toString(regressionTh)+" "
-                    + "max/avg_displacement_threshold="+Double.toString(maxAvgDisplaceTh)+ " "
-                    + "absolute_displacement_threshold="+Double.toString(absDisplaceTh)+ " "
-                    + rois
-                    + subpix
-                    + compOverlap
-                    + "ignore_z_stage"
-                    + "computation_parameters=["+compParams+"] "
-                    + "image_output=[Write to disk]");
-                } catch (Exception ex) {
-                    IJ.log("Stitching exception: "+ex);
-                }
-                for (File e:elements) {
-                    String path=e.getParent();
-                   // restoreMetadataFile(path,"metadata_backup","metadata.txt");                    
-//                    path=new File(path).getName();
-                }
-                
-                try {
-                    //move Stitch configFile and update file handle 
-                    Utils.copyFile(configFile, new File(workDir,configFile.getName()));
-                    configFile.delete();
-                    configFile=new File(workDir,configFile.getName());
+                        String frame="t"+Long.toString(meta.getLong(MMTags.Image.FRAME_INDEX))+"-";
+                        String channel=meta.getString(MMTags.Image.CHANNEL_NAME)+"-";
+                        Long noOfCh=summary.getLong(MMTags.Summary.CHANNELS);
+                        Long noOfSlices=summary.getLong(MMTags.Summary.SLICES);
+                        Long noOfFrames=summary.getLong(MMTags.Summary.FRAMES);
 
-                    //if compute_overlap, registered tile file should have been created
-                    //move registered Stitch configFile and update file handle 
-                    if (registerFile.exists()) {
-                        Utils.copyFile(registerFile, new File(workDir,registerFile.getName()));
-                        registerFile.delete();
-                        registerFile=new File(workDir,registerFile.getName());
-                    }
-                    
-                    TaggedImageStorage storage = null;
+                        // limit stitching to single slice
+                        int dim=2;
+                        long selectedSliceIndex=0;
+//                        int dim=noOfSlices < 2 ? 2 : 3;
 
-                    for (int i=0; i<foundCh.size(); i++) {
-                    //wait for result stitched image file
-                        String name="img_t1_z1_c"+Integer.toString(i+1);
-                        IJ.log("processing result "+name);
-//                        File resultFile=new File(outputDir, name);
-                        File resultFile=new File(sourceImagePath, name);
-                        File resultFile2=null;
-                        if (!"".equals(outputDir))
-                            resultFile2=new File(outputDir, name);
-//                      File resultFile=new File(new File(workDir,prefix),name);                    
-                        //wait for result file to be saved
-                        while (!resultFile.exists()) {
-                            if (resultFile2!=null)
-                                if (resultFile2.exists()) {
-                                    IJ.log("STITCHED FILE FOUND IN outputDir "+ outputDir);
-                                    resultFile=resultFile2;
-                                }    
-                            try {
-                                Thread.sleep(100);
-                            } catch (InterruptedException ex) {
-                                Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
-                            }
-                        } 
+                        List<String> chNames=new ArrayList<String>();
+                        JSONArray chN=meta.getJSONObject(MMTags.Root.SUMMARY).getJSONArray(MMTags.Summary.NAMES);
+                        for (int i=0; i<chN.length(); i++)
+                            chNames.add(chN.getString(i));
+                        String slice="z"+Long.toString(meta.getLong(MMTags.Image.SLICE_INDEX));
+                        Double pixSize=meta.getJSONObject(MMTags.Root.SUMMARY).getDouble(MMTags.Summary.PIXSIZE);
+                        File configFile = new File(sourceImagePath, "StitchConfig-"+prefix+"-"+frame+channel+slice+".txt");
+                        File registerFile = new File(sourceImagePath, "StitchConfig-"+prefix+"-"+frame+channel+slice+".registered.txt");
 
-                    
-                        ImagePlus imp=IJ.openImage(resultFile.getAbsolutePath());
-                        ImageProcessor proc=imp.getProcessor();
-                        IJ.log("Retrieved imageProcessor");
-                        //if compute_overlap, tiles may have been rotated (if camera rotation was not correctly set) 
-            /*            if (registerFile.exists()) {
-                            double angle=calculateRotation(configFile, registerFile);
-                            proc.rotate(angle);
-                        }*/
-                        TaggedImage ti=null;
+                        double xMin=0;
+                        double xMax=0;
+                        double yMin=0;
+                        double yMax=0;
+                        List<String> foundCh=new ArrayList<String>();
                         try {
-                            //these are used to create display settings 
-                            //newMeta.put(MMTags.Summary.HEIGHT, imp.getHeight());
-                            if (storage==null) {
-                                JSONObject newSummary = meta.getJSONObject(MMTags.Root.SUMMARY);
-                                newSummary.put(MMTags.Summary.SLICES, 1); 
-                                newSummary.put(MMTags.Summary.POSITIONS, 1); 
-                                newSummary.put(MMTags.Summary.CHANNELS, noOfCh); 
-                                newSummary.put(MMTags.Summary.FRAMES, 1); 
-                                newSummary.put(MMTags.Summary.WIDTH,imp.getWidth()); 
-                                newSummary.put(MMTags.Summary.HEIGHT,imp.getHeight()); 
-                                newSummary.put(MMTags.Summary.PREFIX,prefix); 
-                                newSummary.put(MMTags.Summary.DIRECTORY, workDir);
-                                // ??newSummary.put("PositionName", prefix);
-                                newSummary.remove("InitialPositionList");
-                                storage = new TaggedImageStorageDiskDefault (
-                                    workDir,true,newSummary);
-                            }
-//                            IJ.log("after summary update");
-                            meta.put(MMTags.Image.HEIGHT, imp.getHeight());
-                            //newMeta.put(MMTags.Summary.WIDTH, imp.getWidth());
-                            meta.put(MMTags.Image.WIDTH, imp.getWidth());
-                            meta.put(MMTags.Image.POS_NAME,prefix);
-                            meta.put(MMTags.Image.POS_INDEX,0);
-                            meta.put(MMTags.Image.CHANNEL_NAME, chNames.get(i));
-                            meta.put(MMTags.Image.CHANNEL_INDEX,i);
-                            meta.put(MMTags.Image.XUM,pixSize * (xMin+(xMax-xMin)/2));
-                            meta.put(MMTags.Image.YUM,pixSize * (yMin+(yMax-yMin)/2));
-                            meta.put("SliceIndex",0);
-                            meta.put("ClusterIndex",currentClusterIndex);
-//                            IJ.log("xMin(pix): "+Double.toString(xMin)+", xMax(pix): "+Double.toString(xMax)+", yMin(pix): "+Double.toString(yMin)+", yMax(pix): "+Double.toString(yMax));
-//                            IJ.log("xMax(pix)-xMin(pix): "+Double.toString(xMax-xMin)+", yMax(pix)-yMin(pix): "+Double.toString(yMax-yMin)+", imp.getWidth()-->um="+Double.toString(imp.getWidth()*pixSize)+", imp.getHeight()-->um="+Double.toString(imp.getHeight()*pixSize));
-//                            IJ.log("Creating new TaggedImage");
-                            ti=new TaggedImage(proc.getPixels(),meta);
-                            //ti.tags.put("FileName", stitchedFile.getName());
-                            //JSONObject summary=newMeta.getJSONObject(MMTags.Root.SUMMARY);
-                            IJ.log("New TaggedImage created");
-                            storage.putImage(ti);
-            /*                stitchedFile=new File(new File(workDir,prefix),ti.tags.getString("FileName"));
-                            IJ.log("        stitchedFile: "+stitchedFile.getAbsolutePath());*/
+                            BufferedWriter writer;
 
-                            stitchedFiles.add(new File(new File(workDir,prefix), 
-                                    ti.tags.getString("FileName")));
-                            IJ.log(stitchedFiles.get(stitchedFiles.size()-1).getAbsolutePath());
-                        } catch (Exception ex) {
-                            IJ.log("Problem saving to storage: "+ti.tags.getString(MMTags.Image.CHANNEL_NAME));
+                            writer = new BufferedWriter(new FileWriter(configFile));
+                            String line = "# Define the number of dimensions we are working on\n"
+                                    + "dim = " + Integer.toString(dim)
+                                    + "\n\n"
+                                    + "# Define the image coordinates\n";
+                            writer.write(line);
+                            int i=1;
+                            Point2D.Double refPoint=null;
+                            for (File e:elements) {
+                                IJ.log(Integer.toString(i)+": "+e.getAbsolutePath());
+                                meta=Utils.parseMetadata(e);
+                                //need to convert from um into pixel coords if using grid stitching plugin
+                                Long sliceIndex=meta.getLong(MMTags.Image.SLICE_INDEX);
+                                if (selectedSliceIndex == sliceIndex) {
+                                    double xUM=meta.getDouble(MMTags.Image.XUM)/pixSize;
+                                    double yUM=meta.getDouble(MMTags.Image.YUM)/pixSize;
+                                    double zUM=meta.getDouble(MMTags.Image.ZUM)/pixSize;
+                                    String ch=meta.getString((MMTags.Image.CHANNEL_NAME));
+                                    if (!foundCh.contains(ch))
+                                        foundCh.add(ch);
+                                    if (i==1) {
+                                        xMin=xUM;
+                                        xMax=xUM;
+                                        yMin=yUM;
+                                        yMax=yUM;
+                                        refPoint=new Point2D.Double(xUM,yUM);
+                                    } else {
+                                        if (cameraRot != FieldOfView.ROTATION_UNKNOWN) {
+                                            Point2D p=Utils.rotatePoint(new Point2D.Double(xUM,yUM), refPoint, cameraRot);
+                                            xUM=p.getX();
+                                            yUM=p.getY();
+                                        }
+                                        xMin=xUM < xMin?xUM:xMin;
+                                        xMax=xUM > xMax?xUM:xMax;
+                                        yMin=yUM < yMin?yUM:yMin;
+                                        yMax=yUM > yMax?yUM:yMax;
+                                    }
+            //                        double x=xUM/pixSize;
+            //                        double y=yUM/pixSize;
+            //                        double z=zUM/pixSize;
+                                    String path=e.getParent();
+                                  //  renameMetadataFile(path,"metadata.txt","metadata_backup");
+                                    path=new File(path).getName();
+                                    if (dim==2) {
+                                        line = new File(path,e.getName()).getPath() + "; ; (" + Double.toString(xUM) + ", " + Double.toString(yUM) + ")\n";
+                                    } else {
+                                        line = new File(path,e.getName()).getPath() + "; ; (" + Double.toString(xUM) + ", " + Double.toString(yUM) + ", " + Double.toString(zUM)+ ")\n";
+
+                                    }
+                                    writer.write(line);
+                                    i++;
+                                }
+
+                            }    
+                            writer.close();
+                            
+                        } catch (IOException ex) {
                             Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                            IJ.log(this.getClass().getName()+": Error creating stitch config file");
+                            return new ArrayList<File>();
                         }
-                        resultFile.delete();
-                    
-                    }
-                    storage.close();
-                    IJ.log("Stitching successful");
+
+                        IJ.log("sourceImagePath: "+sourceImagePath);
+                        IJ.log("workDir: "+workDir);
+
+                            //this is a hack to change the output directory for saving fused image and ROIs
+                        String defaultDirectory="";
+                        if (outputDir==null)
+                            outputDir=sourceImagePath;
+                        if (stitch_grid!=null) {
+                            try {
+                                Field f=stitch_grid.getClass().getDeclaredField("defaultOutputDirectory");
+                                String lastDefaultOutputDirectory=(String)f.get(stitch_grid);
+                                IJ.log("defaultOutputDirectory: "+lastDefaultOutputDirectory);
+                                f.set(null,"");
+                                f=stitch_grid.getClass().getDeclaredField("defaultDirectory");
+                                defaultDirectory=(String)f.get(stitch_grid);
+                                IJ.log("defaultDirectory: "+defaultDirectory);
+                                f.set(null, outputDir);
+
+                            } catch (NoSuchFieldException ex) {
+                                IJ.showMessage("cannot find field"+ex);
+                                Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                            } catch (SecurityException ex) {
+                                IJ.showMessage("security field"+ex);
+                                Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                            } catch (IllegalArgumentException ex) {
+                                IJ.showMessage("illegal arg field"+ex);
+                                Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                            } catch (IllegalAccessException ex) {
+                                IJ.showMessage("illegal access field"+ex);
+                                Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                            }                     
+                        } else {
+                            IJ.log("stitch_grid == null");  
+                        }    
+                     //   IJ.runMacroFile("scripts/setOutput.bsh", sourceImagePath);
+                        try {
+        /*                    Thread thread=Thread.currentThread();
+                            Macro.setOptions(thread, "type=[Positions from file] "
+                                            + "order=[Defined by TileConfiguration] "
+                                            + "directory=["+sourceImagePath+"] "
+                                            + "layout_file=["+configFile.getName()+"] "
+                                            + "fusion_method=["+fusionMethod+"] "
+                                            + "regression_threshold="+Double.toString(regressionTh)+" "
+                                            + "max/avg_displacement_threshold="+Double.toString(maxAvgDisplaceTh)+ " "
+                                            + "absolute_displacement_threshold="+Double.toString(absDisplaceTh)+ " "
+                                            + rois
+                                            + subpix
+                                            + compOverlap
+                                            + "ignore_z_stage"
+                                            + "computation_parameters=["+compParams+"] "
+                                            + "image_output=[Write to disk]");
+                            Object runPlugIn = IJ.runPlugIn("Grid/Collection stitching","");
+                            IJ.log("after call runPlugin");
+                            Macro.setOptions(thread,null);*/
+                            IJ.run("Grid/Collection stitching",
+                            "type=[Positions from file] "
+                            + "order=[Defined by TileConfiguration] "
+                            + "directory=["+sourceImagePath+"] "
+                            + "layout_file=["+configFile.getName()+"] "
+                            + "fusion_method=["+fusionMethod+"] "
+                            + "regression_threshold="+Double.toString(regressionTh)+" "
+                            + "max/avg_displacement_threshold="+Double.toString(maxAvgDisplaceTh)+ " "
+                            + "absolute_displacement_threshold="+Double.toString(absDisplaceTh)+ " "
+                            + (addTilesAsROIs?"add_tiles_as_rois ":"")
+                            + (subpixelAccuracy?"subpixel_accuracy ":"")
+                            + (computeOverlap?"compute_overlap ":"")
+                            + (invertX?"invert_x ":"")
+                            + (invertY?"invert_y ":"")
+                            + (downSample ? "downsample_tiles " : "")
+                            + "ignore_z_stage "
+                            + "computation_parameters=["+compParams+"] "
+                            + "image_output=[Write to disk] ");
+                        } catch (Exception ex) {
+                            IJ.log("Stitching exception: "+ex);
+                            return new ArrayList<File>();
+                        }
+/*                        for (File e:elements) {
+                            String path=e.getParent();
+                           // restoreMetadataFile(path,"metadata_backup","metadata.txt");                    
+        //                    path=new File(path).getName();
+                        }*/
+
+                        try {
+                            //move Stitch configFile and update file handle 
+                            Utils.copyFile(configFile, new File(workDir,configFile.getName()));
+                            configFile.delete();
+                            configFile=new File(workDir,configFile.getName());
+
+                            //if compute_overlap, registered tile file should have been created
+                            //move registered Stitch configFile and update file handle 
+                            if (registerFile.exists()) {
+                                Utils.copyFile(registerFile, new File(workDir,registerFile.getName()));
+                                registerFile.delete();
+                                registerFile=new File(workDir,registerFile.getName());
+                            }
+
+                            TaggedImageStorage storage = null;
+
+                            for (int i=0; i<foundCh.size(); i++) {
+                            //wait for result stitched image file
+                                String name="img_t1_z1_c"+Integer.toString(i+1);
+                                IJ.log("processing result "+name);
+        //                        File resultFile=new File(outputDir, name);
+                                File resultFile=new File(sourceImagePath, name);
+                                File resultFile2=null;
+                                if (!"".equals(outputDir))
+                                    resultFile2=new File(outputDir, name);
+        //                      File resultFile=new File(new File(workDir,prefix),name);                    
+                                //wait for result file to be saved
+                                while (!resultFile.exists()) {
+                                    if (resultFile2!=null)
+                                        if (resultFile2.exists()) {
+                                            IJ.log("STITCHED FILE FOUND IN outputDir "+ outputDir);
+                                            resultFile=resultFile2;
+                                        }    
+                                    try {
+                                        Thread.sleep(100);
+                                    } catch (InterruptedException ex) {
+                                        Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                                    }
+                                } 
+
+                                ImagePlus imp=IJ.openImage(resultFile.getAbsolutePath());
+                                ImageProcessor proc=imp.getProcessor();
+                                IJ.log("Retrieved imageProcessor");
+                                //if compute_overlap, tiles may have been rotated (if camera rotation was not correctly set) 
+                    /*            if (registerFile.exists()) {
+                                    double angle=calculateRotation(configFile, registerFile);
+                                    proc.rotate(angle);
+                                }*/
+                                TaggedImage ti=null;
+                                try {
+                                    //these are used to create display settings 
+                                    //newMeta.put(MMTags.Summary.HEIGHT, imp.getHeight());
+                                    if (storage==null) {
+                                        JSONObject newSummary = meta.getJSONObject(MMTags.Root.SUMMARY);
+                                        newSummary.put(MMTags.Summary.SLICES, 1); 
+                                        newSummary.put(MMTags.Summary.POSITIONS, 1); 
+                                        newSummary.put(MMTags.Summary.CHANNELS, noOfCh); 
+                                        newSummary.put(MMTags.Summary.FRAMES, 1); 
+                                        newSummary.put(MMTags.Summary.WIDTH,imp.getWidth()); 
+                                        newSummary.put(MMTags.Summary.HEIGHT,imp.getHeight()); 
+                                        newSummary.put(MMTags.Summary.PREFIX,prefix); 
+                                        newSummary.put(MMTags.Summary.DIRECTORY, workDir);
+                                        newSummary.put(ExtImageTags.AREAS, 1);
+                                        newSummary.put(ExtImageTags.CLUSTERS, 1);
+                                        // ??newSummary.put("PositionName", prefix);
+                                        newSummary.remove("InitialPositionList");
+                                        storage = new TaggedImageStorageDiskDefault (
+                                            workDir,true,newSummary);
+                                    }
+        //                            IJ.log("after summary update");
+                                    meta.put(MMTags.Image.HEIGHT, imp.getHeight());
+                                    //newMeta.put(MMTags.Summary.WIDTH, imp.getWidth());
+                                    meta.put(MMTags.Image.WIDTH, imp.getWidth());
+                                    meta.put(MMTags.Image.POS_NAME,prefix);
+                                    meta.put(MMTags.Image.POS_INDEX,0);
+                                    meta.put(MMTags.Image.CHANNEL_NAME, chNames.get(i));
+                                    meta.put(MMTags.Image.CHANNEL_INDEX,i);
+                                    meta.put(MMTags.Image.XUM,pixSize * (xMin+(xMax-xMin)/2));
+                                    meta.put(MMTags.Image.YUM,pixSize * (yMin+(yMax-yMin)/2));
+                                    meta.put(MMTags.Image.SLICE_INDEX,0);
+                                    meta.put(ExtImageTags.AREA_INDEX,0);
+//                                    meta.put(ExtImageTags.SITE_INDEX,currentClusterIndex);
+                                    meta.put(ExtImageTags.SITE_INDEX,0);
+//                                    meta.put(ExtImageTags.CLUSTER_INDEX,currentClusterIndex);
+                                    meta.put(ExtImageTags.CLUSTER_INDEX,0);
+                                    meta.put(ExtImageTags.CLUSTERS_IN_AREA, 1);
+                                    meta.put(ExtImageTags.SITES_IN_AREA, 1);
+        //                            IJ.log("xMin(pix): "+Double.toString(xMin)+", xMax(pix): "+Double.toString(xMax)+", yMin(pix): "+Double.toString(yMin)+", yMax(pix): "+Double.toString(yMax));
+        //                            IJ.log("xMax(pix)-xMin(pix): "+Double.toString(xMax-xMin)+", yMax(pix)-yMin(pix): "+Double.toString(yMax-yMin)+", imp.getWidth()-->um="+Double.toString(imp.getWidth()*pixSize)+", imp.getHeight()-->um="+Double.toString(imp.getHeight()*pixSize));
+        //                            IJ.log("Creating new TaggedImage");
+                                    ti=new TaggedImage(proc.getPixels(),meta);
+                                    //ti.tags.put("FileName", stitchedFile.getName());
+                                    //JSONObject summary=newMeta.getJSONObject(MMTags.Root.SUMMARY);
+                                    storage.putImage(ti);
+                                    stitchedFiles.add(new File(new File(workDir,prefix), ti.tags.getString("FileName")));
+                                    IJ.log(stitchedFiles.get(stitchedFiles.size()-1).getAbsolutePath());
+                                } catch (Exception ex) {
+                                    IJ.log("Problem saving to storage: "+ti.tags.getString(MMTags.Image.CHANNEL_NAME));
+                                    Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
+                                }
+                                resultFile.delete();
+
+                            }
+                            storage.close();
+                            IJ.log("Stitching successful");
+//                            stitchingInProgress=false;
+                        } catch (IOException ex) {
+                            Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
+                            IJ.log(this.getClass().getName()+": Error saving stitched results");
+//                            stitchingInProgress=false;
+                        }
+                    } catch (JSONException ex) {
+                        Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
+                        IJ.log(this.getClass().getName()+": Error parsing metadata");
+//                        stitchingInProgress=false;
+                    } 
+                    IJ.log(this.getClass().getName()+".analyzeGroup: finished job # "+jobNumber);
                     IJ.log("----");
-                    stitchingInProgress=false;
-                } catch (IOException ex) {
-                    Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
-                    IJ.log(this.getClass().getName()+": Error saving stitched results");
-                    stitchingInProgress=false;
+                    return stitchedFiles;
                 }
-            } catch (JSONException ex) {
-                Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
-                IJ.log(this.getClass().getName()+": Error parsing metadata");
-                stitchingInProgress=false;
-            } 
+            };
+            Future<List<File>> future=executor.submit(stitchingTask);
+            try {
+                return future.get();
+            } catch (InterruptedException ex) {
+                return new ArrayList<File>();
+            } catch (ExecutionException ex) {
+                return new ArrayList<File>();
+            }
+        } else {
+            return new ArrayList<File>();
         }
-        return stitchedFiles;     
     }
     
     @Override
@@ -576,6 +625,14 @@ public class StitchCluster extends AreaProcessor {
         absDisplaceThField.setValue(new Double(absDisplaceTh));
         optionPanel.add(absDisplaceThField);
             
+        l=new JLabel("Add tiles as ROIs:",JLabel.RIGHT);
+        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        optionPanel.add(l);
+        JCheckBox addTilesAsRoisCB = new JCheckBox();
+        addTilesAsRoisCB.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        addTilesAsRoisCB.setSelected(addTilesAsROIs);
+        optionPanel.add(addTilesAsRoisCB);
+
         l=new JLabel("Compute overlap:",JLabel.RIGHT);
         l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
         optionPanel.add(l);
@@ -583,6 +640,22 @@ public class StitchCluster extends AreaProcessor {
         computeOverlapCB.setAlignmentX(Component.RIGHT_ALIGNMENT);
         computeOverlapCB.setSelected(computeOverlap);
         optionPanel.add(computeOverlapCB);
+
+        l=new JLabel("Invert X coordinates:",JLabel.RIGHT);
+        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        optionPanel.add(l);
+        JCheckBox invertXCB = new JCheckBox();
+        invertXCB.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        invertXCB.setSelected(invertX);
+        optionPanel.add(invertXCB);
+
+        l=new JLabel("Invert Y coordinates:",JLabel.RIGHT);
+        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        optionPanel.add(l);
+        JCheckBox invertYCB = new JCheckBox();
+        invertYCB.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        invertYCB.setSelected(invertY);
+        optionPanel.add(invertYCB);
 
         l=new JLabel("Subpixel accuracy:",JLabel.RIGHT);
         l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
@@ -592,6 +665,14 @@ public class StitchCluster extends AreaProcessor {
         subpixelCB.setSelected(subpixelAccuracy);
         optionPanel.add(subpixelCB);
         
+        l=new JLabel("Downsample tiles:",JLabel.RIGHT);
+        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        optionPanel.add(l);
+        JCheckBox downsampleCB = new JCheckBox();
+        downsampleCB.setAlignmentX(Component.RIGHT_ALIGNMENT);
+        downsampleCB.setSelected(downSample);
+        optionPanel.add(downsampleCB);
+
         l=new JLabel("Computation Parameters:",JLabel.RIGHT);
         l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
         optionPanel.add(l);
@@ -626,8 +707,12 @@ public class StitchCluster extends AreaProcessor {
                 Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
             }
             absDisplaceTh=(Double)absDisplaceThField.getValue();
+            addTilesAsROIs=addTilesAsRoisCB.isSelected();
             computeOverlap=computeOverlapCB.isSelected();
+            invertX=invertXCB.isSelected();
+            invertY=invertYCB.isSelected();
             subpixelAccuracy=subpixelCB.isSelected();
+            downSample=downsampleCB.isSelected();
             compParams=(String)compParamCombo.getSelectedItem();
         }    
     }

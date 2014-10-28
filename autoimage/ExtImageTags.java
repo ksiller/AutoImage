@@ -18,9 +18,11 @@ public class ExtImageTags {
     public final static String AREA_INDEX = "AreaIndex";
     public final static String AREA_NAME = "AreaName";
     public final static String AREA_COMMENT = "AreaComment";
-    public final static String CLUSTERS = "Clusters";
-    public final static String CLUSTER_INDEX = "ClusterIndex";
+    public final static String CLUSTERS = "TotalClusters"; //all clusters across areas
+    public final static String CLUSTERS_IN_AREA = "ClustersInArea";
+    public final static String CLUSTER_INDEX = "ClusterIndex"; //in area
     public final static String SITES = "Sites";
+    public final static String SITES_IN_AREA = "SitesInArea";
     public final static String SITE_INDEX = "SiteIndex";
     public final static String LAYOUT_X = "LayoutX_UM";
     public final static String LAYOUT_Y = "LayoutY_UM";

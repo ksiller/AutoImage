@@ -64,6 +64,7 @@ public abstract class Area {
     protected boolean acquiring;
 //    private boolean abortTileCalc;
     private boolean unknownTileNum; //is set when tilingmode is "runtime" or "file", or pixel size is not calibrated
+    private int noOfClusters;
     
     public static final Color COLOR_UNSELECTED_AREA = Color.GRAY;
     public static final Color COLOR_AREA_BORDER = Color.WHITE;
@@ -103,6 +104,7 @@ public abstract class Area {
 //        tiling=new TilingSetting();
         tilePosList=null;
         unknownTileNum=true;
+        noOfClusters=0;
 //        cameraRot=0;
     }
 
@@ -116,6 +118,10 @@ public abstract class Area {
     
     public void setAreaIndex(int index) {
         areaIndex=index;
+    }
+    
+    public int getNoOfClusters() {
+        return noOfClusters;
     }
     
     public int getAreaIndex() {
@@ -331,10 +337,10 @@ public abstract class Area {
                 for (int j=0; j<yTiles; j++) {   
                     y = starty+tileOffset.getY()*row;
     //                IJ.log(name+", test Tile: "+Integer.toString(i*yTiles+j)+", "+Double.toString(x)+","+Double.toString(y));
-                    siteCounter++;
                     Tile t=new Tile(createTileName(clusterNr,siteCounter), x, y, relPosZ);                
                     tilePosList.add(t);
                     row+=vDir;
+                    siteCounter++;
                 }
                 col+=hDir;
                 vDir=-vDir;
@@ -351,11 +357,11 @@ public abstract class Area {
                 for (int i=0; i<xTiles; i++) {  
                     x = startx+tileOffset.getX()*col;
   //                  IJ.log(name+", test Tile: "+Integer.toString(i*yTiles+j)+", "+Double.toString(x)+","+Double.toString(y));
-                    siteCounter++;
                     Tile t=new Tile(createTileName(clusterNr,siteCounter), x, y, relPosZ);                
                     tilePosList.add(t);
    //                 IJ.log(name+", "+Integer.toString(i*yTiles+j)+", "+Double.toString(x)+","+Double.toString(y));
                     col+=hDir;
+                    siteCounter++;
                 }
                 row+=vDir;
                 hDir=-hDir;
@@ -490,7 +496,8 @@ public abstract class Area {
 //                    IJ.log(name+", test Tile: "+Integer.toString(i*yTiles+j)+", "+Double.toString(x)+","+Double.toString(y));
                     if (acceptTilePos(x,y,fovBounds.getWidth(),fovBounds.getHeight(),insideOnly)) {
                         siteCounter++;
-                        Tile t=new Tile("Site"+paddedTileIndex(siteCounter), x, y, relPosZ);                
+//                        Tile t=new Tile("Site"+paddedTileIndex(siteCounter), x, y, relPosZ);  
+                        Tile t=new Tile(createTileName(0,siteCounter), x, y, relPosZ);
                         tilePosList.add(t);
  //                       IJ.log(name+", accepted Tile: "+Integer.toString(col*yTiles+row)+", "+Double.toString(x)+","+Double.toString(y));
                     }
@@ -513,7 +520,8 @@ public abstract class Area {
  //                   IJ.log(name+", test Tile: "+Integer.toString(i*yTiles+j)+", "+Double.toString(x)+","+Double.toString(y));
                     if (acceptTilePos(x,y,fovBounds.getWidth(),fovBounds.getHeight(),insideOnly)) {
                         siteCounter++;
-                        Tile t=new Tile("Site"+paddedTileIndex(siteCounter), x, y, relPosZ);                
+//                        Tile t=new Tile("Site"+paddedTileIndex(siteCounter), x, y, relPosZ);                
+                        Tile t=new Tile(createTileName(0,siteCounter), x, y, relPosZ);
                         tilePosList.add(t);
  //                       IJ.log(name+", acceptedTile: "+Integer.toString(col*yTiles+row)+", "+Double.toString(x)+","+Double.toString(y));
                     }
@@ -525,6 +533,7 @@ public abstract class Area {
             }            
         }
         unknownTileNum=Thread.currentThread().isInterrupted();
+        noOfClusters = (tilePosList.size() > 0 ?  1 :  0);
         return tilePosList.size();
     }
 
@@ -536,8 +545,8 @@ public abstract class Area {
         if (setting.isCluster())
             size=size*setting.getNrClusterTileX()*setting.getNrClusterTileY();
         tilePosList = new ArrayList<Tile>(size);
-        int nr=1;
-        while (!Thread.currentThread().isInterrupted() && nr <= setting.getMaxSites()) {// && !abortTileCalc) {
+        noOfClusters=0;
+        while (!Thread.currentThread().isInterrupted() && noOfClusters < setting.getMaxSites()) {// && !abortTileCalc) {
             double w;
             double h;
             if (setting.isCluster() && (setting.getNrClusterTileX()>1 || setting.getNrClusterTileY()>1)) {
@@ -558,13 +567,14 @@ public abstract class Area {
 //            IJ.log("Area.calcRandomPositions: "+nr+", "+x+", "+y+", "+w+", "+h);
             if (acceptTilePos(x,y,w,h,setting.isInsideOnly())) {
                 if (setting.isCluster() && (setting.getNrClusterTileX()>1 || setting.getNrClusterTileY()>1)) {
-                    if (createCluster(nr,x,y,fovX,fovY, setting) > 0) {
-                        nr++;
+                    if (createCluster(noOfClusters,x,y,fovX,fovY, setting) > 0) {
+                        noOfClusters++;
                     }
                 } else {
                     if (setting.isSiteOverlap() || (!setting.isSiteOverlap() && !overlapsOtherTiles(new Rectangle2D.Double(x-fovBounds.getWidth()/2,y-fovBounds.getHeight()/2,fovX,fovY),fovX,fovY))) {
-                        tilePosList.add(new Tile("Site"+paddedTileIndex(nr), x, y, relPosZ));
-                        nr++;
+//                        tilePosList.add(new Tile("Site"+paddedTileIndex(nr), x, y, relPosZ));
+                        Tile t=new Tile(createTileName(0,noOfClusters), x, y, relPosZ);
+                        noOfClusters++;
                     }
                 }
             }
@@ -580,13 +590,14 @@ public abstract class Area {
             size=size*tSetting.getNrClusterTileX()*tSetting.getNrClusterTileY();
 //        tilePosList.clear();
         tilePosList = new ArrayList<Tile>(size);
-        addTilesAroundSeed(getCenterX(), getCenterY(), fovX, fovY, tSetting);
+        addTilesAroundSeed(0,getCenterX(), getCenterY(), fovX, fovY, tSetting);
         unknownTileNum=Thread.currentThread().isInterrupted();
+        noOfClusters=tilePosList.size() > 0 ? 1 : 0;
         return tilePosList.size();
     }
     
     
-    private synchronized int addTilesAroundSeed(double seedX, double seedY, double fovX, double fovY, TilingSetting tSetting) {
+    private synchronized int addTilesAroundSeed(int clusterNr,double seedX, double seedY, double fovX, double fovY, TilingSetting tSetting) {
         Point2D tileOffset=Area.calculateTileOffset(fovX, fovY, tSetting.getTileOverlap());
         Rectangle2D fovBounds=getFovBounds(fovX, fovY);
         double w;
@@ -602,10 +613,11 @@ public abstract class Area {
         }        
         if (acceptTilePos(seedX,seedY,w,h,tSetting.isInsideOnly())) {
             if (tSetting.isCluster() && (tSetting.getNrClusterTileX()>1 || tSetting.getNrClusterTileY()>1)) {
-                return createCluster(1,seedX,seedY,fovX,fovY, tSetting);
+                return createCluster(clusterNr,seedX,seedY,fovX,fovY, tSetting);
             }
             else {
-                tilePosList.add(new Tile("Site"+paddedTileIndex(1), seedX, seedY, relPosZ));
+//                tilePosList.add(new Tile("Site"+paddedTileIndex(1), seedX, seedY, relPosZ));
+                tilePosList.add(new Tile(createTileName(clusterNr,0), seedX, seedY, relPosZ));
                 return 1;
             }    
         } else
@@ -636,7 +648,7 @@ public abstract class Area {
             while (!Thread.currentThread().isInterrupted() && seedList.size()>0 && acceptedNr <= tSetting.getMaxSites()) {// && !abortTileCalc) {
                 //use random index in seedList
                 int index=(int)Math.round(Math.random()*(seedList.size()-1));
-                if (addTilesAroundSeed(seedList.get(index).centerX, seedList.get(index).centerY, fovX, fovY, tSetting) > 0) {
+                if (addTilesAroundSeed(acceptedNr,seedList.get(index).centerX, seedList.get(index).centerY, fovX, fovY, tSetting) > 0) {
                     acceptedNr++;
                 }    
                 seedList.remove(index);
@@ -838,6 +850,8 @@ public abstract class Area {
         try {
             info.put(ExtImageTags.AREA_NAME,name);
             info.put(ExtImageTags.AREA_INDEX,areaIndex);
+            info.put(ExtImageTags.CLUSTERS_IN_AREA,noOfClusters);
+            info.put(ExtImageTags.SITES_IN_AREA,tilePosList.size());
             if (tileName.indexOf("Cluster")!=-1) {
                 int startIndex=tileName.indexOf("Cluster")+7;
                 int endIndex=tileName.indexOf("Site")-1;

@@ -722,13 +722,25 @@ class AcquisitionLayout  implements PropertyChangeListener {
         
     public int getNoOfSelectedAreas() {
         int sel=0;
-        for (int i=0; i<areas.size(); i++)
-            if (areas.get(i).isSelectedForAcq())
+        for (Area area : areas) {
+            if (area.isSelectedForAcq()) {
                 sel++;
+            }
+        }
         return sel;
     }
     
-    
+    public int getNoOfSelectedClusters() {
+        int sel=0;
+        for (Area area : areas) {
+            if (area.isSelectedForAcq()) {
+                sel=area.getNoOfClusters()+sel;
+            }
+        }
+        return sel;
+        
+    }
+
     public int getFirstContainingAreaIndex(double lx, double ly) {
         int i=0;
         int index=-1;

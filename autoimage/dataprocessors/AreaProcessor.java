@@ -116,8 +116,8 @@ public class AreaProcessor extends BranchedProcessor<File> {
              Long clusterIndex;
              try {
                 List<File> returnValue;
-                    area = meta.getString(ExtImageTags.AREA_NAME);
-                    clusterIndex = meta.getLong(ExtImageTags.CLUSTER_INDEX);
+                area = meta.getString(ExtImageTags.AREA_NAME);
+                clusterIndex = meta.getLong(ExtImageTags.CLUSTER_INDEX);
                 if ((!currentArea.equals("") && !area.equals(currentArea)) || (currentClusterIndex!=-1 && clusterIndex!=currentClusterIndex)) {//element group set complete
                     List<File> modifiedElements=analyzeGroup(imageList);
                     imageList.clear();
