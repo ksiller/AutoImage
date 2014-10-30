@@ -46,6 +46,8 @@ import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -69,7 +71,6 @@ import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -2061,7 +2062,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         mergeAreasMode = false;
 
         instrumentOnline = false; //to ensure that during gui initialization instrument does not respond 
+        IJ.log("before initComponents");
         initComponents();
+        IJ.log("after initComponents");
         
         JMenuBar menubar = new JMenuBar();
         
@@ -2375,16 +2378,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         snapButton = new javax.swing.JButton();
         liveButton = new javax.swing.JButton();
         zOffsetButton = new javax.swing.JButton();
-        jPanel1 = new javax.swing.JPanel();
+        zStackPanel = new javax.swing.JPanel();
         jLabel19 = new javax.swing.JLabel();
         jLabel20 = new javax.swing.JLabel();
         jLabel21 = new javax.swing.JLabel();
         jLabel22 = new javax.swing.JLabel();
         zStackCenteredCheckBox = new javax.swing.JCheckBox();
-        zStackSlicesField = new javax.swing.JFormattedTextField();
-        zStackStepSizeField = new javax.swing.JFormattedTextField();
-        zStackBeginField = new javax.swing.JFormattedTextField();
-        zStackEndField = new javax.swing.JFormattedTextField();
         jLabel23 = new javax.swing.JLabel();
         zStackTotalDistLabel = new javax.swing.JLabel();
         jLabel24 = new javax.swing.JLabel();
@@ -2392,6 +2391,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         jLabel26 = new javax.swing.JLabel();
         reverseButton = new javax.swing.JButton();
         jLabel9 = new javax.swing.JLabel();
+        zSlicesSpinner = new javax.swing.JSpinner();
+        zStepSizeField = new javax.swing.JFormattedTextField();
+        zStackBeginField = new javax.swing.JFormattedTextField();
+        zStackEndField = new javax.swing.JFormattedTextField();
         jPanel3 = new javax.swing.JPanel();
         jLabel13 = new javax.swing.JLabel();
         intHourField = new javax.swing.JTextField();
@@ -3122,43 +3125,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
-        zStackSlicesField.setText("1");
-        zStackSlicesField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
-        zStackSlicesField.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusLost(java.awt.event.FocusEvent evt) {
-                zStackSlicesFieldFocusLost(evt);
-            }
-        });
-        zStackSlicesField.addPropertyChangeListener(new java.beans.PropertyChangeListener() {
-            public void propertyChange(java.beans.PropertyChangeEvent evt) {
-                zStackSlicesFieldPropertyChange(evt);
-            }
-        });
-
-        zStackStepSizeField.setText("0");
-        zStackStepSizeField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
-        zStackStepSizeField.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusLost(java.awt.event.FocusEvent evt) {
-                zStackStepSizeFieldFocusLost(evt);
-            }
-        });
-
-        zStackBeginField.setText("0.00");
-        zStackBeginField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
-        zStackBeginField.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusLost(java.awt.event.FocusEvent evt) {
-                zStackBeginFieldFocusLost(evt);
-            }
-        });
-
-        zStackEndField.setText("0.00");
-        zStackEndField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
-        zStackEndField.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusLost(java.awt.event.FocusEvent evt) {
-                zStackEndFieldFocusLost(evt);
-            }
-        });
-
         jLabel23.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel23.setText("Total Z Dist:");
 
@@ -3192,83 +3158,121 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         jLabel9.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel9.setText("um");
 
-        org.jdesktop.layout.GroupLayout jPanel1Layout = new org.jdesktop.layout.GroupLayout(jPanel1);
-        jPanel1.setLayout(jPanel1Layout);
-        jPanel1Layout.setHorizontalGroup(
-            jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(jPanel1Layout.createSequentialGroup()
+        zSlicesSpinner.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        zSlicesSpinner.setModel(new javax.swing.SpinnerNumberModel(1, 1, 999, 1));
+        zSlicesSpinner.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                zSlicesSpinnerStateChanged(evt);
+            }
+        });
+
+        zStepSizeField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.00"))));
+        zStepSizeField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        zStepSizeField.addPropertyChangeListener(new java.beans.PropertyChangeListener() {
+            public void propertyChange(java.beans.PropertyChangeEvent evt) {
+                zStepSizeFieldPropertyChange(evt);
+            }
+        });
+
+        zStackBeginField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.00"))));
+        zStackBeginField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        zStackBeginField.addPropertyChangeListener(new java.beans.PropertyChangeListener() {
+            public void propertyChange(java.beans.PropertyChangeEvent evt) {
+                zStackBeginFieldPropertyChange(evt);
+            }
+        });
+
+        zStackEndField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.00"))));
+        zStackEndField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        zStackEndField.addPropertyChangeListener(new java.beans.PropertyChangeListener() {
+            public void propertyChange(java.beans.PropertyChangeEvent evt) {
+                zStackEndFieldPropertyChange(evt);
+            }
+        });
+
+        org.jdesktop.layout.GroupLayout zStackPanelLayout = new org.jdesktop.layout.GroupLayout(zStackPanel);
+        zStackPanel.setLayout(zStackPanelLayout);
+        zStackPanelLayout.setHorizontalGroup(
+            zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(zStackPanelLayout.createSequentialGroup()
                 .add(6, 6, 6)
-                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jPanel1Layout.createSequentialGroup()
-                        .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                            .add(jPanel1Layout.createSequentialGroup()
-                                .add(1, 1, 1)
-                                .add(reverseButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 101, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                            .add(jPanel1Layout.createSequentialGroup()
-                                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                                    .add(jPanel1Layout.createSequentialGroup()
+                .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(zStackPanelLayout.createSequentialGroup()
+                        .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                            .add(zStackPanelLayout.createSequentialGroup()
+                                .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                                    .add(zStackPanelLayout.createSequentialGroup()
                                         .add(9, 9, 9)
                                         .add(jLabel20))
                                     .add(jLabel19))
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                                    .add(zStackBeginField)
-                                    .add(zStackEndField))))
+                                .add(6, 6, 6)
+                                .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                                    .add(zStackEndField)
+                                    .add(zStackBeginField)))
+                            .add(zStackPanelLayout.createSequentialGroup()
+                                .add(1, 1, 1)
+                                .add(reverseButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 101, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
                         .add(6, 6, 6)
-                        .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                            .add(jPanel1Layout.createSequentialGroup()
-                                .add(jLabel23)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                                .add(zStackTotalDistLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 69, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                            .add(jPanel1Layout.createSequentialGroup()
-                                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
+                        .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
+                                .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
                                     .add(jLabel25, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 24, Short.MAX_VALUE)
                                     .add(jLabel26, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                                .add(18, 18, 18)
-                                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                                    .add(jLabel21)
-                                    .add(jLabel22))
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                                    .add(zStackSlicesField, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 77, Short.MAX_VALUE)
-                                    .add(zStackStepSizeField))))
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                                .add(12, 12, 12)
+                                .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
+                                    .add(zStackPanelLayout.createSequentialGroup()
+                                        .add(jLabel21)
+                                        .add(6, 6, 6))
+                                    .add(zStackPanelLayout.createSequentialGroup()
+                                        .add(jLabel22)
+                                        .add(6, 6, 6))))
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
+                                .add(jLabel23)
+                                .add(8, 8, 8)))
+                        .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                                .add(zSlicesSpinner)
+                                .add(zStepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE))
+                            .add(zStackTotalDistLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 69, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                        .add(6, 6, 6)
+                        .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(jLabel24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(jLabel9)))
                     .add(zStackCenteredCheckBox))
-                .addContainerGap(18, Short.MAX_VALUE))
+                .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
-        jPanel1Layout.setVerticalGroup(
-            jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel1Layout.createSequentialGroup()
+        zStackPanelLayout.setVerticalGroup(
+            zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
                 .add(0, 0, 0)
                 .add(zStackCenteredCheckBox)
-                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(zStackBeginField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel25, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(jLabel19)
                     .add(jLabel21, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 16, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(zStackSlicesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(zSlicesSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(zStackBeginField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .add(2, 2, 2)
-                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jLabel26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 14, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                        .add(zStackEndField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .add(jLabel20)
-                        .add(jLabel22)
-                        .add(zStackStepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .add(jLabel24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
-                .add(2, 2, 2)
-                .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel23)
-                    .add(zStackTotalDistLabel)
-                    .add(reverseButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 14, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(jLabel9))
+                .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(zStackPanelLayout.createSequentialGroup()
+                        .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, jLabel26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 14, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                                .add(jLabel20)
+                                .add(jLabel22)
+                                .add(jLabel24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .add(zStackEndField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                        .add(2, 2, 2)
+                        .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                            .add(jLabel23)
+                            .add(zStackTotalDistLabel)
+                            .add(reverseButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 14, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(jLabel9)))
+                    .add(zStepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .add(143, 143, 143))
         );
 
-        acqModePane.addTab("Z-Stack", jPanel1);
+        acqModePane.addTab("Z-Stack", zStackPanel);
 
         jLabel13.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel13.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
@@ -4271,7 +4275,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 //        experimentName=acqSetting.getName();
         SequenceSettings settings = new SequenceSettings();
 
-        try {
+//        try {
 //            StrVector availableChannels = core.getAvailableConfigs(channelGroupStr);
             if (acqSetting.getChannelGroupStr()==null || acqSetting.getChannelGroupStr().equals("")) {
                 String chGroupStr=MMCoreUtils.loadAvailableChannelConfigs(this,"", core);
@@ -4292,10 +4296,15 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             settings.numFrames = timelapseCheckBox.isSelected() ? acqSetting.getFrames() : 1;
             settings.slices = new ArrayList<Double>();
             if (zStackCheckBox.isSelected()) {
-                double z = NumberUtils.displayStringToDouble(zStackBeginField.getText());
+         //       double z = NumberUtils.displayStringToDouble(zStackBeginField_Old.getText());
+                double z = acqSetting.getZBegin();
                 for (int i = 0; i < acqSetting.getZSlices(); i++) {
                     settings.slices.add(z);
-                    z += acqSetting.getZStepSize();
+                    if (acqSetting.getZBegin() < acqSetting.getZEnd()) {
+                        z += acqSetting.getZStepSize();
+                    } else {
+                        z -= acqSetting.getZStepSize();
+                    }
                 }
             } else {
                 settings.slices.add(new Double(0));
@@ -4329,10 +4338,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             settings.prefix = acqSetting.getName();
             settings.root = imageDestPath;
 //            IJ.log("AcqFrame.createMDASettings: imageDestPath"+imageDestPath);
-        } catch (ParseException p) {
+/*        } catch (ParseException p) {
             ReportingUtils.showError(p);
             return null;
-        }
+        }*/
         return settings;
     }
     
@@ -7556,135 +7565,35 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         /*        if (acqSettings!=null && acqSettings.size()>0) {
             AcqSetting setting=acqSettings.get(cAcqSettingIdx);*/
             if (currentAcqSetting != null) {
-                String tmpStr = zStackBeginField.getText();
-                zStackBeginField.setText(zStackEndField.getText());
-                zStackEndField.setText(tmpStr);
-                double temp = currentAcqSetting.getZBegin();
+                double tmp = currentAcqSetting.getZBegin();
                 currentAcqSetting.setZBegin(currentAcqSetting.getZEnd());
-                currentAcqSetting.setZEnd(temp);
+                currentAcqSetting.setZEnd(tmp);
+                zStackBeginField.setValue(currentAcqSetting.getZBegin());
+                zStackEndField.setValue(currentAcqSetting.getZEnd());
             }
     }//GEN-LAST:event_reverseButtonActionPerformed
 
-    private void zStackEndFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_zStackEndFieldFocusLost
-        String s = zStackEndField.getText();
-        if (s.isEmpty()) {
-            s = "0";
-        }
-        DecimalFormat df = new DecimalFormat("0.00");
-        double nr = Double.parseDouble(s);
-        zStackEndField.setText(df.format(nr));
-        /*        if (acqSettings!=null && acqSettings.size()>0) {
-            AcqSetting setting=acqSettings.get(cAcqSettingIdx);*/
-            if (currentAcqSetting != null) {
-                currentAcqSetting.setZEnd(nr);
-                int slices = currentAcqSetting.getZSlices();
-                if (currentAcqSetting.getZSlices() != 1) {
-                    double zStep = Math.abs(currentAcqSetting.getZBegin() - nr) / slices;
-                    zStackStepSizeField.setText(df.format(zStep));
-                    zStackTotalDistLabel.setText(df.format(Math.abs(nr - currentAcqSetting.getZBegin()))+" um");
-                } else {
-                    zStackTotalDistLabel.setText(df.format(0)+" um");
-                }
-            }
-    }//GEN-LAST:event_zStackEndFieldFocusLost
-
-    private void zStackBeginFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_zStackBeginFieldFocusLost
-        String s = zStackBeginField.getText();
-        if (s.isEmpty()) {
-            s = "0";
-        }
-        double nr = Double.parseDouble(s);
-        DecimalFormat df = new DecimalFormat("0.00");
-        zStackBeginField.setText(df.format(nr));
-        /*        if (acqSettings!=null && acqSettings.size()>0) {
-            AcqSetting setting=acqSettings.get(cAcqSettingIdx);*/
-            if (currentAcqSetting != null) {
-                currentAcqSetting.setZBegin(nr);
-                int slices = currentAcqSetting.getZSlices();
-                if (currentAcqSetting.getZSlices() != 1) {
-                    double zStep = Math.abs(currentAcqSetting.getZEnd() - nr) / slices;
-                    zStackStepSizeField.setText(df.format(zStep));
-                    zStackTotalDistLabel.setText(df.format(Math.abs(nr - currentAcqSetting.getZBegin()))+" um");
-                } else {
-                    zStackTotalDistLabel.setText(df.format(0)+" um");
-                }
-            }
-    }//GEN-LAST:event_zStackBeginFieldFocusLost
-
-    private void zStackStepSizeFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_zStackStepSizeFieldFocusLost
-        String stepSizeStr = zStackStepSizeField.getText();
-        if (stepSizeStr.isEmpty()) {
-            stepSizeStr = "0";
-        }
-        double stepSize = Double.parseDouble(stepSizeStr);
-        DecimalFormat df = new DecimalFormat("0.00");
-        zStackStepSizeField.setValue(df.format(stepSize));
-        //        if (stepSize<=0) {
-            //            JOptionPane.showMessageDialog(null, "Error: Please enter a number bigger than 0", "Error Message", JOptionPane.ERROR_MESSAGE);
-            //            zStackStepSizeField.requestFocus();
-            //        } else {
-            /*            if (acqSettings!=null && acqSettings.size()>0) {
-                AcqSetting setting = acqSettings.get(cAcqSettingIdx);*/
-                if (currentAcqSetting != null) {
-                    currentAcqSetting.setZStepSize(stepSize);
-                    if (zStackCenteredCheckBox.isSelected()) {
-                        calculateTotalZDist(currentAcqSetting);
-                    } else {
-                        currentAcqSetting.setZSlices((int) Math.abs(Math.round(currentAcqSetting.getZBegin() - currentAcqSetting.getZEnd()) / currentAcqSetting.getZStepSize()) + 1);
-                        zStackSlicesField.setValue(Integer.toString(currentAcqSetting.getZSlices()));
-                        //                zStackSlicesField.setValue(Integer.toString(zStackSlices));
-                        //                    calculateTotalZDist(setting);
-                    }
-                    zStackTotalDistLabel.setText(df.format(currentAcqSetting.getZBegin() - currentAcqSetting.getZEnd())+" um");
-                }
-                //        }
-    }//GEN-LAST:event_zStackStepSizeFieldFocusLost
-
-    private void zStackSlicesFieldPropertyChange(java.beans.PropertyChangeEvent evt) {//GEN-FIRST:event_zStackSlicesFieldPropertyChange
-        //IJ.showMessage("zStackSlicesFieldPropertyChange");
-    }//GEN-LAST:event_zStackSlicesFieldPropertyChange
-
-    private void zStackSlicesFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_zStackSlicesFieldFocusLost
-        String sliceStr = zStackSlicesField.getText();
-        if (sliceStr.isEmpty()) {
-            sliceStr = "1";
-        }
-        int slices = Integer.parseInt(sliceStr);
-        if (slices <= 0) {
-            JOptionPane.showMessageDialog(null, "Error: Please enter a number larger than 0", "Error Message", JOptionPane.ERROR_MESSAGE);
-            //            AcqSetting setting = acqSettings.get(cAcqSettingIdx);
-            currentAcqSetting.setZSlices(1);
-            zStackSlicesField.setText(Integer.toString(currentAcqSetting.getZSlices()));
-            zStackSlicesField.requestFocus();
-        } else {
-            /*            if (acqSettings!=null && acqSettings.size()>0) {
-                AcqSetting setting = acqSettings.get(cAcqSettingIdx);*/
-                if (currentAcqSetting != null) {
-                    DecimalFormat df = new DecimalFormat("0.00");
-                    currentAcqSetting.setZSlices(slices);
-                    if (zStackCenteredCheckBox.isSelected()) {
-                        calculateTotalZDist(currentAcqSetting);
-                    } else {
-                        if (slices > 1) {
-                            double stepSize = Math.abs((currentAcqSetting.getZBegin() - currentAcqSetting.getZEnd())) / (currentAcqSetting.getZSlices() - 1);
-                            currentAcqSetting.setZStepSize(stepSize);
-                            zStackStepSizeField.setValue(df.format(stepSize));
-                            //calculateTotalZDist(setting);
-                        } else {
-                            zStackTotalDistLabel.setText(df.format(0)+" um");
-                        }
-                        //                zStackStepSizeField.setValue(Double.toString(zStackStepSize));
-                    }
-                }
-            }
-    }//GEN-LAST:event_zStackSlicesFieldFocusLost
-
     private void zStackCenteredCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_zStackCenteredCheckBoxActionPerformed
-        //        if (acqSettings!=null && acqSettings.size()>0) {
-            if (currentAcqSetting != null) {
-                currentAcqSetting.enableZStackCentered(zStackCenteredCheckBox.isSelected());
+        IJ.log(this.getClass().getName()+":.zStackCenteredCheckBoxActionPerformed");
+        zStackBeginField.setEnabled(!zStackCenteredCheckBox.isSelected());
+        zStackEndField.setEnabled(!zStackCenteredCheckBox.isSelected());
+        if (currentAcqSetting != null) {
+            if (zStackCenteredCheckBox.isSelected()) {
+                double dist=currentAcqSetting.getZStepSize()*(currentAcqSetting.getZSlices()-1);
+                if (currentAcqSetting.getZBegin()< currentAcqSetting.getZEnd()) {
+                    currentAcqSetting.setZBegin(-dist/2);
+                    currentAcqSetting.setZEnd(dist/2);
+                    zStackBeginField.setValue(-dist/2);
+                    zStackEndField.setValue(dist/2);
+                } else {
+                    currentAcqSetting.setZBegin(+dist/2);
+                    currentAcqSetting.setZEnd(-dist/2);
+                    zStackBeginField.setValue(dist/2);
+                    zStackEndField.setValue(-dist/2);
+                }    
             }
-            enableZStackBeginAndEndPos(!zStackCenteredCheckBox.isSelected());
+            currentAcqSetting.enableZStackCentered(zStackCenteredCheckBox.isSelected());
+        }
     }//GEN-LAST:event_zStackCenteredCheckBoxActionPerformed
 
     private void zStackCenteredCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_zStackCenteredCheckBoxItemStateChanged
@@ -7950,6 +7859,121 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }//GEN-LAST:event_closeGapsButtonActionPerformed
 
+    private void zStepSizeFieldPropertyChange(java.beans.PropertyChangeEvent evt) {//GEN-FIRST:event_zStepSizeFieldPropertyChange
+        IJ.log("zStepSizeFieldPropertyChange: ");
+        if (currentAcqSetting!=null) {
+            currentAcqSetting.setZStepSize(((Number)zStepSizeField.getValue()).doubleValue());
+            double begin=currentAcqSetting.getZBegin();
+            double end=currentAcqSetting.getZEnd();
+            if (!zStackCenteredCheckBox.isSelected()) {
+                IJ.log("not centered");
+                if (currentAcqSetting.getZStepSize()==0) {
+                    currentAcqSetting.setZStepSize(1);
+                }
+                currentAcqSetting.setZSlices((int) Math.abs(Math.round(end - begin) / currentAcqSetting.getZStepSize()) + 1);
+                double olddist=end-begin;
+                double newdist=Math.abs((currentAcqSetting.getZSlices()-1)*currentAcqSetting.getZStepSize());
+                IJ.log("olddist: "+olddist+"; newdist: "+newdist);
+                if (olddist > 0) {
+                    currentAcqSetting.setZBegin(currentAcqSetting.getZBegin()+(olddist-newdist)/2);
+                    currentAcqSetting.setZEnd(currentAcqSetting.getZEnd()-(olddist-newdist)/2);
+                } else {
+                    currentAcqSetting.setZBegin(currentAcqSetting.getZBegin()-(Math.abs(olddist)-newdist)/2);
+                    currentAcqSetting.setZEnd(currentAcqSetting.getZEnd()+(Math.abs(olddist)-newdist)/2);
+                }
+                /*                if (currentAcqSetting.getZBegin() < currentAcqSetting.getZEnd()) {
+                    currentAcqSetting.setZBegin(newdist!=0 ? -newdist/2 : 0);
+                    currentAcqSetting.setZEnd(newdist!=0 ? newdist/2 : 0);                    
+                } else {
+                    currentAcqSetting.setZBegin(newdist!=0 ? newdist/2 : 0);
+                    currentAcqSetting.setZEnd(newdist!=0 ? -newdist/2 : 0);                    
+                }*/
+                zStackBeginField.setValue(currentAcqSetting.getZBegin());
+                zStackEndField.setValue(currentAcqSetting.getZEnd());
+                zStackTotalDistLabel.setText(String.format("%1$,.2f", newdist));
+                zSlicesSpinner.setValue(currentAcqSetting.getZSlices());
+            } else {
+                IJ.log("centered");
+                double newdist=Math.abs((currentAcqSetting.getZSlices()-1)*currentAcqSetting.getZStepSize());
+                if (currentAcqSetting.getZBegin() < currentAcqSetting.getZEnd()) {
+                    currentAcqSetting.setZBegin(newdist!=0 ? -newdist/2 : 0);
+                    currentAcqSetting.setZEnd(newdist!=0 ? newdist/2 : 0);                    
+                } else {
+                    currentAcqSetting.setZBegin(newdist!=0 ? newdist/2 : 0);
+                    currentAcqSetting.setZEnd(newdist!=0 ? -newdist/2 : 0);                    
+                }
+                zStackBeginField.setValue(currentAcqSetting.getZBegin());
+                zStackEndField.setValue(currentAcqSetting.getZEnd());
+//                zStackBeginField.repaint();
+//                zStackEndField.repaint();                
+                zStackTotalDistLabel.setText(String.format("%1$,.2f", newdist));
+            }
+        }
+    }//GEN-LAST:event_zStepSizeFieldPropertyChange
+
+    private void zSlicesSpinnerStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_zSlicesSpinnerStateChanged
+//        IJ.log("zSlicesSpinnerStateChanged: ");
+        if (currentAcqSetting!=null) {
+            currentAcqSetting.setZSlices((Integer)zSlicesSpinner.getValue());
+            double newdist;
+            if (!zStackCenteredCheckBox.isSelected()) {
+                int currentSlices=currentAcqSetting.getZSlices();
+                double stepSize;
+                if (currentSlices > 1) {
+                    stepSize=Math.abs(currentAcqSetting.getZEnd()-currentAcqSetting.getZBegin()) / (currentSlices-1);
+                    currentAcqSetting.setZStepSize(stepSize);
+                    zStepSizeField.setValue(stepSize);
+                    zStepSizeField.repaint();
+                } else {
+//                    stepSize=stepSize;
+                }    
+                newdist=Math.abs((currentAcqSetting.getZSlices()-1)*currentAcqSetting.getZStepSize());
+            } else {
+                newdist=Math.abs((currentAcqSetting.getZSlices()-1)*currentAcqSetting.getZStepSize());
+                if (currentAcqSetting.getZBegin() < currentAcqSetting.getZEnd()) {
+                    currentAcqSetting.setZBegin(newdist!=0 ? -newdist/2 : 0);
+                    currentAcqSetting.setZEnd(newdist!=0 ? newdist/2 : 0);                    
+                } else {
+                    currentAcqSetting.setZBegin(newdist!=0 ? newdist/2 : 0);
+                    currentAcqSetting.setZEnd(newdist!=0 ? -newdist/2 : 0);                    
+                }
+                zStackBeginField.setValue(currentAcqSetting.getZBegin());
+                zStackEndField.setValue(currentAcqSetting.getZEnd());
+                zStackBeginField.repaint();
+                zStackEndField.repaint();
+            }
+            zStackTotalDistLabel.setText(String.format("%1$,.2f", newdist));
+//            zStackPanel.revalidate();
+//            zStackPanel.repaint();
+        }
+    }//GEN-LAST:event_zSlicesSpinnerStateChanged
+
+    private void zStackBeginFieldPropertyChange(java.beans.PropertyChangeEvent evt) {//GEN-FIRST:event_zStackBeginFieldPropertyChange
+        if (currentAcqSetting!=null) {
+            currentAcqSetting.setZBegin(((Number)zStackBeginField.getValue()).doubleValue());
+            double newdist=Math.abs(currentAcqSetting.getZEnd()-currentAcqSetting.getZBegin());
+            if (currentAcqSetting.getZSlices() > 1) {
+                double stepSize=newdist / (currentAcqSetting.getZSlices()-1);
+                currentAcqSetting.setZStepSize(stepSize);
+                zStepSizeField.setValue(stepSize);
+            }
+            zStackTotalDistLabel.setText(String.format("%1$,.2f", newdist));
+        }
+    }//GEN-LAST:event_zStackBeginFieldPropertyChange
+
+    private void zStackEndFieldPropertyChange(java.beans.PropertyChangeEvent evt) {//GEN-FIRST:event_zStackEndFieldPropertyChange
+        if (currentAcqSetting!=null) {
+            currentAcqSetting.setZEnd(((Number)zStackEndField.getValue()).doubleValue());
+            double newdist=Math.abs(currentAcqSetting.getZEnd()-currentAcqSetting.getZBegin());
+            if (currentAcqSetting.getZSlices() > 1) {
+                double stepSize=newdist / (currentAcqSetting.getZSlices()-1);
+                currentAcqSetting.setZStepSize(stepSize);
+                zStepSizeField.setValue(stepSize);
+            }
+            zStackTotalDistLabel.setText(String.format("%1$,.2f", newdist));
+        }
+    }//GEN-LAST:event_zStackEndFieldPropertyChange
+
     private String getExtension(File f) {
         return f.getName().substring(f.getName().lastIndexOf("."));
     }
@@ -8139,7 +8163,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JLabel jLabel7;
     private javax.swing.JLabel jLabel8;
     private javax.swing.JLabel jLabel9;
-    private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel10;
     private javax.swing.JPanel jPanel11;
     private javax.swing.JPanel jPanel2;
@@ -8200,13 +8223,14 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JLabel totalAreasLabel;
     private javax.swing.JLabel totalTilesLabel;
     private javax.swing.JButton zOffsetButton;
+    private javax.swing.JSpinner zSlicesSpinner;
     private javax.swing.JFormattedTextField zStackBeginField;
     private javax.swing.JCheckBox zStackCenteredCheckBox;
     private javax.swing.JCheckBox zStackCheckBox;
     private javax.swing.JFormattedTextField zStackEndField;
-    private javax.swing.JFormattedTextField zStackSlicesField;
-    private javax.swing.JFormattedTextField zStackStepSizeField;
+    private javax.swing.JPanel zStackPanel;
     private javax.swing.JLabel zStackTotalDistLabel;
+    private javax.swing.JFormattedTextField zStepSizeField;
     private javax.swing.JToggleButton zoomButton;
     // End of variables declaration//GEN-END:variables
 
@@ -8527,10 +8551,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         enableTimelapsePane(setting.isTimelapse());
         initializeChannelTable(setting);
         zStackCenteredCheckBox.setSelected(setting.isZStackCentered());
-        zStackBeginField.setText(Double.toString(setting.getZBegin()));
-        zStackEndField.setText(Double.toString(setting.getZEnd()));
-        zStackStepSizeField.setText(Double.toString(setting.getZStepSize()));
-        zStackSlicesField.setText(Integer.toString(setting.getZSlices()));
+        zStackBeginField.setValue(setting.getZBegin());
+        zStackEndField.setValue(setting.getZEnd());
+        zStepSizeField.setValue(setting.getZStepSize());
+        zSlicesSpinner.setValue(setting.getZSlices());
         intHourField.setText(Integer.toString(setting.getHoursInterval()));
         intMinField.setText(Integer.toString(setting.getMinutesInterval()));
         intSecField.setText(Integer.toString(setting.getSecondsInterval()));
@@ -8806,7 +8830,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 }
             }
             if (zStackCenteredCheckBox.isSelected()) {
-                enableZStackBeginAndEndPos(false);
+                zStackBeginField.setEnabled(false);
+                zStackEndField.setEnabled(false);
             }
         }
     }
@@ -8824,11 +8849,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }
 
-    private void enableZStackBeginAndEndPos(boolean enable) {
-        zStackBeginField.setEnabled(enable);
-        zStackEndField.setEnabled(enable);
-    }
-
     private void calculateTotalZDist(AcqSetting setting) {
         double zTotalDist;
         DecimalFormat df = new DecimalFormat("0.00");
@@ -8836,8 +8856,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             zTotalDist = setting.getZStepSize() * (setting.getZSlices() - 1);
             setting.setZBegin(-zTotalDist / 2);
             setting.setZEnd(zTotalDist / 2);
-            zStackBeginField.setText(df.format(setting.getZBegin()));
-            zStackEndField.setText(df.format(setting.getZEnd()));
+            zStackBeginField.setValue(setting.getZBegin());
+            zStackEndField.setValue(setting.getZEnd());
         } else {
             zTotalDist = Math.abs(setting.getZEnd() - setting.getZBegin());
         }
