@@ -23,6 +23,7 @@ import ij.ImagePlus;
 import ij.ImageStack;
 import ij.Prefs;
 import ij.gui.GenericDialog;
+import ij.gui.ImageWindow;
 import ij.measure.Calibration;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
@@ -34,6 +35,7 @@ import java.awt.Container;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -89,6 +91,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.AbstractCellEditor;
 import javax.swing.BorderFactory;
+import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.DefaultCellEditor;
@@ -1061,6 +1064,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     final Object pixel = lastImage.pix;
                     ImageProcessor ip = Utils.createImageProcessor(lastImage);
                     if (ip!=null) {
+                        boolean newWindow=false;
                         ImagePlus imp=null;
                         try {
                             int index = metadata.getInt(MMTags.Image.CHANNEL_INDEX);
@@ -1072,9 +1076,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                 cal.pixelWidth = pixelSize;
                                 cal.pixelHeight = pixelSize;                
                                 imp.setCalibration(cal);
-
-                            } else
+                                newWindow=true;
+                            } else {
                                 imp = impList.get(index);
+                                newWindow=false;
+                            }    
                             JSONArray color=metadata.getJSONObject(MMTags.Root.SUMMARY).getJSONArray(MMTags.Summary.COLORS);
                             if (color!=null)
                                 ip.setLut(LUT.createLutFromColor(new Color(color.getInt(index))));
@@ -1089,6 +1095,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                             IJ.log("DisplayUpdater.process: JSONException - cannot parse image title");
                         }
                         imp.show();
+/*                        ImageWindow window=imp.getWindow();
+                        if (window!=null && newWindow) {
+                            window.setSize((int)window.getSize().getWidth()/2,(int)window.getSize().getHeight()/2);
+                            imp.getCanvas().fitToWindow();
+                        }*/
                     }
                 }
             }
@@ -2065,6 +2076,23 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         IJ.log("before initComponents");
         initComponents();
         IJ.log("after initComponents");
+        InputVerifier doubleVerifier = new InputVerifier() {
+
+            @Override
+            public boolean verify(JComponent input) {
+                if (input instanceof JFormattedTextField) {
+                    return ((JFormattedTextField)input).isEditValid();
+                } else {
+                    return true;
+                }
+                
+            }
+        };
+        zStackBeginField.setInputVerifier(doubleVerifier);
+        zStackEndField.setInputVerifier(doubleVerifier);
+        zStepSizeField.setInputVerifier(doubleVerifier);
+        zSlicesSpinner.setInputVerifier(doubleVerifier);
+        
         
         JMenuBar menubar = new JMenuBar();
         
@@ -3166,7 +3194,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
-        zStepSizeField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.00"))));
+        zStepSizeField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.000"))));
         zStepSizeField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         zStepSizeField.addPropertyChangeListener(new java.beans.PropertyChangeListener() {
             public void propertyChange(java.beans.PropertyChangeEvent evt) {
@@ -3174,7 +3202,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
-        zStackBeginField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.00"))));
+        zStackBeginField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.000"))));
         zStackBeginField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         zStackBeginField.addPropertyChangeListener(new java.beans.PropertyChangeListener() {
             public void propertyChange(java.beans.PropertyChangeEvent evt) {
@@ -3182,7 +3210,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
-        zStackEndField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.00"))));
+        zStackEndField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.000"))));
         zStackEndField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         zStackEndField.addPropertyChangeListener(new java.beans.PropertyChangeListener() {
             public void propertyChange(java.beans.PropertyChangeEvent evt) {
@@ -3220,12 +3248,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                     .add(jLabel26, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                                 .add(12, 12, 12)
                                 .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                                    .add(zStackPanelLayout.createSequentialGroup()
-                                        .add(jLabel21)
-                                        .add(6, 6, 6))
-                                    .add(zStackPanelLayout.createSequentialGroup()
-                                        .add(jLabel22)
-                                        .add(6, 6, 6))))
+                                    .add(jLabel21)
+                                    .add(jLabel22))
+                                .add(6, 6, 6))
                             .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
                                 .add(jLabel23)
                                 .add(8, 8, 8)))
@@ -4852,10 +4877,23 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 @Override
                 public void run() {
                     final JFrame frame=new JFrame(currentAcqSetting.getName());
-                    frame.setPreferredSize(new Dimension(300,200));
-                    final JLabel label=new JLabel("Status:");
-                    frame.getContentPane().add(label);
+                    frame.setPreferredSize(new Dimension(500,200));
+                    frame.setResizable(false);
+                    
+                    JLabel label=new JLabel("Status:");
+                    final JLabel msgLabel=new JLabel("");
+                                        
+                    JPanel panel = new JPanel();
+                    panel.setLayout(new BoxLayout(panel, BoxLayout.LINE_AXIS));
+                    panel.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
+                    panel.add(label);
+                    panel.add(Box.createRigidArea(new Dimension(10, 0)));
+                    panel.add(msgLabel);
+                    panel.add(Box.createHorizontalGlue());
+
+                    frame.getContentPane().add(panel);
                     frame.pack();
+                    frame.setLocationRelativeTo(null);
                     frame.setVisible(true);
                            
                     SwingWorker<Void, String> worker = new SwingWorker<Void, String>() {
@@ -4898,7 +4936,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         @Override
                         protected void process(List<String> chunks) {
                             String msg=chunks.get(chunks.size()-1);
-                            label.setText("Status: "+msg);
+                            msgLabel.setText(msg);
                         }
 
                         @Override
@@ -7890,7 +7928,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 }*/
                 zStackBeginField.setValue(currentAcqSetting.getZBegin());
                 zStackEndField.setValue(currentAcqSetting.getZEnd());
-                zStackTotalDistLabel.setText(String.format("%1$,.2f", newdist));
+                zStackTotalDistLabel.setText(String.format("%1$,.3f", newdist));
                 zSlicesSpinner.setValue(currentAcqSetting.getZSlices());
             } else {
                 IJ.log("centered");
@@ -7906,7 +7944,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 zStackEndField.setValue(currentAcqSetting.getZEnd());
 //                zStackBeginField.repaint();
 //                zStackEndField.repaint();                
-                zStackTotalDistLabel.setText(String.format("%1$,.2f", newdist));
+                zStackTotalDistLabel.setText(String.format("%1$,.3f", newdist));
             }
         }
     }//GEN-LAST:event_zStepSizeFieldPropertyChange
@@ -7942,7 +7980,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 zStackBeginField.repaint();
                 zStackEndField.repaint();
             }
-            zStackTotalDistLabel.setText(String.format("%1$,.2f", newdist));
+            zStackTotalDistLabel.setText(String.format("%1$,.3f", newdist));
 //            zStackPanel.revalidate();
 //            zStackPanel.repaint();
         }
@@ -7957,7 +7995,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 currentAcqSetting.setZStepSize(stepSize);
                 zStepSizeField.setValue(stepSize);
             }
-            zStackTotalDistLabel.setText(String.format("%1$,.2f", newdist));
+            zStackTotalDistLabel.setText(String.format("%1$,.3f", newdist));
         }
     }//GEN-LAST:event_zStackBeginFieldPropertyChange
 
@@ -7970,7 +8008,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 currentAcqSetting.setZStepSize(stepSize);
                 zStepSizeField.setValue(stepSize);
             }
-            zStackTotalDistLabel.setText(String.format("%1$,.2f", newdist));
+            zStackTotalDistLabel.setText(String.format("%1$,.3f", newdist));
         }
     }//GEN-LAST:event_zStackEndFieldPropertyChange
 
@@ -8649,7 +8687,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
             ((LayoutPanel) acqLayoutPanel).setAcqSetting(currentAcqSetting, true);
             updateAcqSettingTab(currentAcqSetting);
-            calculateTotalZDist(currentAcqSetting);
+//            calculateTotalZDist(currentAcqSetting);
             calculateDuration(currentAcqSetting);
         }    
         //set active layout
@@ -8848,7 +8886,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         }
     }
-
+/*
     private void calculateTotalZDist(AcqSetting setting) {
         double zTotalDist;
         DecimalFormat df = new DecimalFormat("0.00");
@@ -8863,7 +8901,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
         zStackTotalDistLabel.setText(df.format(zTotalDist)+" um");
     }
-
+*/
     boolean isInChannelList(String s, List<String> list) {
         boolean b = false;
         if (list != null) //            for (int i=0; i<list.size(); i++) {
