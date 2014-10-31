@@ -2073,9 +2073,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         mergeAreasMode = false;
 
         instrumentOnline = false; //to ensure that during gui initialization instrument does not respond 
-        IJ.log("before initComponents");
         initComponents();
-        IJ.log("after initComponents");
         InputVerifier doubleVerifier = new InputVerifier() {
 
             @Override
@@ -2214,6 +2212,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         
         loadPreferences();
         loadAvailableObjectiveLabels();
+        
         //load last settings
         expSettingsFile = new File(Prefs.getHomeDir(),"LastExpSettings.txt");
         loadExpSettings(expSettingsFile, true);
@@ -2235,6 +2234,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
 
         //initialize and start stage and live-mode monitors
+        //refresh every 100ms
         stageMonitor = new StagePosMonitor(gui,100);
         stageMonitor.addListener(this);
         stageMonitor.addListener((LayoutPanel)acqLayoutPanel);
@@ -7898,20 +7898,18 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }//GEN-LAST:event_closeGapsButtonActionPerformed
 
     private void zStepSizeFieldPropertyChange(java.beans.PropertyChangeEvent evt) {//GEN-FIRST:event_zStepSizeFieldPropertyChange
-        IJ.log("zStepSizeFieldPropertyChange: ");
         if (currentAcqSetting!=null) {
             currentAcqSetting.setZStepSize(((Number)zStepSizeField.getValue()).doubleValue());
             double begin=currentAcqSetting.getZBegin();
             double end=currentAcqSetting.getZEnd();
+            double newdist;
             if (!zStackCenteredCheckBox.isSelected()) {
-                IJ.log("not centered");
                 if (currentAcqSetting.getZStepSize()==0) {
                     currentAcqSetting.setZStepSize(1);
                 }
                 currentAcqSetting.setZSlices((int) Math.abs(Math.round(end - begin) / currentAcqSetting.getZStepSize()) + 1);
                 double olddist=end-begin;
-                double newdist=Math.abs((currentAcqSetting.getZSlices()-1)*currentAcqSetting.getZStepSize());
-                IJ.log("olddist: "+olddist+"; newdist: "+newdist);
+                newdist=Math.abs((currentAcqSetting.getZSlices()-1)*currentAcqSetting.getZStepSize());
                 if (olddist > 0) {
                     currentAcqSetting.setZBegin(currentAcqSetting.getZBegin()+(olddist-newdist)/2);
                     currentAcqSetting.setZEnd(currentAcqSetting.getZEnd()-(olddist-newdist)/2);
@@ -7919,20 +7917,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     currentAcqSetting.setZBegin(currentAcqSetting.getZBegin()-(Math.abs(olddist)-newdist)/2);
                     currentAcqSetting.setZEnd(currentAcqSetting.getZEnd()+(Math.abs(olddist)-newdist)/2);
                 }
-                /*                if (currentAcqSetting.getZBegin() < currentAcqSetting.getZEnd()) {
-                    currentAcqSetting.setZBegin(newdist!=0 ? -newdist/2 : 0);
-                    currentAcqSetting.setZEnd(newdist!=0 ? newdist/2 : 0);                    
-                } else {
-                    currentAcqSetting.setZBegin(newdist!=0 ? newdist/2 : 0);
-                    currentAcqSetting.setZEnd(newdist!=0 ? -newdist/2 : 0);                    
-                }*/
                 zStackBeginField.setValue(currentAcqSetting.getZBegin());
                 zStackEndField.setValue(currentAcqSetting.getZEnd());
-                zStackTotalDistLabel.setText(String.format("%1$,.3f", newdist));
                 zSlicesSpinner.setValue(currentAcqSetting.getZSlices());
             } else {
-                IJ.log("centered");
-                double newdist=Math.abs((currentAcqSetting.getZSlices()-1)*currentAcqSetting.getZStepSize());
+                newdist=Math.abs((currentAcqSetting.getZSlices()-1)*currentAcqSetting.getZStepSize());
                 if (currentAcqSetting.getZBegin() < currentAcqSetting.getZEnd()) {
                     currentAcqSetting.setZBegin(newdist!=0 ? -newdist/2 : 0);
                     currentAcqSetting.setZEnd(newdist!=0 ? newdist/2 : 0);                    
@@ -7942,15 +7931,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 }
                 zStackBeginField.setValue(currentAcqSetting.getZBegin());
                 zStackEndField.setValue(currentAcqSetting.getZEnd());
-//                zStackBeginField.repaint();
-//                zStackEndField.repaint();                
-                zStackTotalDistLabel.setText(String.format("%1$,.3f", newdist));
             }
+            zStackTotalDistLabel.setText(String.format("%1$,.3f", newdist));
         }
     }//GEN-LAST:event_zStepSizeFieldPropertyChange
 
     private void zSlicesSpinnerStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_zSlicesSpinnerStateChanged
-//        IJ.log("zSlicesSpinnerStateChanged: ");
         if (currentAcqSetting!=null) {
             currentAcqSetting.setZSlices((Integer)zSlicesSpinner.getValue());
             double newdist;
@@ -7961,7 +7947,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     stepSize=Math.abs(currentAcqSetting.getZEnd()-currentAcqSetting.getZBegin()) / (currentSlices-1);
                     currentAcqSetting.setZStepSize(stepSize);
                     zStepSizeField.setValue(stepSize);
-                    zStepSizeField.repaint();
                 } else {
 //                    stepSize=stepSize;
                 }    
@@ -7977,12 +7962,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 }
                 zStackBeginField.setValue(currentAcqSetting.getZBegin());
                 zStackEndField.setValue(currentAcqSetting.getZEnd());
-                zStackBeginField.repaint();
-                zStackEndField.repaint();
             }
             zStackTotalDistLabel.setText(String.format("%1$,.3f", newdist));
-//            zStackPanel.revalidate();
-//            zStackPanel.repaint();
         }
     }//GEN-LAST:event_zSlicesSpinnerStateChanged
 
@@ -8584,7 +8565,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         acqOrderList.setSelectedItem(AcqSetting.ACQ_ORDER_LIST[setting.getAcqOrder()]);
         autofocusCheckBox.setSelected(setting.isAutofocus());
         zStackCheckBox.setSelected(setting.isZStack());
-        enableZStackPane(setting.isZStack());
         timelapseCheckBox.setSelected(setting.isTimelapse());
         enableTimelapsePane(setting.isTimelapse());
         initializeChannelTable(setting);
@@ -8593,6 +8573,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         zStackEndField.setValue(setting.getZEnd());
         zStepSizeField.setValue(setting.getZStepSize());
         zSlicesSpinner.setValue(setting.getZSlices());
+        enableZStackPane(setting.isZStack());
         intHourField.setText(Integer.toString(setting.getHoursInterval()));
         intMinField.setText(Integer.toString(setting.getMinutesInterval()));
         intSecField.setText(Integer.toString(setting.getSecondsInterval()));
@@ -8613,12 +8594,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }
     
     private void loadExpSettings(File file, boolean revertToDefault) {
-        IJ.log("Loading experiment setting: "+file.getAbsolutePath());
         List<AcqSetting> settings=null;
         AcquisitionLayout layout=null;
         if (!file.exists()) {
+            IJ.log("Loading experiment settings: "+file.getAbsolutePath() + " not found, creating default settings.");
             JOptionPane.showMessageDialog(this, "Experiment setting file "+file.getAbsolutePath()+" not found.");
         } else {   
+            IJ.log("Loading experiment settings: "+file.getAbsolutePath());
             try {
                 BufferedReader br=new BufferedReader(new FileReader(file));
                 StringBuilder sb=new StringBuilder();
@@ -8649,18 +8631,22 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }    
         if (layout==null) {
             if (revertToDefault) {
+                IJ.log("    Layout not found. Initializing with empty layout."); 
                 JOptionPane.showMessageDialog(this, "Last used layout definition could not be found or read!\n"
                         + "Creating default layout.");
                 layout=new AcquisitionLayout(null,null);//creates emptyLayout
             } else {
+                IJ.log("    Layout not found."); 
                 JOptionPane.showMessageDialog(this, "Last used layout definition could not be found or read!");                
             }    
+        } else {
+            IJ.log("    Layout loaded, file: "+layout.getName()); 
         }
-        IJ.log("    Layout loaded, file: "+layout.getName());
         if (settings==null || settings.size()==0) {
             JOptionPane.showMessageDialog(this,"Could not read acquisition settings from file '"+expSettingsFile.getName()+"'.");
             //set up a default acquisition setting
             if (revertToDefault) {
+                IJ.log("    Acquisition settings could not be loaded. Initializing default acquisition settings.");
                 settings = new ArrayList<AcqSetting>();
 //                AcqSetting setting = new AcqSetting("Seq_1", cCameraPixX, cCameraPixY, availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)), Integer.parseInt(binningOptions[0]), false);
                 FieldOfView fov=new FieldOfView(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel(),currentDetector.getFieldRotation());
@@ -8668,7 +8654,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 settings.add(setting);
                 expSettingsFile=new File(Prefs.getHomeDir(),"not found");
                 expSettingsFileLabel.setToolTipText("");    
-            } 
+            } else {
+                IJ.log("    Acquisition settings could not be loaded.");
+            }
         }
         IJ.log("    "+settings.size()+ " acquisition sequence(s) initialized.");
         if (settings!=null) {
@@ -8687,9 +8675,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
             ((LayoutPanel) acqLayoutPanel).setAcqSetting(currentAcqSetting, true);
             updateAcqSettingTab(currentAcqSetting);
-//            calculateTotalZDist(currentAcqSetting);
+            calculateTotalZDist(currentAcqSetting);
             calculateDuration(currentAcqSetting);
-        }    
+        } 
+        IJ.log("    GUI updated for sequence: "+currentAcqSetting.getName());
         //set active layout
         if (layout!=null) {
             acqLayout=layout;        
@@ -8724,8 +8713,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             ((LayoutPanel) acqLayoutPanel).calculateScale(r.width, r.height);
             areaTable.revalidate();
             areaTable.repaint();
-
         }
+        IJ.log("    Layout initialized and tiling updated for sequence: "+currentAcqSetting.getName());
         //try to select last used objective
         String selObjective = "";
         if (availableObjectives == null) {
@@ -8746,7 +8735,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         updatePixelSize(selObjective); //calls updateFOVDimension, updateTileOverlap, updateTileSizeLabel 
             
         calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), SELECTING_AREA);
-        IJ.log("Loading of experiment setting completed.");
+        IJ.log("Loading of experiment settings completed.");
     }    
     
  
@@ -8886,7 +8875,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         }
     }
-/*
+
     private void calculateTotalZDist(AcqSetting setting) {
         double zTotalDist;
         DecimalFormat df = new DecimalFormat("0.00");
@@ -8901,7 +8890,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
         zStackTotalDistLabel.setText(df.format(zTotalDist)+" um");
     }
-*/
+
+
     boolean isInChannelList(String s, List<String> list) {
         boolean b = false;
         if (list != null) //            for (int i=0; i<list.size(); i++) {
