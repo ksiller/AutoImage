@@ -4,7 +4,6 @@
  */
 package autoimage.dataprocessors;
 
-import autoimage.dataprocessors.BranchedProcessor;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,7 +28,7 @@ public class NoFilterSeqAnalyzer<E> extends BranchedProcessor<E>{
 
     //need to create copy?
     @Override
-    protected List<E> analyze(E element) {
+    protected List<E> processElement(E element) {
 /*        E modElement=null;
         if (element instanceof TaggedImage) {
             try {

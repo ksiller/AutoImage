@@ -10,9 +10,11 @@ import autoimage.dataprocessors.ImageTagFilter;
 import autoimage.dataprocessors.MultiChMultiZAnalyzer;
 import autoimage.dataprocessors.RoiFinder;
 import autoimage.dataprocessors.ScriptAnalyzer;
+import ij.IJ;
 import java.awt.Component;
 import java.util.EventObject;
 import javax.swing.Icon;
+import javax.swing.JComponent;
 import javax.swing.JTree;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
@@ -46,7 +48,7 @@ public class ProcessorTreeCellRenderer extends DefaultTreeCellRenderer {
             boolean sel, boolean expanded, 
             boolean leaf, int row, boolean hasFocus) {
         
-        super.getTreeCellRendererComponent(
+        Component cell=super.getTreeCellRendererComponent(
             tree, value, sel, expanded, leaf, row, hasFocus);
         DefaultMutableTreeNode node=(DefaultMutableTreeNode)value;
         DataProcessor dp=(DataProcessor)node.getUserObject();
@@ -62,6 +64,10 @@ public class ProcessorTreeCellRenderer extends DefaultTreeCellRenderer {
         if (dp instanceof ExtDataProcessor) {
             String pName=((ExtDataProcessor)dp).getProcName();
             setText(pName);
+            if (cell instanceof JComponent) {
+                ((JComponent)cell).setToolTipText(((ExtDataProcessor)dp).getToolTipText());
+            } else
+                IJ.log("NOT JCOMPONENT");
             if (pName.contains(ProcessorTree.PROC_NAME_ACQ_ENG))
                 setIcon(acqEngIcon);
             if (pName.contains(ProcessorTree.PROC_NAME_IMAGE_STORAGE))
@@ -85,19 +91,10 @@ public class ProcessorTreeCellRenderer extends DefaultTreeCellRenderer {
                 setIcon(aMC_MZ_Icon);
             if (dp instanceof RoiFinder)
                 setIcon(roiIcon);
-        } else
+        } else {
             setText(dp.getClass().getSimpleName());
-/*        if (dp instanceof ImageTagFilter) {
-            JPanel panel = new JPanel();
-            panel.add(new JLabel(((ExtDataProcessor)dp).getProcName()));
-            JComboBox jcb=new JComboBox();
-            jcb.addItem("Dapi");
-            jcb.addItem("FITC");
-            jcb.addItem("Cy5");
-            panel.add(jcb);
-            return panel;
-        } else*/
-            return this;
+        }    
+        return cell;
     }
     
     public boolean isCellEditable(EventObject evt) {

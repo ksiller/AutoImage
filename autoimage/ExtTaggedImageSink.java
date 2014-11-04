@@ -6,7 +6,6 @@ package autoimage;
 
 import java.io.File;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import mmcorej.TaggedImage;
 import org.micromanager.acquisition.TaggedImageQueue;

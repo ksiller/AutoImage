@@ -17,13 +17,13 @@ import org.json.JSONObject;
 
 
 /** Caches group of images of selected channel and selected z-position (slice) that belong to same timepoint and position.
- * Image group is analyzed in "analyze(Element E)" method. A single modified image can be returned, which will be pushed to analysis_output queue 
- * 
- * handles TaggedImage or File
+ * Image group is analyzed in "processElement(Element E)" method. A single modified image can be returned, which will be pushed to analysis_output queue 
+ 
+ handles TaggedImage or File
  * 
  * @author Karsten
  */ 
-public class AreaProcessor extends BranchedProcessor<File> {
+public class ClusterProcessor extends BranchedProcessor<File> {
     
 //    protected final List<String> selAreas_;
 //    private final int frameIndex_;
@@ -35,11 +35,11 @@ public class AreaProcessor extends BranchedProcessor<File> {
     protected List<File> imageList;
     protected JSONObject meta; 
     
-    public AreaProcessor(final String pName) {
+    public ClusterProcessor(final String pName) {
         this (pName,"",null);
     }
     
-    public AreaProcessor(final String pName, final String path,final List<String> areas) {
+    public ClusterProcessor(final String pName, final String path,final List<String> areas) {
         super(pName, path);
         //selAreas_=areas;
         imageList=new ArrayList<File>();
@@ -55,16 +55,17 @@ public class AreaProcessor extends BranchedProcessor<File> {
         return obj;
     } 
     */
+/*
     protected void readMetadata(File element) {
         IJ.log("AreaAnalyzer: readMetadata: "+element.getAbsolutePath());
         try {
             meta=Utils.parseMetadata((File)element);
         } catch (JSONException ex) {
             meta=null;
-            Logger.getLogger(AreaProcessor.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(ClusterProcessor.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
-    
+*/    
     //called when Poison element is received. this is called before poison element is passed on to analysisOutput queue
     @Override
     protected void cleanUp() {
@@ -87,7 +88,12 @@ public class AreaProcessor extends BranchedProcessor<File> {
     
     @Override
     protected boolean acceptElement(File element) {
-        readMetadata(element);
+        try {
+            readMetadata(element);
+        } catch (JSONException ex) {
+            Logger.getLogger(ClusterProcessor.class.getName()).log(Level.SEVERE, null, ex);
+            return false;
+        }
 /*        if (meta==null) {
             IJ.log("readdata: problem metadata");            
             return false;
@@ -109,7 +115,7 @@ public class AreaProcessor extends BranchedProcessor<File> {
     }
     
     @Override
-    protected List<File> analyze(File element) { 
+    protected List<File> processElement(File element) { 
         IJ.log("  analyze..."); 
         if (meta!=null) {
              String area;

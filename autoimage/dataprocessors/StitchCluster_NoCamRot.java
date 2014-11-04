@@ -45,7 +45,7 @@ import org.micromanager.api.TaggedImageStorage;
  *
  * @author Karsten
  */
-public class StitchCluster_NoCamRot extends AreaProcessor {
+public class StitchCluster_NoCamRot extends ClusterProcessor {
     
     private String fusionMethod;
     private double regressionTh;
@@ -76,13 +76,13 @@ public class StitchCluster_NoCamRot extends AreaProcessor {
             stitch_grid = stitchClass.newInstance();
         } catch (ClassNotFoundException ex) {
             IJ.log("StitchCluster.constructor: Class not found");
-            Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
         } catch (InstantiationException ex) {
             IJ.log("StitchCluster.constructor: Instantiation Error");
-            Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
         } catch (IllegalAccessException ex) {
             IJ.log("StitchCluster.constructor: Illegal Access");
-            Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
         }
 
     }
@@ -208,10 +208,10 @@ public class StitchCluster_NoCamRot extends AreaProcessor {
             }
         } catch (FileNotFoundException ex) {
             IJ.log(this.getClass().getName()+": FileNotFound");
-            Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
             IJ.log(this.getClass().getName()+": IOException");
-            Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
         }
         return angle;
     }
@@ -227,7 +227,7 @@ public class StitchCluster_NoCamRot extends AreaProcessor {
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException ex) {
-                    Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
                 }
             }
             stitchingInProgress=true;
@@ -315,7 +315,7 @@ public class StitchCluster_NoCamRot extends AreaProcessor {
                     }    
                     writer.close();
                 } catch (IOException ex) {
-                    Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
                     IJ.log(this.getClass().getName()+": Error creating stitch config file");
                 }
                 
@@ -339,16 +339,16 @@ public class StitchCluster_NoCamRot extends AreaProcessor {
 
                     } catch (NoSuchFieldException ex) {
                         IJ.showMessage("cannot find field"+ex);
-                        Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                        Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
                     } catch (SecurityException ex) {
                         IJ.showMessage("security field"+ex);
-                        Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                        Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
                     } catch (IllegalArgumentException ex) {
                         IJ.showMessage("illegal arg field"+ex);
-                        Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                        Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
                     } catch (IllegalAccessException ex) {
                         IJ.showMessage("illegal access field"+ex);
-                        Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                        Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
                     }                     
                 } else {
                     IJ.log("stitch_grid = null");  
@@ -436,7 +436,7 @@ public class StitchCluster_NoCamRot extends AreaProcessor {
                             try {
                                 Thread.sleep(100);
                             } catch (InterruptedException ex) {
-                                Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                                Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
                             }
                         } 
 
@@ -496,7 +496,7 @@ public class StitchCluster_NoCamRot extends AreaProcessor {
                             IJ.log(stitchedFiles.get(stitchedFiles.size()-1).getAbsolutePath());
                         } catch (Exception ex) {
                             IJ.log("Problem saving to storage: "+ti.tags.getString(MMTags.Image.CHANNEL_NAME));
-                            Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                            Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
                         }
                         resultFile.delete();
                     
@@ -506,12 +506,12 @@ public class StitchCluster_NoCamRot extends AreaProcessor {
                     IJ.log("----");
                     stitchingInProgress=false;
                 } catch (IOException ex) {
-                    Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
                     IJ.log(this.getClass().getName()+": Error saving stitched results");
                     stitchingInProgress=false;
                 }
             } catch (JSONException ex) {
-                Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
                 IJ.log(this.getClass().getName()+": Error parsing metadata");
                 stitchingInProgress=false;
             } 
@@ -599,19 +599,19 @@ public class StitchCluster_NoCamRot extends AreaProcessor {
             try {
                 regressionThField.commitEdit();
             } catch (ParseException ex) {
-                Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
             }
             regressionTh=(Double)regressionThField.getValue();
             try {
                 maxAvgDisplaceThField.commitEdit();
             } catch (ParseException ex) {
-                Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
             }
             maxAvgDisplaceTh=(Double)maxAvgDisplaceThField.getValue();
             try {
                 absDisplaceThField.commitEdit();
             } catch (ParseException ex) {
-                Logger.getLogger(StitchCluster.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
             }
             absDisplaceTh=(Double)absDisplaceThField.getValue();
             computeOverlap=computeOverlapCB.isSelected();

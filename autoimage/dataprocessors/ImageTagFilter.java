@@ -41,6 +41,7 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
     protected String key_; //key to retrieve property of JSONObject in TaggedImages that will be filtered
     protected List<T> values_; //accepted values for property retrieved with key_
     protected long imageNumberForThisDim=0; //used to adjust dimension properties of TaggedImage (# of 'CHANNELS', 'FRAMES', 'SLICES')
+    protected TaggedImageStorageDiskDefault storage=null;
             
     public ImageTagFilter() {
         this("Filter","",null);
@@ -71,16 +72,16 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
         values_=new ArrayList<T>(vals.length());
         for (int i=0; i<vals.length(); i++) {
             T v;
-            IJ.log(this.getClass().getSimpleName()+".setParameters: set vals.get(i): "+vals.get(i).getClass().getName());
+//            IJ.log(this.getClass().getSimpleName()+".setParameters: set vals.get(i): "+vals.get(i).getClass().getName());
             if (vals.get(i) instanceof Integer){ 
                 v=(T)new Long(vals.getInt(i)); 
             }else {
                 v=(T)vals.get(i);
             }    
-            IJ.log(this.getClass().getSimpleName()+".setParameters: set (T)v: "+v.getClass().getName());
+//            IJ.log(this.getClass().getSimpleName()+".setParameters: set (T)v: "+v.getClass().getName());
             values_.add(v);
         } 
-        IJ.log("---");
+//        IJ.log("---");
     }
     
     @Override
@@ -128,7 +129,7 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
    
     protected boolean listContainsElement(T value) {
         if (value instanceof Integer) {
-            IJ.log(this.getClass().getName()+": Integer found, converting to Long");
+//            IJ.log(this.getClass().getName()+": Integer found, converting to Long");
             return values_.contains(new Long((Integer)value));   
         } else {
             return values_.contains(value);
@@ -187,6 +188,7 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
         if (key_.equals(MMTags.Image.CHANNEL_INDEX) 
                         || key_.equals(MMTags.Image.CHANNEL_NAME)
                         || key_.equals(MMTags.Image.CHANNEL)) {
+//                IJ.log(this.getClass().getName()+": updating channel info");
                     String thisChannel=meta.getString(MMTags.Image.CHANNEL_NAME);
                     JSONArray chNames=summary.getJSONArray(MMTags.Summary.NAMES);
                     JSONArray chColor=summary.getJSONArray(MMTags.Summary.COLORS);
@@ -221,10 +223,11 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
                     summary.put("ChContrastMax",foundChMax);//MMTags.Summary.CHANNEL_MAXES, foundChMax);
         } if (key_.equals(MMTags.Image.FRAME_INDEX) 
                         || key_.equals(MMTags.Image.FRAME)) {
+//                IJ.log(this.getClass().getName()+": updating frame info");
                     if (imageNumberForThisDim==0) {
-                        long currentNoOfSlices=summary.getLong(MMTags.Summary.FRAMES);                        
+                        long currentNoOfFrames=summary.getLong(MMTags.Summary.FRAMES);                        
                         for (T value : values_) {
-                            if ((Long)value < currentNoOfSlices) {
+                            if ((Long)value < currentNoOfFrames) {
                                 imageNumberForThisDim++;
                             }
                         }    
@@ -232,16 +235,22 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
                     Long oldIdx = meta.getLong(MMTags.Image.FRAME_INDEX);
                     for (int i=0; i<values_.size(); i++) {
                         if (oldIdx.equals((Long)values_.get(i))) {
+//                            IJ.log("WRITING FRAMEINDEX: "+i);
                             meta.put(MMTags.Image.FRAME_INDEX,i);
+                            meta.put(MMTags.Image.FRAME,i);
                             break;
-                        } 
+                        } else {
+//                            IJ.log("LEAVING FRAMEINDEX: "+oldIdx);                            
+                        }
                     }    
                     summary.put(MMTags.Summary.FRAMES, imageNumberForThisDim);
         } if (key_.equals(MMTags.Image.SLICE_INDEX) 
                         || key_.equals(MMTags.Image.SLICE)) {
+//            IJ.log(this.getClass().getName()+": updating slice info");
 //                    if (isTaggedImage) {
                         if (imageNumberForThisDim==0) {
-                            long currentNoOfSlices=summary.getLong(MMTags.Summary.SLICES);                        
+                            long currentNoOfSlices=summary.getLong(MMTags.Summary.SLICES);
+//                            IJ.log("CURRENTNOOFSLICES: "+currentNoOfSlices);
                             for (T value:values_) {
                                 if ((Long)value < currentNoOfSlices) {
                                     imageNumberForThisDim++;
@@ -254,9 +263,12 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
                                 }
                             }    */
                         }
+//                        IJ.log("IMAGENNOFORTHISDIM: "+imageNumberForThisDim);
                         Long oldIdx = meta.getLong(MMTags.Image.SLICE_INDEX);
                         for (int i=0; i<values_.size(); i++) {
                             if (oldIdx.equals((Long)values_.get(i))) {
+//                                IJ.log("WRITING SLICEINDEX: "+i);
+                                meta.put(MMTags.Image.SLICE,i);
                                 meta.put(MMTags.Image.SLICE_INDEX,i);
                                 break;
                             } 
@@ -279,6 +291,7 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
                             } 
                         }        
                     }    */
+//                        IJ.log("WRITING SUMMARY SLICES: "+imageNumberForThisDim);
                     summary.put(MMTags.Summary.SLICES, imageNumberForThisDim);
         }
         return meta;
@@ -296,18 +309,21 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
             ImagePlus imp=null;
             imp=IJ.openImage(((File)element).getAbsolutePath());
             if (imp.getProperty("Info") != null) {
-                TaggedImageStorageDiskDefault storage=null;
+//                TaggedImageStorageDiskDefault storage=null;
                 try {
                     meta = new JSONObject((String)imp.getProperty("Info"));
-//                    String newDir=new File(workDir).getParentFile().getAbsolutePath();
-//                    String newPrefix=new File(workDir).getName();
+                    String newDir=new File(workDir).getParentFile().getAbsolutePath();
 //                    String newDir=new File(workDir).getAbsolutePath();
                     ImageProcessor ip=imp.getProcessor();
                     ti=ImageUtils.makeTaggedImage(ip);
                     ti.tags=new JSONObject(meta.toString());
-                    String newPrefix=ti.tags.getString("PositionName");
-                    ti.tags=updateTagValue(ti.tags, workDir, newPrefix, false);
-                    storage = new TaggedImageStorageDiskDefault (workDir,true,ti.tags.getJSONObject(MMTags.Root.SUMMARY));
+//                    String newPrefix=ti.tags.getString("PositionName");
+                    String newPrefix=new File(workDir).getName();
+//                    ti.tags=updateTagValue(ti.tags, workDir, newPrefix, false);
+                    ti.tags=updateTagValue(ti.tags, newDir, newPrefix, false);
+                    if (storage==null) {
+                        storage = new TaggedImageStorageDiskDefault (workDir,true,ti.tags.getJSONObject(MMTags.Root.SUMMARY));
+                    }
                     storage.putImage(ti);
 /*                    JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
                     File copiedFile=new File(new File(new File(summary.getString(MMTags.Summary.DIRECTORY), 
@@ -318,7 +334,11 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
 //                                                summary.getString(MMTags.Summary.PREFIX)),
 //                                                meta.getString("PositionName")),
 //                                                    meta.getString("FileName"));
-                    File copiedFile=new File(new File(workDir,newPrefix),
+
+//                    File copiedFile=new File(new File(workDir,newPrefix),
+//                                                    ti.tags.getString("FileName"));
+                    String posName="";
+                    File copiedFile=new File(new File(new File(newDir,newPrefix),meta.getString("PositionName")),
                                                     ti.tags.getString("FileName"));
                     copy=(E)copiedFile;
                 } catch (Exception ex) {
@@ -326,9 +346,9 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
                     Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
                     copy=super.createCopy(element);
                 }
-                if (storage!=null) {
-                    storage.close();           
-                }
+//                if (storage!=null) {
+//                    storage.close();           
+//                }
             } else {
                 copy=super.createCopy(element);
             }
@@ -346,7 +366,7 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
     }    
         
     @Override
-    protected List<E> analyze(E element) {
+    protected List<E> processElement(E element) {
         // create copy, update metadata and pass accepted elements through
         List<E> list=new ArrayList<E>(1);
         list.add(createCopy(element));
@@ -396,5 +416,15 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
             key_="";
             values_.clear();
         }   
+    }
+    
+    @Override
+    protected void cleanUp() {
+        if (storage!=null) {
+            storage.close(); 
+            //set to null so a new storage will be created when processor runs again
+            storage=null;
+        }
+        imageNumberForThisDim=0;
     }
 }

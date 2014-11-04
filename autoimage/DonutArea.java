@@ -120,7 +120,7 @@ class DonutArea extends Area {
     
     @Override
     public void initializeFromJSONObject(JSONObject obj) throws JSONException {
-        IJ.log("initializing: "+this.getClass().getName());
+//        IJ.log("initializing: "+this.getClass().getName());
 //        super.initializeFromJSONObject(obj);
 //      initialize 'Donut' specific fields, inherited fields initialized by parent class
         if (obj!=null)

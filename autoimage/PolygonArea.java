@@ -28,7 +28,6 @@ public class PolygonArea extends Area {
     private Path2D polygon;
     
     protected final static String TAG_POINT_ARRAY = "POINT_ARRAY";
-//    protected final static String TAG_POINT_OBJECT = "POINT_OBJECT";
     protected final static String TAG_COORD_X = "COORD_X";
     protected final static String TAG_COORD_Y = "COORD_Y";
     protected final static String TAG_NUMBER = "NUMBER";
@@ -111,12 +110,12 @@ public class PolygonArea extends Area {
 
     @Override
     public double getCenterX() {
-        return polygon.getBounds2D().getWidth()/2;
+        return topLeftX + polygon.getBounds2D().getWidth()/2;
     }
 
     @Override
     public double getCenterY() {
-        return polygon.getBounds2D().getHeight()/2;
+        return topLeftY + polygon.getBounds2D().getHeight()/2;
     }
 
     @Override

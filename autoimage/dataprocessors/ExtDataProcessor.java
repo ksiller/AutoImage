@@ -21,6 +21,7 @@ import org.micromanager.api.DataProcessor;
 public class ExtDataProcessor<E> extends DataProcessor<E>{
 
     protected String procName;
+    protected String toolTipText;
     protected String workDir;
     protected boolean done;
     
@@ -51,6 +52,7 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
         procName=pName;
         workDir=path;
         done=false;
+        toolTipText="no information";
     }
     
     public String getProcName() {
@@ -67,6 +69,13 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
     
     public String getWorkDir() {
         return workDir;
+    }
+    
+    public void setToolTipText(String text) {
+        toolTipText=text;
+    }
+    public String getToolTipText() {
+        return toolTipText;
     }
     
     @Override

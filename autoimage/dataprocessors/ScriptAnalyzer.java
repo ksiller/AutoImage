@@ -270,7 +270,7 @@ public class ScriptAnalyzer extends BranchedProcessor<File>  {
     }
     
     @Override
-    protected List<File> analyze(File f) {
+    protected List<File> processElement(File f) {
 /*        JSONObject meta=Utils.parseMetadata(f);
         try {
             String area = meta.getString("Area");

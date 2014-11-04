@@ -188,9 +188,9 @@ public class Utils {
 
     public static File getImageAsFileObject(TaggedImage ti) throws JSONException {
         JSONObject summary=ti.tags.getJSONObject(MMTags.Root.SUMMARY);
-        String directory = summary.getString("Directory");
+        String directory = summary.getString(MMTags.Summary.DIRECTORY); //"Directory"
         String prefix = summary.getString(MMTags.Summary.PREFIX);
-        String positionName=ti.tags.getString("PositionName");
+        String positionName=ti.tags.getString(MMTags.Image.POS_NAME); //"PositionName"
         String fileName = ti.tags.getString("FileName");
         File f=new File(new File(new File(directory,prefix),positionName),fileName);
         return f;

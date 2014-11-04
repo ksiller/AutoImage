@@ -123,6 +123,7 @@ import javax.swing.JViewport;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
+import javax.swing.ToolTipManager;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 import javax.swing.event.TableModelEvent;
@@ -2225,6 +2226,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         processorTreeView.setEditable(true);
         DefaultTreeCellRenderer dtcr = new ProcessorTreeCellRenderer();
         processorTreeView.setCellRenderer(dtcr);
+        ToolTipManager.sharedInstance().registerComponent(processorTreeView);
         
         recalculateTiles = true;
 
@@ -6589,7 +6591,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 //        ImageTagFilter itf=showAreaFilterDlg(null, selectedNode);
 //        if (itf!=null)
 //            createAndAddProcessorNode(selectedNode,itf);    
-        ImageTagFilterOptString itf=new ImageTagFilterOptString(ProcessorTree.PROC_NAME_AREA_FILTER,null);
+        ImageTagFilterOptString itf=new ImageTagFilterOptString(ExtImageTags.AREA_NAME,null);
         List<String> areas=new ArrayList<String>(acqLayout.getAreaArray().size());
         for (Area a:acqLayout.getAreaArray())
             areas.add(a.getName());

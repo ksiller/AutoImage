@@ -20,9 +20,9 @@ import org.micromanager.api.MMTags;
 
 
 /** Caches group of images of selected channel and selected z-position (slice) that belong to same timepoint and position.
- * Image group is analyzed in "analyze(Element E)" method. A single modified image can be returned, which will be pushed to analysis_output queue 
- * 
- * handles TaggedImage or File
+ * Image group is analyzed in "processElement(Element E)" method. A single modified image can be returned, which will be pushed to analysis_output queue 
+ 
+ handles TaggedImage or File
  * 
  * @author Karsten
  * @param <E> 
@@ -141,7 +141,7 @@ public abstract class MultiChMultiZAnalyzer<E> extends BranchedProcessor<E> {
     protected abstract List<E> analyzeGroup(List<E> elements);
     
     @Override
-    protected List<E> analyze(E element) { 
+    protected List<E> processElement(E element) { 
         IJ.log("  analyze...");
         JSONObject meta=readMetadata(element);
         if (meta!=null) {

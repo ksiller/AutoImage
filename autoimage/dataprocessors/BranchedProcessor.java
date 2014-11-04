@@ -19,7 +19,7 @@ import org.micromanager.utils.ReportingUtils;
 
 
 /**
- * A SeqAnalayzer thread allows for on-the-fly analysis and modification of image
+ * A BranchedProcessor thread allows for on-the-fly analysis and modification of image
  * data during acquisition.
  * 
  * Inherit from this class and use the AcquisitionEngine functions
@@ -59,7 +59,7 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
    
    
    /*
-    * The analyze method should be overridden by classes implementing
+    * The processElement method should be overridden by classes implementing
   BranchedProcessoryzer, to provide a analysis and processing function.
     *
     * For example, an "Identity" DataProcessor (where nothing is
@@ -104,6 +104,16 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
       } 
    }
 
+    protected JSONObject readMetadata(E element) throws JSONException {
+        JSONObject meta=null;
+        if (element instanceof File) {
+            meta=Utils.parseMetadata((File)element);
+        } else if (element instanceof TaggedImage) {
+            meta=((TaggedImage)element).tags;
+        }    
+        return meta;
+    }
+
    //has to reject TaggedImageQueue.Poison
    protected abstract boolean acceptElement(E element);
    
@@ -111,7 +121,7 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
     * createCopy can handle that
     * copy will be passed to analysisOutput_ 
     */
-   protected abstract List<E> analyze(E element);
+   protected abstract List<E> processElement(E element);
    
    /* creates copy of element
     * if meta!=null, metadata in copied element will be replaced by meta, otherwise keep original metadata
@@ -190,11 +200,11 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
              return;
          }
          if (acceptElement(element)) { 
-            List<E> modifiedElements=analyze(element);
+            List<E> modifiedElements=processElement(element);
             if (modifiedElements!=null) { //image analysis was successful and processed element should be passed to next processor
             /* analyzers that form nodes need to place processed image in 
              * modifiedOutput_ queue
-             * for last analyzer in tree branch (='leaf') modifiedOutput_ = null,
+             * for last analyzer in tree branch (='leaf') modifiedOutput_ == null,
              * which is handled in produceModified method
              */
                 for (E modElement:modifiedElements)

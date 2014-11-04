@@ -86,6 +86,7 @@ public class ZProj extends MultiChMultiZAnalyzer<File> {
                     TaggedImage ti=ImageUtils.makeTaggedImage(resultImp.getProcessor());
                     JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
                     meta.put(MMTags.Image.SLICE_INDEX, 0);
+                    meta.put(MMTags.Image.SLICE, 0);
                     summary.put(MMTags.Summary.SLICES, 1);
                     String area = meta.getString("Area")+"-";
                     String cluster="Cluster"+Long.toString(meta.getLong("ClusterIndex"))+"-";
@@ -110,7 +111,8 @@ public class ZProj extends MultiChMultiZAnalyzer<File> {
 //                    Utils.calibrateImage(resultImp, meta);
                     //resultImp.getProcessor().setLut(impArray[0].getProcessor().getLut());
                     zProjFiles.add(new File(new File(workDir,meta.getString("PositionName")),
-                                                    meta.getString("FileName")));                    IJ.log("ZProject result: "+zProjFiles.get(zProjFiles.size()-1).getAbsolutePath());
+                                                    meta.getString("FileName")));                    
+                    IJ.log("ZProject result: "+zProjFiles.get(zProjFiles.size()-1).getAbsolutePath());
 //                    if (!IJ.saveAsTiff(resultImp, destFile.getAbsolutePath()))
 //                        destFile=null;
                     it.remove(); // avoids a ConcurrentModificationException
