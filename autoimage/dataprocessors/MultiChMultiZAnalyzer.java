@@ -5,7 +5,6 @@
 package autoimage.dataprocessors;
 
 import autoimage.Utils;
-import autoimage.dataprocessors.BranchedProcessor;
 import ij.IJ;
 import java.io.File;
 import java.util.ArrayList;

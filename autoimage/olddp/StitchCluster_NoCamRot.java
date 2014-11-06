@@ -2,7 +2,7 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-package autoimage.dataprocessors;
+package autoimage.olddp;
 
 import autoimage.ExtImageTags;
 import autoimage.Utils;
@@ -193,6 +193,7 @@ public class StitchCluster_NoCamRot extends ClusterProcessor {
         return list;
     }
     
+/*    
     private double calculateRotation(File configFile, File registerFile) {
         double angle=0;
         try {
@@ -202,7 +203,11 @@ public class StitchCluster_NoCamRot extends ClusterProcessor {
             for (int i=0; i<original.size(); i++) {
                 Vec3d orig=original.get(i);
                 Vec3d reg=registered.get(i);
-                angle=orig.angle(reg);
+                try {
+                    angle=orig.angle(reg);
+                } catch (Exception ex) {
+                    Logger.getLogger(StitchCluster_NoCamRot.class.getName()).log(Level.SEVERE, null, ex);
+                }
                 IJ.log("orig: "+orig.toString()+" --> "+reg.toString()+", Angle: "+Double.toString(angle));
                 angles.add(angle);
             }
@@ -215,6 +220,7 @@ public class StitchCluster_NoCamRot extends ClusterProcessor {
         }
         return angle;
     }
+    */
     
     @Override
     public List<File> analyzeGroup(List<File> elements) {

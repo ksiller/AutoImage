@@ -343,8 +343,9 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("Set Landmarks");
-        setMinimumSize(new java.awt.Dimension(0, 290));
-        setResizable(false);
+        setMaximumSize(new java.awt.Dimension(2147483647, 300));
+        setMinimumSize(new java.awt.Dimension(527, 300));
+        setPreferredSize(new java.awt.Dimension(527, 300));
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowClosing(java.awt.event.WindowEvent evt) {
                 formWindowClosing(evt);
@@ -442,7 +443,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
                                 .add(6, 6, 6)
                                 .add(stagePosLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 207, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                             .add(messageLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                        .add(6, 6, 6)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
                             .add(org.jdesktop.layout.GroupLayout.TRAILING, okButton, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                             .add(org.jdesktop.layout.GroupLayout.TRAILING, updateStagePosButton, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
@@ -485,7 +486,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
 
 
     private void updateStageRotAndTilt() {
-        IJ.log(getClass().getName()+".updateStagePosAndTilt");
+//        IJ.log(getClass().getName()+".updateStagePosAndTilt");
         int mappedPos=acqLayout.getNoOfMappedStagePos();
         if (mappedPos == 0) {
             tiltLabel.setText("unknown");
@@ -510,43 +511,43 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
                 String message="";
                 List<RefArea> mappedList=acqLayout.getMappedLandmarks();
                 if (mappedPos == 2) {
-/*                    RefArea r0=mappedList.get(0);
+                    RefArea r0=mappedList.get(0);
                     RefArea r1=mappedList.get(1);
                     double sx=r1.getStageCoordX()-r0.getStageCoordX();
-                    double sy=r1.getStageCoordX()-r0.getStageCoordX();
+                    double sy=r1.getStageCoordY()-r0.getStageCoordY();
                     double sl=Math.sqrt(sx*sx+sy*sy);
                     double dx=r1.getLayoutCoordX()-r0.getLayoutCoordX();
-                    double dy=r1.getLayoutCoordX()-r0.getLayoutCoordX();
+                    double dy=r1.getLayoutCoordY()-r0.getLayoutCoordY();
                     double dl=Math.sqrt(dx*dx+dy*dy);
                     if (Math.abs(dl/sl - 1) > TOLERANCE_SCALE_FACTOR) {
-                        message="Warning: Uniform scaling "+String.format("%1$,.2f",dl/sl);
-                    }    */
-                    if (Math.abs(at.getScaleX()/at.getScaleY() - 1) > TOLERANCE_SCALE_FACTOR) {
-                        message="Warning: Non-uniform scaling (x:y ratio="+String.format("%1$,.2f",at.getScaleX()/at.getScaleY());
+                        message="Warning: Uniform scaling factor is "+String.format("%1$,.2f",dl/sl)+" (exceeding "+(100*TOLERANCE_SCALE_FACTOR)+"% tolerance)";
                     }
+/*                    if (Math.abs(at.getScaleX()/at.getScaleY() - 1) > TOLERANCE_SCALE_FACTOR) {
+                        message="Warning: Non-uniform scaling (x:y ratio="+String.format("%1$,.2f",at.getScaleX()/at.getScaleY());
+                    }*/
                 } else if (mappedPos==3) {
-/*                    RefArea r0=mappedList.get(0);
+                    RefArea r0=mappedList.get(0);
                     RefArea r1=mappedList.get(1);
                     RefArea r2=mappedList.get(2);
                     double s01x=r1.getStageCoordX()-r0.getStageCoordX();
-                    double s01y=r1.getStageCoordX()-r0.getStageCoordX();
+                    double s01y=r1.getStageCoordY()-r0.getStageCoordY();
                     double s01l=Math.sqrt(s01x*s01x+s01y*s01y);
                     double d01x=r1.getLayoutCoordX()-r0.getLayoutCoordX();
-                    double d01y=r1.getLayoutCoordX()-r0.getLayoutCoordX();
+                    double d01y=r1.getLayoutCoordY()-r0.getLayoutCoordY();
                     double d01l=Math.sqrt(d01x*d01x+d01y*d01y);
 
                     double s02x=r2.getStageCoordX()-r0.getStageCoordX();
-                    double s02y=r2.getStageCoordX()-r0.getStageCoordX();
+                    double s02y=r2.getStageCoordY()-r0.getStageCoordY();
                     double s02l=Math.sqrt(s02x*s02x+s02y*s02y);
                     double d02x=r2.getLayoutCoordX()-r0.getLayoutCoordX();
-                    double d02y=r2.getLayoutCoordX()-r0.getLayoutCoordX();
+                    double d02y=r2.getLayoutCoordY()-r0.getLayoutCoordY();
                     double d02l=Math.sqrt(d02x*d02x+d02y*d02y);
 
                     double s21x=r1.getStageCoordX()-r2.getStageCoordX();
-                    double s21y=r1.getStageCoordX()-r2.getStageCoordX();
+                    double s21y=r1.getStageCoordY()-r2.getStageCoordY();
                     double s21l=Math.sqrt(s21x*s21x+s21y*s21y);
                     double d21x=r1.getLayoutCoordX()-r2.getLayoutCoordX();
-                    double d21y=r1.getLayoutCoordX()-r2.getLayoutCoordX();
+                    double d21y=r1.getLayoutCoordY()-r2.getLayoutCoordY();
                     double d21l=Math.sqrt(d21x*d21x+d21y*d21y);
                     if (Math.abs(d01l/s01l - 1) > TOLERANCE_SCALE_FACTOR
                             || Math.abs(d21l/s21l - 1) > TOLERANCE_SCALE_FACTOR
@@ -554,14 +555,15 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
                         if (Math.abs(d01l/s01l - d21l/s21l) < 0.01
                                && Math.abs(d01l/s01l - d02l/s02l) < 0.01
                                && Math.abs(d02l/s02l - d21l/s21l) < 0.01) {
-                            message="Warning: Uniform scaling "+String.format("%1$,.2f",d01l/s01l)
+                            message="Warning: Uniform scaling factor is "+String.format("%1$,.2f",d01l/s01l)+" (exceeding "+(100*TOLERANCE_SCALE_FACTOR)+"% tolerance)";
+/*                            message="Warning: Uniform scaling "+String.format("%1$,.2f",d01l/s01l)
                             +", "+String.format("%1$,.2f",d02l/s02l)
-                            +", "+String.format("%1$,.2f",d21l/s21l);    
+                            +", "+String.format("%1$,.2f",d21l/s21l);    */
                         } else {
                             message="Warning: Non-uniform scaling and shearing.";                              
                         }
-                    }*/
-                    if (Math.abs(at.getScaleX()/at.getScaleY() - 1) > TOLERANCE_SCALE_FACTOR
+                    }
+/*                    if (Math.abs(at.getScaleX()/at.getScaleY() - 1) > TOLERANCE_SCALE_FACTOR
                             && at.getShearX() == -at.getShearY()) {
                         message="Warning: Non-uniform scaling (x:y ratio="+String.format("%1$,.2f",at.getScaleX()/at.getScaleY());
                     }
@@ -572,7 +574,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
                     if (Math.abs(at.getScaleX()/at.getScaleY() - 1) > TOLERANCE_SCALE_FACTOR
                             && at.getShearX() != -at.getShearY()) {
                         message="Warning: Non-uniform scaling (x:y ratio="+String.format("%1$,.2f",at.getScaleX()/at.getScaleY())+"Shearing (x:y ratio="+String.format("%1$,.2f",at.getShearX()/at.getShearY());
-                    }
+                    }*/
 
                 }
 /*                messageLabel.setText("Shear X: "+String.format("%1$,.2f",at.getShearX())

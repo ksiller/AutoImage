@@ -9,7 +9,6 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -49,12 +48,14 @@ public abstract class Area {
     protected static boolean optimizedForCameraRotation = true;
 //    protected static String shape;
 //    protected TilingSetting tiling;
-    protected List<Tile> tilePosList;
+    protected List<Tile> tilePosList;//has absolute layout positions in um
     protected int tileNumber;
     protected int id;
-    protected int areaIndex;
+    protected int index;
     protected double topLeftX; //in um
     protected double topLeftY; //in um
+    protected Point2D centerPos;
+    protected Point2D defaultPos;
     protected double relPosZ; //in um relative to flat layout bottom
     protected double width; //in um
     protected double height; //in um
@@ -91,7 +92,7 @@ public abstract class Area {
     public Area(String n, int id, double ox, double oy, double oz, double w, double h, boolean s, String anot) {
         name=n;
         this.id=id;
-        areaIndex=-1;
+        index=-1;
         topLeftX=ox;
         topLeftY=oy;
         relPosZ=oz;
@@ -105,7 +106,8 @@ public abstract class Area {
         tilePosList=null;
         unknownTileNum=true;
         noOfClusters=0;
-//        cameraRot=0;
+//        centerPos=calculateCenterPos();
+//        defaultPos=calculateDefaultPos();
     }
 
     public void enableOptimizedForCameraRotation(boolean b) {
@@ -117,7 +119,7 @@ public abstract class Area {
     }
     
     public void setAreaIndex(int index) {
-        areaIndex=index;
+        this.index=index;
     }
     
     public int getNoOfClusters() {
@@ -125,7 +127,7 @@ public abstract class Area {
     }
     
     public int getAreaIndex() {
-        return areaIndex;
+        return index;
     }
     
     //in radians
@@ -564,7 +566,6 @@ public abstract class Area {
             }
             double x=topLeftX+Math.random()*width;
             double y=topLeftY+Math.random()*height;
-//            IJ.log("Area.calcRandomPositions: "+nr+", "+x+", "+y+", "+w+", "+h);
             if (acceptTilePos(x,y,w,h,setting.isInsideOnly())) {
                 if (setting.isCluster() && (setting.getNrClusterTileX()>1 || setting.getNrClusterTileY()>1)) {
                     if (createCluster(noOfClusters,x,y,fovX,fovY, setting) > 0) {
@@ -573,12 +574,11 @@ public abstract class Area {
                 } else {
                     if (setting.isSiteOverlap() || (!setting.isSiteOverlap() && !overlapsOtherTiles(new Rectangle2D.Double(x-fovBounds.getWidth()/2,y-fovBounds.getHeight()/2,fovX,fovY),fovX,fovY))) {
 //                        tilePosList.add(new Tile("Site"+paddedTileIndex(nr), x, y, relPosZ));
-                        Tile t=new Tile(createTileName(0,noOfClusters), x, y, relPosZ);
+                        tilePosList.add(new Tile(createTileName(0,noOfClusters), x, y, relPosZ));
                         noOfClusters++;
                     }
                 }
             }
-
         }
         unknownTileNum=Thread.currentThread().isInterrupted();
         return tilePosList.size();
@@ -590,7 +590,10 @@ public abstract class Area {
             size=size*tSetting.getNrClusterTileX()*tSetting.getNrClusterTileY();
 //        tilePosList.clear();
         tilePosList = new ArrayList<Tile>(size);
-        addTilesAroundSeed(0,getCenterX(), getCenterY(), fovX, fovY, tSetting);
+        if (centerPos==null) {
+            centerPos=calculateCenterPos();
+        }
+        addTilesAroundSeed(0,centerPos.getX(), centerPos.getY(), fovX, fovY, tSetting);
         unknownTileNum=Thread.currentThread().isInterrupted();
         noOfClusters=tilePosList.size() > 0 ? 1 : 0;
         return tilePosList.size();
@@ -771,18 +774,58 @@ public abstract class Area {
         return topLeftX;
     } 
     
-    public void setTopLeftX(double value) {
-        topLeftX=value;
+    public void setTopLeft(double x, double y) {
+        topLeftX=x;
+        topLeftY=y;
+        centerPos=calculateCenterPos();
+        defaultPos=calculateDefaultPos();
+    }
+    
+    public void setTopLeftX(double x) {
+        topLeftX=x;
+        centerPos=calculateCenterPos();
+        defaultPos=calculateDefaultPos();
+    }
+    
+    public void setTopLeftY(double y) {
+        topLeftY=y;
+        centerPos=calculateCenterPos();
+        defaultPos=calculateDefaultPos();
     }
     
     public double getTopLeftY() {
         return topLeftY;
     } 
     
-    public void setTopLeftY(double value) {
-        topLeftY=value;
+/*
+    public double getCenterX() {
+        if (centerPos==null) {
+            calculateCenterPos();
+        }
+        return centerPos.getX();
     }
-
+    
+    public double getCenterY() {
+        if (centerPos==null) {
+            calculateCenterPos();
+        }
+        return centerPos.getY();
+    }
+   */ 
+    public Point2D getCenterPos() {
+        if (centerPos==null) {
+            centerPos=calculateCenterPos();
+        }
+        return centerPos;
+    }
+    
+    public Point2D getDefaultPos() {
+        if (defaultPos==null) {
+            defaultPos=calculateDefaultPos();
+        }
+        return defaultPos;
+    }
+    
     public double getRelPosZ() {
         return relPosZ;
     }
@@ -791,12 +834,14 @@ public abstract class Area {
         relPosZ=z;
     }
  
-   public double getWidth() {
+    public double getWidth() {
         return width;
     } 
     
     public void setWidth(double value) {
         width=value;
+        centerPos=calculateCenterPos();
+        defaultPos=calculateDefaultPos();
     }
     
     public double getHeight() {
@@ -805,6 +850,8 @@ public abstract class Area {
     
     public void setHeight(double value) {
         height=value;
+        centerPos=calculateCenterPos();
+        defaultPos=calculateDefaultPos();
     }
     
     public void setSelectedForAcq(boolean b) {
@@ -849,7 +896,7 @@ public abstract class Area {
         JSONObject info=new JSONObject();
         try {
             info.put(ExtImageTags.AREA_NAME,name);
-            info.put(ExtImageTags.AREA_INDEX,areaIndex);
+            info.put(ExtImageTags.AREA_INDEX,index);
             info.put(ExtImageTags.CLUSTERS_IN_AREA,noOfClusters);
             info.put(ExtImageTags.SITES_IN_AREA,tilePosList.size());
             if (tileName.indexOf("Cluster")!=-1) {
@@ -890,7 +937,7 @@ public abstract class Area {
     public List<Tile> getTilePositions() {
         return tilePosList;
     }
-        
+/*        
     public boolean setAreaParams (List<String> params) {
         if (params!=null && params.size()>=1 && params.get(0).equals(this.getName())) 
             return true;
@@ -900,9 +947,9 @@ public abstract class Area {
 
     public void setAreaParams (Map<String,String> params) {
         if (params!=null) {
-/*            String s=params.get(TAG_SHAPE);
-            if (s!=null)
-                shape=s;*/
+//            String s=params.get(TAG_SHAPE);
+//            if (s!=null)
+//                shape=s;
             String s=params.get(TAG_NAME);
             if (s!=null)
                 name=s;
@@ -944,7 +991,7 @@ public abstract class Area {
         map.put(TAG_COMMENT,comment);
         return map;
     }
-    
+*/    
 
     private static String paddedTileIndex(int index) {
         return String.format(TILE_NAME_PADDING, index);
@@ -1003,17 +1050,23 @@ public abstract class Area {
         return obj;
     }
     
-    //derived classes should override this to initialize fields that are not part of Area class
+    /* 
+    Used to convert JSONObject to Area
+    derived classes should overwrite this to save fields that are not part of Area class
+    */
     abstract protected void initializeFromJSONObject(JSONObject obj) throws JSONException;
 
-    //derived classes should overwrite this to save fields that are not part of Area class
+    /* 
+    Used to create a JSONObject representation of Area
+    derived classes should overwrite this to save fields that are not part of Area class
+    */
     abstract protected void addFieldsToJSONObject(JSONObject obj) throws JSONException;
 
     public abstract String getShape();
+        
+    public abstract Point2D calculateCenterPos();
     
-    public abstract double getCenterX();
-    
-    public abstract double getCenterY();
+    public abstract Point2D calculateDefaultPos();
     
     public abstract void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio);
     

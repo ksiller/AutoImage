@@ -8,6 +8,7 @@ package autoimage;
 
 import java.awt.Graphics2D;
 import java.awt.Shape;
+import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,7 +54,7 @@ public class CompoundArea extends Area {
     public String getShape() {
         return "Compound";
     }
-
+/*
     @Override
     public double getCenterX() {
         return area.getBounds2D().getWidth()/2;
@@ -63,7 +64,7 @@ public class CompoundArea extends Area {
     public double getCenterY() {
         return area.getBounds2D().getHeight()/2;
     }
-
+*/
     @Override
     public void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
@@ -138,6 +139,16 @@ public class CompoundArea extends Area {
     @Override
     public Area duplicate() {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public Point2D calculateCenterPos() {
+        return new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
+    }
+
+    @Override
+    public Point2D calculateDefaultPos() {
+        return new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
     }
     
 }

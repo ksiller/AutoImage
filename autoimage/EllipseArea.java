@@ -10,6 +10,7 @@ import static autoimage.Area.COLOR_MERGE_AREA_BORDER;
 import static autoimage.Area.COLOR_SELECTED_AREA_BORDER;
 import java.awt.Graphics2D;
 import java.awt.geom.Ellipse2D;
+import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.List;
@@ -72,10 +73,12 @@ class EllipseArea extends Area {
         s[6]="REL_POS_Z";
         return s;
     }
-*/            
+*/  
+    /*
     @Override
     public boolean setAreaParams (List<String> params) {
-         if (/*super.setAreaParams(params) && */params.size()>=8) {
+         //if (super.setAreaParams(params)) {
+         if (params.size()>=8) {
 //            shape=params.get(1);
             name=params.get(2);
             width=Double.parseDouble(params.get(3));
@@ -103,8 +106,9 @@ class EllipseArea extends Area {
         map.put(TAG_CLASS,this.getClass().getName());
         return map;
     }
+*/
 
-    @Override
+/*   @Override
     public double getCenterX () {
         return topLeftX+width/2;
     }
@@ -113,7 +117,7 @@ class EllipseArea extends Area {
     public double getCenterY () {
         return topLeftY+height/2;
     }
-    
+*/    
     @Override
     public void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio) {
         if (acquiring) {
@@ -182,6 +186,7 @@ class EllipseArea extends Area {
         newArea.setAcquiring(this.acquiring);
 //        newArea.setTilingSetting(this.tiling.duplicate());
         newArea.tilePosList=new ArrayList<Tile>(this.getTilePositions());
+        newArea.setUnknownTileNum(this.hasUnknownTileNum());
         return newArea;
     }
 
@@ -191,6 +196,16 @@ class EllipseArea extends Area {
 
     @Override
     protected void addFieldsToJSONObject(JSONObject obj) throws JSONException {
+    }
+
+    @Override
+    public Point2D calculateCenterPos() {
+        return new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
+    }
+
+    @Override
+    public Point2D calculateDefaultPos() {
+        return calculateCenterPos();
     }
 
 }

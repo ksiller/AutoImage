@@ -429,7 +429,7 @@ public class Utils {
         }
         //two points: translation, scale, rotation
         if (src.length == 2) {
-            Point2D.Double v1=new Point2D.Double(src[1].x-src[0].x, src[1].y-src[0].y);
+/*            Point2D.Double v1=new Point2D.Double(src[1].x-src[0].x, src[1].y-src[0].y);
             Point2D.Double v2=new Point2D.Double(dst[1].x-dst[0].x, dst[1].y-dst[0].y);
             IJ.log("v1: "+v1.toString()+", v2:"+v2.toString());
             at = new AffineTransform();
@@ -437,7 +437,7 @@ public class Utils {
             double scale=1.0;
             if (!v1.equals(v2)) {
                 angleRad=Utils.angle2D_Rad(v1, v2);
-
+                IJ.log("angleRad: "+angleRad);
                 double length_src=Math.sqrt(
                         ((src[1].x-src[0].x)*(src[1].x-src[0].x))
                        +((src[1].y-src[0].y)*(src[1].y-src[0].y)));
@@ -452,7 +452,7 @@ public class Utils {
             }
             IJ.log("1. angle: "+angleRad/Math.PI*180+", scale: "+scale+", translate: "+(dst[0].x-src[0].x)+"/"+(dst[0].y-src[0].y));
             IJ.log("1. "+at.toString());
-            
+            */
             double dx=-(src[1].getY()-src[0].getY());
             double dy=src[1].getX()-src[0].getX();
             Point2D src2=new Point2D.Double(src[0].getX()+dx,src[0].getY()+dy);
@@ -467,8 +467,9 @@ public class Utils {
             RealMatrix inv_x=new LUDecompositionImpl(x).getSolver().getInverse();
             double[][] matrix = y.multiply(inv_x).getData();
             at = new AffineTransform(new double[] { matrix[0][0], matrix[1][0], matrix[0][1], matrix[1][1], matrix[0][2], matrix[1][2] });
-            IJ.log("1mod. angle: "+angleRad/Math.PI*180+", scale: "+scale+", translate: "+(dst[0].x-src[0].x)+"/"+(dst[0].y-src[0].y));
+//            IJ.log("1mod. angle: "+angleRad/Math.PI*180+", scale: "+scale+", translate: "+(dst[0].x-src[0].x)+"/"+(dst[0].y-src[0].y));
             IJ.log("1mod. "+at.toString());
+            IJ.log("1mod. angle: "+Math.atan2(at.getShearY(), at.getScaleY())/Math.PI*180);
         }
         //three points: translation, scale, rotation, shear
         if (src.length > 2) {

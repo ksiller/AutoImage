@@ -4,6 +4,7 @@ import static autoimage.Area.COLOR_ACQUIRING_AREA;
 import static autoimage.Area.COLOR_AREA_BORDER;
 import static autoimage.Area.COLOR_UNSELECTED_AREA;
 import java.awt.Graphics2D;
+import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,10 +53,11 @@ class RectArea extends Area{
         return s;
     }
     */        
-
+/*
     @Override
     public boolean setAreaParams (List<String> params) {
-        if (/*super.setAreaParams(params) && */params.size()>=8) {
+//        if (super.setAreaParams(params)) {
+        if (params.size()>=8) {
 //            shape=params.get(1);
             name=params.get(2);
             width=Double.parseDouble(params.get(3));
@@ -84,7 +86,8 @@ class RectArea extends Area{
         map.put(TAG_CLASS,this.getClass().getName());
         return map;
     }
-    
+*/    
+/*    
     @Override
     public double getCenterX () {
         return topLeftX+width/2;
@@ -94,7 +97,7 @@ class RectArea extends Area{
     public double getCenterY () {
         return topLeftY+height/2;
     }
-    
+*/    
     @Override
     public void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio) {
         if (acquiring) {
@@ -163,6 +166,7 @@ class RectArea extends Area{
         newArea.setAcquiring(this.acquiring);
 //        newArea.setTilingSetting(this.tiling.duplicate());
         newArea.tilePosList=new ArrayList<Tile>(this.getTilePositions());
+        newArea.setUnknownTileNum(this.hasUnknownTileNum());
         return newArea;
     }
 
@@ -173,6 +177,17 @@ class RectArea extends Area{
     @Override
     protected void addFieldsToJSONObject(JSONObject obj) throws JSONException {
     }
+
+    @Override
+    public Point2D calculateCenterPos() {
+        return new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
+    }
+
+    @Override
+    public Point2D calculateDefaultPos() {
+        return calculateCenterPos();
+    }
+
     
 }
 

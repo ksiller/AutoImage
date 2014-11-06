@@ -12,6 +12,7 @@ import static autoimage.Area.TAG_CLASS;
 import ij.IJ;
 import java.awt.Graphics2D;
 import java.awt.geom.Ellipse2D;
+import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
 import java.util.List;
@@ -72,10 +73,11 @@ class DonutArea extends Area {
     }
    */    
     
-    
+/*    
     @Override
     public boolean setAreaParams (List<String> params) {
-        if (/*super.setAreaParams(params) &&*/ params.size()>=9) {
+//        if (super.setAreaParams(params)) {
+        if (params.size()>=9) {
 //            shape=params.get(1);
             name=params.get(2);
             width=Double.parseDouble(params.get(3));
@@ -117,7 +119,7 @@ class DonutArea extends Area {
 
         }
     }    
-    
+*/    
     @Override
     public void initializeFromJSONObject(JSONObject obj) throws JSONException {
 //        IJ.log("initializing: "+this.getClass().getName());
@@ -135,14 +137,7 @@ class DonutArea extends Area {
             obj.put(TAG_RING_WIDTH,ringWidth);
     }
     
-/*    @Override
-    public JSONObject toJSONObject() throws JSONException {
-        JSONObject obj=super.toJSONObject();
-        if (obj!=null)
-            obj.put(TAG_RING_WIDTH,ringWidth);
-        return obj;
-    }*/
-    
+/*    
     @Override
     public double getCenterX () {
         return topLeftX+width/2;
@@ -152,7 +147,7 @@ class DonutArea extends Area {
     public double getCenterY () {
         return topLeftY+height/2;
     }
-    
+*/    
     @Override
     public void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio) {
         if (acquiring) {
@@ -246,7 +241,18 @@ class DonutArea extends Area {
 //        newArea.setTilingSetting(this.tiling.duplicate());
         newArea.tilePosList=new ArrayList<Tile>(this.getTilePositions());
         newArea.setRingWidth(this.ringWidth);
+        newArea.setUnknownTileNum(this.hasUnknownTileNum());
         return newArea;
+    }
+
+    @Override
+    public Point2D calculateCenterPos() {
+        return new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
+    }
+
+    @Override
+    public Point2D calculateDefaultPos() {
+        return new Point2D.Double(topLeftX+width/2,topLeftY+ringWidth/2);
     }
 
 }

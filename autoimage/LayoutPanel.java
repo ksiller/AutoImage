@@ -5,6 +5,7 @@
 package autoimage;
 
 //import ij.IJ;
+import ij.IJ;
 import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -24,6 +25,8 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.JPanel;
 import javax.swing.Scrollable;
 import javax.swing.SwingConstants;
@@ -52,6 +55,8 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     private static Color COLOR_SEL_LANDMARK = Color.MAGENTA;
     private static Color COLOR_LAYOUT_BACKGR = Color.BLACK;
     private static Color COLOR_STAGE_GRID = Color.DARK_GRAY;
+    private static Color COLOR_TILT_LOW = Color.RED;
+    private static Color COLOR_TILT_HIGH = Color.BLUE;
     private static Stroke SOLID_STROKE = new BasicStroke(1.0f);
     private static Stroke DASHED_STROKE = new BasicStroke(1.0f, // line width
       /* cap style */BasicStroke.CAP_BUTT,
@@ -505,28 +510,58 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         return Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
     }
     
-    private Point2D.Double[] calcGradientVector() {
-        Vec3d n=acqLayout.getNormalVector();
+    private Point2D[] calcGradientVector() {
+        Vec3d n=null;
+        try {
+            n = new Vec3d(acqLayout.getNormalVector());
+            //ensure that normalvector used for tilt always points in same direction
+            if (n.z < 0) {
+                n.negate();
+            }
+            n.z=0;
+            //scale so that length of n = 1
+            n = Vec3d.normalized(n);
+        } catch (Exception ex) {
+            Logger.getLogger(LayoutPanel.class.getName()).log(Level.SEVERE, null, ex);
+        }
         if (acqLayout.getLandmarks()!=null & acqLayout.getLandmarks().size()>1 & calcDist(0,0,n.x,n.y)>0) {
             //gradient center positioned in center of layout
-            double lmx=acqLayout.getWidth()/2;
+            Rectangle2D layoutRect=new Rectangle2D.Double(0,0,acqLayout.getWidth(),acqLayout.getHeight());
+            java.awt.geom.Area stage = new java.awt.geom.Area(layoutRect);
+            stage.transform(acqLayout.getLayoutToStageTransform());
+            Rectangle2D stageRect=stage.getBounds();
+
+            IJ.log("layoutRect: "+layoutRect.toString()+"; stageRect: "+stageRect.toString());
+            double lmx=stageRect.getWidth()/2;
+            double lmy=stageRect.getHeight()/2;
+            double radius=calcDist(0,0,lmx,lmy)*n.length();
+            
+            Point2D[] stagep=new Point2D.Double[2];
+//            stagep[0] = new Point2D.Double(stageRect.getX()+(lmx+n.x*radius),stageRect.getY()+(lmy+n.y*radius));
+//            stagep[1] = new Point2D.Double(stageRect.getX()+(lmx-n.x*radius),stageRect.getY()+(lmy-n.y*radius));
+            stagep[0] = new Point2D.Double(stageRect.getX()+(lmx+n.x*radius),stageRect.getY()+(lmy+n.y*radius));
+            stagep[1] = new Point2D.Double(stageRect.getX()+(lmx-n.x*radius),stageRect.getY()+(lmy-n.y*radius));
+            
+            Point2D[] layoutp=new Point2D.Double[2];
+            layoutp[0] = acqLayout.convertStageToLayoutPos_XY(stagep[0]);
+            layoutp[1] = acqLayout.convertStageToLayoutPos_XY(stagep[1]);
+
+            Point2D[] screenp=new Point2D.Double[2];
+            screenp[0] = new Point2D.Double(physToPixelRatio * layoutp[0].getX(), physToPixelRatio * layoutp[0].getY());
+            screenp[1] = new Point2D.Double(physToPixelRatio * layoutp[1].getX(), physToPixelRatio * layoutp[1].getY());
+            IJ.log("stagep[0]: "+stagep[0].toString()+", stagep[1]: "+stagep[1].toString());
+            IJ.log("layoutp[0]: "+layoutp[0].toString()+", layoutp[1]: "+layoutp[1].toString());
+            IJ.log("screenp[0]: "+screenp[0].toString()+", screenp[1]: "+screenp[1].toString());
+/*            double lmx=acqLayout.getWidth()/2;
             double lmy=acqLayout.getHeight()/2;
             double radius=calcDist(0,0,lmx,lmy);
             
-            //gradient center positioned in center of first landmark
-            //acqLayout.getLandmark(0).getLayoutCoordX();
-            //acqLayout.getLandmark(0).getLayoutCoordY();
-            //double d1=calcDist(lmx,lmy, 0, 0);
-            //double d2=calcDist(lmx,lmy, acqLayout.getWidth(), 0);
-            //double d3=calcDist(lmx,lmy, acqLayout.getWidth(), acqLayout.getHeight());
-            //double d4=calcDist(lmx,lmy, 0, acqLayout.getHeight());
-            //double radius=Math.max(Math.max(Math.max(d1, d2),d3),d4);
             Point2D.Double[] p=new Point2D.Double[2];
             p[0] = new Point2D.Double(physToPixelRatio*(lmx+n.x*radius), physToPixelRatio*(lmy+n.y*radius));
             p[1] = new Point2D.Double(physToPixelRatio*(lmx-n.x*radius), physToPixelRatio*(lmy-n.y*radius));
 //            IJ.log("LayoutPanel.calGradientVector: radius: "+Double.toString(radius));
-//            IJ.log("LayoutPanel.calGradientVector: p[0]: ("+Double.toString(p[0].x)+"/"+p[0].y+"), p[1]: ("+Double.toString(p[1].x)+"/"+p[1].y+")");
-            return p;
+//            IJ.log("LayoutPanel.calGradientVector: p[0]: ("+Double.toString(p[0].x)+"/"+p[0].y+"), p[1]: ("+Double.toString(p[1].x)+"/"+p[1].y+")");*/
+            return screenp;
         } else
             return null;
     }
@@ -626,15 +661,27 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         g2d.translate(-dimRot.width/2,-dimRot.height/2);
 */ 
         //draw background
-        Point2D.Double[] p=calcGradientVector();
-        if (showZProfile & p!=null) {
-            Point2D start = new Point2D.Double(bdPix+p[0].x,bdPix+p[0].y);
-            Point2D end = new Point2D.Double(bdPix+p[1].x,bdPix+p[1].y);
+        if (showZProfile) {
+            //uses stageToLayoutTransform to calculate gradient screen start and end points
+            Point2D[] p=calcGradientVector();
+
+//            Rectangle2D layoutRect=new Rectangle2D.Double(0,0,acqLayout.getWidth(),acqLayout.getHeight());
+//            java.awt.geom.Area a = new java.awt.geom.Area(layoutRect);
+//            a.transform(acqLayout.getLayoutToStageTransform());
+//            Rectangle2D stageRect=a.getBounds();
+
+            if (p!=null) {
+            Point2D start = new Point2D.Double(bdPix+p[0].getX(),bdPix+p[0].getY());
+            Point2D end = new Point2D.Double(bdPix+p[1].getX(),bdPix+p[1].getY());
             float[] dist = {0.0f, 0.5f, 1.0f};
-            Color[] colors = {Color.RED, Color.BLACK, Color.BLUE};
+            Color[] colors = {COLOR_TILT_HIGH, Color.BLACK, COLOR_TILT_LOW};
             LinearGradientPaint lg =new LinearGradientPaint(start, end, dist, colors);            
             g2d.setPaint(lg);
             g2d.fill (new Rectangle2D.Double(bdPix, bdPix, w-2*bdPix, h-2*bdPix));
+            } else {
+                g2d.setColor(COLOR_LAYOUT_BACKGR);
+                g2d.fillRect(bdPix, bdPix, w-2*bdPix, h-2*bdPix); //getWidth(), getHeight());                
+            }
         } else {
             g2d.setColor(COLOR_LAYOUT_BACKGR);
             g2d.fillRect(bdPix, bdPix, w-2*bdPix, h-2*bdPix); //getWidth(), getHeight());

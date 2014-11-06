@@ -144,6 +144,7 @@ class AcquisitionLayout  implements PropertyChangeListener {
     
     public AcquisitionLayout(JSONObject obj, File f) {
         isEmpty=true;
+        IJ.log("AcqLayout.loading from JSONObject");
         if (obj!=null) {
             landmarks=new ArrayList<RefArea>();
             try {
@@ -155,7 +156,9 @@ class AcquisitionLayout  implements PropertyChangeListener {
                 JSONArray areaArray=obj.getJSONArray(Area.TAG_AREA_ARRAY);
                 for (int i=0;i<areaArray.length(); i++) {
                     JSONObject areaObj=areaArray.getJSONObject(i);
+                    IJ.log("AcqLayout.trying to initialize area");
                     Area area=Area.createFromJSONObject(areaObj);
+                    IJ.log("AcqLayout. area "+area.getName()+" initialized succesfully");
                     area.setId(i);
                     areas.add(area);
                 }
@@ -411,9 +414,14 @@ class AcquisitionLayout  implements PropertyChangeListener {
     }
     
     //returns angle between vertical vector and normalVec of layout (in degree)
-    public double getTilt() {
-        Vec3d vertical=new Vec3d (0,0,1);
-        return vertical.angle(normalVec);
+    public double getTilt() throws Exception {
+        if (normalVec.z >= 0) {
+            Vec3d vertical=new Vec3d (0,0,1);
+            return vertical.angle(normalVec);
+        } else {
+            Vec3d vertical=new Vec3d (0,0,-1);
+            return vertical.angle(normalVec);
+        }    
     }
 
     //returns list of RefArea for which stagePosMapped==true
@@ -441,7 +449,7 @@ class AcquisitionLayout  implements PropertyChangeListener {
             if (mappedLandmarks.size() == 2) {//2 mapped stage positions
                 v1=new Vec3d(mappedLandmarks.get(0).getStageCoordX(),mappedLandmarks.get(0).getStageCoordY(),mappedLandmarks.get(0).getStageCoordZ()-mappedLandmarks.get(0).getLayoutCoordZ());
                 v2=new Vec3d(mappedLandmarks.get(1).getStageCoordX(),mappedLandmarks.get(1).getStageCoordY(),mappedLandmarks.get(1).getStageCoordZ()-mappedLandmarks.get(1).getLayoutCoordZ());
-                v3=new Vec3d(v2.y-v1.y,-(v2.x-v1.x),v1.z);
+                v3=new Vec3d(v1.x+v2.y-v1.y,v1.y-(v2.x-v1.x),v1.z);
             
             } else {// at least 3 mapped stage positions
                 v1=new Vec3d(mappedLandmarks.get(0).getStageCoordX(),mappedLandmarks.get(0).getStageCoordY(),mappedLandmarks.get(0).getStageCoordZ()-mappedLandmarks.get(0).getLayoutCoordZ());
@@ -450,27 +458,42 @@ class AcquisitionLayout  implements PropertyChangeListener {
                 //need to catch case of 3 co-linear vectors
                 try {
                     if ((Vec3d.cross(v2.minus(v1), v3.minus(v1))).length() == 0) {//co-linear vectors
+                        //ignore third point and reset
                         v3=new Vec3d(v2.y-v1.y,-(v2.x-v1.x),v1.z);
                     }
                 } catch (Exception ex) {
+                    //this can never occur
                     Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
-            Vec3d a=new Vec3d(v2.x-v1.x,v2.y-v1.y,v2.z-v1.z);
-            Vec3d b=new Vec3d(v3.x-v1.x,v3.y-v1.y,v3.z-v1.z);
-            //normalVec = new Vec3d();
-            normalVec = Vec3d.cross(a,b);
+            IJ.log("v1: "+v1.toString()+", v2: "+v2.toString()+", v3: "+v3.toString());
+//            Vec3d a=new Vec3d(v2.x-v1.x,v2.y-v1.y,v2.z-v1.z);
+//            Vec3d b=new Vec3d(v3.x-v1.x,v3.y-v1.y,v3.z-v1.z);
+            try {
+                Vec3d a = v2.minus(v1);
+                Vec3d b = v3.minus(v1);
+                IJ.log("a: "+a.toString()+ ", b: "+ b.toString());
+                //normalVec = new Vec3d();
+                normalVec = Vec3d.cross(a,b);
+            } catch (Exception ex) {
+                //this can never occur
+                Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+            }
+/*            
             if (normalVec.z<0)
-            normalVec.negate();
-            double len=Math.sqrt(normalVec.x*normalVec.x+normalVec.y*normalVec.y);
+                normalVec.negate();
+*/
+            double len=Math.sqrt(normalVec.x*normalVec.x+normalVec.y*normalVec.y+normalVec.z*normalVec.z);
+
             if (len!=0)
                 normalVec.scale(1/len);
+            
 //        normalVec.normalize();
         } else {
 //            IJ.log("no or singe landmarks");
             normalVec=new Vec3d(0,0,1);
         }    
-        
+        IJ.log("normalVec: "+normalVec.toString());
         //determine lowest corner to set z-pos when moving xy-stage
 
 //        RefArea rp = getLandmark(0);
@@ -515,7 +538,10 @@ class AcquisitionLayout  implements PropertyChangeListener {
     
     public Vec3d convertLayoutToStagePos(double layoutX, double layoutY, double layoutZ) throws Exception {
         Point2D xy=convertLayoutToStagePos_XY(new Point2D.Double(layoutX,layoutY));
-        double z=getStageZPosForLayoutPos(layoutX,layoutY);
+//        double z=getStageZPosForLayoutPos(layoutX,layoutY);
+        //get z stage position in layout reference plane (layoutZ=0);
+        double z=getStageZPosForStageXYPos(xy.getX(),xy.getY());
+        //add layoutZ
         Vec3d sCoord=new Vec3d(xy.getX(),xy.getY(),z+layoutZ);
         return sCoord;
     }
@@ -532,6 +558,20 @@ class AcquisitionLayout  implements PropertyChangeListener {
         return stageXY;
     }
     
+    //returns stageZ pos that corresponds to layout reference plane (layoutZ = 0) at stageX/stageY pos
+    public double getStageZPosForStageXYPos(double stageX, double stageY) throws Exception {
+        if (getNoOfMappedStagePos() == 0)
+            throw new Exception("Converting z position: no Landmarks defined");
+        RefArea rp=getMappedLandmarks().get(0);
+//        double z=((-normalVec.x*(layoutX-rp.getStageCoordX())-normalVec.y*(layoutY-rp.getStageCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
+        //ensure that length of normal vector = 1;
+//        Vec3d normalVecN=Vec3d.normalized(normalVec);
+        //calculate z pos in layout reference plane
+        double z=((-normalVec.x*(stageX-rp.getStageCoordX())-normalVec.y*(stageY-rp.getStageCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
+        return z;
+    }
+/*    
+    //faulty: does not take stageToLayoutTransform into account
     public double getStageZPosForLayoutPos(double layoutX, double layoutY) throws Exception {
         if (getNoOfMappedStagePos() == 0)
             throw new Exception("Converting z position: no Landmarks defined");
@@ -540,7 +580,7 @@ class AcquisitionLayout  implements PropertyChangeListener {
         double z=((-normalVec.x*(layoutX-rp.getLayoutCoordX())-normalVec.y*(layoutY-rp.getLayoutCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
         return z;
     }
-    
+*/    
     public double getEscapeZPos() {
         return escapeZPos;
     }
@@ -575,14 +615,14 @@ class AcquisitionLayout  implements PropertyChangeListener {
 
     public double getStagePosX(Area a, int tileIndex) {
         if (a!=null && landmarks!=null && landmarks.size()>0) 
-            return landmarks.get(0).getStageCoordX()-landmarks.get(0).getLayoutCoordX()+a.getCenterX();
+            return landmarks.get(0).getStageCoordX()-landmarks.get(0).getLayoutCoordX()+a.getCenterPos().getX();
         else
             return 0;
     }
     
     public double getStagePosY(Area a, int tileIndex) {
         if (a!=null && landmarks!=null && landmarks.size()>0) 
-            return landmarks.get(0).getStageCoordY()-landmarks.get(0).getLayoutCoordY()+a.getCenterY();
+            return landmarks.get(0).getStageCoordY()-landmarks.get(0).getLayoutCoordY()+a.getCenterPos().getY();
         else
             return 0;
     }
@@ -777,9 +817,10 @@ class AcquisitionLayout  implements PropertyChangeListener {
         if (lm!=null) {
             double x=stageX-(lm.getStageCoordX()-lm.getLayoutCoordX());
             double y=stageY-(lm.getStageCoordY()-lm.getLayoutCoordY());
+            Point2D xy=convertStageToLayoutPos_XY(new Point2D.Double(stageX, stageY));
             boolean found=false;
             while ((index==-1) && (i<areas.size())) {
-                if (areas.get(i).doesFovTouchArea(x,y,fovX,fovY))
+                if (areas.get(i).doesFovTouchArea(xy.getX(),xy.getY(),fovX,fovY))
                     index=i;
                 i++;
             }
@@ -1303,7 +1344,7 @@ class AcquisitionLayout  implements PropertyChangeListener {
             return -1;
     }
 
-    public void removeAreaId(int id) {
+    public void removeAreaById(int id) {
         if (areas!=null) {
             for (int i=0; i<areas.size(); i++) {
                 if (areas.get(i).getId()==id)

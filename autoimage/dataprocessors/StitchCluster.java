@@ -16,7 +16,6 @@ import ij.plugin.PlugIn;
 import ij.process.ImageProcessor;
 import java.awt.Component;
 import java.awt.GridLayout;
-import java.awt.Rectangle;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
@@ -67,7 +66,8 @@ public class StitchCluster extends GroupProcessor<File> {
     private boolean invertX;
     private boolean invertY;
     private String compParams;
-    private boolean rotateAfterStitching;
+    private String postStitchProcessing;
+//    private boolean rotateAfterStitching;
     private static PlugIn stitch_grid=null;
     
 //    private static boolean stitchingInProgress=false;
@@ -94,7 +94,7 @@ public class StitchCluster extends GroupProcessor<File> {
         subpixelAccuracy=true;
         downSample=false;
         compParams="Save memory (but be slower)";
-        rotateAfterStitching=true;
+        postStitchProcessing="None";
         Class<? extends PlugIn> stitchClass;
         try {
             stitchClass = (Class<? extends PlugIn>)Class.forName("plugin.Stitching_Grid");
@@ -126,7 +126,7 @@ public class StitchCluster extends GroupProcessor<File> {
         obj.put("SubpixelAccuracy", subpixelAccuracy);
         obj.put("DownSample", downSample);
         obj.put("ComputationParams", compParams);
-        obj.put("RotateAfterStitching", rotateAfterStitching);
+        obj.put("PostStitchProcessing", postStitchProcessing);
         return obj;
     }
             
@@ -144,7 +144,7 @@ public class StitchCluster extends GroupProcessor<File> {
         subpixelAccuracy=obj.getBoolean("SubpixelAccuracy");
         downSample=obj.getBoolean("DownSample");
         compParams=obj.getString("ComputationParams");
-        rotateAfterStitching=obj.getBoolean("RotateAfterStitching");
+        postStitchProcessing=obj.getString("PostStitchProcessing");
     }
          
     @Override
@@ -159,7 +159,7 @@ public class StitchCluster extends GroupProcessor<File> {
                 + "Subpixel accuracy: " + subpixelAccuracy + "<br>"
                 + "Downsample: " + downSample + "<br>"
                 + "Computation: " + compParams + "<br>"
-                + "Rotate after stitching: " + rotateAfterStitching + "</html>";
+                + "Post-stitch processing: " + postStitchProcessing + "</html>";
         return text;
 }
     
@@ -255,7 +255,7 @@ public class StitchCluster extends GroupProcessor<File> {
                                     double yUM=meta.getDouble(MMTags.Image.YUM)/pixSize;
                                     double zUM=meta.getDouble(MMTags.Image.ZUM)/pixSize;
                                     
-                                    if (rotateAfterStitching) {
+                                    if (!postStitchProcessing.equals("None")) {
                                         widthPx=meta.getDouble(MMTags.Image.WIDTH);
                                         heightPx=meta.getDouble(MMTags.Image.HEIGHT);
                                         if (boundsPx==null) {
@@ -455,14 +455,12 @@ public class StitchCluster extends GroupProcessor<File> {
                                     double angle=calculateRotation(configFile, registerFile);
                                     proc.rotate(angle);
                                 }*/
-                                if (rotateAfterStitching && cameraRot != FieldOfView.ROTATION_UNKNOWN) {
-//                                    proc.rotate(-cameraRot);
+                                if (!postStitchProcessing.equals("None") && cameraRot != FieldOfView.ROTATION_UNKNOWN) {
                                     IJ.run(imp,"Rotate... ", "angle="+Double.toString(-cameraRot/Math.PI*180)+" grid=0 interpolation=Bicubic fill enlarge");
-                                    int newWidth=imp.getWidth();
-                                    int newHeight=imp.getHeight();
-                                    IJ.log(newWidth+", "+newHeight+", "+expectedWidth + ", "+expectedHeight);
-                                    imp.setRoi(new Roi((int)(newWidth-expectedWidth)/2,(int)(newHeight-expectedHeight)/2,(int)expectedWidth,(int)expectedHeight));
-                                    IJ.run(imp, "Crop","");
+                                    if (postStitchProcessing.equals("Rotate and crop")) {
+                                        imp.setRoi(new Roi((int)(imp.getWidth()-expectedWidth)/2,(int)(imp.getHeight()-expectedHeight)/2,(int)expectedWidth,(int)expectedHeight));
+                                        IJ.run(imp, "Crop","");
+                                    }
                                 }
                                 ImageProcessor proc=imp.getProcessor();
                                 TaggedImage ti=null;
@@ -471,7 +469,7 @@ public class StitchCluster extends GroupProcessor<File> {
                                     //newMeta.put(MMTags.Summary.HEIGHT, imp.getHeight());
                                     if (storage==null) {
                                         JSONObject newSummary = new JSONObject(meta.getJSONObject(MMTags.Root.SUMMARY).toString());
-                                        if (rotateAfterStitching && cameraRot != FieldOfView.ROTATION_UNKNOWN) {
+                                        if (!postStitchProcessing.equals("None") && cameraRot != FieldOfView.ROTATION_UNKNOWN) {
                                             newSummary.put(ExtImageTags.DETECTOR_ROTATION, new Double(0));
                                         }
                                         newSummary.put(MMTags.Summary.SLICES, noOfSlices); 
@@ -663,13 +661,16 @@ public class StitchCluster extends GroupProcessor<File> {
         compParamCombo.setSelectedItem(compParams);
         optionPanel.add(compParamCombo);
         
-        l=new JLabel("Rotate after stitching:",JLabel.RIGHT);
+        l=new JLabel("Post-Stitching processing:",JLabel.RIGHT);
         l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
         optionPanel.add(l);
-        JCheckBox rotateAfterStitchCB = new JCheckBox();
-        rotateAfterStitchCB.setAlignmentX(Component.RIGHT_ALIGNMENT);
-        rotateAfterStitchCB.setSelected(rotateAfterStitching);
-        optionPanel.add(rotateAfterStitchCB);
+        String[] postStitchParamOptions=new String[]
+                {"None",
+                "Rotate",
+                "Rotate and crop"};
+        JComboBox postStitchCombo=new JComboBox(postStitchParamOptions);
+        postStitchCombo.setSelectedItem(postStitchProcessing);
+        optionPanel.add(postStitchCombo);
         
         int result = JOptionPane.showConfirmDialog(null, optionPanel, 
                 this.getClass().getName(), JOptionPane.OK_CANCEL_OPTION);
@@ -700,7 +701,7 @@ public class StitchCluster extends GroupProcessor<File> {
             subpixelAccuracy=subpixelCB.isSelected();
             downSample=downsampleCB.isSelected();
             compParams=(String)compParamCombo.getSelectedItem();
-            rotateAfterStitching=rotateAfterStitchCB.isSelected();
+            postStitchProcessing=(String)postStitchCombo.getSelectedItem();
         }    
     }
 

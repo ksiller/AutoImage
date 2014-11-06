@@ -13,7 +13,7 @@ import autoimage.dataprocessors.ImageTagFilterOpt;
 import autoimage.dataprocessors.ImageTagFilterOptLong;
 import autoimage.dataprocessors.ImageTagFilterOptString;
 import autoimage.dataprocessors.ImageTagFilterString;
-import autoimage.dataprocessors.NoFilterSeqAnalyzer;
+import autoimage.olddp.NoFilterSeqAnalyzer;
 import autoimage.dataprocessors.RoiFinder;
 import autoimage.dataprocessors.ScriptAnalyzer;
 import autoimage.dataprocessors.SiteInfoUpdater;
@@ -993,7 +993,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         }
                         lastArea = a;
                     }
-            //        acqLayoutPanel.repaint();                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+                    acqLayoutPanel.repaint(); 
                 }
             }
         });
@@ -5138,7 +5138,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             double coordX = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(evt.getX());
             double coordY = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(evt.getY());
 //            IJ.log("Layout Pos: "+Double.toString(coordX)+", "+Double.toString(coordY));
-
             JViewport vp = layoutScrollPane.getViewport();
             Dimension vpSize = vp.getViewSize();
             Rectangle vpRect = vp.getViewRect();
@@ -5157,22 +5156,26 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         vp.setViewPosition(newPos);
                     }
                     //RefArea lm = acqLayout.getLandmark(0);
-                    moveToLayoutPos(coordX, coordY);
+                    if (SwingUtilities.isLeftMouseButton(evt)) {
+                        moveToLayoutPos(coordX, coordY);
+                    } else if (SwingUtilities.isRightMouseButton(evt)) {                        
+                        moveToAreaDefaultPos(acqLayout.getAreaByLayoutPos(coordX, coordY));
+                    }
                 }
             } else if (zoomMode) {
                 double oldZoom = ((LayoutPanel) acqLayoutPanel).getZoom();
                 double newZoom = oldZoom;
                 if (SwingUtilities.isLeftMouseButton(evt)) {
-                    IJ.log("zooming in: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
+//                    IJ.log("zooming in: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
                     newZoom = ((LayoutPanel) acqLayoutPanel).zoomIn(); //calls acqLayoutPanel.setSize
-                    IJ.log("zooming in: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
-                    IJ.log("-----");
+//                    IJ.log("zooming in: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
+//                    IJ.log("-----");
                 }
                 if (SwingUtilities.isRightMouseButton(evt)) {
-                    IJ.log("zooming out: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
+//                    IJ.log("zooming out: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
                     newZoom = ((LayoutPanel) acqLayoutPanel).zoomOut(vpRect.width, vpRect.height); //calls acqLAyoutPanel.setSize
-                    IJ.log("zooming out: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
-                    IJ.log("-----");
+//                    IJ.log("zooming out: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
+//                    IJ.log("-----");
                 }
                 if ((newZoom != 1) && (newZoom != oldZoom)) {
                     Point newPos = new Point();
@@ -5237,7 +5240,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }
 
     private void acqLayoutPanelMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_acqLayoutPanelMouseReleased
-        if ((marking & selectMode) | (marking & mergeAreasMode) | (marking & commentMode)) {
+        if ((marking & selectMode) || (marking & mergeAreasMode) || (marking & commentMode)) {
 //            IJ.showMessage("EventHandler", "mouseReleased");
 //            IJ.log("MouseReleased: "+Integer.toString(evt.getX())+", "+Integer.toString(evt.getY()));
 //            double coordX=((LayoutPanel)acqLayoutPanel).convertPixToPhysCoord(evt.getX());
@@ -5342,7 +5345,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }//GEN-LAST:event_acqLayoutPanelMouseReleased
 
     private void acqLayoutPanelMouseDragged(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_acqLayoutPanelMouseDragged
-        if (selectMode | mergeAreasMode | commentMode) {
+        if (selectMode || mergeAreasMode || commentMode) {
             double coordX = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(evt.getX());
             double coordY = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(evt.getY());
             String xStr = String.format("%1$,.2f", coordX);
@@ -9286,11 +9289,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }
 
-    private void moveToArea(int index) {
-        Area area = acqLayout.getAreaByIndex(index);
+    private void moveToAreaDefaultPos(Area area) {
         if (area != null) {
             try {
-                Vec3d stage = acqLayout.convertLayoutToStagePos(area.getCenterX(),area.getCenterY(),area.getRelPosZ());
+                Vec3d stage = acqLayout.convertLayoutToStagePos(area.getDefaultPos().getX(),area.getDefaultPos().getY(),area.getRelPosZ());
                 String xyStageName = core.getXYStageDevice();
                 String zStageName = core.getFocusDevice();
                 core.waitForDevice(zStageName);

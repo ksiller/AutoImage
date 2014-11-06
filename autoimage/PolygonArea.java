@@ -45,6 +45,46 @@ public class PolygonArea extends Area {
         createArea(pList, ox, oy);
     }
         
+    private double area(List<Point2D> pList) {
+        if (pList != null) {
+            int i, j, n = pList.size();
+            double area = 0;
+
+            for (i = 0; i < n; i++) {
+                j = (i + 1) % n;
+                area += pList.get(i).getX() * pList.get(j).getY();
+                area -= pList.get(j).getX() * pList.get(i).getY();
+            }
+            area /= 2.0;
+            return area;
+        } else {
+            return 0;
+        }
+    }
+    
+    public Point2D centerOfMass(List<Point2D> pList) {
+        double cx = 0;
+        double cy = 0;
+        double area = area(pList);
+        int i;
+        int j;
+        int n = pList.size();
+
+        double factor = 0;
+        for (i = 0; i < n; i++) {
+            j = (i + 1) % n;
+            factor = (pList.get(i).getX() * pList.get(j).getY()
+                            - pList.get(j).getX() * pList.get(i).getY());
+            cx += (pList.get(i).getX() + pList.get(j).getX()) * factor;
+            cy += (pList.get(i).getY() + pList.get(j).getY()) * factor;
+        }
+        area *= 6.0d;
+        factor = 1 / area;
+        cx *= factor;
+        cy *= factor;
+        return new Point2D.Double(cx,cy);
+    }
+    
     private void createArea(List<Point2D> pList, double offsetX, double offsetY) {
         if (pList!=null) {
             points=new ArrayList<Point2D>(pList.size());
@@ -64,6 +104,60 @@ public class PolygonArea extends Area {
             height=polygon.getBounds2D().getHeight();
         } else {
             polygon=null;
+        }
+    }
+    
+    @Override
+    public void setWidth(double w) {
+        //do nothing because width is determined by vertex points
+    }
+
+    @Override
+    public void setHeight(double h) {
+        //do nothing because width is determined by vertex points
+    }
+    
+    @Override
+    public void setTopLeftX(double x) {
+        double delta=x-topLeftX;
+        if (points!=null) {
+            for (Point2D point:points) {
+                point.setLocation(point.getX()+delta, point.getY());
+            }
+            topLeftX=x;
+            createArea(points, topLeftX, topLeftY);
+            centerPos=calculateCenterPos();
+            defaultPos=calculateDefaultPos();
+        }
+    }
+    
+    @Override
+    public void setTopLeftY(double y) {
+        double delta=y-topLeftY;
+        if (points!=null) {
+            for (Point2D point:points) {
+                point.setLocation(point.getX(), point.getY()+delta);
+            }
+            topLeftY=y;
+            createArea(points, topLeftX, topLeftY);
+            centerPos=calculateCenterPos();
+            defaultPos=calculateDefaultPos();
+        }
+    }
+    
+    @Override
+    public void setTopLeft(double x, double y) {
+        double deltax=x-topLeftX;
+        double deltay=y-topLeftY;
+        if (points!=null) {
+            for (Point2D point:points) {
+                point.setLocation(point.getX()+deltax, point.getY()+deltay);
+            }
+            topLeftX=x;
+            topLeftY=y;
+            createArea(points, topLeftX, topLeftY);
+            centerPos=calculateCenterPos();
+            defaultPos=calculateDefaultPos();
         }
     }
     
@@ -107,7 +201,7 @@ public class PolygonArea extends Area {
     public String getShape() {
         return "Polygon";
     }
-
+/*
     @Override
     public double getCenterX() {
         return topLeftX + polygon.getBounds2D().getWidth()/2;
@@ -117,7 +211,7 @@ public class PolygonArea extends Area {
     public double getCenterY() {
         return topLeftY + polygon.getBounds2D().getHeight()/2;
     }
-
+*/
     @Override
     public void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio) {
         if (acquiring) {
@@ -174,12 +268,6 @@ public class PolygonArea extends Area {
         PolygonArea newArea = new PolygonArea(this.getName());
 //        newArea.shape=this.getShape();
         newArea.setId(this.getId());
-/*        newArea.setTopLeftX(this.topLeftX);
-        newArea.setTopLeftY(this.topLeftY);
-        newArea.setRelPosZ(this.relPosZ);
-        newArea.setWidth(this.width);
-        newArea.setHeight(this.height);
-*/
         newArea.createArea(points,0,0);
         newArea.setSelectedForAcq(isSelectedForAcq());
         newArea.setSelectedForMerge(isSelectedForMerge());
@@ -187,7 +275,21 @@ public class PolygonArea extends Area {
         newArea.setAcquiring(this.acquiring);
 //        newArea.setTilingSetting(this.tiling.duplicate());
         newArea.tilePosList=new ArrayList<Tile>(this.getTilePositions());
+        newArea.setUnknownTileNum(this.hasUnknownTileNum());
         return newArea;
     }
-    
+
+    @Override
+    public Point2D calculateCenterPos() {
+ /*       return new Point2D.Double(
+                topLeftX + polygon.getBounds2D().getWidth()/2,
+                topLeftY + polygon.getBounds2D().getHeight()/2);*/
+        return centerOfMass(points);
+    }
+
+    @Override
+    public Point2D calculateDefaultPos() {
+        return centerOfMass(points);
+    }
+
 }
