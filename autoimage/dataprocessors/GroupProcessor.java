@@ -12,6 +12,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import mmcorej.TaggedImage;
@@ -23,7 +24,7 @@ import org.json.JSONObject;
  * @author Karsten
  * @param <E> File or TaggedImage
  */
-public abstract class GroupProcessor<E> extends BranchedProcessor<E>{
+public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements IMetaDataModifier {
 
     protected List<Group> groupList;
     protected List<String> criteriaKeys; 
@@ -32,14 +33,19 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E>{
 
     protected class Group<E> {
         protected List<E> images;
-        protected boolean listComplete;
-        protected boolean processed;
+//        protected boolean listComplete;
+        protected long status;
         protected JSONObject groupCriteria;
+        protected long maxGroupSize=-1; //-1 unknown --> process all groups during clean up
+        
+        protected final static long IS_NOT_PROCESSED = 0;
+        protected final static long IS_PROCESSING = 1;
+        protected final static long IS_PROCESSED = 2;
         
         
         protected Group(JSONObject grpCriteria) {
-            processed=false;
-            listComplete=false;
+            status=IS_NOT_PROCESSED;
+//            listComplete=false;
             images=new ArrayList<E>();
             if (grpCriteria == null) {
                 groupCriteria = new JSONObject();
@@ -47,7 +53,7 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E>{
                 groupCriteria=grpCriteria;
             }
         }
-
+        
         protected void addCriterium(String key, Object value) throws JSONException {
             groupCriteria.put(key,value);
         }
@@ -79,6 +85,15 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E>{
                 return false;
             }
         }
+        
+        private void setMaxGroupSize(long max) {
+            maxGroupSize=max;
+        }
+        
+        private long getMaxGroupSize() {
+            return maxGroupSize;
+        }
+        
     }    
     
     public GroupProcessor(final String pName) {
@@ -91,13 +106,14 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E>{
         criteriaKeys=criteria;
     }
 
-    //returns list of processed images
-    protected List<E> processGroup(final Group<E> group) {
-        IJ.log(this.getClass().getName()+".processGroup: ");
-        IJ.log("   Criteria: "+group.groupCriteria.toString());
-        IJ.log("   Images: "+group.images.size()+" images");
-        return group.images;
+    protected abstract List<E> processGroup(final Group<E> group);
+    
+    protected boolean groupIsComplete(Group<E> group) {
+        Long max=group.getMaxGroupSize();
+        return (max!=null && max != -1 && group.images.size()>=max);
     }
+    
+    protected abstract long determineMaxGroupSize(JSONObject meta) throws JSONException;
     
     @Override
     protected List<E> processElement(E element) { 
@@ -118,7 +134,15 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E>{
             }    
             if (currentGroup==null) {//new to create new group
                 currentGroup=new Group<E>(null);
-                JSONObject meta=readMetadata(element);
+                JSONObject meta=Utils.readMetadata(element,false);
+                try {
+                    long max=determineMaxGroupSize(meta);
+                    currentGroup.setMaxGroupSize(max);
+                    IJ.log("    Setting maxGroupSize="+max);
+                } catch (JSONException jex) {
+                    //leave as -1 (default), which by default means that group will be processed during cleanup 
+                    IJ.log("    Setting maxGroupSize=-1");
+                }    
 //                IJ.log("    Creating new group");
                 for (String key:criteriaKeys) {
                     currentGroup.addCriterium(key, meta.get(key));
@@ -129,15 +153,17 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E>{
                 IJ.log("    Added to group #"+(groupList.size()-1));
                 IJ.log("    "+groupList.size()+" groups");
             }
-            if (currentGroup.listComplete) {
-                currentGroup.processed=true;
-                return processGroup(currentGroup);
+            if (groupIsComplete(currentGroup) && currentGroup.status==Group.IS_NOT_PROCESSED) {
+                currentGroup.status=Group.IS_PROCESSING;
+                List<E> results=processGroup(currentGroup);
+                currentGroup.status=Group.IS_PROCESSED;
+                return results;
             }
         } catch (JSONException ex) {
             IJ.log("    JSONException");
             Logger.getLogger(GroupProcessor.class.getName()).log(Level.SEVERE, null, ex);
         }
-        return null;
+        return new ArrayList<E>();
     }
 
     protected void setCriteria (List<String> criteria) {
@@ -150,10 +176,14 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E>{
     
     @Override
     protected void cleanUp() {
-        IJ.log(this.getClass().getName()+".cleanUp");
+        IJ.log(this.getClass().getName()+".cleanUp: "+groupList.size()+" groups");
+        int i=0;
         for (Group<E> grp:groupList) {
-            if (processIncompleteGrps && !grp.processed) {
+            if (processIncompleteGrps && grp.status==Group.IS_NOT_PROCESSED) {
+                IJ.log(this.getClass().getName()+".cleanUp: processing group "+i);
+                grp.status=Group.IS_PROCESSING;
                 List<E> modifiedElements=processGroup(grp);
+                grp.status=Group.IS_PROCESSED;
                 if (modifiedElements!=null) { //image processing was successful
                         //analyzers that form nodes need to place processed image in 
                         //modifiedOutput_ queue
@@ -163,9 +193,12 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E>{
                     for (E element:modifiedElements)
                         produceModified(element);
                 }
+            } else {
+                IJ.log(this.getClass().getName()+".cleanUp: group "+i+" already processed");
             }
             grp.images.clear();
+            i++;
         }
-        groupList.clear();
+        clearGroups();
     }
 }

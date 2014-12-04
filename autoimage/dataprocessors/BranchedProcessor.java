@@ -104,7 +104,7 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
       } 
    }
 
-    protected JSONObject readMetadata(E element) throws JSONException {
+/*    protected JSONObject readMetadata(E element) throws JSONException {
         JSONObject meta=null;
         if (element instanceof File) {
             meta=Utils.parseMetadata((File)element);
@@ -113,7 +113,7 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
         }    
         return meta;
     }
-
+*/
    //has to reject TaggedImageQueue.Poison
    protected abstract boolean acceptElement(E element);
    

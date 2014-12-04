@@ -22,7 +22,6 @@ import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.swing.JOptionPane;
 import javax.swing.ProgressMonitor;
 import javax.swing.SwingWorker;
 import javax.xml.stream.XMLInputFactory;
@@ -49,6 +48,8 @@ class AcquisitionLayout  implements PropertyChangeListener {
     private double originY;
     private double width;
     private double height;
+    private String bottomMaterial;
+    private double bottomThickness;
     private String version;
     private AffineTransform stageToLayoutTransform;
     private AffineTransform layoutToStageTransform;
@@ -94,8 +95,6 @@ class AcquisitionLayout  implements PropertyChangeListener {
     private static final int FILE_NO_MATCHING_AREAS=-5;
     private static final double ESCAPE_ZPOS_SAFETY=50; //keeps z-stage at least 50um below plate
     
-    
-    private int indent;
     
     
     class TileCalcTask extends SwingWorker<Void, Void> {
@@ -908,6 +907,38 @@ class AcquisitionLayout  implements PropertyChangeListener {
     }
     
     
+    public static AcquisitionLayout createSBSPlate(File f, int columns, int rows, double w, double h, double a1ColumnOffset, double a1RowOffset, double wellDiam, double wellSpacingX, double wellSpacingY, String wellShape, double bottomThickness, String bottomMaterial){
+        AcquisitionLayout layout=new AcquisitionLayout(null,null);
+        layout.width=w; //physical dim in um
+        layout.height=h; //physical dim in um
+        double oX=(double)a1ColumnOffset-wellDiam/2;
+        double oY=(double)a1RowOffset-wellDiam/2;
+        int areaNum=columns*rows;
+        layout.areas = new ArrayList<Area>(areaNum);
+        int id=1;
+        String wellName;
+        for (int row=0; row<rows; row++) {
+            for (int column=0; column<columns; column++) {
+                if (row>=Area.PLATE_ALPHABET.length)
+                    wellName=Integer.toString(id);
+                else
+                    wellName=Area.PLATE_ALPHABET[row]+Integer.toString(column+1);
+                Area a=null;
+                if (wellShape.equals("Square"))
+                    a = new RectArea(wellName, id, oX+wellSpacingX*column, oY+wellSpacingY*row,0,wellDiam,wellDiam,false,"");
+                else if (wellShape.equals("Circle"))
+                    a = new EllipseArea(wellName, id, oX+wellSpacingX*column, oY+wellSpacingY*row,0,wellDiam,wellDiam,false,"");
+                layout.areas.add(a);
+                id++;
+            }    
+        }
+                 
+        layout.addLandmark(new RefArea("Landmark 1",0,0,0,oX+wellDiam/2,oY+wellDiam/2,0,512,512,"landmark_1.tif")); //expects stage then layout coords
+        layout.addLandmark(new RefArea("Landmark 2",0,0,0,oX+wellDiam/2+(columns-1)*wellSpacingX,oY+wellDiam/2,0,512,512,"landmark_2.tif")); //expects stage then layout coords
+        layout.addLandmark(new RefArea("Landmark 3",0,0,0,oX+wellDiam/2,oY+wellDiam/2+(rows-1)*wellSpacingY,0,512,512,"landmark_3.tif")); //expects stage then layout coords
+        return layout;
+    }
+        
     public void createSBSPlateLayout(File f, int columns, int rows, double w, double h, double a1ColumnOffset, double a1RowOffset, double wellDiam, double wellSpacingX, double wellSpacingY, String wellShape){
         width=w; //physical dim in um
         height=h; //physical dim in um

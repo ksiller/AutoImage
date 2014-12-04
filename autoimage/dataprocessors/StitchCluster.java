@@ -177,7 +177,7 @@ public class StitchCluster extends GroupProcessor<File> {
         IJ.log(this.getClass().getName()+".processGroup: ");
         IJ.log("   Criteria: "+group.groupCriteria.toString());
         IJ.log("   Images: "+group.images.size()+" images");
-        if (group.images!=null && group.images.size()>1) {
+        if (group!=null && group.images!=null && group.images.size()>1) {
 
             Callable stitchingTask=new Callable<List<File>>() {
 
@@ -227,6 +227,7 @@ public class StitchCluster extends GroupProcessor<File> {
                         List<String> foundCh=new ArrayList<String>();
                         double expectedWidth=0;
                         double expectedHeight=0;
+                        //create TileConfig file
                         try {
                             BufferedWriter writer;
 
@@ -250,66 +251,62 @@ public class StitchCluster extends GroupProcessor<File> {
                                 meta=Utils.parseMetadata(e);
                                 //need to convert from um into pixel coords if using grid stitching plugin
                                 Long sliceIndex=meta.getLong(MMTags.Image.SLICE_INDEX);
-//                                if (selectedSliceIndex == sliceIndex) {
-                                    double xUM=meta.getDouble(MMTags.Image.XUM)/pixSize;
-                                    double yUM=meta.getDouble(MMTags.Image.YUM)/pixSize;
-                                    double zUM=meta.getDouble(MMTags.Image.ZUM)/pixSize;
-                                    
-                                    if (!postStitchProcessing.equals("None")) {
-                                        widthPx=meta.getDouble(MMTags.Image.WIDTH);
-                                        heightPx=meta.getDouble(MMTags.Image.HEIGHT);
-                                        if (boundsPx==null) {
-                                            boundsPx=getTileBounds(new Rectangle2D.Double(0,0,widthPx,heightPx), cameraRot);
-                                            IJ.log("BOUNDS: "+boundsPx.toString());
-                                            minXPx=xUM - (double)boundsPx.getWidth()/2;
-                                            minYPx=yUM - (double)boundsPx.getHeight()/2;
-                                            maxXPx=xUM + (double)boundsPx.getWidth()/2;
-                                            maxYPx=yUM + (double)boundsPx.getHeight()/2;
-                                        } else {
-//                                                    boundsPx=getTileBounds(new Rectangle2D.Double(0,0,widthPx,heightPx),cameraRot);
-                                            minXPx=Math.min(minXPx,xUM - (double)boundsPx.getWidth()/2);
-                                            minYPx=Math.min(minYPx,yUM - (double)boundsPx.getHeight()/2);
-                                            maxXPx=Math.max(maxXPx,xUM + (double)boundsPx.getWidth()/2);
-                                            maxYPx=Math.max(maxYPx,yUM + (double)boundsPx.getHeight()/2);             
-                                        }
-                                    }   
-                                    
-                                    String ch=meta.getString((MMTags.Image.CHANNEL_NAME));
-                                    if (!foundCh.contains(ch))
-                                        foundCh.add(ch);
-                                    if (i==1) {
-                                        xMin=xUM;
-                                        xMax=xUM;
-                                        yMin=yUM;
-                                        yMax=yUM;
-                                        refPoint=new Point2D.Double(xUM,yUM);
-                                    } else {
-                                        if (cameraRot != FieldOfView.ROTATION_UNKNOWN) {
-                                            Point2D p=Utils.rotatePoint(new Point2D.Double(xUM,yUM), refPoint, cameraRot);
-                                            xUM=p.getX();
-                                            yUM=p.getY();
-                                        }
-                                        xMin=xUM < xMin?xUM:xMin;
-                                        xMax=xUM > xMax?xUM:xMax;
-                                        yMin=yUM < yMin?yUM:yMin;
-                                        yMax=yUM > yMax?yUM:yMax;
-                                    }
-            //                        double x=xUM/pixSize;
-            //                        double y=yUM/pixSize;
-            //                        double z=zUM/pixSize;
-                                    String path=e.getParent();
-                                  //  renameMetadataFile(path,"metadata.txt","metadata_backup");
-                                    path=new File(path).getName();
-                                    if (dim==2) {
-                                        line = new File(path,e.getName()).getPath() + "; ; (" + Double.toString(xUM) + ", " + Double.toString(yUM) + ")\n";
-                                    } else {
-                                        line = new File(path,e.getName()).getPath() + "; ; (" + Double.toString(xUM) + ", " + Double.toString(yUM) + ", " + Double.toString(zUM)+ ")\n";
+                                double xUM=meta.getDouble(MMTags.Image.XUM)/pixSize;
+                                double yUM=meta.getDouble(MMTags.Image.YUM)/pixSize;
+                                double zUM=meta.getDouble(MMTags.Image.ZUM)/pixSize;
 
+                                if (!postStitchProcessing.equals("None")) {
+                                    widthPx=meta.getDouble(MMTags.Image.WIDTH);
+                                    heightPx=meta.getDouble(MMTags.Image.HEIGHT);
+                                    if (boundsPx==null) {
+                                        boundsPx=getTileBounds(new Rectangle2D.Double(0,0,widthPx,heightPx), cameraRot);
+                                        IJ.log("BOUNDS: "+boundsPx.toString());
+                                        minXPx=xUM - (double)boundsPx.getWidth()/2;
+                                        minYPx=yUM - (double)boundsPx.getHeight()/2;
+                                        maxXPx=xUM + (double)boundsPx.getWidth()/2;
+                                        maxYPx=yUM + (double)boundsPx.getHeight()/2;
+                                    } else {
+                                        minXPx=Math.min(minXPx,xUM - (double)boundsPx.getWidth()/2);
+                                        minYPx=Math.min(minYPx,yUM - (double)boundsPx.getHeight()/2);
+                                        maxXPx=Math.max(maxXPx,xUM + (double)boundsPx.getWidth()/2);
+                                        maxYPx=Math.max(maxYPx,yUM + (double)boundsPx.getHeight()/2);             
                                     }
-                                    writer.write(line);
-                                    i++;
-//                                }
+                                }   
 
+                                String ch=meta.getString((MMTags.Image.CHANNEL_NAME));
+                                if (!foundCh.contains(ch))
+                                    foundCh.add(ch);
+                                if (i==1) {
+                                    xMin=xUM;
+                                    xMax=xUM;
+                                    yMin=yUM;
+                                    yMax=yUM;
+                                    refPoint=new Point2D.Double(xUM,yUM);
+                                } else {
+                                    if (cameraRot != FieldOfView.ROTATION_UNKNOWN) {
+                                        Point2D p=Utils.rotatePoint(new Point2D.Double(xUM,yUM), refPoint, cameraRot);
+                                        xUM=p.getX();
+                                        yUM=p.getY();
+                                    }
+                                    xMin=xUM < xMin?xUM:xMin;
+                                    xMax=xUM > xMax?xUM:xMax;
+                                    yMin=yUM < yMin?yUM:yMin;
+                                    yMax=yUM > yMax?yUM:yMax;
+                                }
+        //                        double x=xUM/pixSize;
+        //                        double y=yUM/pixSize;
+        //                        double z=zUM/pixSize;
+                                String path=e.getParent();
+                              //  renameMetadataFile(path,"metadata.txt","metadata_backup");
+                                path=new File(path).getName();
+                                if (dim==2) {
+                                    line = new File(path,e.getName()).getPath() + "; ; (" + Double.toString(xUM) + ", " + Double.toString(yUM) + ")\n";
+                                } else {
+                                    line = new File(path,e.getName()).getPath() + "; ; (" + Double.toString(xUM) + ", " + Double.toString(yUM) + ", " + Double.toString(zUM)+ ")\n";
+
+                                }
+                                writer.write(line);
+                                i++;
                             }    
                             writer.close();
                             boundsPx=getTileBounds(new Rectangle2D.Double(0,0,widthPx,heightPx), cameraRot);
@@ -465,9 +462,9 @@ public class StitchCluster extends GroupProcessor<File> {
                                 ImageProcessor proc=imp.getProcessor();
                                 TaggedImage ti=null;
                                 try {
-                                    //these are used to create display settings 
-                                    //newMeta.put(MMTags.Summary.HEIGHT, imp.getHeight());
+                                    //update summary and image metadata
                                     if (storage==null) {
+                                        meta=updateTagValue(meta,workDir,prefix,true);
                                         JSONObject newSummary = new JSONObject(meta.getJSONObject(MMTags.Root.SUMMARY).toString());
                                         if (!postStitchProcessing.equals("None") && cameraRot != FieldOfView.ROTATION_UNKNOWN) {
                                             newSummary.put(ExtImageTags.DETECTOR_ROTATION, new Double(0));
@@ -486,6 +483,8 @@ public class StitchCluster extends GroupProcessor<File> {
                                         newSummary.remove("InitialPositionList");
                                         storage = new TaggedImageStorageDiskDefault (
                                             workDir,true,newSummary);
+                                    } else {
+                                        meta=updateTagValue(meta,workDir,prefix,false);
                                     }
         //                            IJ.log("after summary update");
                                     meta.put(MMTags.Image.HEIGHT, imp.getHeight());
@@ -501,19 +500,17 @@ public class StitchCluster extends GroupProcessor<File> {
                                     meta.put(MMTags.Image.SLICE,j);
                                     meta.put(MMTags.Image.FRAME_INDEX,t);
                                     meta.put(MMTags.Image.FRAME,t);
-                                    meta.put(ExtImageTags.AREA_INDEX,0);
+//                                    meta.put(ExtImageTags.AREA_INDEX,0);
 //                                    meta.put(ExtImageTags.SITE_INDEX,currentClusterIndex);
                                     meta.put(ExtImageTags.SITE_INDEX,0);
 //                                    meta.put(ExtImageTags.CLUSTER_INDEX,currentClusterIndex);
-                                    meta.put(ExtImageTags.CLUSTER_INDEX,0);
+//                                    meta.put(ExtImageTags.CLUSTER_INDEX,0);
                                     meta.put(ExtImageTags.CLUSTERS_IN_AREA, 1);
                                     meta.put(ExtImageTags.SITES_IN_AREA, 1);
         //                            IJ.log("xMin(pix): "+Double.toString(xMin)+", xMax(pix): "+Double.toString(xMax)+", yMin(pix): "+Double.toString(yMin)+", yMax(pix): "+Double.toString(yMax));
         //                            IJ.log("xMax(pix)-xMin(pix): "+Double.toString(xMax-xMin)+", yMax(pix)-yMin(pix): "+Double.toString(yMax-yMin)+", imp.getWidth()-->um="+Double.toString(imp.getWidth()*pixSize)+", imp.getHeight()-->um="+Double.toString(imp.getHeight()*pixSize));
         //                            IJ.log("Creating new TaggedImage");
                                     ti=new TaggedImage(proc.getPixels(),meta);
-                                    //ti.tags.put("FileName", stitchedFile.getName());
-                                    //JSONObject summary=newMeta.getJSONObject(MMTags.Root.SUMMARY);
                                     storage.putImage(ti);
                                     stitchedFiles.add(new File(new File(workDir,prefix), ti.tags.getString("FileName")));
                                     IJ.log("    "+stitchedFiles.get(stitchedFiles.size()-1).getAbsolutePath());
@@ -543,7 +540,8 @@ public class StitchCluster extends GroupProcessor<File> {
                     IJ.log("----");
                     return stitchedFiles;
                 }
-            };
+            };// end callable
+            
             Future<List<File>> future=executor.submit(stitchingTask);
             try {
                 List<File> returnList=future.get();
@@ -708,6 +706,21 @@ public class StitchCluster extends GroupProcessor<File> {
     @Override
     protected boolean acceptElement(File element) {
         return true;
+    }
+
+    @Override
+    public JSONObject updateTagValue(JSONObject meta,String newDir, String newPrefix, boolean updateSummary) throws JSONException {
+        return meta;
+    }
+
+    @Override
+    protected boolean groupIsComplete(Group<File> group) {
+        return false;
+    }
+
+    @Override
+    protected long determineMaxGroupSize(JSONObject meta) throws JSONException {
+        return -1;
     }
     
 }

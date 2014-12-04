@@ -2,9 +2,10 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-package autoimage.dataprocessors;
+package autoimage.olddp;
 
 import autoimage.Utils;
+import autoimage.dataprocessors.MultiChMultiZAnalyzer;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
@@ -30,13 +31,13 @@ import org.micromanager.utils.ImageUtils;
  *
  * @author Karsten
  */
-public class ZProj extends MultiChMultiZAnalyzer<File> {
+public class ZProjOld extends MultiChMultiZAnalyzer<File> {
 
-    public ZProj() {
+    public ZProjOld() {
         this("",null,null);
     }
 
-    public ZProj(String path, List<String> channels, List<Long> slices) {
+    public ZProjOld(String path, List<String> channels, List<Long> slices) {
         super("Z-Project",path,channels, slices);
     }
     
@@ -102,7 +103,7 @@ public class ZProj extends MultiChMultiZAnalyzer<File> {
                         storage = new TaggedImageStorageDiskDefault(workDir,true,summary);
                         storage.putImage(ti);
                     } catch (Exception ex) {
-                        Logger.getLogger(ZProj.class.getName()).log(Level.SEVERE, null, ex);
+                        Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
                     }
                     if (storage!=null)
                         storage.close();
@@ -117,7 +118,7 @@ public class ZProj extends MultiChMultiZAnalyzer<File> {
 //                        destFile=null;
                     it.remove(); // avoids a ConcurrentModificationException
                 }
-//                destFile=new File (path,"ZProj-stack.tif");
+//                destFile=new ZProjOld(path,"ZProj-stack.tif");
 //                if (!IJ.saveAsTiff(stackImp, destFile.getAbsolutePath()))
 //                    destFile=null;
                 return zProjFiles;

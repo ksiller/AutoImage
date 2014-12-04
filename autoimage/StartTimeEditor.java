@@ -12,7 +12,6 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import javax.swing.AbstractCellEditor;
 import javax.swing.JButton;
-import javax.swing.JDialog;
 import javax.swing.JTable;
 import javax.swing.table.TableCellEditor;
 
@@ -25,30 +24,34 @@ public class StartTimeEditor extends AbstractCellEditor
     AcqSetting.ScheduledTime startTime;
     JButton button;//component in table
     TimeChooserDlg timeChooser;
-    JDialog dialog;
+//    JDialog dialog;
     protected static final String EDIT = "edit";
  
     public StartTimeEditor() {
+        IJ.log("StartTimeEditor.constructor");
         button = new JButton();
         button.setActionCommand(EDIT);//when cell is pressed in table
+        button.addActionListener(this);
+/*
         button.addActionListener(new ActionListener() {
-            /**
-             * Handles events from the table cell editor button.
-             */
             @Override
             public void actionPerformed(ActionEvent e) {
+                IJ.log("StartTimeEditor.actionPerformed");
                 if (EDIT.equals(e.getActionCommand())) {
                     //The user has clicked the cell, so
                     //bring up the dialog.
-
+                    IJ.log("before setStartTime");    
                     timeChooser.setStartTime(new AcqSetting.ScheduledTime(startTime.type,startTime.startTimeMS));
+                    IJ.log("after setStartTime");    
                     timeChooser.setVisible(true);
+                    IJ.log("after setVisible");    
 
                     //Make the renderer reappear.
                     fireEditingStopped();
                 }
             }
         });
+            */
         button.setBorderPainted(false);
  
         timeChooser = new TimeChooserDlg(null,true);
@@ -58,7 +61,15 @@ public class StartTimeEditor extends AbstractCellEditor
  
     @Override
     public void actionPerformed(ActionEvent e) {
-        if (e.getActionCommand().equals("Ok")) {
+        if (EDIT.equals(e.getActionCommand())) {
+            //The user has clicked the cell, so
+            //bring up the dialog.
+            timeChooser.setStartTime(new AcqSetting.ScheduledTime(startTime.type,startTime.startTimeMS));
+            timeChooser.setVisible(true);
+
+            //Make the renderer reappear.
+            fireEditingStopped();
+        } else if (e.getActionCommand().equals("Ok")) {
             startTime = timeChooser.getStartTime();
         }
         if (e.getActionCommand().equals("Cancel")) {
@@ -71,7 +82,7 @@ public class StartTimeEditor extends AbstractCellEditor
         return startTime;
     }
  
-    //TableCellEditor
+    //AbstractCellEditor
     @Override
     public Component getTableCellEditorComponent(JTable table,
                                                  Object value,

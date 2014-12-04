@@ -36,7 +36,7 @@ import org.micromanager.utils.ImageUtils;
 
 //E: element type in BlockingQueue (either TaggedImage or File)
 //T: tag value type
-public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
+public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implements IMetaDataModifier {
     
     protected String key_; //key to retrieve property of JSONObject in TaggedImages that will be filtered
     protected List<T> values_; //accepted values for property retrieved with key_
@@ -179,7 +179,8 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E>{
         super.run();
     }
     
-    protected JSONObject updateTagValue(JSONObject meta,String newDir, String newPrefix, boolean isTaggedImage) throws JSONException {
+    @Override
+    public JSONObject updateTagValue(JSONObject meta,String newDir, String newPrefix, boolean isTaggedImage) throws JSONException {
         JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
         if (!isTaggedImage && newDir!=null)
             summary.put(MMTags.Summary.DIRECTORY,newDir);

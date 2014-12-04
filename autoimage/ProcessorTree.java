@@ -99,7 +99,7 @@ public class ProcessorTree<E> {
 
          //create OutputQueue for currentNode
          if (currentProc instanceof BranchedProcessor) {
-            IJ.log("current=SeqAnalyzer: "+currentProc.getClass().getSimpleName());
+            IJ.log("current=BranchedProcessor: "+currentProc.getClass().getSimpleName());
             if (currentNode.getChildCount()>0)
                 analysisOut=new LinkedBlockingQueue(1);
             else 

@@ -13,17 +13,16 @@ import autoimage.dataprocessors.ImageTagFilterOpt;
 import autoimage.dataprocessors.ImageTagFilterOptLong;
 import autoimage.dataprocessors.ImageTagFilterOptString;
 import autoimage.dataprocessors.ImageTagFilterString;
-import autoimage.olddp.NoFilterSeqAnalyzer;
 import autoimage.dataprocessors.RoiFinder;
 import autoimage.dataprocessors.ScriptAnalyzer;
 import autoimage.dataprocessors.SiteInfoUpdater;
+import autoimage.olddp.NoFilterSeqAnalyzer;
 import ij.CompositeImage;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
 import ij.Prefs;
 import ij.gui.GenericDialog;
-import ij.gui.ImageWindow;
 import ij.measure.Calibration;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
@@ -35,7 +34,6 @@ import java.awt.Container;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -48,8 +46,6 @@ import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -63,7 +59,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.text.DecimalFormat;
-import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -130,6 +125,7 @@ import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.JTableHeader;
+import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableColumn;
 import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
@@ -166,7 +162,6 @@ import org.micromanager.api.TaggedImageStorage;
 import org.micromanager.internalinterfaces.AcqSettingsListener;
 import org.micromanager.utils.ChannelSpec;
 import org.micromanager.utils.MMScriptException;
-import org.micromanager.utils.NumberUtils;
 import org.micromanager.utils.ReportingUtils;
 
 
@@ -325,7 +320,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             while (en.hasMoreElements()) {
                     DefaultMutableTreeNode node = en.nextElement();
                     DataProcessor dp=(DataProcessor)node.getUserObject();
-                    File procDir=new File (new File(new File (imageDestPath,"Processed"),setting.getName()),"Proc"+String.format(Integer.toString(i),"%06d"));
+                    File procDir=new File (new File(new File (imageDestPath,"Processed"),setting.getName()),"Proc"+String.format("%03d",i)+"-"+dp.getName());
                     if (!procDir.mkdirs()) {
                         throw new Exception("Directories for Processed Images cannot be created.");
                     }            
@@ -676,7 +671,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 if (!acqLayout.hasGaps(setting.getFieldOfView(),setting.getTileOverlap())) {
                     message=message+"Setting '"+setting.getName()+"': Ok.\n";
                 } else {//tiling gap
-                    double newOverlap=acqLayout.closeTilingGaps(setting.getFieldOfView(), 0.005);                                
+                    double newOverlap=acqLayout.closeTilingGaps(setting.getFieldOfView(), 0.005);
+                    
+                    //round up to next percentage to ensure that no gaps remain
+                    newOverlap = Math.ceil(newOverlap * 100)/100;
+                            
                     settingsToUpdate.add(setting);
                     newTileOverlaps.add(newOverlap);
                     message=message+"Setting '"+setting.getName()+"': Tiling gaps, suggested tile overlap: "+Integer.toString((int)Math.ceil(newOverlap*100))+"%.\n";
@@ -752,6 +751,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
                     } else {
                         JOptionPane.showMessageDialog(null, "Camera rotation angle could not be determined.");
+                        setCameraRotation(FieldOfView.ROTATION_UNKNOWN);
+                        acqLayoutPanel.repaint();        
                     }
                     cameraRotDialog.dispose();
                     IJ.log("AcqFrame: currentDetector.fieldRotation="+currentDetector.fieldRotation);
@@ -821,6 +822,75 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         zOffsetDialog.selectGroup(currentAcqSetting.getChannelGroupStr());
         zOffsetDialog.setVisible(true);
     }
+
+    private void showManagePlateLayout(boolean modal) {
+        PlateConfiguration plateConfig=new PlateConfiguration();
+        LayoutPlateManagerDlg plateDialog=new LayoutPlateManagerDlg(this, modal);
+        plateConfig.fileLocation=Prefs.getHomeDir();
+        plateDialog.setConfiguration(plateConfig);
+        plateDialog.addWindowListener(new java.awt.event.WindowAdapter() {
+                    @Override
+                    public void windowClosing(java.awt.event.WindowEvent e) {
+                        System.exit(0);
+                    }
+                });
+        plateDialog.setVisible(true);
+        
+        
+    /*    if (zOffsetDialog == null) {
+            zOffsetDialog = new  ZOffsetDlg(this,gui,currentAcqSetting.getChannelGroupStr(),modal);
+            zOffsetDialog.addWindowListener(this);
+            if (liveModeMonitor!=null) {
+                liveModeMonitor.addListener(zOffsetDialog);
+                    }
+            if (stageMonitor!=null) {
+                stageMonitor.addListener(zOffsetDialog);
+                                            }
+            zOffsetDialog.addApplyListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    String groupName=zOffsetDialog.getGroupName();
+                    if (!groupName.equals(currentAcqSetting.getChannelGroupStr())) {
+                        JOptionPane.showMessageDialog(null, "Group name mismatch. Z-offset settings cannot be added to current channel table.");
+                    }
+                    List<ZOffsetDlg.ChannelData> cdList=zOffsetDialog.getConfigData();
+                    if (cdList!=null) {
+                        for (ZOffsetDlg.ChannelData cd:cdList) {
+                            if (cd.isSet()) {
+                                boolean found=false;
+                                for (Channel ch:currentAcqSetting.getChannels()) {
+                                    if (ch.getName().equals(cd.getConfigName())) {
+                                        ch.setZOffset(cd.getZOffset());
+                                        if (ch.getExposure() != cd.getExposure()) {
+                                            int result=JOptionPane.showConfirmDialog(null, "Exposure for channel "+ch.getName() + " has changed.\n\n"
+                                                    +"Do you want to update the exposure setting?", "AutoImag: Set Z-Offset",JOptionPane.YES_NO_OPTION);
+                                            if (result==JOptionPane.YES_OPTION) {
+                                                ch.setExposure(cd.getExposure());
+                                            }
+                                        }
+                                        found=true;
+                                        break;
+                                    }
+                                }
+                                if (!found) {
+                                    int result=JOptionPane.showConfirmDialog(null, "Do you want to add configuration "+cd.getConfigName()+" to the channel selection", "AutoImag: Set Z-Offset",JOptionPane.YES_NO_OPTION);
+                                    if (result==JOptionPane.YES_OPTION) {
+                                        currentAcqSetting.getChannels().add(new Channel(cd.getConfigName(),cd.getExposure(),cd.getZOffset(),new Color(127,127,127)));
+//                                        channelTable.setModel(new ChannelTableModel(currentAcqSetting.getChannels()));
+                                        initializeChannelTable(currentAcqSetting);
+                                    }
+                                }
+                            }
+                        }
+                    }    
+                }
+            });
+        }
+        zOffsetDialog.setGroupData(currentAcqSetting.getChannelGroupStr(),zOffsetDialog.convertChannelList(currentAcqSetting.getChannels()),true);
+//        zOffsetDialog.updateConfigData(currentAcqSetting.getChannelGroupStr(),zOffsetDialog.convertChannelList(currentAcqSetting.getChannels()));
+        zOffsetDialog.selectGroup(currentAcqSetting.getChannelGroupStr());
+        zOffsetDialog.setVisible(true);*/
+    }
     
     @Override
     public void actionPerformed(ActionEvent e) {
@@ -829,6 +899,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         } else
         if (e.getActionCommand().equals(CMD_Z_OFFSET)) {
             showZOffsetDlg(false);
+        }
+        if (e.getActionCommand().equals(CMD_MANAGE_LAYOUT)) {
+            showManagePlateLayout(true);
         }
     }
 
@@ -1752,6 +1825,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             this.settings = al;
         }
         
+        public void setData(List<AcqSetting> al) {
+            if (al == null) {
+                al = new ArrayList<AcqSetting>();
+            }
+            this.settings = al;            
+        }
+        
         public List<AcqSetting> getAcqSettingList() {
             return settings;
         }
@@ -2171,9 +2251,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-        //format acgSettingTable
-        acqSettingTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-
         //format areaTable
         areaTable.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
         //areaTable.getModel().addTableModelListener(this);
@@ -2217,8 +2294,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         //load last settings
         expSettingsFile = new File(Prefs.getHomeDir(),"LastExpSettings.txt");
         loadExpSettings(expSettingsFile, true);
+//        IJ.showMessage("after loadExp "+(acqSettingTable.getColumnModel().getColumn(1).getCellEditor() instanceof StartTimeEditor ? "yes" : "no"));
 
+        //format acgSettingTable
+        acqSettingTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         acqSettingTable.getSelectionModel().setSelectionInterval(0, 0);
+        acqSettingTable.setDefaultEditor(AcqSetting.ScheduledTime.class, new StartTimeEditor());
+                
         sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
                         "Sequence: "+currentAcqSetting.getName()));
 
@@ -5472,13 +5554,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         int returnVal = fc.showOpenDialog(null);
         if (returnVal == JFileChooser.APPROVE_OPTION) {
             File f = fc.getSelectedFile();
-            if (!getExtension(f).toLowerCase().equals(".txt")) {
+            if (!Utils.getExtension(f).toLowerCase().equals(".txt")) {
                 JOptionPane.showMessageDialog(null, 
                         "Experiment setting files have to be in txt format.\nSettings have not been loaded.", "", JOptionPane.ERROR_MESSAGE);
                 return;
             }
             loadExpSettings(fc.getSelectedFile(),false); 
-
+//            IJ.showMessage("after loadExp "+(acqSettingTable.getColumnModel().getColumn(1).getCellEditor() instanceof StartTimeEditor ? "yes" : "no"));
         }
     }//GEN-LAST:event_loadExpSettingFileButtonActionPerformed
 
@@ -5735,7 +5817,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         int returnVal = fc.showOpenDialog(null);
         if (returnVal == JFileChooser.APPROVE_OPTION) {
             File f = fc.getSelectedFile();
-            if (!getExtension(f).toLowerCase().equals(".txt")) {
+            if (!Utils.getExtension(f).toLowerCase().equals(".txt")) {
                 JOptionPane.showMessageDialog(null, "Layout files have to be in txt format.\nLayout has not been loaded.", "", JOptionPane.ERROR_MESSAGE);
                 return;
             }
@@ -7896,6 +7978,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private void closeGapsButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_closeGapsButtonActionPerformed
         double newTileOverlap=acqLayout.closeTilingGaps(currentAcqSetting.getFieldOfView(), 0.005);
         if (newTileOverlap!=currentAcqSetting.getTileOverlap()) {
+            //round up to next percentage to ensure that no gaps remain
+            newTileOverlap=Math.ceil(newTileOverlap*100)/100;
             tileOverlapField.setText(Integer.toString((int)Math.round(newTileOverlap*100)));
             currentAcqSetting.setTileOverlap(Double.parseDouble(tileOverlapField.getText())/100);
             calcTilePositions(null,currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(),"Adjusting...");
@@ -7998,9 +8082,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }//GEN-LAST:event_zStackEndFieldPropertyChange
 
-    private String getExtension(File f) {
-        return f.getName().substring(f.getName().lastIndexOf("."));
-    }
 
     private void saveLayout() {
         JFileChooser jfc = new JFileChooser();
@@ -8021,7 +8102,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         jfc.ensureFileIsVisible(acqLayout.getFile());
         if (jfc.showSaveDialog(null) == JFileChooser.APPROVE_OPTION) {
             File f = jfc.getSelectedFile();
-            if (!getExtension(f).toLowerCase().equals(".txt")) {
+            if (!Utils.getExtension(f).toLowerCase().equals(".txt")) {
                 JOptionPane.showMessageDialog(this,"Not a txt file");
                 f = new File(f.getAbsolutePath() + ".txt");
             }
@@ -8278,6 +8359,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         } catch (JSONException ex) {
             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
+//        acqLayout=AcquisitionLayout.createSBSPlate(new File("Landmark1.tif"), 12, 8, 127640, 85600, 14380, 11340, 6350, 8990, 8990, "ellipse");
+//        saveLayout();
         acqLayout=new AcquisitionLayout(layoutObj, file);
         
 
@@ -9023,9 +9106,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     private void initializeAcqSettingTable() {
         acqSettingTable.setModel(new AcqSettingTableModel(acqSettings));
-        TableColumn colorColumn = acqSettingTable.getColumnModel().getColumn(1);
-        colorColumn.setCellEditor(new StartTimeEditor());
-
+//        ((AcqSettingTableModel)acqSettingTable.getModel()).setData(acqSettings);
+//        TableColumn colorColumn = acqSettingTable.getColumnModel().getColumn(1);
+//        colorColumn.setCellEditor(new StartTimeEditor());
 //        cAcqSettingIdx = 0;
         currentAcqSetting = acqSettings.get(0);
         acqSettingTable.getModel().addTableModelListener(this);

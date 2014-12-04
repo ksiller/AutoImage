@@ -178,6 +178,26 @@ public class Utils {
         return md;
     }
 
+    
+    public static JSONObject readMetadata(Object element, boolean createCopy) throws JSONException {
+        JSONObject meta=null;
+        if (element instanceof TaggedImage) {
+            if (createCopy) {
+                meta=new JSONObject(((TaggedImage)element).tags.toString());
+            } else{
+                meta=((TaggedImage)element).tags;
+            }    
+        } else if (element instanceof java.io.File) {
+            meta=Utils.parseMetadata((java.io.File)element);
+        }
+        return meta;
+    }
+    
+    public static JSONObject readMetadataSummary(Object element, boolean createCopy) throws JSONException {
+        return readMetadata(element, false).getJSONObject(MMTags.Root.SUMMARY);
+    }
+            
+
     public static void writeMetadata(final File dataFile, JSONObject meta) throws JSONException {
         ImagePlus imp = new Opener().openImage(dataFile.getAbsolutePath());
         if (imp != null) {
@@ -537,4 +557,14 @@ public class Utils {
         return dist;
     }
     
+    public static TaggedImage openAsTaggedImage(String filename) throws JSONException {
+        ImagePlus imp=IJ.openImage(filename);
+        TaggedImage ti=ImageUtils.makeTaggedImage(imp.getProcessor());
+        ti.tags=readMetadata(new File(filename),true);
+        return ti;
+    }    
+    
+    public static String getExtension(File f) {
+        return f.getName().substring(f.getName().lastIndexOf("."));
+    }
 }

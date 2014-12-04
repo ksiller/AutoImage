@@ -90,7 +90,7 @@ public class ClusterProcessor extends BranchedProcessor<File> {
     @Override
     protected boolean acceptElement(File element) {
         try {
-            readMetadata(element);
+            Utils.readMetadata(element,false);
         } catch (JSONException ex) {
             Logger.getLogger(ClusterProcessor.class.getName()).log(Level.SEVERE, null, ex);
             return false;
