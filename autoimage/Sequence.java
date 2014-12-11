@@ -14,13 +14,14 @@ import javax.swing.tree.DefaultMutableTreeNode;
  */
 public class Sequence {
     
-    private AcquisitionLayout layout;
+    private AcqLayout layout;
     private AcqSetting setting;
     private DefaultMutableTreeNode imageProcRoot;
     private TileManager tileManager;
     
     public Sequence() {
-        layout=new AcquisitionLayout(null,null);
+//        layout=new AcqLayout(null,null);
+        layout=new AcqLayout();
     }
     
 }

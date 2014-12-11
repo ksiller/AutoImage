@@ -34,7 +34,7 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
 
     private JTable areaTable;
 //    private AcqFrame acqFrame;
-    private AcquisitionLayout acqLayout;
+    private AcqLayout acqLayout;
     private final List<IMergeAreaListener> listeners;
     private ExecutorService listenerExecutor;
 
@@ -169,7 +169,7 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
       
    }
 
-   public MergeAreasDlg(AcqFrame aFrame, AcquisitionLayout al, ScriptInterface gui) {
+   public MergeAreasDlg(AcqFrame aFrame, AcqLayout al, ScriptInterface gui) {
       super();
       listeners=new ArrayList<IMergeAreaListener>();
       listenerExecutor = Executors.newFixedThreadPool(1);
@@ -298,7 +298,7 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
         IJ.log(getClass().getName()+": "+listeners.size()+" listeners");
     }
 
-    public void setAcquisitionLayout(AcquisitionLayout acqL) {
+    public void setAcquisitionLayout(AcqLayout acqL) {
         acqLayout=acqL;
     }    
    

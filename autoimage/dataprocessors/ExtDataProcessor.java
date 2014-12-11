@@ -5,7 +5,6 @@
 package autoimage.dataprocessors;
 
 import autoimage.ImageFileQueue;
-import autoimage.Utils;
 import ij.IJ;
 import java.io.File;
 import mmcorej.TaggedImage;
@@ -13,7 +12,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.micromanager.acquisition.TaggedImageQueue;
 import org.micromanager.api.DataProcessor;
-import org.micromanager.api.MMTags;
 
 /**
  *

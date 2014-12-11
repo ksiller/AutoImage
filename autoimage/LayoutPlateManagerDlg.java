@@ -6,7 +6,8 @@
 
 package autoimage;
 
-import ij.IJ;
+import ij.Prefs;
+import java.awt.Rectangle;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -23,14 +24,15 @@ import org.json.JSONObject;
  */
 public class LayoutPlateManagerDlg extends javax.swing.JDialog {
 
-    private PlateConfiguration configuration;
+    private PlateConfiguration startUpConfig;
+    private static String lastFileLocation = "";
     /**
      * Creates new form LayoutManagerPlate
      */
     public LayoutPlateManagerDlg(java.awt.Frame parent, boolean modal) {
         super(parent, modal);
         initComponents();
-        configuration = new PlateConfiguration(); 
+//        config = new PlateConfiguration(); 
     }
 
     /**
@@ -62,8 +64,6 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
         fileLocationLabel = new javax.swing.JLabel();
         jLabel11 = new javax.swing.JLabel();
         jLabel12 = new javax.swing.JLabel();
-        columnsField = new javax.swing.JFormattedTextField();
-        rowsField = new javax.swing.JFormattedTextField();
         jLabel13 = new javax.swing.JLabel();
         leftEdgeToA1Field = new javax.swing.JFormattedTextField();
         topEdgeToA1Field = new javax.swing.JFormattedTextField();
@@ -76,30 +76,49 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
         platenameField = new javax.swing.JFormattedTextField();
         jLabel14 = new javax.swing.JLabel();
         materialComboBox = new javax.swing.JComboBox();
+        jLabel15 = new javax.swing.JLabel();
+        plateLengthField = new javax.swing.JFormattedTextField();
+        jSeparator2 = new javax.swing.JSeparator();
+        columnsSpinner = new javax.swing.JSpinner();
+        rowsSpinner = new javax.swing.JSpinner();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("Plate Layout Manager");
+        setMaximumSize(new java.awt.Dimension(454, 486));
+        setMinimumSize(new java.awt.Dimension(454, 486));
+        setResizable(false);
 
+        jLabel1.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel1.setText("Plate width (mm):");
 
+        jLabel2.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel2.setText("Plate height (mm):");
 
+        jLabel3.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel3.setText("Well shape:");
 
         plateWidthField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.000"))));
+        plateWidthField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
 
         plateHeightField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.000"))));
+        plateHeightField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
 
+        jLabel4.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel4.setText("Dist. left edge - center A1 (mm):");
 
+        jLabel5.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel5.setText("Dist. top edge - center A1 (mm):");
 
+        jLabel6.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel6.setText("Well diameter (mm):");
 
+        jLabel7.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel7.setText("Well depth (mm):");
 
+        jLabel8.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel8.setText("Plate bottom thickness (mm):");
 
+        closeButton.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         closeButton.setText("Close");
         closeButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -107,11 +126,18 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
             }
         });
 
+        jLabel9.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel9.setText("Plate name:");
 
+        jLabel10.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel10.setText("Location:");
 
         openButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/openDoc.png"))); // NOI18N
+        openButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                openButtonActionPerformed(evt);
+            }
+        });
 
         saveButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/saveDoc.png"))); // NOI18N
         saveButton.addActionListener(new java.awt.event.ActionListener() {
@@ -120,115 +146,147 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
             }
         });
 
+        newButton.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         newButton.setText("New");
+        newButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                newButtonActionPerformed(evt);
+            }
+        });
 
+        fileLocationLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         fileLocationLabel.setText("jLabel11");
 
-        jLabel11.setText("wells/column:");
+        jLabel11.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel11.setText("Wells/column:");
 
-        jLabel12.setText("wells/row:");
+        jLabel12.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel12.setText("Wells/row:");
 
-        columnsField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(java.text.NumberFormat.getIntegerInstance())));
-
-        rowsField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(java.text.NumberFormat.getIntegerInstance())));
-
-        jLabel13.setText("Well separation (mm):");
+        jLabel13.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel13.setText("Well-to-well distance (mm):");
 
         leftEdgeToA1Field.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.000"))));
+        leftEdgeToA1Field.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
 
         topEdgeToA1Field.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.000"))));
+        topEdgeToA1Field.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
 
         wellDiameterField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.000"))));
+        wellDiameterField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
 
         wellDistanceField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.000"))));
+        wellDistanceField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
 
         wellDepthField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.000"))));
+        wellDepthField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
 
         bottomThicknessField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.000"))));
+        bottomThicknessField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
 
         wellShapeComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        wellShapeComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Square", "Circle" }));
+        wellShapeComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Round", "Square" }));
 
         platenameField.setText("jFormattedTextField11");
+        platenameField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
 
+        jLabel14.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel14.setText("Plate bottom material:");
 
+        materialComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         materialComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Glass", "Plastic", "Other" }));
+
+        jLabel15.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel15.setText("Plate length (mm):");
+
+        plateLengthField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.000"))));
+        plateLengthField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+
+        columnsSpinner.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        columnsSpinner.setModel(new javax.swing.SpinnerNumberModel(1, 1, 48, 1));
+
+        rowsSpinner.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        rowsSpinner.setModel(new javax.swing.SpinnerNumberModel(1, 1, 32, 1));
 
         org.jdesktop.layout.GroupLayout layout = new org.jdesktop.layout.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(layout.createSequentialGroup()
-                .add(12, 12, 12)
+                .add(10, 10, 10)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
+                    .add(layout.createSequentialGroup()
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                            .add(layout.createSequentialGroup()
+                            .add(jLabel4)
+                            .add(jLabel6)
+                            .add(jLabel5)
+                            .add(jLabel7)
+                            .add(jLabel13)
+                            .add(jLabel8)
+                            .add(jLabel14))
+                        .add(6, 6, 6)
+                        .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                            .add(leftEdgeToA1Field, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE)
+                            .add(topEdgeToA1Field, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE)
+                            .add(wellDiameterField, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 96, Short.MAX_VALUE)
+                            .add(wellDistanceField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE)
+                            .add(wellDepthField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE)
+                            .add(bottomThicknessField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE)
+                            .add(closeButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 92, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(materialComboBox, 0, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                        .addContainerGap())
+                    .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
+                        .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
                                 .add(jLabel10)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
                                 .add(fileLocationLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                            .add(layout.createSequentialGroup()
-                                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                                    .add(jLabel1)
-                                    .add(jLabel11))
-                                .add(6, 6, 6)
-                                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                                    .add(plateWidthField, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 63, Short.MAX_VALUE)
-                                    .add(columnsField))
-                                .add(30, 30, 30)
-                                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                                    .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
-                                        .add(jLabel2)
-                                        .add(6, 6, 6)
-                                        .add(plateHeightField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 70, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                                    .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
-                                        .add(jLabel12)
-                                        .add(6, 6, 6)
-                                        .add(rowsField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 70, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))))
-                            .add(layout.createSequentialGroup()
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
+                                .add(0, 0, Short.MAX_VALUE)
                                 .add(jLabel9)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
                                 .add(platenameField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 195, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                 .add(newButton)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                 .add(openButton)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(saveButton)))
-                        .add(12, 12, 12))
-                    .add(layout.createSequentialGroup()
-                        .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                                .add(jLabel6)
-                                .add(jLabel5)
-                                .add(jLabel7)
-                                .add(jLabel13)
-                                .add(jLabel8)
-                                .add(jLabel14))
-                            .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                                .add(jLabel4)
-                                .add(jLabel3)))
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(leftEdgeToA1Field, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE)
-                            .add(topEdgeToA1Field, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE)
-                            .add(wellDiameterField, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 96, Short.MAX_VALUE)
-                            .add(wellDistanceField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE)
-                            .add(wellDepthField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE)
-                            .add(bottomThicknessField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE)))
-                    .add(layout.createSequentialGroup()
-                        .add(211, 211, 211)
-                        .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(wellShapeComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(materialComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))))
-            .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
-                .addContainerGap()
-                .add(closeButton)
-                .add(159, 159, 159))
+                                .add(saveButton))
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
+                                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jLabel1)
+                                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jLabel15)
+                                    .add(org.jdesktop.layout.GroupLayout.TRAILING, jLabel2))
+                                .add(6, 6, 6)
+                                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                                    .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
+                                        .add(plateLengthField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 80, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                        .add(jLabel12))
+                                    .add(layout.createSequentialGroup()
+                                        .add(plateWidthField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 80, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                        .add(0, 0, Short.MAX_VALUE))
+                                    .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
+                                        .add(0, 0, Short.MAX_VALUE)
+                                        .add(jLabel11))
+                                    .add(org.jdesktop.layout.GroupLayout.TRAILING, layout.createSequentialGroup()
+                                        .add(plateHeightField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 80, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                        .add(jLabel3)))
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
+                                    .add(org.jdesktop.layout.GroupLayout.LEADING, columnsSpinner)
+                                    .add(org.jdesktop.layout.GroupLayout.LEADING, rowsSpinner)
+                                    .add(wellShapeComboBox, 0, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
+                        .add(12, 12, 12))))
             .add(layout.createSequentialGroup()
-                .addContainerGap()
-                .add(jSeparator1)
+                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(layout.createSequentialGroup()
+                        .addContainerGap()
+                        .add(jSeparator1))
+                    .add(layout.createSequentialGroup()
+                        .addContainerGap()
+                        .add(jSeparator2)))
                 .addContainerGap())
         );
 
@@ -250,23 +308,27 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
                     .add(fileLocationLabel))
                 .add(6, 6, 6)
                 .add(jSeparator1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 10, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .add(6, 6, 6)
+                .add(13, 13, 13)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel1)
-                    .add(jLabel2)
                     .add(plateWidthField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(plateHeightField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(6, 6, 6)
-                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel11)
-                    .add(jLabel12)
-                    .add(columnsField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(rowsField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(12, 12, 12)
+                    .add(columnsSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .add(7, 7, 7)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel3)
-                    .add(wellShapeComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(6, 6, 6)
+                    .add(jLabel12)
+                    .add(jLabel15)
+                    .add(plateLengthField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(rowsSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(jLabel2)
+                    .add(plateHeightField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(wellShapeComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(jLabel3))
+                .add(1, 1, 1)
+                .add(jSeparator2, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 10, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(12, 12, 12)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel4)
                     .add(leftEdgeToA1Field, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
@@ -302,15 +364,18 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
-    public void setConfiguration(PlateConfiguration config) {
-        configuration=config;
+    public void setConfiguration(PlateConfiguration configuration) {
         if (configuration!=null) {
             platenameField.setValue(configuration.name);
+            if (configuration.fileLocation.equals("")) {
+                configuration.fileLocation=Prefs.getHomeDir();
+            }
             fileLocationLabel.setText(configuration.fileLocation);
             plateWidthField.setValue(configuration.width/1000);
+            plateLengthField.setValue(configuration.length/1000);
             plateHeightField.setValue(configuration.height/1000);
-            columnsField.setValue(configuration.columns);
-            rowsField.setValue(configuration.rows);
+            columnsSpinner.setValue(configuration.columns);
+            rowsSpinner.setValue(configuration.rows);
             leftEdgeToA1Field.setValue(configuration.distLeftEdgeToA1/1000);
             topEdgeToA1Field.setValue(configuration.distTopEdgeToA1/1000);
             wellDiameterField.setValue(configuration.wellDiameter/1000);
@@ -320,18 +385,19 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
             materialComboBox.setSelectedItem(configuration.bottomMaterial);
             bottomThicknessField.setValue(configuration.bottomThickness/1000);
         }
+        lastFileLocation=configuration.fileLocation;
+        startUpConfig=configuration;
     }
     
-    private void updateConfiguration() {
-        if (configuration==null) {
-            configuration=new PlateConfiguration();
-        }
+    private PlateConfiguration getConfiguration() {
+        PlateConfiguration configuration=new PlateConfiguration();
         configuration.name=(String)platenameField.getValue();
         configuration.fileLocation=fileLocationLabel.getText();
         configuration.width=1000*((Number)plateWidthField.getValue()).doubleValue();
+        configuration.length=1000*((Number)plateLengthField.getValue()).doubleValue();
         configuration.height=1000*((Number)plateHeightField.getValue()).doubleValue();
-        configuration.columns=((Number)columnsField.getValue()).intValue();
-        configuration.rows=((Number)rowsField.getValue()).intValue();
+        configuration.columns=((Number)columnsSpinner.getValue()).intValue();
+        configuration.rows=((Number)rowsSpinner.getValue()).intValue();
         configuration.distLeftEdgeToA1=1000*((Number)leftEdgeToA1Field.getValue()).doubleValue();
         configuration.distTopEdgeToA1=1000*((Number)topEdgeToA1Field.getValue()).doubleValue();
         configuration.wellDiameter=1000*((Number)wellDiameterField.getValue()).doubleValue();
@@ -339,31 +405,49 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
         configuration.wellDepth=1000*((Number)wellDepthField.getValue()).doubleValue();
         configuration.wellShape=(String)wellShapeComboBox.getSelectedItem();
         configuration.bottomMaterial=(String)materialComboBox.getSelectedItem();
-        configuration.bottomThickness=1000*((Number)bottomThicknessField.getValue()).doubleValue();        
+        configuration.bottomThickness=1000*((Number)bottomThicknessField.getValue()).doubleValue();
+        return configuration;
     }
 
     private void closeButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_closeButtonActionPerformed
-        // TODO add your handling code here:
+        //check if modified and if yes, open save dialog
+        if (!startUpConfig.equals(getConfiguration())) {
+            int result=JOptionPane.showConfirmDialog(this, "Save current plate configuration?", "Plate Layout Manager", JOptionPane.YES_NO_CANCEL_OPTION);
+            switch (result) {
+                case JOptionPane.CANCEL_OPTION: {
+                    break;
+                }
+                case JOptionPane.NO_OPTION: {
+                    dispose();
+                    break;
+                }
+                case JOptionPane.YES_OPTION: {
+                    saveLayout();
+                    break;
+                }
+            }
+        }
     }//GEN-LAST:event_closeButtonActionPerformed
 
-    private void saveButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveButtonActionPerformed
-        updateConfiguration();
-        AcquisitionLayout acqLayout=AcquisitionLayout.createSBSPlate(
-                new File(configuration.fileLocation,configuration.name), 
-                configuration.columns, 
-                configuration.rows, 
-                configuration.width, 
-                configuration.height, 
-                configuration.distLeftEdgeToA1,
-                configuration.distTopEdgeToA1, 
-                configuration.wellDiameter,
-                configuration.wellDistance,
-                configuration.wellDistance,
-                configuration.wellShape,
-                configuration.bottomThickness,
-                configuration.bottomMaterial);
+    private void saveLayout() {
+        PlateConfiguration config = getConfiguration();
+        if ((config.width < config.distLeftEdgeToA1+(config.columns-1)*config.wellDistance+config.wellDiameter)
+                || (config.length < config.distTopEdgeToA1+(config.rows-1)*config.wellDistance+config.wellDiameter)) {
+            JOptionPane.showMessageDialog(this,"Cannot fit all wells into layout.");
+            return;
+        }
+        if (config.wellDiameter <= 0) {
+            JOptionPane.showMessageDialog(this,"Well diameter has to be larger than 0");
+            return;
+        }
+        if (config.wellDistance < config.wellDiameter) {
+            JOptionPane.showMessageDialog(this,"Well-to-well distance has to be larger than the well diameter.");
+            return;
+        }
+        AcqLayout acqLayout= new AcqPlateLayout(new File(config.fileLocation,config.name),config);
         JFileChooser jfc = new JFileChooser();
-        jfc.setCurrentDirectory(new File(configuration.fileLocation));
+        jfc.setCurrentDirectory(new File(config.fileLocation));
+        lastFileLocation=config.fileLocation;
         jfc.setFileSelectionMode(JFileChooser.FILES_ONLY);
         jfc.setMultiSelectionEnabled(false);
         jfc.ensureFileIsVisible(acqLayout.getFile());
@@ -381,7 +465,6 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
             }
             acqLayout.setName(f.getName());
             acqLayout.setFile(f);
-            IJ.showMessage(f.getAbsolutePath());
 
             FileWriter fw;
             try {
@@ -390,35 +473,118 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
                 try {
                     JSONObject obj=acqLayout.toJSONObject();
                     if (obj!=null) {
-                        layoutObj.put(AcquisitionLayout.TAG_LAYOUT,obj);
+                        layoutObj.put(AcqLayout.TAG_LAYOUT,obj);
                         fw.write(layoutObj.toString(4));
                     }
+                    startUpConfig=config;
                 } catch (JSONException ex) {
                     JOptionPane.showMessageDialog(null,"Error parsing Acquisition Layout as JSONObject.");
-                    Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
                 } catch (IOException ex) {
                     JOptionPane.showMessageDialog(null,"Error saving Acquisition Layout as JSONObject.");
-                    Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
                 } finally {
                     fw.close();
                 }        
             } catch (IOException ex) {
-                Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
             }
-            IJ.showMessage("OK");
             platenameField.setText(acqLayout.getName());
             fileLocationLabel.setText(acqLayout.getFile().getParent());
             acqLayout.setModified(false);
-        }
-
+        }       
+    }
+    
+    private void saveButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveButtonActionPerformed
+        saveLayout();
     }//GEN-LAST:event_saveButtonActionPerformed
+
+    private void openButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openButtonActionPerformed
+        //check if modified and if yes, open save dialog
+        if (!startUpConfig.equals(getConfiguration())) {
+            int result=JOptionPane.showConfirmDialog(this, "Save current plate configuration?", "Plate Layout Manager", JOptionPane.YES_NO_CANCEL_OPTION);
+            switch (result) {
+                case JOptionPane.CANCEL_OPTION: {
+                    return;
+                }
+                case JOptionPane.NO_OPTION: {
+                    break;
+                }
+                case JOptionPane.YES_OPTION: {
+                    saveLayout();
+                    break;
+                }
+            }
+        }
+        JFileChooser fc = new JFileChooser();
+        fc.setCurrentDirectory(new File(fileLocationLabel.getText()));
+        int returnVal = fc.showOpenDialog(null);
+        if (returnVal == JFileChooser.APPROVE_OPTION) {
+            File f = fc.getSelectedFile();
+            if (!Utils.getExtension(f).toLowerCase().equals(".txt")) {
+                JOptionPane.showMessageDialog(null, "Layout files have to be in txt format.\nLayout has not been loaded.", "", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            AcqLayout layout=AcqLayout.loadLayout(fc.getSelectedFile());
+            if (layout==null) {
+                JOptionPane.showMessageDialog(this, "Layout file '"+f.getName()+"' could not be found or read!");
+                return;
+            }
+            if (!(layout instanceof AcqPlateLayout)) {
+                JOptionPane.showMessageDialog(this, "Layout file '"+f.getName()+"' could not be found or read!");
+                return;
+            }
+            PlateConfiguration configuration=new PlateConfiguration();
+            configuration.name=layout.getName();
+            configuration.fileLocation=layout.getFile().getParent();
+            configuration.width=layout.getWidth();
+            configuration.length=layout.getLength();
+            configuration.height=layout.getHeight();
+            configuration.columns=((AcqPlateLayout)layout).getColumns();
+            configuration.rows=((AcqPlateLayout)layout).getRows();
+            configuration.distLeftEdgeToA1=((AcqPlateLayout)layout).getLeftEdgeToA1();
+            configuration.distTopEdgeToA1=((AcqPlateLayout)layout).getTopEdgeToA1();
+            configuration.wellDiameter=((AcqPlateLayout)layout).getWellDiameter();
+            configuration.wellDistance=((AcqPlateLayout)layout).getWellDistance();
+            configuration.wellDepth=((AcqPlateLayout)layout).getWellDepth();
+            configuration.wellShape=((AcqPlateLayout)layout).getWellShape();
+            configuration.bottomMaterial=layout.getBottomMaterial();
+            configuration.bottomThickness=layout.getBottomThickness();
+            setConfiguration(configuration);
+        }        // TODO add your handling code here:
+    }//GEN-LAST:event_openButtonActionPerformed
+
+    private void newButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_newButtonActionPerformed
+        //check if modified and if yes, open save dialog
+        if (!startUpConfig.equals(getConfiguration())) {
+            int result=JOptionPane.showConfirmDialog(this, "Save current plate configuration?", "Plate Layout Manager", JOptionPane.YES_NO_CANCEL_OPTION);
+            switch (result) {
+                case JOptionPane.CANCEL_OPTION: {
+                    return;
+                }
+                case JOptionPane.NO_OPTION: {
+                    break;
+                }
+                case JOptionPane.YES_OPTION: {
+                    saveLayout();
+                    break;
+                }
+            }
+        }
+        PlateConfiguration config=new PlateConfiguration();
+ //       if (lastFileLocation.equals("")) {
+ //           lastFileLocation=Prefs.getHomeDir();
+ //       }
+        config.fileLocation=lastFileLocation;
+        setConfiguration(config);
+    }//GEN-LAST:event_newButtonActionPerformed
 
     
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JFormattedTextField bottomThicknessField;
     private javax.swing.ButtonGroup buttonGroup1;
     private javax.swing.JButton closeButton;
-    private javax.swing.JFormattedTextField columnsField;
+    private javax.swing.JSpinner columnsSpinner;
     private javax.swing.JLabel fileLocationLabel;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel10;
@@ -426,6 +592,7 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
     private javax.swing.JLabel jLabel12;
     private javax.swing.JLabel jLabel13;
     private javax.swing.JLabel jLabel14;
+    private javax.swing.JLabel jLabel15;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
@@ -435,14 +602,16 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
     private javax.swing.JLabel jLabel8;
     private javax.swing.JLabel jLabel9;
     private javax.swing.JSeparator jSeparator1;
+    private javax.swing.JSeparator jSeparator2;
     private javax.swing.JFormattedTextField leftEdgeToA1Field;
     private javax.swing.JComboBox materialComboBox;
     private javax.swing.JButton newButton;
     private javax.swing.JButton openButton;
     private javax.swing.JFormattedTextField plateHeightField;
+    private javax.swing.JFormattedTextField plateLengthField;
     private javax.swing.JFormattedTextField plateWidthField;
     private javax.swing.JFormattedTextField platenameField;
-    private javax.swing.JFormattedTextField rowsField;
+    private javax.swing.JSpinner rowsSpinner;
     private javax.swing.JButton saveButton;
     private javax.swing.JFormattedTextField topEdgeToA1Field;
     private javax.swing.JFormattedTextField wellDepthField;

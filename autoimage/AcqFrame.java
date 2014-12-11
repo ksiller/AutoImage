@@ -55,6 +55,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -73,6 +74,7 @@ import java.util.TimerTask;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -153,6 +155,7 @@ import org.micromanager.api.IAcquisitionEngine2010;
 import org.micromanager.api.ImageCache;
 import org.micromanager.api.ImageCacheListener;
 import org.micromanager.api.MMListenerInterface;
+import org.micromanager.api.MMPlugin;
 import org.micromanager.api.MMTags;
 import org.micromanager.api.PositionList;
 import org.micromanager.api.ScriptInterface;
@@ -171,17 +174,21 @@ import org.micromanager.utils.ReportingUtils;
  */
 public class AcqFrame extends javax.swing.JFrame implements ActionListener, TableModelListener, WindowListener, IStageMonitorListener, ILiveListener, IRefPointListener, IMergeAreaListener, MMListenerInterface, AcqSettingsListener, ImageCacheListener, IDataProcessorListener {//, LiveModeListener {
 
-    //gui, core, acqEngine
-    private final ScriptInterface gui;
+    //gui, core, acqEngine, mmplugins
+    private final ScriptInterface app;
     private boolean imagePipelineSupported;
     private CMMCore core;
     private IAcquisitionEngine2010 acqEng2010;
+    private final static String MMPLUGINSDIR="mmplugins";
+    private final static String DEVICE_CONTROL_DIR = "Device_Control";
+    private final static String STAGE_CONTROL_FILE = "StageControl.jar";
     
     //Dialogs
     private RefPointListDialog refPointListDialog;
     private MergeAreasDlg mergeAreasDialog;
     private CameraRotDlg cameraRotDialog;
     private ZOffsetDlg zOffsetDialog;
+    private MMPlugin stageControlPlugin;
 
     //Monitors and Task Executors
     private ThreadPoolExecutor retilingExecutor;
@@ -205,7 +212,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private File expSettingsFile;
     private String imageDestPath;
     private String dataProcessorPath;
-    private AcquisitionLayout acqLayout;
+    private AcqLayout acqLayout;
     private List<AcqSetting> acqSettings;
    // private Map<String,String> sequenceDirMap;
 //    private int cAcqSettingIdx;
@@ -260,7 +267,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private static final String CMD_REVIEW_DATA = "Review data";
     private static final String CMD_CAMERA_ROTATION = "Check camera rotation";
     private static final String CMD_Z_OFFSET = "Set Z-Offset";
-    private static final String CMD_MANAGE_LAYOUT = "Manage layout";
+    private static final String CMD_MANAGE_LAYOUT = "Manage plate layout";
 
     @Override
     public void slmExposureChanged(String string, double d) {
@@ -279,7 +286,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         private PositionList posList;
         private DefaultMutableTreeNode mainImageStorageNode;
         
-        AcquisitionTask (AcqSetting setting, AcquisitionLayout layout, ImageCacheListener imgListener, File seqDir) throws Exception {
+        AcquisitionTask (AcqSetting setting, AcqLayout layout, ImageCacheListener imgListener, File seqDir) throws Exception {
 //            IJ.log("AcquisitionTask.constructor: begin");
             acqSetting=setting;
             imageListener=imgListener;
@@ -359,8 +366,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             } else {
                 IJ.log("Sequence '"+acqSetting.getName()+"' started at:  "+now.getTime().toString()+" ("+Long.toString(now.getTimeInMillis() - scheduledExecutionTime())+" ms delay)");            
             }try {
-                acqEng2010 = gui.getAcquisitionEngine2010();
-                BlockingQueue<TaggedImage> engineOutputQueue = acqEng2010.run(mdaSettings, false, posList, gui.getAutofocusManager().getDevice());
+                acqEng2010 = app.getAcquisitionEngine2010();
+                BlockingQueue<TaggedImage> engineOutputQueue = acqEng2010.run(mdaSettings, false, posList, app.getAutofocusManager().getDevice());
                 JSONObject summaryMetadata = acqEng2010.getSummaryMetadata();
                 summaryMetadata.put(ExtImageTags.AREAS,acqLayout.getNoOfSelectedAreas());
                 summaryMetadata.put(ExtImageTags.CLUSTERS,acqLayout.getNoOfSelectedClusters());
@@ -713,13 +720,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         if (cameraRotDialog == null) {
             cameraRotDialog = new  CameraRotDlg(
                 this,
-                gui,
+                app,
                 currentAcqSetting.getChannelGroupStr(),
                 stepSize,
                 modal);
             cameraRotDialog.setIterations(5);
             cameraRotDialog.addWindowListener(this);
-            gui.addMMListener(cameraRotDialog);
+            app.addMMListener(cameraRotDialog);
             liveModeMonitor.addListener(cameraRotDialog);
             cameraRotDialog.addCancelButtonListener(new ActionListener() {
                 @Override
@@ -769,7 +776,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     
     private void showZOffsetDlg(boolean modal) {
         if (zOffsetDialog == null) {
-            zOffsetDialog = new  ZOffsetDlg(this,gui,currentAcqSetting.getChannelGroupStr(),modal);
+            zOffsetDialog = new  ZOffsetDlg(this,app,currentAcqSetting.getChannelGroupStr(),modal);
             zOffsetDialog.addWindowListener(this);
             if (liveModeMonitor!=null) {
                 liveModeMonitor.addListener(zOffsetDialog);
@@ -828,17 +835,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         LayoutPlateManagerDlg plateDialog=new LayoutPlateManagerDlg(this, modal);
         plateConfig.fileLocation=Prefs.getHomeDir();
         plateDialog.setConfiguration(plateConfig);
-        plateDialog.addWindowListener(new java.awt.event.WindowAdapter() {
-                    @Override
-                    public void windowClosing(java.awt.event.WindowEvent e) {
-                        System.exit(0);
-                    }
-                });
         plateDialog.setVisible(true);
         
         
     /*    if (zOffsetDialog == null) {
-            zOffsetDialog = new  ZOffsetDlg(this,gui,currentAcqSetting.getChannelGroupStr(),modal);
+            zOffsetDialog = new  ZOffsetDlg(this,app,currentAcqSetting.getChannelGroupStr(),modal);
             zOffsetDialog.addWindowListener(this);
             if (liveModeMonitor!=null) {
                 liveModeMonitor.addListener(zOffsetDialog);
@@ -988,8 +989,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     public void systemConfigurationLoaded() {
         instrumentOnline=false;
         recalculateTiles=false;
-        acqEng2010 = gui.getAcquisitionEngine2010();// .getAcquisitionEngine();
-        core = gui.getMMCore();
+        acqEng2010 = app.getAcquisitionEngine2010();// .getAcquisitionEngine();
+        core = app.getMMCore();
         zStageLabel = core.getFocusDevice();
         xyStageLabel = core.getXYStageDevice();
         List<String> groupStrList=Arrays.asList(core.getAvailableConfigGroups().toArray());
@@ -1271,7 +1272,25 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 progressBar.repaint();
             }
             calculating = false;
-            if (retilingAborted) {
+            boolean successful=true;
+            if (!retilingAborted) {
+                //check if all areas tiled successfully (Future<Integer> in resultList >=0;
+                for (Future<Integer> tiles:resultList) {
+                    try {
+                        if (tiles.get()==-1) {
+                            JOptionPane.showMessageDialog(null, "Tiling unsuccessful. Reverting to previous settings.");
+                            successful=false;
+    //                        cancelCalculateTiles();
+                            break;
+                        }
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                    } catch (ExecutionException ex) {
+                        Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+            }
+            if (retilingAborted || !successful) {
                 recalculateTiles = false;
                 if (command.equals(ADJUSTING_SETTINGS)) {
                     currentAcqSetting.setObjective(prevObjLabel, getObjPixelSize(prevObjLabel));
@@ -1399,7 +1418,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 }
                 acqLayoutPanel.repaint();
             } catch (Exception ex) {
-                gui.logError(ex);
+                app.logError(ex);
             }
         }
 
@@ -2120,7 +2139,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }
 
     AcqFrame(ScriptInterface gui) {
-        this.gui = gui;
+        this.app = gui;
         IJ.log("Micro-Manager: "+gui.getVersion());
         try {
             /* version Strings on Mac and Windows build are different in nightly build 1.4.18
@@ -2153,7 +2172,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         commentMode = false;
         mergeAreasMode = false;
 
-        instrumentOnline = false; //to ensure that during gui initialization instrument does not respond 
+        instrumentOnline = false; //to ensure that during app initialization instrument does not respond 
         initComponents();
         InputVerifier doubleVerifier = new InputVerifier() {
 
@@ -2198,6 +2217,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         menubar.add(utilMenu);
         
         setJMenuBar(menubar);
+        
+        instantiateStageControlPlugin();
         
 /*        Rule columnView = new Rule(Rule.HORIZONTAL, true);
         columnView.setPreferredWidth((int)acqLayoutPanel.getPreferredSize().getWidth());
@@ -2340,7 +2361,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     */
     public boolean versionLessThan(String version, String separator) throws MMScriptException {
         try {
-            String[] v = gui.getVersion().split(separator, 2);
+            String[] v = app.getVersion().split(separator, 2);
             String[] m = v[0].split("\\.", 3);
             String[] v2 = version.split(separator, 2);
             String[] m2 = v2[0].split("\\.", 3);
@@ -2581,6 +2602,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         selectButton = new javax.swing.JToggleButton();
         commentButton = new javax.swing.JToggleButton();
         showZProfileCheckBox = new javax.swing.JCheckBox();
+        stageControlButton = new javax.swing.JButton();
         layoutScrollPane = new javax.swing.JScrollPane();
         acqLayoutPanel = new LayoutPanel(null,null);
 
@@ -4131,6 +4153,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
         moveToScreenCoordButton.setFont(new java.awt.Font("Lucida Grande", 0, 11)); // NOI18N
         moveToScreenCoordButton.setText("Move To");
+        moveToScreenCoordButton.setSize(new java.awt.Dimension(70, 29));
         moveToScreenCoordButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 moveToScreenCoordButtonActionPerformed(evt);
@@ -4140,6 +4163,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         zoomButton.setFont(new java.awt.Font("Lucida Grande", 0, 11)); // NOI18N
         zoomButton.setText("Zoom");
         zoomButton.setToolTipText("Left click to zoom in, right click to zoom out.");
+        zoomButton.setSize(new java.awt.Dimension(70, 29));
         zoomButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 zoomButtonActionPerformed(evt);
@@ -4152,6 +4176,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
         selectButton.setFont(new java.awt.Font("Lucida Grande", 0, 11)); // NOI18N
         selectButton.setText("Select");
+        selectButton.setSize(new java.awt.Dimension(70, 29));
         selectButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 selectButtonActionPerformed(evt);
@@ -4174,6 +4199,15 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
+        stageControlButton.setFont(new java.awt.Font("Lucida Grande", 0, 11)); // NOI18N
+        stageControlButton.setText("Stage");
+        stageControlButton.setSize(new java.awt.Dimension(70, 29));
+        stageControlButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                stageControlButtonActionPerformed(evt);
+            }
+        });
+
         org.jdesktop.layout.GroupLayout statusPanelLayout = new org.jdesktop.layout.GroupLayout(statusPanel);
         statusPanel.setLayout(statusPanelLayout);
         statusPanelLayout.setHorizontalGroup(
@@ -4188,26 +4222,31 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
                                 .add(stagePosXLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 84, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                                .add(jLabel30)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
+                                .add(jLabel30))
+                            .add(statusPanelLayout.createSequentialGroup()
+                                .add(zoomButton)
+                                .add(0, 0, 0)
+                                .add(selectButton)))
+                        .add(0, 0, 0)
+                        .add(statusPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(statusPanelLayout.createSequentialGroup()
                                 .add(stagePosYLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 90, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                 .add(jLabel31))
                             .add(statusPanelLayout.createSequentialGroup()
-                                .add(zoomButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 86, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .add(commentButton)
                                 .add(0, 0, 0)
-                                .add(moveToScreenCoordButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 83, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .add(stageControlButton)
                                 .add(0, 0, 0)
-                                .add(selectButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 82, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                                .add(moveToScreenCoordButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 77, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                        .add(0, 0, 0)
                         .add(statusPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(statusPanelLayout.createSequentialGroup()
-                                .add(18, 18, 18)
                                 .add(stagePosZLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 91, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                 .add(18, 18, 18)
-                                .add(cursorLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 111, Short.MAX_VALUE)
-                                .add(96, 96, 96))
+                                .add(cursorLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 39, Short.MAX_VALUE)
+                                .add(55, 55, 55))
                             .add(statusPanelLayout.createSequentialGroup()
-                                .add(commentButton)
                                 .add(0, 0, 0)
                                 .add(setLandmarkButton)
                                 .add(0, 0, 0)
@@ -4232,7 +4271,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     .add(zoomButton)
                     .add(selectButton)
                     .add(commentButton)
-                    .add(showZProfileCheckBox))
+                    .add(showZProfileCheckBox)
+                    .add(stageControlButton))
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(statusPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel29)
@@ -4242,13 +4282,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     .add(jLabel31)
                     .add(stagePosZLabel)
                     .add(cursorLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(6, 6, 6)
                 .add(progressBar, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(6, 6, 6)
                 .add(statusPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(timepointLabel)
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, areaLabel))
-                .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .add(12, 12, 12))
         );
 
         layoutScrollPane.addComponentListener(new java.awt.event.ComponentAdapter() {
@@ -4615,16 +4655,16 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             try {
                 core.setProperty(core.getCameraDevice(), "Binning", Integer.toString(setting.getBinning()));
             
-                if (updateGUI) {
-                    gui.refreshGUI();
-                }
+//                if (updateGUI) {
+//                    app.refreshGUI();
+//                }
 
             } catch (Exception e) {
                 ReportingUtils.showError(e);
                 return false;
             } finally {
                 if (updateGUI) {
-                    gui.refreshGUI();
+                    app.refreshGUI();
                 }
             }
             return true;
@@ -4736,7 +4776,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 expSettingObj.put(TAG_EXP_BASE_NAME,experimentTextField.getText());
             
                 JSONObject layoutObj=acqLayout.toJSONObject();
-                expSettingObj.put(AcquisitionLayout.TAG_LAYOUT, layoutObj);
+                expSettingObj.put(AcqLayout.TAG_LAYOUT, layoutObj);
             } catch (JSONException ex) {
                 JOptionPane.showMessageDialog(this,"Error parsing layout file '"+acqLayout.getName()+"'.");
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
@@ -4914,15 +4954,15 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 }
             } catch (JSONException ex) {
                 JOptionPane.showMessageDialog(null,"Error parsing Acquisition Layout as JSONObject.");
-                Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
             } catch (IOException ex) {
                 JOptionPane.showMessageDialog(null,"Error saving Acquisition Layout as JSONObject.");
-                Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
             } finally {
                 fw.close();
             }        
         } catch (IOException ex) {
-            Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
     
@@ -5224,7 +5264,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             Dimension vpSize = vp.getViewSize();
             Rectangle vpRect = vp.getViewRect();
             if (moveToMode) {
-                if (coordX >= 0 && coordX <= acqLayout.getWidth() && coordY >= 0 && coordY < acqLayout.getHeight()) {
+                if (coordX >= 0 && coordX <= acqLayout.getWidth() && coordY >= 0 && coordY < acqLayout.getLength()) {
                     if (((LayoutPanel) acqLayoutPanel).getZoom() != 1) {
                         Point newPos = new Point();
                         newPos.x = Math.max(0, (int) Math.round(evt.getX() - vpRect.width / 2));
@@ -5707,7 +5747,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 }
             }
         }
-        if (gui.isLiveModeOn()) {
+        if (app.isLiveModeOn()) {
             JOptionPane.showMessageDialog(this, "Live Mode is running.\n"
                     + "Stop Live Mode before starting another acquisition.", "Acquisition", JOptionPane.ERROR_MESSAGE);
             return;
@@ -5821,7 +5861,22 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 JOptionPane.showMessageDialog(null, "Layout files have to be in txt format.\nLayout has not been loaded.", "", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            if (loadLayout(fc.getSelectedFile())) {
+            AcqLayout layout=AcqLayout.loadLayout(f);
+            if (layout==null) {
+                if (f.getName().equals("LastExpSetting.txt"))
+                    JOptionPane.showMessageDialog(this, "Last used layout file could not be found or read!");
+                else
+                    JOptionPane.showMessageDialog(this, "Layout file '"+f.getName()+"' could not be found or read!");
+                //create empty layout
+                //            acqLayout=new AcqLayout();
+            } else {
+                acqLayout=layout;
+                ((LayoutPanel) acqLayoutPanel).setAcquisitionLayout(acqLayout, getMaxFOV());
+                layoutFileLabel.setText(acqLayout.getName());
+                layoutFileLabel.setToolTipText("LOADED FROM: "+acqLayout.getFile().getAbsolutePath());
+                lastArea = null;
+                initializeAreaTable();
+                setLandmarkFound(false);
                 Area.setStageToLayoutRot(0);
                 RefArea.setStageToLayoutRot(0);
                 acqLayoutPanel.setCursor(normCursor);
@@ -5842,7 +5897,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     }
                     refPointListDialog.dispose();
                 }                
-                refPointListDialog = new RefPointListDialog(this, gui, acqLayout);
+                refPointListDialog = new RefPointListDialog(this, app, acqLayout);
                 refPointListDialog.addWindowListener(this);
                 refPointListDialog.addListener(this);
                 stageMonitor.addListener(refPointListDialog);
@@ -6009,8 +6064,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }
 
     private void mergeAreasButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_mergeAreasButtonActionPerformed
+        if (acqLayout instanceof AcqPlateLayout) {
+            JOptionPane.showMessageDialog(this, "Areas cannot be merged in well plate formats.");
+            return;
+        }
         if (mergeAreasDialog == null) {
-            mergeAreasDialog = new MergeAreasDlg(this, acqLayout, gui);
+            mergeAreasDialog = new MergeAreasDlg(this, acqLayout, app);
             mergeAreasDialog.addWindowListener(this);
             mergeAreasDialog.addListener(this);
         } else {
@@ -6225,7 +6284,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }
 
-    private void cancelThreadButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cancelThreadButtonActionPerformed
+    private void cancelCalculateTiles() {
         if (retilingExecutor != null && !retilingExecutor.isTerminated()) {
 //            IJ.log("AcqFrame.cancelThreadButtonActionPerformed");
             retilingAborted = true;
@@ -6233,7 +6292,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             for (Area a:acqLayout.getAreaArray())
                 a.setUnknownTileNum(true);
             retilingExecutor.shutdownNow();
-        }
+        }        
+    }
+    
+    private void cancelThreadButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cancelThreadButtonActionPerformed
+        cancelCalculateTiles();
     }//GEN-LAST:event_cancelThreadButtonActionPerformed
 
     private void deleteAcqSettingButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteAcqSettingButtonActionPerformed
@@ -6854,7 +6917,16 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                          // -6 because of .class
                         String className = je.getName().substring(0,je.getName().length()-6);
                         className = className.replace('/', '.');
-                        classes.add(className);
+                        try {
+                            Class<?> clazz=Class.forName(className);
+                            //only add DataProcessor and not abstract classes to list
+                            if (DataProcessor.class.isAssignableFrom(clazz) && !Modifier.isAbstract(clazz.getModifiers())) {
+                                classes.add(className);
+                            }
+                        } catch (ClassNotFoundException ex) {
+                            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                        }                        
+                        //classes.add(className);
                     }
                     if (classes.isEmpty()) {
                         JOptionPane.showMessageDialog(this,"No classes found.");
@@ -6895,7 +6967,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         break;
                 }
                 if (dp instanceof DataProcessor) {
-                    List<DataProcessor<TaggedImage>> loadedDPs=gui.getImageProcessorPipeline();
+                    List<DataProcessor<TaggedImage>> loadedDPs=app.getImageProcessorPipeline();
                     for (DataProcessor<TaggedImage> ldp:loadedDPs) {
                         if (ldp.getClass().getName().equals(dp.getClass().getName())) {
                             JOptionPane.showMessageDialog(null,"DataProcessor already loaded.");
@@ -7335,7 +7407,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             RefArea oldLm = acqLayout.getLandmark(0);
             //            ArrayList<RefArea> oldRPList=cloneRefPointList(acqLayout.getLandmarks());
             if (refPointListDialog == null) {
-                refPointListDialog = new RefPointListDialog(this, gui, acqLayout);
+                refPointListDialog = new RefPointListDialog(this, app, acqLayout);
                 if (stageMonitor!=null) {
                     stageMonitor.addListener(refPointListDialog);
                 }
@@ -7368,7 +7440,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     private void loadImagePipelineButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadImagePipelineButtonActionPerformed
         try {
-            if (gui.versionLessThan("1.4.18")) {
+            if (app.versionLessThan("1.4.18")) {
                 JOptionPane.showMessageDialog(null, "Use of Image Pipeline requires Micro-Manager vesion 1.4.18 or higher.");
                 loadImagePipelineButton.setEnabled(false);
                 return;
@@ -7383,7 +7455,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             JOptionPane.showMessageDialog(null, "Select Node in Processor Tree");
             return;
         }
-        List<DataProcessor<TaggedImage>> ipList=gui.getImageProcessorPipeline();
+        List<DataProcessor<TaggedImage>> ipList=app.getImageProcessorPipeline();
         if (ipList==null || ipList.isEmpty()) {
             JOptionPane.showMessageDialog(this,"ImageProcessor Pipeline is empty.");
             return;
@@ -7464,7 +7536,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }//GEN-LAST:event_tilingModeComboBoxActionPerformed
 
     private void autofocusButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_autofocusButtonActionPerformed
-        gui.showAutofocusDialog();
+        app.showAutofocusDialog();
     }//GEN-LAST:event_autofocusButtonActionPerformed
 
     private void acqOrderListActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_acqOrderListActionPerformed
@@ -7727,7 +7799,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     private void liveButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_liveButtonActionPerformed
         if (liveButton.getText().equals("Live")) {
-            if (gui.isLiveModeOn()) {
+            if (app.isLiveModeOn()) {
                 JOptionPane.showMessageDialog(this, "Live Mode is already running.", "Live Mode", JOptionPane.ERROR_MESSAGE);
                 return;
             }
@@ -7744,16 +7816,16 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     //                            core.setConfig(channelGroupStr, c.getName());
                     core.setConfig(currentAcqSetting.getChannelGroupStr(), c.getName());
                     //gui.setChannelExposureTime(channelGroupStr, c.getName(), c.getExposure());
-                    gui.refreshGUI();
+                    app.refreshGUI();
                     //gui.setConfigChanged(true);
                 } catch (Exception e) {
                 }
-                gui.enableLiveMode(true);
-                gui.getSnapLiveWin().toFront();            
+                app.enableLiveMode(true);
+                app.getSnapLiveWin().toFront();            
             }
 //            liveButton.setText("Stop");
         } else {
-            gui.enableLiveMode(false);
+            app.enableLiveMode(false);
         }      
     }//GEN-LAST:event_liveButtonActionPerformed
 
@@ -8082,6 +8154,86 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }//GEN-LAST:event_zStackEndFieldPropertyChange
 
+    private void instantiateStageControlPlugin() {
+        stageControlPlugin=null;
+        File pluginRootDir = new File(System.getProperty("org.micromanager.plugin.path", MMPLUGINSDIR));
+        String jarFileStr=new File(new File(pluginRootDir, DEVICE_CONTROL_DIR),STAGE_CONTROL_FILE).getAbsolutePath();
+        String stageControlClassName="";
+        try {
+            JarFile jarFile;
+            jarFile = new JarFile(jarFileStr);
+            Enumeration e = jarFile.entries();
+
+            URL[] urls = { new URL("jar:file:" + jarFileStr+"!/") };
+            URLClassLoader classLoader = URLClassLoader.newInstance(urls,
+                //    this.getClass().getClassLoader());
+                MMPlugin.class.getClassLoader());
+
+            int i=0;
+            List<String> classes=new ArrayList<String>();
+            while (e.hasMoreElements()) {
+                JarEntry je = (JarEntry) e.nextElement();
+                if(je.isDirectory() || !je.getName().endsWith(".class")){
+                    continue;
+                }
+                 // -6 because of .class
+                String className = je.getName().substring(0,je.getName().length()-6);
+                className = className.replace('/', '.');
+                try {
+                    Class<?> clazz=Class.forName(className);
+                    for (Class<?> iface : clazz.getInterfaces()) {
+                        if (iface == MMPlugin.class) {
+                            classes.add(className);
+                            break;
+                        }
+                    }
+                } catch (ClassNotFoundException ex) {
+                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+            if (classes.isEmpty()) {
+                JOptionPane.showMessageDialog(this,"No classes found.");
+                return;
+            } if (classes.size() > 1) {   
+                JComboBox jcb = new JComboBox(classes.toArray());
+                JOptionPane.showMessageDialog( null, jcb, "Select plugin class:", JOptionPane.QUESTION_MESSAGE);
+                stageControlClassName=(String)jcb.getSelectedItem();
+            } else {
+                stageControlClassName=classes.get(0);
+            }
+
+        } catch (MalformedURLException ex) {
+            JOptionPane.showMessageDialog(this,"Cannot from URL to load classes in jar file.");
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            return;
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this,"Problem reading content of jar file.");
+                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            return;    
+        } 
+        if (stageControlClassName!="") {
+            Class<?> clazz;
+            try {
+                clazz = Class.forName(stageControlClassName);
+                stageControlPlugin = (MMPlugin) clazz.newInstance();
+            } catch (ClassNotFoundException ex) {
+                ReportingUtils.logError(ex);
+            } catch (InstantiationException ex) {
+                ReportingUtils.logError(ex);
+            } catch (IllegalAccessException ex) {
+                ReportingUtils.logError(ex);
+            }
+        }             
+    }
+    
+    private void stageControlButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_stageControlButtonActionPerformed
+
+        if (stageControlPlugin != null) {
+            stageControlPlugin.setApp(app);
+            stageControlPlugin.show();
+        }    
+    }//GEN-LAST:event_stageControlButtonActionPerformed
+
 
     private void saveLayout() {
         JFileChooser jfc = new JFileChooser();
@@ -8123,20 +8275,20 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 try {
                     JSONObject obj=acqLayout.toJSONObject();
                     if (obj!=null) {
-                        layoutObj.put(AcquisitionLayout.TAG_LAYOUT,obj);
+                        layoutObj.put(AcqLayout.TAG_LAYOUT,obj);
                         fw.write(layoutObj.toString(4));
                     }
                 } catch (JSONException ex) {
                     JOptionPane.showMessageDialog(null,"Error parsing Acquisition Layout as JSONObject.");
-                    Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
                 } catch (IOException ex) {
                     JOptionPane.showMessageDialog(null,"Error saving Acquisition Layout as JSONObject.");
-                    Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
                 } finally {
                     fw.close();
                 }        
             } catch (IOException ex) {
-                Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
             }
             
 //            layoutFile = f;
@@ -8315,6 +8467,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JCheckBox showZProfileCheckBox;
     private javax.swing.JCheckBox siteOverlapCheckBox;
     private javax.swing.JButton snapButton;
+    private javax.swing.JButton stageControlButton;
     private javax.swing.JLabel stagePosXLabel;
     private javax.swing.JLabel stagePosYLabel;
     private javax.swing.JLabel stagePosZLabel;
@@ -8339,7 +8492,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JToggleButton zoomButton;
     // End of variables declaration//GEN-END:variables
 
-    private boolean loadLayout(File file) {//returns true if layout has been changed
+/*    
+    private AcqLayout loadLayout(File file) {//returns true if layout has been changed
 //        IJ.log("AcqFrame.loadLayout: "+absPath);
         BufferedReader br;
         StringBuilder sb=new StringBuilder();
@@ -8351,7 +8505,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 sb.append(line);
             }
             JSONObject expSettingsObj=new JSONObject(sb.toString());
-            layoutObj=expSettingsObj.getJSONObject(AcquisitionLayout.TAG_LAYOUT);
+            layoutObj=expSettingsObj.getJSONObject(AcqLayout.TAG_LAYOUT);
         } catch (FileNotFoundException ex) {
             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
@@ -8359,34 +8513,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         } catch (JSONException ex) {
             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
-//        acqLayout=AcquisitionLayout.createSBSPlate(new File("Landmark1.tif"), 12, 8, 127640, 85600, 14380, 11340, 6350, 8990, 8990, "ellipse");
-//        saveLayout();
-        acqLayout=new AcquisitionLayout(layoutObj, file);
-        
-
-        //        acqLayout=new AcquisitionLayout(file);
-
-//        tileManager.setAcquisitionLayout(acqLayout);
-        if (acqLayout.isEmpty()) {
-            if (file.getName().equals("LastExpSetting.txt"))
-                JOptionPane.showMessageDialog(this, "Last used layout file could not be found or read!");
-            else    
-                JOptionPane.showMessageDialog(this, "Layout file '"+file.getName()+"' could not be found or read!");
-
-        }
-        ((LayoutPanel) acqLayoutPanel).setAcquisitionLayout(acqLayout, getMaxFOV());
-        layoutFileLabel.setText(acqLayout.getName());
-        layoutFileLabel.setToolTipText("LOADED FROM: "+acqLayout.getFile().getAbsolutePath());
-        lastArea = null;
-        initializeAreaTable();
-//        IJ.log(layoutFile.getAbsolutePath());
-//        IJ.log(layoutFile.getName());
-        setLandmarkFound(false);
-//        layoutScrollPane.revalidate();
-//        layoutScrollPane.repaint();
-        return !acqLayout.isEmpty();
+//        acqLayout=new AcqLayout(layoutObj, file);
+        AcqLayout layout=AcqLayout.createFromJSONObject(layoutObj, file);
+        return layout;
     }
-
+*/
 
     private void setTilingInsideAreaOnly(boolean b) {
 //        if (acqSettings!=null && acqSettings.size()>cAcqSettingIdx) {
@@ -8683,7 +8814,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     
     private void loadExpSettings(File file, boolean revertToDefault) {
         List<AcqSetting> settings=null;
-        AcquisitionLayout layout=null;
+        AcqLayout layout=null;
         if (!file.exists()) {
             IJ.log("Loading experiment settings: "+file.getAbsolutePath() + " not found, creating default settings.");
             JOptionPane.showMessageDialog(this, "Experiment setting file "+file.getAbsolutePath()+" not found.");
@@ -8698,7 +8829,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 }
                 JSONObject expSettingsObj=new JSONObject(sb.toString());
                 
-                layout=new AcquisitionLayout(expSettingsObj.getJSONObject(AcquisitionLayout.TAG_LAYOUT),file);
+//                layout=new AcqLayout(expSettingsObj.getJSONObject(AcqLayout.TAG_LAYOUT),file);
+                //returns null if problem with parsing of JSONObject
+                layout=AcqLayout.createFromJSONObject(expSettingsObj.getJSONObject(AcqLayout.TAG_LAYOUT), file);
                 settings=loadAcquisitionSettings(expSettingsObj.getJSONArray(AcqSetting.TAG_ACQ_SETTING_ARRAY));  
             } catch (FileNotFoundException ex) {    
                     Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
@@ -8722,7 +8855,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 IJ.log("    Layout not found. Initializing with empty layout."); 
                 JOptionPane.showMessageDialog(this, "Last used layout definition could not be found or read!\n"
                         + "Creating default layout.");
-                layout=new AcquisitionLayout(null,null);//creates emptyLayout
+//                layout=new AcqLayout(null,null);//creates emptyLayout
+                layout=new AcqLayout();//creates emptyLayout
             } else {
                 IJ.log("    Layout not found."); 
                 JOptionPane.showMessageDialog(this, "Last used layout definition could not be found or read!");                
@@ -9338,9 +9472,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             core.waitForDevice(xyStage);
             core.setXYPosition(xyStage, x, y);
         } catch (Exception e) {
-            gui.logError(e);
         }
     }
+
 
     private void moveToLayoutPos(double lx, double ly) {
 //        RefArea rp = acqLayout.getLandmark(0);
@@ -9366,7 +9500,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 core.waitForDevice(zStageName);
                 core.setPosition(zStageName, stage.z);
             } catch (Exception ex) {
-                gui.logError(ex);
+                app.logError(ex);
                 IJ.log("AcqFrame.moveToLayoutPos: "+ex.getMessage());
             }
         }
@@ -9385,7 +9519,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 core.waitForDevice(xyStageName);
                 core.setPosition(zStageName, stage.z);
             } catch (Exception ex) {
-                gui.logError(ex);
+                app.logError(ex);
                 IJ.log("AcqFrame.moveToArea: "+ex.getMessage());
             }
         } else {
@@ -9404,15 +9538,17 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 core.waitForDevice(zStageName);
                 core.setPosition(zStageName, lm.getStageCoordZ());
             } catch (Exception ex) {
-                gui.logError(ex);
+                app.logError(ex);
                 IJ.log("AcqFrame.moveToLandmark: "+ex.getMessage());
             }
         } else {
         }
     }
 
-    //starts calculation of tile positions in new thread(s) 
+    //starts calculation of tile positions in new thread(s)
+    //if areas==null, calculates for all areas in layout 
     public void calcTilePositions(List<Area> areas, final FieldOfView fov, final TilingSetting setting, String cmd) {
+        //if pixelsize is unknown (<=0), tile positions cannot be calculated
         if (currentAcqSetting.getImagePixelSize()<=0) {
             for (Area a:acqLayout.getAreaArray()) {
                 a.setUnknownTileNum(true);

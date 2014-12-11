@@ -29,7 +29,7 @@ import org.micromanager.api.ScriptInterface;
 public class RefPointListDialog extends javax.swing.JDialog implements IStageMonitorListener {
 
     private CMMCore core;
-    private AcquisitionLayout acqLayout;
+    private AcqLayout acqLayout;
     private List<RefArea> rpList;
     private List<RefArea> rpBackup;
 //    private AffineTransform layoutTransform;
@@ -209,7 +209,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
         
 
     
-    public RefPointListDialog(java.awt.Frame parent, ScriptInterface gui, AcquisitionLayout aLayout) {
+    public RefPointListDialog(java.awt.Frame parent, ScriptInterface gui, AcqLayout aLayout) {
         super(parent, false);
         listeners = new ArrayList<IRefPointListener>();
         this.core=gui.getMMCore();

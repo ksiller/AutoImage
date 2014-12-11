@@ -77,7 +77,9 @@ public abstract class Area {
     public static final String[] PLATE_ALPHABET={"A","B","C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF"};
     public static final String TILE_NAME_PADDING = "%06d"; //padds tile name with preceding '0' to fill up to 6 digits
     public static final String CLUSTER_NAME_PADDING = "%06d";
-    public static final long DELAY_TO_CANCEL = 1000;
+    
+    protected static final long DELAY_TO_CANCEL = 1000;
+    protected static final int MAX_TILING_ATTEMPTS = 200;
 
            
     public Area() {
@@ -546,42 +548,55 @@ public abstract class Area {
         int size=setting.getMaxSites();
         if (setting.isCluster())
             size=size*setting.getNrClusterTileX()*setting.getNrClusterTileY();
-        tilePosList = new ArrayList<Tile>(size);
-        noOfClusters=0;
-        while (!Thread.currentThread().isInterrupted() && noOfClusters < setting.getMaxSites()) {// && !abortTileCalc) {
-            double w;
-            double h;
-            if (setting.isCluster() && (setting.getNrClusterTileX()>1 || setting.getNrClusterTileY()>1)) {
-//                double offsetX=fovX*(1-setting.getTileOverlap());
-//                double offsetY=fovY*(1-setting.getTileOverlap());
-//                w=fovX+offsetX*(setting.getNrClusterTileX()-1);
-//                h=fovY+offsetY*(setting.getNrClusterTileY()-1);
-                  w=fovBounds.getWidth()+tileOffset.getX()*(setting.getNrClusterTileX()-1);
-                  h=fovBounds.getHeight()+tileOffset.getY()*(setting.getNrClusterTileX()-1);
-            } else {
-//                w=fovX;
-//                h=fovY;
-                    w=tileOffset.getX();
-                    h=tileOffset.getY();
-            }
-            double x=topLeftX+Math.random()*width;
-            double y=topLeftY+Math.random()*height;
-            if (acceptTilePos(x,y,w,h,setting.isInsideOnly())) {
+        int iterations=0;
+//        int attempts=0;
+//        noOfClusters=0;
+        do {
+            tilePosList = new ArrayList<Tile>(size);
+            noOfClusters=0;
+            int attempts=0;
+            while (!Thread.currentThread().isInterrupted() && noOfClusters < setting.getMaxSites() && attempts < MAX_TILING_ATTEMPTS) {// && !abortTileCalc) {
+                double w;
+                double h;
                 if (setting.isCluster() && (setting.getNrClusterTileX()>1 || setting.getNrClusterTileY()>1)) {
-                    if (createCluster(noOfClusters,x,y,fovX,fovY, setting) > 0) {
-                        noOfClusters++;
-                    }
+    //                double offsetX=fovX*(1-setting.getTileOverlap());
+    //                double offsetY=fovY*(1-setting.getTileOverlap());
+    //                w=fovX+offsetX*(setting.getNrClusterTileX()-1);
+    //                h=fovY+offsetY*(setting.getNrClusterTileY()-1);
+                      w=fovBounds.getWidth()+tileOffset.getX()*(setting.getNrClusterTileX()-1);
+                      h=fovBounds.getHeight()+tileOffset.getY()*(setting.getNrClusterTileX()-1);
                 } else {
-                    if (setting.isSiteOverlap() || (!setting.isSiteOverlap() && !overlapsOtherTiles(new Rectangle2D.Double(x-fovBounds.getWidth()/2,y-fovBounds.getHeight()/2,fovX,fovY),fovX,fovY))) {
-//                        tilePosList.add(new Tile("Site"+paddedTileIndex(nr), x, y, relPosZ));
-                        tilePosList.add(new Tile(createTileName(0,noOfClusters), x, y, relPosZ));
-                        noOfClusters++;
+    //                w=fovX;
+    //                h=fovY;
+                        w=tileOffset.getX();
+                        h=tileOffset.getY();
+                }
+                double x=topLeftX+Math.random()*width;
+                double y=topLeftY+Math.random()*height;
+                if (acceptTilePos(x,y,w,h,setting.isInsideOnly())) {
+                    if (setting.isCluster() && (setting.getNrClusterTileX()>1 || setting.getNrClusterTileY()>1)) {
+                        if (createCluster(noOfClusters,x,y,fovX,fovY, setting) > 0) {
+                            noOfClusters++;
+                        }
+                    } else {
+                        if (setting.isSiteOverlap() || (!setting.isSiteOverlap() && !overlapsOtherTiles(new Rectangle2D.Double(x-fovBounds.getWidth()/2,y-fovBounds.getHeight()/2,fovX,fovY),fovX,fovY))) {
+    //                        tilePosList.add(new Tile("Site"+paddedTileIndex(nr), x, y, relPosZ));
+                            tilePosList.add(new Tile(createTileName(0,noOfClusters), x, y, relPosZ));
+                            noOfClusters++;
+                        }
                     }
                 }
+                attempts++;
             }
+            iterations++;
+        } while (!Thread.currentThread().isInterrupted() && noOfClusters < setting.getMaxSites() && iterations < (MAX_TILING_ATTEMPTS/10)); // && !abortTileCalc) {
+    
+        unknownTileNum=(Thread.currentThread().isInterrupted() || (noOfClusters < setting.getMaxSites() && iterations >= MAX_TILING_ATTEMPTS/10));
+        if (noOfClusters < setting.getMaxSites() && iterations >= MAX_TILING_ATTEMPTS/10.0d) {
+            return -1;//unsuccessful
+        } else {
+            return tilePosList.size();
         }
-        unknownTileNum=Thread.currentThread().isInterrupted();
-        return tilePosList.size();
     }
     
     private int calcCenterTilePositions(double fovX, double fovY, TilingSetting tSetting) throws InterruptedException {
@@ -914,7 +929,7 @@ public abstract class Area {
         return info;
     }
     
-    public PositionList addTilePositions(PositionList pl, ArrayList<JSONObject> posInfoL, String xyStageLabel, String zStageLabel, AcquisitionLayout aLayout) {
+    public PositionList addTilePositions(PositionList pl, ArrayList<JSONObject> posInfoL, String xyStageLabel, String zStageLabel, AcqLayout aLayout) {
         if (pl==null)
             pl=new PositionList();
         for (Tile tile:tilePosList) {

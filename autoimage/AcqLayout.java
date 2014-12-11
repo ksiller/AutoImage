@@ -12,10 +12,13 @@ import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.RejectedExecutionHandler;
@@ -39,50 +42,56 @@ import org.json.JSONObject;
  *
  * @author Karsten Siller
  */
-class AcquisitionLayout  implements PropertyChangeListener {
+class AcqLayout  implements PropertyChangeListener {
     
-    private String name;
-    private boolean isEmpty;
-    private boolean isModified;
-    private double originX;
-    private double originY;
-    private double width;
-    private double height;
-    private String bottomMaterial;
-    private double bottomThickness;
-    private String version;
+    protected String name;
+    protected boolean isEmpty;
+    protected boolean isModified;
+//    protected double originX;
+//    protected double originY;
+    protected double width;
+    protected double height;
+    protected double length;
+    protected String bottomMaterial;
+    protected double bottomThickness;
+    protected String version;
     private AffineTransform stageToLayoutTransform;
     private AffineTransform layoutToStageTransform;
     private Vec3d normalVec;
-    private File file;
+    protected File file;
     
     private static int inst=0;
 
     private double escapeZPos; //z-stage is moved to this position when moving xystage to avoid collision with plate
 
-    private List<Area> areas;
-    private List<RefArea> landmarks;
+    protected List<Area> areas;
+    protected List<RefArea> landmarks;
     private ProgressMonitor tileCalcMonitor;
     private TileCalcTask tileTask;
 //    private TileManager tileManager;
   
     public static final String TAG_VERSION="VERSION";
+    public static final String TAG_CLASS_NAME="CLASS";
     public static final String TAG_NAME="NAME";
     public static final String TAG_LAYOUT_WIDTH="LAYOUT_WIDTH";
+    public static final String TAG_LAYOUT_LENGTH="LAYOUT_LENGTH";
     public static final String TAG_LAYOUT_HEIGHT="LAYOUT_HEIGHT";
+    public static final String TAG_LAYOUT_BOTTOM_MATERIAL="BOTTOM_MATERIAL";
+    public static final String TAG_LAYOUT_BOTTOM_THICKNESS="BOTTOM_THICKNESS";
     public static final String TAG_LAYOUT="LAYOUT";
     public static final String TAG_LANDMARK="LANDMARK";
     public static final String TAG_TILE_SEED_FILE="TILE_SEEDS";
     public static final String TAG_STAGE_X="STAGE_X";
     public static final String TAG_STAGE_Y="STAGE_Y";
     public static final String TAG_STAGE_Z="STAGE_Z";
-    public static final String TAG_PHYS_WIDTH="PHYS_WIDTH";
-    public static final String TAG_PHYS_HEIGHT="PHYS_HEIGHT";
+//    public static final String TAG_PHYS_WIDTH="PHYS_WIDTH";
+//    public static final String TAG_PHYS_HEIGHT="PHYS_HEIGHT";
     public static final String TAG_LAYOUT_COORD_X="LAYOUT_COORD_X";
     public static final String TAG_LAYOUT_COORD_Y="LAYOUT_COORD_Y";
     public static final String TAG_LAYOUT_COORD_Z="LAYOUT_COORD_Z";
-    public static final String TAG_REF_IMAGE_FILE="REF_IMAGE_FILE";
+//    public static final String TAG_REF_IMAGE_FILE="REF_IMAGE_FILE";
     
+    private static final String VERSION="1.0";
     private static final int STITCH_ALL_SLICES = -1;
     private static final int STITCH_CENTER_SLICE = -2;
     private static final int STITCH_ALL_TIMEPOINTS = -1;
@@ -141,40 +150,39 @@ class AcquisitionLayout  implements PropertyChangeListener {
     }    
 
     
-    public AcquisitionLayout(JSONObject obj, File f) {
+    public AcqLayout() {
+        createEmptyLayout();
+        
+/*
+        isModified;
+    version;
+    stageToLayoutTransform;
+    layoutToStageTransform;
+    normalVec;
+    file=null;
+    
+    escapeZPos = 50; //z-stage is moved to this position when moving xystage to avoid collision with plate
+
+    ProgressMonitor tileCalcMonitor;
+    TileCalcTask tileTask;        
+*/        
+    }
+
+/*    public AcqLayout(JSONObject obj, File f) {
         isEmpty=true;
         IJ.log("AcqLayout.loading from JSONObject");
         if (obj!=null) {
-            landmarks=new ArrayList<RefArea>();
             try {
-                areas=new ArrayList<Area>();
-                version=obj.getString(TAG_VERSION);
-                name=obj.getString(TAG_NAME);
-                width=obj.getDouble(TAG_LAYOUT_WIDTH);
-                height=obj.getDouble(TAG_LAYOUT_HEIGHT);
-                JSONArray areaArray=obj.getJSONArray(Area.TAG_AREA_ARRAY);
-                for (int i=0;i<areaArray.length(); i++) {
-                    JSONObject areaObj=areaArray.getJSONObject(i);
-                    IJ.log("AcqLayout.trying to initialize area");
-                    Area area=Area.createFromJSONObject(areaObj);
-                    IJ.log("AcqLayout. area "+area.getName()+" initialized succesfully");
-                    area.setId(i);
-                    areas.add(area);
-                }
-                JSONArray landmarkArray=obj.getJSONArray(RefArea.TAG_LANDMARK_ARRAY);
-                for (int i=0;i<landmarkArray.length(); i++) {
-                    JSONObject landmarkObj=landmarkArray.getJSONObject(i);
-                    landmarks.add(new RefArea(landmarkObj));
-                }
+                initializeFromJSONObject(obj);
                 isEmpty=false;
             } catch (ClassNotFoundException ex) {
-                Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
             } catch (InstantiationException ex) {
-                Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
             } catch (IllegalAccessException ex) {
-                Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
             } catch (JSONException ex) {
-                Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
             }
         }    
         if (isEmpty) {
@@ -188,16 +196,111 @@ class AcquisitionLayout  implements PropertyChangeListener {
             calcStageToLayoutTransform();
 //        tileManager=new TileManager(this);
         } catch (Exception ex) {
-            Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+*/  
+    
+    public static AcqLayout loadLayout(File file) {//returns true if layout has been changed
+//        IJ.log("AcqFrame.loadLayout: "+absPath);
+        BufferedReader br;
+        StringBuilder sb=new StringBuilder();
+        JSONObject layoutObj=null;
+        try {
+            br = new BufferedReader(new FileReader(file));
+            String line;
+            while ((line = br.readLine()) !=null) {
+                sb.append(line);
+            }
+            JSONObject obj=new JSONObject(sb.toString());
+            layoutObj=obj.getJSONObject(AcqLayout.TAG_LAYOUT);
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (JSONException ex) {
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        }
+//        acqLayout=new AcqLayout(layoutObj, file);
+        AcqLayout layout=AcqLayout.createFromJSONObject(layoutObj, file);
+        return layout;
+    }
+    
+    public static AcqLayout createFromJSONObject(JSONObject obj, File f) {
+        IJ.log("AcqLayout.loading from JSONObject");
+        //create empty layout;
+        AcqLayout layout=null;
+        if (obj!=null) {
+            String className;
+            try {
+                //dynamic class loading
+                className = obj.getString(TAG_CLASS_NAME);
+                Class clazz=Class.forName(className);
+                layout=(AcqLayout) clazz.newInstance();
+                layout.initializeFromJSONObject(obj);
+                layout.isEmpty=false;
+                layout.isModified=false;
+                layout.file=f;
+                try {
+                    layout.calcStageToLayoutTransform();
+        //        tileManager=new TileManager(this);
+                } catch (Exception ex) {
+                    IJ.log("Error calculating stageToLayout transform");
+                    Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+                }        
+            } catch (ClassNotFoundException ex) {
+                layout=null;
+                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (InstantiationException ex) {
+                layout=null;
+                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (IllegalAccessException ex) {
+                layout=null;
+                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (JSONException ex) {
+                layout=null;
+                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }    
+        return layout;
+    }
+    
+    protected void initializeFromJSONObject(JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+        landmarks=new ArrayList<RefArea>();
+        areas=new ArrayList<Area>();
+        version=obj.getString(TAG_VERSION);
+        name=obj.getString(TAG_NAME);
+        width=obj.getDouble(TAG_LAYOUT_WIDTH);
+        length=obj.getDouble(TAG_LAYOUT_LENGTH);
+        height=obj.getDouble(TAG_LAYOUT_HEIGHT);
+        bottomMaterial=obj.getString(TAG_LAYOUT_BOTTOM_MATERIAL);
+        bottomThickness=obj.getDouble(TAG_LAYOUT_BOTTOM_THICKNESS);
+        JSONArray areaArray=obj.getJSONArray(Area.TAG_AREA_ARRAY);
+        for (int i=0;i<areaArray.length(); i++) {
+            JSONObject areaObj=areaArray.getJSONObject(i);
+            IJ.log("AcqLayout.trying to initialize area");
+            Area area=Area.createFromJSONObject(areaObj);
+            IJ.log("AcqLayout. area "+area.getName()+" initialized succesfully");
+            area.setId(i);
+            areas.add(area);
+        }
+        JSONArray landmarkArray=obj.getJSONArray(RefArea.TAG_LANDMARK_ARRAY);
+        for (int i=0;i<landmarkArray.length(); i++) {
+            JSONObject landmarkObj=landmarkArray.getJSONObject(i);
+            landmarks.add(new RefArea(landmarkObj));
         }
     }
     
     public JSONObject toJSONObject () throws JSONException {
         JSONObject obj=new JSONObject();
         obj.put(TAG_VERSION,version);
+        obj.put(TAG_CLASS_NAME,this.getClass().getName());
         obj.put(TAG_NAME,name);
         obj.put(TAG_LAYOUT_WIDTH,width);
+        obj.put(TAG_LAYOUT_LENGTH,length);
         obj.put(TAG_LAYOUT_HEIGHT,height);
+        obj.put(TAG_LAYOUT_BOTTOM_MATERIAL,bottomMaterial);
+        obj.put(TAG_LAYOUT_BOTTOM_THICKNESS,bottomThickness);
         JSONArray areaArray=new JSONArray();
         for (Area a:areas) {
             areaArray.put(a.toJSONObject());
@@ -263,11 +366,11 @@ class AcquisitionLayout  implements PropertyChangeListener {
         while (highOverlap-lowOverlap > accuracy) {
             newOverlap=(highOverlap-lowOverlap)/2+lowOverlap;
 
-//            IJ.log("AcquisitionLayout.closingTilingGaps: while loop, before Area.calulateTileOffset: angle: "+Double.toString(fov.getFieldRotation()/Math.PI*180)+"new overlap: "+Double.toString(newOverlap));
+//            IJ.log("AcqLayout.closingTilingGaps: while loop, before Area.calulateTileOffset: angle: "+Double.toString(fov.getFieldRotation()/Math.PI*180)+"new overlap: "+Double.toString(newOverlap));
             Point2D tileOffset=Area.calculateTileOffset(fovROI.getWidth(), fovROI.getHeight(), newOverlap);
             double centerX=tileOffset.getX()/2;
             double centerY=tileOffset.getY()/2;
-//            IJ.log("AcquisitionLayout.closingTilingGaps: while loop, after Area.calulateTileOffset, tileOffset: "+tileOffset.toString());
+//            IJ.log("AcqLayout.closingTilingGaps: while loop, after Area.calulateTileOffset, tileOffset: "+tileOffset.toString());
 
             AffineTransform rot=new AffineTransform();
             rot.rotate(fov.getFieldRotation()-getStageToLayoutRot(),fovROI.getWidth()/2,fovROI.getHeight()/2);
@@ -362,18 +465,7 @@ class AcquisitionLayout  implements PropertyChangeListener {
        }
        return id;
     }   
-
-/*    
-    public static int getNoOfMappedStagePos(List<RefArea> refList) {
-        int mappedPoints=0;
-        if (refList!=null) {
-            for (RefArea rp:refList)
-                if (rp.isStagePosFound())
-                    mappedPoints++;
-        }
-        return mappedPoints;
-    }
-*/    
+  
     public int getNoOfMappedStagePos() {
         int mappedPoints=0;
         if (landmarks!=null) {
@@ -437,7 +529,7 @@ class AcquisitionLayout  implements PropertyChangeListener {
     }
     
     private void calcNormalVector() {
-//        IJ.log("AcquisitionLayout.calcNormalVector: begin...again");
+//        IJ.log("AcqLayout.calcNormalVector: begin...again");
         List<RefArea> mappedLandmarks=getMappedLandmarks();
         if (mappedLandmarks.size() >= 2) {
 //            IJ.log("2 or more landmarks");
@@ -462,7 +554,7 @@ class AcquisitionLayout  implements PropertyChangeListener {
                     }
                 } catch (Exception ex) {
                     //this can never occur
-                    Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
             IJ.log("v1: "+v1.toString()+", v2: "+v2.toString()+", v3: "+v3.toString());
@@ -476,7 +568,7 @@ class AcquisitionLayout  implements PropertyChangeListener {
                 normalVec = Vec3d.cross(a,b);
             } catch (Exception ex) {
                 //this can never occur
-                Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
             }
 /*            
             if (normalVec.z<0)
@@ -508,24 +600,24 @@ class AcquisitionLayout  implements PropertyChangeListener {
             y=rp.convertLayoutCoordToStageCoord_Y(0);
             double z2=((-normalVec.x*(x-rp.getStageCoordX())-normalVec.y*(y-rp.getStageCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
 */            
-                Vec3d p3=convertLayoutToStagePos(width,height,0);
+                Vec3d p3=convertLayoutToStagePos(width,length,0);
 /*            x=rp.convertLayoutCoordToStageCoord_X(width);
-            y=rp.convertLayoutCoordToStageCoord_Y(height);
+            y=rp.convertLayoutCoordToStageCoord_Y(length);
             double z3=((-normalVec.x*(x-rp.getStageCoordX())-normalVec.y*(y-rp.getStageCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
 */            
-                Vec3d p4=convertLayoutToStagePos(0,height,0);
+                Vec3d p4=convertLayoutToStagePos(0,length,0);
 /*            x=rp.convertLayoutCoordToStageCoord_X(0);
-            y=rp.convertLayoutCoordToStageCoord_Y(height);
+            y=rp.convertLayoutCoordToStageCoord_Y(length);
             double z4=((-normalVec.x*(x-rp.getStageCoordX())-normalVec.y*(y-rp.getStageCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
 */            
                 escapeZPos=Math.min(Math.min(Math.min(p1.z,p2.z),p3.z),p4.z)-ESCAPE_ZPOS_SAFETY;
             } catch (Exception ex) {
                 escapeZPos=0;
-                Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
             }
 //        } else
 //          escapeZPos=0;
-//        IJ.log("AcquisitionLayout.calcNormalVector: end.");
+//        IJ.log("AcqLayout.calcNormalVector: end.");
     }
     
     public Vec3d convertStagePosToLayoutPos(double stageX, double stageY, double stageZ) {
@@ -605,13 +697,22 @@ class AcquisitionLayout  implements PropertyChangeListener {
         return width;
     }
     
+    public double getLength() {
+        return length;
+    }
     
     public double getHeight() {
         return height;
+    }    
+
+    public String getBottomMaterial() {
+        return bottomMaterial;
     }
     
+    public double getBottomThickness() {
+        return bottomThickness;
+    }
     
-
     public double getStagePosX(Area a, int tileIndex) {
         if (a!=null && landmarks!=null && landmarks.size()>0) 
             return landmarks.get(0).getStageCoordX()-landmarks.get(0).getLayoutCoordX()+a.getCenterPos().getX();
@@ -642,7 +743,7 @@ class AcquisitionLayout  implements PropertyChangeListener {
         try {
             calcStageToLayoutTransform();
         } catch (Exception ex) {
-            Logger.getLogger(AcquisitionLayout.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
     
@@ -668,13 +769,7 @@ class AcquisitionLayout  implements PropertyChangeListener {
         } else
             addLandmark(lm);
     }
-    
-/*    public void setLandmarkFound(boolean b) {
-        for (RefArea landmark : landmarks) {
-            landmark.setStagePosMapped(b);
-        }
-    }
-*/    
+     
     public void addLandmark(RefArea lm) {
         if (landmarks==null)
             landmarks=new ArrayList<RefArea>();
@@ -688,7 +783,6 @@ class AcquisitionLayout  implements PropertyChangeListener {
     public void deleteLandmark(RefArea lm) {
         landmarks.remove(lm);
     }
-
     
     public List<Area> getAreaArray() {
         return areas;
@@ -752,12 +846,10 @@ class AcquisitionLayout  implements PropertyChangeListener {
         isModified=true;
     }
     
-    
     public void deleteArea(int index) {
         areas.remove(index);
         isModified=true;
     }
-    
         
     public int getNoOfSelectedAreas() {
         int sel=0;
@@ -791,8 +883,7 @@ class AcquisitionLayout  implements PropertyChangeListener {
         }
         return index;
     }
-    
-    
+        
     public Area getFirstContainingArea(double lx, double ly, double fovX, double fovY) {
         int i=0;
         int index=-1;
@@ -897,8 +988,12 @@ class AcquisitionLayout  implements PropertyChangeListener {
     }
         
     private void createEmptyLayout() {
+        version=VERSION;
         width=19999; //physical dim in um
-        height=10000; //physical dim in um
+        length=10000; //physical dim in um
+        height=1000;
+        bottomMaterial="Glass";
+        bottomThickness=0.17;
         areas = new ArrayList<Area>();
         landmarks=new ArrayList<RefArea>();
         name="not selected";
@@ -906,11 +1001,14 @@ class AcquisitionLayout  implements PropertyChangeListener {
         isEmpty=true;
     }
     
-    
-    public static AcquisitionLayout createSBSPlate(File f, int columns, int rows, double w, double h, double a1ColumnOffset, double a1RowOffset, double wellDiam, double wellSpacingX, double wellSpacingY, String wellShape, double bottomThickness, String bottomMaterial){
-        AcquisitionLayout layout=new AcquisitionLayout(null,null);
+/*    
+    public static AcqLayout createSBSPlate(File f, int columns, int rows, double w, double l, double h, double a1ColumnOffset, double a1RowOffset, double wellDiam, double wellSpacingX, double wellSpacingY, String wellShape, double bottomThickness, String bottomMaterial){
+        AcqLayout layout=new AcqLayout(null,null);
         layout.width=w; //physical dim in um
+        layout.length=l; //physical dim in um
         layout.height=h; //physical dim in um
+        layout.bottomMaterial=bottomMaterial;
+        layout.bottomThickness=bottomThickness;
         double oX=(double)a1ColumnOffset-wellDiam/2;
         double oY=(double)a1RowOffset-wellDiam/2;
         int areaNum=columns*rows;
@@ -938,10 +1036,11 @@ class AcquisitionLayout  implements PropertyChangeListener {
         layout.addLandmark(new RefArea("Landmark 3",0,0,0,oX+wellDiam/2,oY+wellDiam/2+(rows-1)*wellSpacingY,0,512,512,"landmark_3.tif")); //expects stage then layout coords
         return layout;
     }
-        
-    public void createSBSPlateLayout(File f, int columns, int rows, double w, double h, double a1ColumnOffset, double a1RowOffset, double wellDiam, double wellSpacingX, double wellSpacingY, String wellShape){
+*/    
+/*        
+    public void createSBSPlateLayout(File f, int columns, int rows, double w, double l, double h, double a1ColumnOffset, double a1RowOffset, double wellDiam, double wellSpacingX, double wellSpacingY, String wellShape){
         width=w; //physical dim in um
-        height=h; //physical dim in um
+        length=h; //physical dim in um
         double oX=(double)a1ColumnOffset-wellDiam/2;
         double oY=(double)a1RowOffset-wellDiam/2;
         int areaNum=columns*rows;
@@ -968,82 +1067,8 @@ class AcquisitionLayout  implements PropertyChangeListener {
         
 //        saveLayoutToXMLFile(f);    
     }
-    
-    /*
-    private void loadLayoutFromXMLFile(File f) throws FileNotFoundException, XMLStreamException {
- //       IJ.log("AcquisitionLayout.loadLayoutFromXMLFile -start");
-        boolean ok=true;
-            XMLStreamReader xrt = null;
-            try {
-                XMLInputFactory xif = XMLInputFactory.newInstance();
-                xrt = xif.createXMLStreamReader(new FileInputStream(f));
-                int areaCount=0;
-                areas=new ArrayList<Area>();
-                while(xrt.hasNext()) {
-                    int element = xrt.next();
-                    if (element == XMLStreamReader.START_ELEMENT){
-                        if (xrt.getLocalName().equals(TAG_LAYOUT))
-                            ok=readLayoutParam(xrt);    
-                        else if  (xrt.getLocalName().equals(TAG_LANDMARK))
-                            addLandmark(readLandmarkParam(xrt));
-                        else if  (xrt.getLocalName().equals(Area.TAG_AREA)) {
-                            areaCount++;
-                            Area a=readAreaParam(xrt);
-                            a.setId(areaCount);
-                            areas.add(a);
-                        }    
-                    }
-                }
-                xrt.close();
-            } catch (XMLStreamException ex) { 
-                if (xrt!=null)
-                    xrt.close();
-                throw new XMLStreamException();
-            }    
-    }
+*/    
 
-
-    public void saveLayoutToXMLFile(File f) {
-        if (f==null)
-            return;
-        XMLUtils.initialize();
-        XMLOutputFactory xof =  XMLOutputFactory.newInstance(); 
-        try { 
-            try {
-                String fname=f.getAbsolutePath();
-                XMLStreamWriter xtw; 
-                xtw = xof.createXMLStreamWriter(new FileOutputStream(fname), "UTF-8"); 
-                xtw.writeStartDocument("utf-8","1.0"); 
-                xtw.writeCharacters(XMLUtils.LINE_FEED);
-                
-                XMLUtils.wStartElement(xtw, TAG_LAYOUT);
-               
-
-                    XMLUtils.writeLine(xtw, TAG_VERSION, "1.0");
-                    XMLUtils.writeLine(xtw, TAG_NAME, name);
-                    XMLUtils.writeLine(xtw, TAG_LAYOUT_WIDTH, java.lang.Double.toString(width));
-                    XMLUtils.writeLine(xtw, TAG_LAYOUT_HEIGHT, java.lang.Double.toString(height));
-                    
-                    for (int i=0; i<landmarks.size(); i++) {
-                        writeLandmark(xtw, landmarks.get(i));  
-                    }   
-                    for (int i=0; i<areas.size(); i++) {
-                        writeArea(xtw, areas.get(i));
-                    }
-                
-                XMLUtils.wEndElement(xtw);
-                
-                xtw.writeEndDocument(); 
-                xtw.flush();
-                xtw.close(); 
-            } catch (XMLStreamException ex) { 
-
-            } 
-        } catch (FileNotFoundException ex) { 
-
-        }     
-    }
-    */
     private void setLandmarkStageCoord(int index, double sX, double sY, double sZ) {
         if (landmarks!=null & landmarks.size()>index)
             landmarks.get(index).setStageCoord(sX, sY, sZ);
@@ -1096,7 +1121,7 @@ class AcquisitionLayout  implements PropertyChangeListener {
                         writeSingleTile(xtw,tile);
                     }    
                 } else {
-                    //determine topLeftX, topLeftY, width and height of cluster
+                    //determine topLeftX, topLeftY, width and length of cluster
                     int lastIndex=-1;
                     int firstIndex=-1;
                     int tilesPerCluster=setting.getNrClusterTileX()*setting.getNrClusterTileY();
@@ -1171,67 +1196,7 @@ class AcquisitionLayout  implements PropertyChangeListener {
 
         }     
     }
-/*
-    public Area readAreaSiteCoords(XMLStreamReader xrt) {
-        String sh="undefined";
-        String n="";
-        double aW=-1;
-        double aH=-1;
-        double tLX=-1;
-        double tLY=-1;
-        double pZ=-1;
-        boolean ignoreTiles=false;
-        List<String> areaParams = new ArrayList<String>();
-        List<Tile> tl = new ArrayList<Tile>();
-        try {
-            while (xrt.hasNext()) {
-                int element=xrt.next();
-                if (element==XMLStreamReader.END_ELEMENT && xrt.getLocalName().equals(Area.TAG_AREA))
-                    break;
-                else {
-                    if (element == XMLStreamReader.START_ELEMENT && xrt.getLocalName().equals(Area.TAG_AREA)) { 
-                        areaParams.add(xrt.getElementText());
-                    }
-                    if (element == XMLStreamReader.START_ELEMENT && xrt.getLocalName().equals(Area.TAG_CLUSTER)) {
-                        List<String> clusterParams=new ArrayList<String>();
-                        while (xrt.hasNext()) {
-                            element=xrt.next();
-                            if (element==XMLStreamReader.END_ELEMENT && xrt.getLocalName().equals(Area.TAG_CLUSTER))
-                                break;
-                            if (element==XMLStreamReader.START_ELEMENT && xrt.getLocalName().equals(Area.TAG_TILE))
-                                break;
-                            clusterParams.add(xrt.getElementText());
-                         }
-                    }
-                    if (element == XMLStreamReader.START_ELEMENT && xrt.getLocalName().equals(Area.TAG_TILE)) {
-                        
-                    }
-                }
-            }
-            Area area=null;
-            if (areaParams.size()>0 && areaParams.get(0).contains("RectArea")) 
-                area=new RectArea();
-            else if (areaParams.size()>0 && areaParams.get(0).contains("EllipseArea")) 
-                area=new EllipseArea();
-            else if (areaParams.size()>0 && areaParams.get(0).contains("DonutArea")) 
-                area=new DonutArea();           
-            if (area!=null)
-                area.setAreaParams(areaParams);
- //           IJ.log("areaParams.get(0): "+areaParams.get(0));
-            /*try {
-                IJ.log("areaParams.get(0): "+areaParams.get(0));
-                Class areaClass = Class.forName("autoimage."+areaParams.get(0));
-                area = areaClass.newInstance();
-                ((Area)area).setAreaParams(areaParams);
-            } catch (Throwable e) {
-                System.err.println(e);
-            }
-            return area;
-        } catch (XMLStreamException ex) {
-            return null;
-        }
-    }
-  */  
+
             
     private void readTileCoordsForArea(XMLStreamReader xrt, List<List<Tile>> groupList) {
         String areaName="";
@@ -1326,10 +1291,9 @@ class AcquisitionLayout  implements PropertyChangeListener {
         } catch (XMLStreamException ex) {
         }        
     } 
-    
-   
+       
     public List<List<Tile>> readTileCoordsFromXMLFile(String fname) {
-//        IJ.log("AcquisitionLayout.readTileCoordFromXMLFile -start");
+//        IJ.log("AcqLayout.readTileCoordFromXMLFile -start");
         int returnValue=FILE_READING_OK;
         
         List<List<Tile>> list = new ArrayList<List<Tile>>();
@@ -1355,12 +1319,11 @@ class AcquisitionLayout  implements PropertyChangeListener {
         } catch (FileNotFoundException ex) { 
             return null;
         } 
-//        IJ.log("AcquisitionLayout.loadLayoutFromXMLFile -end");
+//        IJ.log("AcqLayout.loadLayoutFromXMLFile -end");
         return list;
        
     }
-    
-    
+        
     //returns index of first area with duplicate name
     public int hasDuplicateAreaNames() {
         if (areas!=null) {

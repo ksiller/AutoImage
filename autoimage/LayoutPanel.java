@@ -62,7 +62,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
       /* cap style */BasicStroke.CAP_BUTT,
       /* join style, miter limit */BasicStroke.JOIN_BEVEL, 1.0f,
       /* the dash pattern */new float[] { 8.0f, 8.0f},0.0f);
-    private AcquisitionLayout acqLayout;
+    private AcqLayout acqLayout;
     private AcqSetting cAcqSetting;//reference to current AcqSetting
     private Point anchorMousePos;
     private Point prevMousePos;
@@ -85,7 +85,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         this(null,null);
     }
     
-    public LayoutPanel(AcquisitionLayout al, AcqSetting as) {
+    public LayoutPanel(AcqLayout al, AcqSetting as) {
         super(true);
 //        IJ.log("LayoutPanel.constructor");
         setOpaque(true);
@@ -118,7 +118,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     //end IStageMonitorListener
     
 
-    public AcquisitionLayout getAcqLayout() {
+    public AcqLayout getAcqLayout() {
         return acqLayout;
     }
     
@@ -136,7 +136,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         return showZProfile;
     }
     
-    public void setAcquisitionLayout(AcquisitionLayout al, double borderD) {
+    public void setAcquisitionLayout(AcqLayout al, double borderD) {
  //       IJ.log("LayoutPanel.setAcquisitionLayout: start");
         this.acqLayout=al;
         borderDim=borderD;
@@ -182,7 +182,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     
     //w, h: width and height of JScrollPane.getVisibleRect()
     public void calculateScale(int w, int h) { 
-        Dimension d=new Dimension(getPreferredLayoutWidth(),getPreferredLayoutHeight());
+        Dimension d=new Dimension(getPreferredLayoutWidth(),getPreferredLayoutLength());
         if (zoom==1) {
             scale=Math.min(((double)w-2)/d.width,((double)h-2)/d.height);
             revalidate();
@@ -208,7 +208,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     private Dimension getPreferredLayoutSize() {
         return new Dimension(
                     getPreferredLayoutWidth(),
-                    getPreferredLayoutHeight());
+                    getPreferredLayoutLength());
     }
 
     
@@ -221,10 +221,10 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     }
     
     
-    private int getPreferredLayoutHeight() {
+    private int getPreferredLayoutLength() {
         if (acqLayout!=null) {
 //            return (int)Math.round(2*getBorderDimPix()+(int)Math.ceil(acqLayout.getHeight()*physToPixelRatio)*zoom);
-            return 2*getBorderDimPix()+(int)Math.ceil(acqLayout.getHeight()*physToPixelRatio);
+            return 2*getBorderDimPix()+(int)Math.ceil(acqLayout.getLength()*physToPixelRatio);
         } else
             return Math.round(LAYOUT_MAX_DIM/2);
     }
@@ -526,7 +526,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         }
         if (acqLayout.getLandmarks()!=null & acqLayout.getLandmarks().size()>1 & calcDist(0,0,n.x,n.y)>0) {
             //gradient center positioned in center of layout
-            Rectangle2D layoutRect=new Rectangle2D.Double(0,0,acqLayout.getWidth(),acqLayout.getHeight());
+            Rectangle2D layoutRect=new Rectangle2D.Double(0,0,acqLayout.getWidth(),acqLayout.getLength());
             java.awt.geom.Area stage = new java.awt.geom.Area(layoutRect);
             stage.transform(acqLayout.getLayoutToStageTransform());
             Rectangle2D stageRect=stage.getBounds();
@@ -577,7 +577,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     }
     
     private void drawStageGrid(Graphics2D g2d) {
-        Rectangle2D layoutRect=new Rectangle2D.Double(0,0,acqLayout.getWidth(),acqLayout.getHeight());
+        Rectangle2D layoutRect=new Rectangle2D.Double(0,0,acqLayout.getWidth(),acqLayout.getLength());
         java.awt.geom.Area a = new java.awt.geom.Area(layoutRect);
         a.transform(acqLayout.getLayoutToStageTransform());
         Rectangle2D stageRect=a.getBounds();

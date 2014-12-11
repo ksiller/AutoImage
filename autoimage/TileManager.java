@@ -17,11 +17,11 @@ import java.util.Map;
 public class TileManager implements IStagePosListener {
     
     private Map<String,List<Tile>> areaMap;
-    private AcquisitionLayout acqLayout;
+    private AcqLayout acqLayout;
     private AcqSetting acqSetting;
 //    protected boolean finalized;
     
-    public TileManager (AcquisitionLayout aLayout, AcqSetting aSetting) {
+    public TileManager (AcqLayout aLayout, AcqSetting aSetting) {
         areaMap=new HashMap<String,List<Tile>>();
         acqLayout=aLayout;
         acqSetting=aSetting;
@@ -36,7 +36,7 @@ public class TileManager implements IStagePosListener {
         return finalized;
     }
 */    
-    public void setAcquisitionLayout(AcquisitionLayout aLayout) {
+    public void setAcquisitionLayout(AcqLayout aLayout) {
         acqLayout=aLayout;
     }
     
@@ -74,7 +74,7 @@ public class TileManager implements IStagePosListener {
         areaMap.clear();
     }
     /*
-    public void convertStagePosMap(AcquisitionLayout acqLayout) {
+    public void convertStagePosMap(AcqLayout acqLayout) {
         RefArea rp = acqLayout.getLandmark(0);
         if (rp!=null) {
             Iterator it = seedMap.entrySet().iterator();
