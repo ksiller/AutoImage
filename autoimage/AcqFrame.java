@@ -67,6 +67,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
@@ -147,9 +148,11 @@ import mmcorej.TaggedImage;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.micromanager.MMStudio;
 import org.micromanager.acquisition.DefaultTaggedImageSink;
 import org.micromanager.acquisition.MMImageCache;
 import org.micromanager.acquisition.TaggedImageStorageDiskDefault;
+import org.micromanager.api.Autofocus;
 import org.micromanager.api.DataProcessor;
 import org.micromanager.api.IAcquisitionEngine2010;
 import org.micromanager.api.ImageCache;
@@ -164,6 +167,7 @@ import org.micromanager.api.TaggedImageAnalyzer;
 import org.micromanager.api.TaggedImageStorage;
 import org.micromanager.internalinterfaces.AcqSettingsListener;
 import org.micromanager.utils.ChannelSpec;
+import org.micromanager.utils.MMException;
 import org.micromanager.utils.MMScriptException;
 import org.micromanager.utils.ReportingUtils;
 
@@ -367,7 +371,20 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 IJ.log("Sequence '"+acqSetting.getName()+"' started at:  "+now.getTime().toString()+" ("+Long.toString(now.getTimeInMillis() - scheduledExecutionTime())+" ms delay)");            
             }try {
                 acqEng2010 = app.getAcquisitionEngine2010();
-                BlockingQueue<TaggedImage> engineOutputQueue = acqEng2010.run(mdaSettings, false, posList, app.getAutofocusManager().getDevice());
+                Autofocus af=null;
+                if (currentAcqSetting.isAutofocus()) {
+                    //apply autofocus settings
+                    if (app.getAutofocusManager().hasDevice(currentAcqSetting.getAutofocusDevice())) {
+                        app.getAutofocusManager().selectDevice(currentAcqSetting.getAutofocusDevice());
+                        af=app.getAutofocusManager().getDevice();
+                        currentAcqSetting.applyAutofocusSettingsToDevice(af);
+                        IJ.log("Autofocus device: "+af.getDeviceName() + " initialized.");
+                    } else {
+                        IJ.log("Autofocus device not found");
+                        mdaSettings.useAutofocus=false;
+                    }
+                }
+                BlockingQueue<TaggedImage> engineOutputQueue = acqEng2010.run(mdaSettings, false, posList, af);
                 JSONObject summaryMetadata = acqEng2010.getSummaryMetadata();
                 summaryMetadata.put(ExtImageTags.AREAS,acqLayout.getNoOfSelectedAreas());
                 summaryMetadata.put(ExtImageTags.CLUSTERS,acqLayout.getNoOfSelectedClusters());
@@ -2324,6 +2341,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 
         sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
                         "Sequence: "+currentAcqSetting.getName()));
+        updateAutofocusToolTip(currentAcqSetting);
+/*        try {
+            core.setChannelGroup(currentAcqSetting.getChannelGroupStr());
+        } catch (Exception ex) {
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        }*/
 
         //initialize processorTreeView
         processorTreeView.setEditable(true);
@@ -2343,8 +2366,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         stageMonitor = new StagePosMonitor(gui,100);
         stageMonitor.addListener(this);
         stageMonitor.addListener((LayoutPanel)acqLayoutPanel);
-        stageMonitor.execute();
-        
+        stageMonitor.execute();        
         liveModeMonitor = new LiveModeMonitor(gui,100);
         liveModeChanged(liveModeMonitor.isLive());
         liveModeMonitor.addListener(this);
@@ -2499,6 +2521,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         clusterLabel1 = new javax.swing.JLabel();
         clearRoiButton = new javax.swing.JButton();
         closeGapsButton = new javax.swing.JButton();
+        autofocusImportButton = new javax.swing.JButton();
         acqModePane = new javax.swing.JTabbedPane();
         jPanel4 = new javax.swing.JPanel();
         jScrollPane3 = new javax.swing.JScrollPane();
@@ -2752,7 +2775,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         .add(areaDownButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(mergeAreasButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                    .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 317, Short.MAX_VALUE))
+                    .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 319, Short.MAX_VALUE))
                 .add(3, 3, 3))
         );
 
@@ -2909,7 +2932,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         });
 
         autofocusButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/wrench_orange.png"))); // NOI18N
-        autofocusButton.setToolTipText("Autofocu Configuration");
+        autofocusButton.setToolTipText("Autofocus Configuration");
         autofocusButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 autofocusButtonActionPerformed(evt);
@@ -2964,6 +2987,15 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
+        autofocusImportButton.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
+        autofocusImportButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/micromanager/icons/arrow_refresh.png"))); // NOI18N
+        autofocusImportButton.setToolTipText("Apply autofocus settings");
+        autofocusImportButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                autofocusImportButtonActionPerformed(evt);
+            }
+        });
+
         org.jdesktop.layout.GroupLayout jPanel10Layout = new org.jdesktop.layout.GroupLayout(jPanel10);
         jPanel10.setLayout(jPanel10Layout);
         jPanel10Layout.setHorizontalGroup(
@@ -2975,7 +3007,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         .add(autofocusCheckBox)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(autofocusButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .add(26, 26, 26)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(autofocusImportButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(zStackCheckBox)
                         .add(26, 26, 26)
                         .add(timelapseCheckBox))
@@ -3060,7 +3094,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         .add(pixelSizeLabel)
                         .add(jLabel5)
                         .add(tileSizeLabel)))
-                .add(0, 0, 0)
+                .add(2, 2, 2)
                 .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
                     .add(jLabel33)
                     .add(tilingModeComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
@@ -3094,7 +3128,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     .add(autofocusCheckBox)
                     .add(autofocusButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(zStackCheckBox)
-                    .add(timelapseCheckBox))
+                    .add(timelapseCheckBox)
+                    .add(autofocusImportButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .add(0, 0, 0))
         );
 
@@ -3784,7 +3819,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(jLabel28)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jScrollPane4, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 314, Short.MAX_VALUE)
+                    .add(jScrollPane4, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 316, Short.MAX_VALUE)
                     .add(jPanel9Layout.createSequentialGroup()
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(addZFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
@@ -4105,7 +4140,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(sequenceListPanel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(sequenceTabbedPane, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 416, Short.MAX_VALUE)
+                .add(sequenceTabbedPane, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 418, Short.MAX_VALUE)
                 .add(3, 3, 3)
                 .add(settingsPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
                     .add(acquireButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
@@ -4247,7 +4282,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                 .add(cursorLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 39, Short.MAX_VALUE)
                                 .add(55, 55, 55))
                             .add(statusPanelLayout.createSequentialGroup()
-                                .add(0, 0, 0)
                                 .add(setLandmarkButton)
                                 .add(0, 0, 0)
                                 .add(showZProfileCheckBox)
@@ -4382,6 +4416,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             if (e.getType() == TableModelEvent.INSERT) {
 //                IJ.showMessage("insert");
             }
+            updateAutofocusToolTip(currentAcqSetting);
             updatingAcqSettingTable=false;
         }
     }
@@ -4405,6 +4440,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 ((LayoutPanel) acqLayoutPanel).setAcqSetting(currentAcqSetting, true);
                 updateAcqSettingTab(currentAcqSetting);
                 updateProcessorTreeView(currentAcqSetting);
+                updateAutofocusToolTip(currentAcqSetting);
+/*                try {
+                    core.setChannelGroup(currentAcqSetting.getChannelGroupStr());
+                } catch (Exception ex) {
+                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                }*/
                 acqSettingTable.requestFocusInWindow();
             }
         }
@@ -4537,6 +4578,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         maxSitesField.setEnabled(maxSitesLabel.isEnabled());
         tileOverlapField.setEnabled(b);
         autofocusButton.setEnabled(b);
+        autofocusImportButton.setEnabled(b);
         clearRoiButton.setEnabled(b);
         closeGapsButton.setEnabled(b);
         
@@ -5181,8 +5223,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         }      
         
-        //set up tilemanagers
+        //check if autofocus function is available and set up tilemanagers
         for (AcqSetting setting:acqSettings) {
+            if (setting.isAutofocus() && !app.getAutofocusManager().hasDevice(setting.getAutofocusDevice())) {
+                JOptionPane.showMessageDialog(this,"Autofocus device "+setting.getAutofocusDevice()+ " not available");
+                return null;
+            }
             DefaultMutableTreeNode node=setting.getImageProcessorTree();
             Enumeration<DefaultMutableTreeNode> en=node.preorderEnumeration();
             while (en.hasMoreElements()) {
@@ -7536,7 +7582,19 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }//GEN-LAST:event_tilingModeComboBoxActionPerformed
 
     private void autofocusButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_autofocusButtonActionPerformed
-        app.showAutofocusDialog();
+        String currentAF=currentAcqSetting.getAutofocusDevice();
+        if (currentAF != null) {
+            try {
+                app.getAutofocusManager().selectDevice(currentAF);
+                Autofocus af=app.getAutofocus();
+                currentAcqSetting.applyAutofocusSettingsToDevice(af);
+                app.getAutofocusManager().refresh();
+            } catch (MMException ex) {
+                JOptionPane.showMessageDialog(this,"Error selecting Autofocus device: " +ex.getMessage());
+                ReportingUtils.logError(ex, this.getClass().getName()+": Autofocus configuration");
+            }
+        }    
+        app.getAutofocusManager().showOptionsDialog();
     }//GEN-LAST:event_autofocusButtonActionPerformed
 
     private void acqOrderListActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_acqOrderListActionPerformed
@@ -8234,6 +8292,45 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }    
     }//GEN-LAST:event_stageControlButtonActionPerformed
 
+    private void updateAutofocusToolTip(AcqSetting setting) {
+        String text="";
+        if (setting.getAutofocusDevice()!=null) {
+            text="<html><b>AF method: " +setting.getAutofocusDevice()+"</b><br>";
+            JSONObject properties=setting.getAutofocusProperties();
+            Iterator<String> keys=properties.keys();
+            while (keys.hasNext()) {
+                String pname=keys.next();
+                try {
+                    text+=pname+": "+properties.getString(pname)+"<br>";
+                } catch (JSONException ex) {
+                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+            text+="</html>";
+        } else {
+            text="<html><b>AF method: not selected</b></html>";
+        }
+//        autofocusButton.setToolTipText(text);
+        autofocusCheckBox.setToolTipText(text);
+    } 
+    
+    private void autofocusImportButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_autofocusImportButtonActionPerformed
+        Autofocus af=null;
+        try {
+            af=app.getAutofocus();
+            if (af==null) {
+                JOptionPane.showMessageDialog(this,"No autofocus device/plugin installed.");
+            }
+            currentAcqSetting.setAutofocusSettings(af, core);
+            updateAutofocusToolTip(currentAcqSetting);
+        } catch (MMException ex) {
+            if (af!=null) {
+                JOptionPane.showMessageDialog(this,"Error transferrring properties for "+af.getDeviceName());
+            }
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }//GEN-LAST:event_autofocusImportButtonActionPerformed
+
 
     private void saveLayout() {
         JFileChooser jfc = new JFileChooser();
@@ -8359,6 +8456,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JButton areaUpButton;
     private javax.swing.JButton autofocusButton;
     private javax.swing.JCheckBox autofocusCheckBox;
+    private javax.swing.JButton autofocusImportButton;
     private javax.swing.JComboBox binningComboBox;
     private javax.swing.JButton browseImageDestPathButton;
     private javax.swing.ButtonGroup buttonGroup1;

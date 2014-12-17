@@ -49,7 +49,7 @@ public class Auto_Image implements org.micromanager.api.MMPlugin{
 
     @Override
     public String getCopyright() {
-        return "University of Virginia, 2014"; 
+        return "Karsten Siller - University of Virginia, 2014"; 
     }
     
     

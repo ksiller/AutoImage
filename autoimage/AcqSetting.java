@@ -8,14 +8,23 @@ import ij.IJ;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
+import java.util.Iterator;
 import java.util.List;
 import java.util.TimeZone;
+import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.tree.DefaultMutableTreeNode;
+import mmcorej.CMMCore;
+import mmcorej.StrVector;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.micromanager.api.Autofocus;
+import org.micromanager.utils.CoreAutofocus;
+import org.micromanager.utils.MMException;
+import org.micromanager.utils.PropertyItem;
+import org.micromanager.utils.ReportingUtils;
 
 /**
  *
@@ -47,6 +56,9 @@ public class AcqSetting {
     public static final String TAG_FIELD_OF_VIEW = "FIELD_OF_VIEW";
 //    public static final String TAG_DETECTOR = "DETECTOR";
     public static final String TAG_AUTOFOCUS = "AUTOFOCUS";
+    public static final String TAG_AUTOFOCUS_SETTINGS = "AUTOFOCUS_SETTINGS";
+    public static final String TAG_AUTOFOCUS_DEVICE_NAME = "AUTOFOCUS_DEVICE_NAME";
+    public static final String TAG_AUTOFOCUS_PROPERTIES = "AUTOFOCUS_PROPERTY_ARRAY";
     public static final String TAG_Z_STACK = "Z_STACK";
     public static final String TAG_Z_STACK_CENTERED = "Z_STACK_CENTERED";
     public static final String TAG_Z_BEGIN = "Z_BEGIN";
@@ -76,6 +88,7 @@ public class AcqSetting {
     protected TileManager tileManager;
 
     private boolean autofocus;      //visible
+    private JSONObject autofocusSettings;
     private boolean zStack;         //visible
     private boolean zStackCentered; //visible
     private double zBegin;          //visible
@@ -190,6 +203,7 @@ public class AcqSetting {
 //        setCameraChipSize(detector.getFullDetectorPixelX(), detector.getFullDetectorPixelY());
         setObjective(objective,oPixSize);        
         autofocus=autof;
+        autofocusSettings=new JSONObject();
         channelGroupStr="";
         channels=new ArrayList<Channel>();
         startTime=new ScheduledTime(ScheduledTime.ASAP,0);
@@ -222,11 +236,12 @@ public class AcqSetting {
                 JSONObject fovObj=obj.getJSONObject(TAG_FIELD_OF_VIEW);
                 fieldOfView = new FieldOfView(fovObj);
             } catch (JSONException e) {
-                IJ.log("Cannot load detector from acquisition settings. Instantiating standard detector");
+                ReportingUtils.logError("Cannot load detector from acquisition settings. Instantiating standard detector");
                 fieldOfView = new FieldOfView(1,1,-1);
             }    
             setObjective(obj.getString(TAG_OBJ_LABEL),-1);
             autofocus=obj.getBoolean(TAG_AUTOFOCUS);
+            autofocusSettings=obj.getJSONObject(TAG_AUTOFOCUS_SETTINGS);
             zStack=obj.getBoolean(TAG_Z_STACK);
             zStackCentered=obj.getBoolean(TAG_Z_STACK_CENTERED);
             zBegin=obj.getDouble(TAG_Z_BEGIN);
@@ -260,6 +275,109 @@ public class AcqSetting {
         }
     }
     
+    public static String[] getPropertyNames(String devName_, CMMCore core_){
+        Vector<String> propNames = new Vector<String>();
+        try {
+            core_.setAutoFocusDevice(devName_);
+            StrVector propNamesVect = core_.getDevicePropertyNames(devName_);
+            for (int i = 0; i < propNamesVect.size(); i++)
+                if (!core_.isPropertyReadOnly(devName_, propNamesVect.get(i))
+	                  && !core_.isPropertyPreInit(devName_,
+	                        propNamesVect.get(i)))
+	               propNames.add(propNamesVect.get(i));
+        } catch (Exception e) {
+           ReportingUtils.logError(e);
+        }
+        return propNames.toArray(new String[propNames.size()]);
+//        return (String[]) propNames.toArray();
+    }
+
+    public static JSONObject convertAutofocusSettings(Autofocus af, CMMCore core_) throws JSONException, MMException {
+        JSONObject obj=new JSONObject();
+        obj.put(TAG_AUTOFOCUS_DEVICE_NAME, af.getDeviceName());
+        JSONObject properties=new JSONObject();
+        try {
+            for (String propertyName : af.getPropertyNames()) {
+                properties.put(propertyName, af.getPropertyValue(propertyName));
+            }
+        } catch (ClassCastException ex) {
+            //caused by bug in CoreAutofocus.getPropertyNames()
+//            IJ.showMessage("classcastexception");
+            for (String propertyName : getPropertyNames(af.getDeviceName(),core_)) {
+                properties.put(propertyName, af.getPropertyValue(propertyName));
+            }
+//            throw new MMException("Cannot read properties for "+af.getDeviceName());
+        }
+        obj.put(TAG_AUTOFOCUS_PROPERTIES, properties);
+        return obj;
+    }
+
+    public void setAutofocusSettings(Autofocus af, CMMCore core_) throws MMException{
+        try {
+            autofocusSettings=AcqSetting.convertAutofocusSettings(af, core_);
+        } catch (JSONException ex) {
+            autofocusSettings=new JSONObject();
+            ReportingUtils.logError(ex, "cannot set autofocus settings for "+af.getDeviceName());
+            throw new MMException(ex.getMessage());
+        } catch (MMException ex) {
+            autofocusSettings=new JSONObject();
+            ReportingUtils.logError(ex, "cannot set autofocus settings for "+af.getDeviceName());
+            throw new MMException(ex.getMessage());
+        }
+    }
+    //returns null if settings are not defind or device name not found
+    public String getAutofocusDevice() {
+        String device=null;
+        if (autofocusSettings!=null) {
+            try {
+                device=autofocusSettings.getString(TAG_AUTOFOCUS_DEVICE_NAME);
+            } catch (JSONException ex) {
+                Logger.getLogger(AcqSetting.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        return device;
+    }
+    
+    public JSONObject getAutofocusProperties() {
+        JSONObject properties=null;
+        if (autofocusSettings!=null) {
+            try {
+                properties=autofocusSettings.getJSONObject(TAG_AUTOFOCUS_PROPERTIES);
+            } catch (JSONException ex) {
+                Logger.getLogger(AcqSetting.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        return properties;
+    }
+
+    public JSONObject getAutofocusSettings() {
+        return autofocusSettings;
+    }
+    
+    //trys to apply autofocusSettings to af object 
+    public void applyAutofocusSettingsToDevice(Autofocus af) throws MMException {
+        boolean error=false;
+        String property="";
+        String key="";
+        if (af.getDeviceName().equals(getAutofocusDevice())) {
+            JSONObject properties=getAutofocusProperties();
+            Iterator<String> keys=properties.keys();
+            while (keys.hasNext()) {
+                key=keys.next();
+                try {
+                    property = properties.getString(key);
+                    af.setPropertyValue(key, property);
+                } catch (JSONException ex) {
+                    error=true;
+                }
+            }
+//            af.applySettings();
+        }
+        if (error) {
+            throw (new MMException("AcqSetting.applyAutofocusSettings: error setting property for "+af.getDeviceName()+", key: "+key+", property:" + property));
+        }
+    }
+    
     public JSONObject toJSONObject() throws JSONException {
         JSONObject obj=new JSONObject();
         obj.put(TAG_NAME,name);
@@ -269,6 +387,7 @@ public class AcqSetting {
         obj.put(TAG_BINNING, binning);
         obj.put(TAG_FIELD_OF_VIEW, fieldOfView.toJSONObject());
         obj.put(TAG_AUTOFOCUS, autofocus);
+        obj.put(TAG_AUTOFOCUS_SETTINGS, autofocusSettings);
         obj.put(TAG_Z_STACK, zStack);
         obj.put(TAG_Z_STACK_CENTERED, zStackCentered);
         obj.put(TAG_Z_BEGIN, zBegin);
