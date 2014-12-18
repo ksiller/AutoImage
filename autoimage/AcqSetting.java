@@ -301,8 +301,7 @@ public class AcqSetting {
                 properties.put(propertyName, af.getPropertyValue(propertyName));
             }
         } catch (ClassCastException ex) {
-            //caused by bug in CoreAutofocus.getPropertyNames()
-//            IJ.showMessage("classcastexception");
+            //caused by bug in CoreAutofocus.getPropertyNames(), fixed in 1.4.20
             for (String propertyName : getPropertyNames(af.getDeviceName(),core_)) {
                 properties.put(propertyName, af.getPropertyValue(propertyName));
             }
@@ -359,7 +358,8 @@ public class AcqSetting {
         boolean error=false;
         String property="";
         String key="";
-        if (af.getDeviceName().equals(getAutofocusDevice())) {
+        error= af==null;
+        if (!error && af.getDeviceName().equals(getAutofocusDevice())) {
             JSONObject properties=getAutofocusProperties();
             Iterator<String> keys=properties.keys();
             while (keys.hasNext()) {

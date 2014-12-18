@@ -282,6 +282,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private class AcquisitionTask extends TimerTask {
 
         private final AcqSetting acqSetting;
+        private Autofocus autofocus;
         private final ImageCacheListener imageListener;
         private int totalImages;
         private boolean hasStarted;
@@ -289,13 +290,16 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         private SequenceSettings mdaSettings;
         private PositionList posList;
         private DefaultMutableTreeNode mainImageStorageNode;
+        private final ScriptInterface app_;
         
-        AcquisitionTask (AcqSetting setting, AcqLayout layout, ImageCacheListener imgListener, File seqDir) throws Exception {
+        AcquisitionTask (ScriptInterface app, AcqSetting setting, AcqLayout layout, ImageCacheListener imgListener, File seqDir) throws MMException {
 //            IJ.log("AcquisitionTask.constructor: begin");
+            app_=app;
             acqSetting=setting;
             imageListener=imgListener;
             sequenceDir=seqDir;
             hasStarted=false;
+            isInitializing=false;
             posList = new PositionList();
 
             ArrayList<JSONObject> posInfoList = new ArrayList<JSONObject>();
@@ -316,7 +320,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             mdaSettings = createMDASettings(acqSetting);
 //            IJ.log("AcquisitionTask.constructor: after createMDASettings");
             if (mdaSettings == null) {
-                throw new Exception("Cannot initialize MDA settings");
+                throw new MMException("Cannot initialize MDA settings");
             }
 
             int slices = setting.isZStack() ? setting.getZSlices() : 1;
@@ -333,7 +337,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     DataProcessor dp=(DataProcessor)node.getUserObject();
                     File procDir=new File (new File(new File (imageDestPath,"Processed"),setting.getName()),"Proc"+String.format("%03d",i)+"-"+dp.getName());
                     if (!procDir.mkdirs()) {
-                        throw new Exception("Directories for Processed Images cannot be created.");
+                        throw new MMException("Directories for Processed Images cannot be created.");
                     }            
                     if (dp instanceof SiteInfoUpdater) {
                         ((SiteInfoUpdater)dp).setPositionInfoList(posInfoList);
@@ -362,25 +366,30 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         
         @Override
         public void run() {
-            isInitializing=true;
             isWaiting=false;
+            isInitializing=true;
             Calendar now=Calendar.getInstance();
             if (acqSetting.getStartTime().type == AcqSetting.ScheduledTime.ASAP) {
                 IJ.log("Sequence '"+acqSetting.getName()+"' started asap at : "+now.getTime().toString());
             } else {
                 IJ.log("Sequence '"+acqSetting.getName()+"' started at:  "+now.getTime().toString()+" ("+Long.toString(now.getTimeInMillis() - scheduledExecutionTime())+" ms delay)");            
             }try {
-                acqEng2010 = app.getAcquisitionEngine2010();
+                acqEng2010 = app_.getAcquisitionEngine2010();
                 Autofocus af=null;
-                if (currentAcqSetting.isAutofocus()) {
+                if (acqSetting.isAutofocus()) {
                     //apply autofocus settings
-                    if (app.getAutofocusManager().hasDevice(currentAcqSetting.getAutofocusDevice())) {
-                        app.getAutofocusManager().selectDevice(currentAcqSetting.getAutofocusDevice());
-                        af=app.getAutofocusManager().getDevice();
-                        currentAcqSetting.applyAutofocusSettingsToDevice(af);
+                    IJ.log("Autofocus devices:");
+                    for (String device:app_.getAutofocusManager().getAfDevices()) {
+                        IJ.log("    Found: "+device);
+                    }
+//                    if (app_.getAutofocusManager().hasDevice(acqSetting.getAutofocusDevice())) {
+                    try {
+                        app_.getAutofocusManager().selectDevice(acqSetting.getAutofocusDevice());
+                        af=app_.getAutofocusManager().getDevice();
+                        acqSetting.applyAutofocusSettingsToDevice(af);
                         IJ.log("Autofocus device: "+af.getDeviceName() + " initialized.");
-                    } else {
-                        IJ.log("Autofocus device not found");
+                    } catch (MMException e) {
+                        IJ.log("Autofocus device "+acqSetting.getAutofocusDevice() + " not found or cannot be initiated with current settings.");
                         mdaSettings.useAutofocus=false;
                     }
                 }
@@ -5035,7 +5044,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         String returnValue;
         try {
             Timer timer=new Timer();
-            acquisitionTask = new AcquisitionTask(currentAcqSetting,acqLayout,this, sequenceDir);
+            acquisitionTask = new AcquisitionTask(app, currentAcqSetting, acqLayout,this, sequenceDir);
             timer.schedule(acquisitionTask, currentAcqSetting.getAbsoluteStart().getTime());
             
             SwingUtilities.invokeLater(new Runnable() {
@@ -6886,30 +6895,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             saveAcquisitionSetting(file,currentAcqSetting);
     }//GEN-LAST:event_saveAcqSettingButtonActionPerformed
 
-/*    
-    public static <T> Class<? extends DataProcessor<T>> load(ClassLoader classLoader, String selClass, Class<T> type)
-    throws ClassNotFoundException
-  {
-    //Class<?> any = Class.forName(fqcn);
-    Class<?> any = classLoader.loadClass(selClass);
-    for (Class<?> clz = any; clz != null; clz = clz.getSuperclass()) {
-      for (Object ifc : clz.getGenericInterfaces()) {
-        if (ifc instanceof ParameterizedType) {
-          ParameterizedType pType = (ParameterizedType) ifc;
-          if (DataProcessor.class.equals(pType.getRawType())) {
-            if (!pType.getActualTypeArguments()[0].equals(type))
-              throw new ClassCastException("Class implements " + pType);
-            //We've done the necessary checks to show that this is safe. 
-            @SuppressWarnings("unchecked")
-            Class<? extends DataProcessor<T>> dp = (Class<? extends DataProcessor<T>>) any;
-            return dp;
-          }
-        }
-      }
-    }
-    throw new ClassCastException(selClass + " does not implement DataProcessor<TaggedImage>");
-  }
-*/
     private void addDataProcFromFileButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addDataProcFromFileButtonActionPerformed
         DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode)
                        processorTreeView.getLastSelectedPathComponent();
