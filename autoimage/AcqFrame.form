@@ -1023,26 +1023,29 @@
                                       <Group type="103" groupAlignment="0" attributes="0">
                                           <Group type="102" alignment="0" attributes="0">
                                               <Group type="103" groupAlignment="1" max="-2" attributes="0">
-                                                  <Component id="snapButton" alignment="0" max="32767" attributes="0"/>
-                                                  <Group type="102" attributes="0">
+                                                  <Component id="snapButton" alignment="0" pref="0" max="32767" attributes="0"/>
+                                                  <Group type="102" alignment="0" attributes="0">
                                                       <Component id="addChannelButton" min="-2" pref="22" max="-2" attributes="0"/>
                                                       <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
                                                       <Component id="removeChannelButton" min="-2" pref="22" max="-2" attributes="0"/>
-                                                      <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
+                                                  </Group>
+                                              </Group>
+                                              <EmptySpace min="2" pref="2" max="-2" attributes="0"/>
+                                              <Group type="103" groupAlignment="0" attributes="0">
+                                                  <Component id="liveButton" alignment="1" min="-2" pref="46" max="-2" attributes="0"/>
+                                                  <Group type="102" attributes="0">
                                                       <Component id="channelUpButton" min="-2" pref="22" max="-2" attributes="0"/>
                                                       <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
                                                       <Component id="channelDownButton" min="-2" pref="22" max="-2" attributes="0"/>
+                                                      <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
                                                   </Group>
                                               </Group>
-                                              <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
                                           </Group>
                                           <Group type="102" alignment="1" attributes="0">
                                               <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
-                                              <Group type="103" groupAlignment="0" attributes="0">
-                                                  <Component id="liveButton" alignment="1" min="-2" pref="94" max="-2" attributes="0"/>
-                                                  <Component id="zOffsetButton" alignment="1" min="-2" pref="94" max="-2" attributes="0"/>
-                                              </Group>
+                                              <Component id="zOffsetButton" min="-2" pref="94" max="-2" attributes="0"/>
                                           </Group>
+                                          <Component id="autoExposureButton" pref="0" max="32767" attributes="0"/>
                                       </Group>
                                       <EmptySpace max="-2" attributes="0"/>
                                   </Group>
@@ -1058,9 +1061,12 @@
                                           <Component id="channelDownButton" min="-2" pref="22" max="-2" attributes="0"/>
                                       </Group>
                                       <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
-                                      <Component id="snapButton" linkSize="14" min="-2" pref="20" max="-2" attributes="0"/>
+                                      <Group type="103" groupAlignment="3" attributes="0">
+                                          <Component id="snapButton" linkSize="14" alignment="3" min="-2" pref="20" max="-2" attributes="0"/>
+                                          <Component id="liveButton" linkSize="14" alignment="3" min="-2" pref="20" max="-2" attributes="0"/>
+                                      </Group>
                                       <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
-                                      <Component id="liveButton" linkSize="14" min="-2" pref="20" max="-2" attributes="0"/>
+                                      <Component id="autoExposureButton" min="-2" pref="20" max="-2" attributes="0"/>
                                       <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
                                       <Component id="zOffsetButton" min="-2" pref="20" max="-2" attributes="0"/>
                                       <EmptySpace max="32767" attributes="0"/>
@@ -1150,6 +1156,18 @@
                               </Properties>
                               <Events>
                                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="zOffsetButtonActionPerformed"/>
+                              </Events>
+                            </Component>
+                            <Component class="javax.swing.JButton" name="autoExposureButton">
+                              <Properties>
+                                <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                                  <Font name="SansSerif" size="12" style="0"/>
+                                </Property>
+                                <Property name="text" type="java.lang.String" value="Auto-Exp"/>
+                                <Property name="toolTipText" type="java.lang.String" value="Snap Image(s) using selected Channel Configurations "/>
+                              </Properties>
+                              <Events>
+                                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="autoExposureButtonActionPerformed"/>
                               </Events>
                             </Component>
                           </SubComponents>

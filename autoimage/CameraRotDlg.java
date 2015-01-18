@@ -28,6 +28,7 @@ import java.util.logging.Logger;
 import javax.swing.AbstractCellEditor;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.table.DefaultTableModel;
 import mmcorej.CMMCore;
@@ -989,7 +990,13 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     } catch (Exception e) {
                     }
                     gui.enableLiveMode(true);
-                    gui.getSnapLiveWin().toFront();                
+                    SwingUtilities.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            gui.getSnapLiveWin().toFront();
+                            gui.getSnapLiveWin().repaint();
+                        }
+                    });               
                 } catch (ParseException ex) {
                     Logger.getLogger(CameraRotDlg.class.getName()).log(Level.SEVERE, null, ex);
                 }

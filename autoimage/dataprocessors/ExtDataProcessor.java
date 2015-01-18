@@ -23,7 +23,8 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
     protected String procName;
     protected String toolTipText;
     protected String workDir;
-    protected boolean done;
+    protected volatile boolean done;
+    protected volatile boolean stopRequested;
     
     public JSONObject getParameters() throws JSONException {
         JSONObject obj=new JSONObject();
@@ -116,5 +117,10 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
     
     public void setDone(boolean b) {
         done=b;
+    }
+    
+    public void requestStop() {
+        if (!done)
+            stopRequested=true;
     }
 }

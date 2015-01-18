@@ -445,6 +445,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
         @Override
         public Object getCellEditorValue() {
             if (isPushed)  {
+                channelTable.getCellEditor().stopCellEditing();
                 ConfigTableModel model=(ConfigTableModel)channelTable.getModel();
                 if (channelTable.getSelectedColumn() == 5) {
                     if (!gui.isLiveModeOn()) {
@@ -459,7 +460,13 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
                         } catch (Exception e) {
                         }
                         gui.enableLiveMode(true);
-                        gui.getSnapLiveWin().toFront();
+                        SwingUtilities.invokeLater(new Runnable() {
+                            @Override
+                            public void run() {
+                                gui.getSnapLiveWin().toFront();
+                                gui.getSnapLiveWin().repaint();
+                            }
+                        });
                     } else {
                         gui.enableLiveMode(false);
                     }
