@@ -23,13 +23,13 @@ import ij.ImagePlus;
 import ij.ImageStack;
 import ij.Prefs;
 import ij.gui.GenericDialog;
-import ij.gui.ImageWindow;
 import ij.measure.Calibration;
 import ij.process.ByteProcessor;
 import ij.process.ImageProcessor;
 import ij.process.ImageStatistics;
 import ij.process.LUT;
 import ij.process.ShortProcessor;
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
@@ -119,6 +119,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.JRadioButton;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JViewport;
@@ -132,7 +133,6 @@ import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.JTableHeader;
-import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableColumn;
 import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
@@ -152,7 +152,6 @@ import mmcorej.TaggedImage;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.micromanager.MMStudio;
 import org.micromanager.acquisition.DefaultTaggedImageSink;
 import org.micromanager.acquisition.MMImageCache;
 import org.micromanager.acquisition.TaggedImageStorageDiskDefault;
@@ -243,6 +242,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private boolean isRightMouseButton;
     private boolean isInitializing = false;
     private boolean isAcquiring = false;
+    private boolean isProcessing = false;
     private boolean isAborted = false;
     private boolean isWaiting = false;//true when user pressed 'Acquire' and app is waiting for AcquisitionTask to start acquiring at desired time
     private boolean recalculateTiles = false;
@@ -574,54 +574,148 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     @Override
     public void imagingFinished(String string) {
 //        IJ.log("AcqFrame.imagingFinished(Listener): begin. ");
+        final AcqSetting acqSetting=currentAcqSetting;
         currentAcqSetting.getTileManager().clearList();
-
         IJ.log("Finished acquiring sequence: "+currentAcqSetting.getName()+"\n");
 
         if (string!=null) {
-            DefaultMutableTreeNode node=currentAcqSetting.getImageProcessorTree();
-            List<DataProcessor> activeProcs=new ArrayList<DataProcessor>();
-            Enumeration<DefaultMutableTreeNode> en=node.preorderEnumeration();
-            while (en.hasMoreElements()) {
-                DataProcessor dp=(DataProcessor)en.nextElement().getUserObject();
-                if (//!(dp instanceof ExtDataProcessor) ||
-                        (dp instanceof ExtDataProcessor && !((ExtDataProcessor)dp).getProcName().equals(ProcessorTree.PROC_NAME_IMAGE_STORAGE))) {
-                    activeProcs.add(dp);
-                }    
-            }
-            boolean stillRunning=true;
-            IJ.log(activeProcs.size()+" active DataProcessors. Waiting for active DataProcessor(s) to finish...");
-            while (activeProcs.size()>0) {
-//                IJ.log("activeProcs: "+activeProcs.size());
-                for (DataProcessor dp:activeProcs) {
-                    if (dp.isAlive()) {
-                        if (dp instanceof ExtDataProcessor) {
-                            if (!((ExtDataProcessor)dp).isDone()) {
-//                                IJ.log("ExtDataProcessor RUNNING: "+((ExtDataProcessor)dp).getProcName());
-                                break;
-                            } else {
-//                                IJ.log("ExtDataProcessor DONE: "+((ExtDataProcessor)dp).getProcName());
-                                activeProcs.remove(dp);
-                                break;
+            
+            try {
+                SwingUtilities.invokeAndWait(new Runnable() {
+                    
+                    @Override
+                    public void run() {
+                        final JFrame frame=new JFrame("Image Processing: "+acqSetting.getName());
+                        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+                        frame.setPreferredSize(new Dimension(400,420));
+                        frame.setResizable(false);
+                        frame.getContentPane().setLayout(new GridLayout(0,1));
+                        
+                        JLabel label=new JLabel("Active Processors");
+                        final JList list=new JList();
+                        list.setVisibleRowCount(10);
+                        final JScrollPane scrollPane = new JScrollPane(list);
+                        scrollPane.setPreferredSize(new Dimension(250, 80));
+                        scrollPane.setAlignmentX(LEFT_ALIGNMENT);
+                        //scrollPane.add(list);
+                        JPanel listPanel = new JPanel();
+                        listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.PAGE_AXIS));
+                        listPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                        listPanel.add(label);
+                        listPanel.add(Box.createRigidArea(new Dimension(0, 5)));
+                        listPanel.add(scrollPane);
+
+//                                boolean stillRunning=true;
+                        final DefaultMutableTreeNode node=acqSetting.getImageProcessorTree();
+                        
+                        final SwingWorker<Void, String[]> worker=new SwingWorker<Void,String[]>() {
+
+                            @Override
+                            protected Void doInBackground() throws Exception {
+                                List<String> activeProcs;
+                                do {
+                                    activeProcs=new ArrayList<String>();
+                                    Enumeration<DefaultMutableTreeNode> en=node.preorderEnumeration();
+                                    //get list of active processors
+                                    while (en.hasMoreElements()) {
+                                        DataProcessor dp=(DataProcessor)en.nextElement().getUserObject();
+                                        if (//!(dp instanceof ExtDataProcessor) ||
+                                                (dp instanceof ExtDataProcessor && !((ExtDataProcessor)dp).getProcName().equals(ProcessorTree.PROC_NAME_IMAGE_STORAGE))) {
+                                            if (dp.isAlive()) {
+                                                if (dp instanceof ExtDataProcessor) {
+                                                    if (!((ExtDataProcessor)dp).isDone()) {
+                                                        activeProcs.add(dp.getName());
+                                                    } 
+                                                } else {
+                                                    //                           IJ.log("DataProcessor ALIVE/RUNNING: "+dp.getName());
+                                                    activeProcs.add(dp.getName());
+                                                }
+                                            }    
+                                        }
+                                    }
+
+                                    try {
+                                        String[] procNames=new String[activeProcs.size()];
+                                        for (int i=0; i<activeProcs.size(); i++) {
+                                            procNames[i]=activeProcs.get(i);
+                                        }
+                                        publish(procNames);
+                                        Thread.sleep(200);
+                                    } catch (InterruptedException ex) {
+                                        Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                                    }
+                                } while (activeProcs.size()>0);
+                                return null;
+                            }
+                            
+                            @Override
+                            protected void process(List<String[]> chunks) {
+                                String[] procNames=chunks.get(chunks.size()-1);
+                                if (procNames.length!=list.getModel().getSize())
+                                    IJ.log(acqSetting.getName()+": "+procNames.length+" active Processors");
+                                //create simple animation to indicate that processors are alive
+                                for (int i=0; i<procNames.length; i++) {
+                                    long x=1+(System.currentTimeMillis()/1000) % 5;
+                                    for (int j=0; j<x; j++) {
+                                        procNames[i]+=".";
+                                    }
+                                }
+                                //update list with active processor names
+                                list.setListData(procNames);
+//                                scrollPane.revalidate();
+//                                scrollPane.repaint();
+                            }
+
+                            @Override
+                            protected void done() {
+                                frame.dispose();
+                                IJ.log("Finished processing of sequence: "+acqSetting.getName());
+                                isProcessing=false;
                             }    
-                        } else {
- //                           IJ.log("DataProcessor ALIVE/RUNNING: "+dp.getName());
-                            break;
-                        }    
-                    } else {
-//                        IJ.log("DataProcessor DONE: "+dp.getName());
-                        activeProcs.remove(dp);
-                        break;
+                        };//end SwingWorker
+                       
+                        JButton abortButton=new JButton("Abort Processing");
+                        abortButton.addActionListener(new ActionListener() {
+                            @Override
+                            public void actionPerformed(ActionEvent e) {
+                                IJ.showMessage("abort");
+                                Enumeration<DefaultMutableTreeNode> en=node.preorderEnumeration();
+                                //get list of active processors
+                                while (en.hasMoreElements()) {
+                                    DataProcessor dp=(DataProcessor)en.nextElement().getUserObject();
+                                    dp.requestStop();
+                                }
+                            }
+                        });
+                        JPanel buttonPanel=new JPanel();
+                        buttonPanel.add(abortButton);
+
+                        frame.getContentPane().add(listPanel, BorderLayout.PAGE_START);
+                        frame.getContentPane().add(buttonPanel);
+                        frame.pack();
+                        frame.setLocationRelativeTo(null);
+                        frame.setVisible(true);
+                            
+                        worker.execute();
+                    } //end run
+                    
+                    
+                }); //end invokeLater
+                while (isProcessing) {
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                     }
                 }
-                try {
-                    Thread.sleep(200);
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                }
+            } catch (InterruptedException ex) {
+                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (InvocationTargetException ex) {
+                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             }
-            IJ.log("Finished processing of sequence: "+currentAcqSetting.getName());
         }    
+        
+        
         int currentIndex=acqSettings.indexOf(currentAcqSetting);
         if ((acqSettings.size() > currentIndex + 1) && !isAborted) {
             acqSettingTable.setRowSelectionInterval(currentIndex + 1, currentIndex + 1);
@@ -1364,101 +1458,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }
     
-/*    
-    class StagePosMonitor extends SwingWorker<Void, double[]> {
-
-        private final double[] stage = new double[3];
-        private double stageY;
-        private double stageZ;
-        private String xyStageName;
-        private String zStageName;
-        private int interval_ms;
-
-        public StagePosMonitor(int interval) {
-            super();
-            interval_ms=interval;
-            try {
-                xyStageName = core.getXYStageDevice();
-                zStageName = core.getFocusDevice();
-                newStagePosition();
-                publish(stage);
-            } catch (Exception ex) {
-                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
-
-        private boolean newStagePosition() {
-            try {
-                double sX = core.getXPosition(xyStageName);
-                double sY = core.getYPosition(xyStageName);
-                double sZ = core.getPosition(zStageName);
-                if (sX != stage[0] || sY != stage[1] || sZ != stage[2]) {
-                    stage[0] = sX;
-                    stage[1] = sY;
-                    stage[2] = sZ;
-                    return true;
-                } else {
-                    return false;
-                }
-            } catch (Exception ex) {
-                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                return false;
-            }
-        }
-
-        @Override
-        public Void doInBackground() {
-            while (!this.isCancelled()) {// & landmarkFound) {
-                try {
-                    if (newStagePosition()) {
-                        publish(stage);
-                    }
-                    Thread.sleep(interval_ms);
-
-                } catch (InterruptedException ex) {
-                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }
-            return null;
-        }
-
-        @Override
-        protected void process(final List<double[]> chunks) {
-            // Updates the relevant GUI fields
-            double[] s = chunks.get(chunks.size() - 1);
-            try {
-                stagePosXLabel.setText(String.format("%1$,.2f", s[0]));
-                stagePosYLabel.setText(String.format("%1$,.2f", s[1]));
-                stagePosZLabel.setText(String.format("%1$,.2f", s[2]));
-                if (refPointListDialog != null) {
-                    refPointListDialog.updateStagePosLabel(s[0], s[1], s[2]);
-                }
-                ((LayoutPanel) acqLayoutPanel).setCurrentXYStagePos(s[0], s[1]);
-                Area a = acqLayout.getFirstContainingAreaAbs(s[0], s[1], currentAcqSetting.getTileWidth_UM(), currentAcqSetting.getTileHeight_UM());
-                if (a != lastArea) {
-                    if (a != null) {
-                        areaLabel.setText(a.getName());
-                        a.setAcquiring(true);
-                    } else {
-                        areaLabel.setText("");
-                    }
-                    if (lastArea != null) {
-                        lastArea.setAcquiring(false);
-                    }
-                    lastArea = a;
-                }
-                acqLayoutPanel.repaint();
-            } catch (Exception ex) {
-                app.logError(ex);
-            }
-        }
-
-        @Override
-        public void done() {
-            IJ.log("StagePosMonitor.done.");
-        }
-    }
-*/
     
     private class AreaTableModel extends AbstractTableModel {
 
@@ -4951,7 +4950,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }
     
-    
+/*    
     private int saveProcessorTreeXML(File file, DefaultMutableTreeNode procRoot) {
         if (procRoot==null) {
             return XMLUtils.FILE_WRITE_ERROR;
@@ -4976,8 +4975,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             return XMLUtils.FILE_WRITE_ERROR;
         }
     }
-    
-    
+*/    
+ 
+/*    
     private void saveProcessorTree(File file, List<AcqSetting> settings) {
         FileWriter fw=null;
         try {
@@ -5012,7 +5012,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }       
         }
     }
-
+*/
     public void saveAcqLayoutToJSONObjectFile (File f) {
         FileWriter fw;
         try {
@@ -5257,6 +5257,24 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 JOptionPane.showMessageDialog(this,"Autofocus device "+setting.getAutofocusDevice()+ " not available");
                 return null;
             }
+            
+            //create new copy of processor
+            //this is required to make sure stopRequested is false
+            try {
+                JSONObject procTreeObject = Utils.processortreeToJSONObject(setting.getImageProcessorTree(),setting.getImageProcessorTree());
+                DefaultMutableTreeNode newProcTree=Utils.createProcessorTree(procTreeObject);
+                setting.setImageProcTree(newProcTree);
+                IJ.showMessage("NEW TREE");
+            } catch (JSONException ex) {
+                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (ClassNotFoundException ex) {
+                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (InstantiationException ex) {
+                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (IllegalAccessException ex) {
+                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            
             DefaultMutableTreeNode node=setting.getImageProcessorTree();
             Enumeration<DefaultMutableTreeNode> en=node.preorderEnumeration();
             while (en.hasMoreElements()) {
@@ -5681,6 +5699,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private void acquireButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_acquireButtonActionPerformed
         //deal with aborted acquisition first
         if ((acqEng2010.isRunning() && isAcquiring) || isWaiting) {
+            //stop acquisition
             Object[] options = {"Stop all sequences",
                     "Skip to next sequence",
                     "Cancel"};
@@ -5733,6 +5752,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             return;
         }
 
+        //start acquisition
         int dupIndex = acqLayout.hasDuplicateAreaNames();
         if (dupIndex != -1) {
             JOptionPane.showMessageDialog(this, "Each Area name has to be unique.\n"
@@ -5865,6 +5885,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 //                    setting.getFieldOfView().setFieldRotation(fieldRot);
 //                }
                 isAcquiring = startAcquisition() != null;
+                isProcessing=isAcquiring;
             } else {
                 JOptionPane.showMessageDialog(this,"Undefined AcqSettings");
             }
@@ -7352,9 +7373,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             } else
                 break;
         } while (true);
-        if (saveAllCB.isSelected())
-            saveProcessorTree(file,acqSettings);
-        else {
+        if (saveAllCB.isSelected()) {
+            //saveProcessorTree(file,acqSettings);
+            //not supported
+        } else {
             saveProcessorTree(file,currentAcqSetting);
          //   saveProcessorTreeForXML(new File(file.getParentFile(),"ProcForXML.txt"),currentAcqSetting);
         }    

@@ -153,7 +153,7 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
                 IJ.log("    Added to group #"+(groupList.size()-1));
                 IJ.log("    "+groupList.size()+" groups");
             }
-            if (groupIsComplete(currentGroup) && currentGroup.status==Group.IS_NOT_PROCESSED) {
+            if (!stopRequested && groupIsComplete(currentGroup) && currentGroup.status==Group.IS_NOT_PROCESSED) {
                 currentGroup.status=Group.IS_PROCESSING;
                 List<E> results=processGroup(currentGroup);
                 currentGroup.status=Group.IS_PROCESSED;
@@ -179,7 +179,7 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
         IJ.log(this.getClass().getName()+".cleanUp: "+groupList.size()+" groups");
         int i=0;
         for (Group<E> grp:groupList) {
-            if (processIncompleteGrps && grp.status==Group.IS_NOT_PROCESSED) {
+            if (!stopRequested && processIncompleteGrps && grp.status==Group.IS_NOT_PROCESSED) {
                 IJ.log(this.getClass().getName()+".cleanUp: processing group "+i);
                 grp.status=Group.IS_PROCESSING;
                 List<E> modifiedElements=processGroup(grp);
@@ -200,5 +200,5 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
             i++;
         }
         clearGroups();
-    }
+    }    
 }

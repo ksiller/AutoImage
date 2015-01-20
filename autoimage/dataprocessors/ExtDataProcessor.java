@@ -107,6 +107,7 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
     @Override
     public void run() {
         done=false;
+        //run() will check if stopRequested==true;
         super.run();
         done=true;
     }
@@ -120,7 +121,9 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
     }
     
     public void requestStop() {
+        IJ.log(this.getClass().getName()+": requestStop()");
         if (!done)
             stopRequested=true;
     }
-}
+    
+ }
