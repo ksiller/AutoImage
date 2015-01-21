@@ -6,7 +6,6 @@
 
 package autoimage;
 
-import ij.IJ;
 import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -28,7 +27,7 @@ public class StartTimeEditor extends AbstractCellEditor
     protected static final String EDIT = "edit";
  
     public StartTimeEditor() {
-        IJ.log("StartTimeEditor.constructor");
+//        IJ.log("StartTimeEditor.constructor");
         button = new JButton();
         button.setActionCommand(EDIT);//when cell is pressed in table
         button.addActionListener(this);

@@ -5,11 +5,14 @@
 package autoimage;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import mmcorej.TaggedImage;
+import org.json.JSONException;
 import org.micromanager.acquisition.TaggedImageQueue;
 import org.micromanager.api.ImageCache;
+import org.micromanager.utils.MMException;
 import org.micromanager.utils.ReportingUtils;
 
 /**
@@ -53,8 +56,14 @@ public class ExtTaggedImageSink {
                      }    
                   }
                }
-            } catch (Exception ex2) {
+            } catch (IOException ex2) {
                ReportingUtils.logError(ex2);
+            } catch (InterruptedException ex2) {
+                ReportingUtils.logError(ex2);
+            } catch (JSONException ex2) {
+                 ReportingUtils.logError(ex2);
+            } catch (MMException ex2) {
+                 ReportingUtils.logError(ex2);
             }
             long t2 = System.currentTimeMillis();
             ReportingUtils.logMessage(imageCount + " images stored in " + (t2 - t1) + " ms.");

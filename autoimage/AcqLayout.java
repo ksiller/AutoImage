@@ -278,9 +278,9 @@ class AcqLayout  implements PropertyChangeListener {
         JSONArray areaArray=obj.getJSONArray(Area.TAG_AREA_ARRAY);
         for (int i=0;i<areaArray.length(); i++) {
             JSONObject areaObj=areaArray.getJSONObject(i);
-            IJ.log("AcqLayout.trying to initialize area");
+//            IJ.log("AcqLayout.trying to initialize area");
             Area area=Area.createFromJSONObject(areaObj);
-            IJ.log("AcqLayout. area "+area.getName()+" initialized succesfully");
+//            IJ.log("AcqLayout. area "+area.getName()+" initialized succesfully");
             area.setId(i);
             areas.add(area);
         }
@@ -557,13 +557,13 @@ class AcqLayout  implements PropertyChangeListener {
                     Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
-            IJ.log("v1: "+v1.toString()+", v2: "+v2.toString()+", v3: "+v3.toString());
+//            IJ.log("v1: "+v1.toString()+", v2: "+v2.toString()+", v3: "+v3.toString());
 //            Vec3d a=new Vec3d(v2.x-v1.x,v2.y-v1.y,v2.z-v1.z);
 //            Vec3d b=new Vec3d(v3.x-v1.x,v3.y-v1.y,v3.z-v1.z);
             try {
                 Vec3d a = v2.minus(v1);
                 Vec3d b = v3.minus(v1);
-                IJ.log("a: "+a.toString()+ ", b: "+ b.toString());
+//                IJ.log("a: "+a.toString()+ ", b: "+ b.toString());
                 //normalVec = new Vec3d();
                 normalVec = Vec3d.cross(a,b);
             } catch (Exception ex) {
@@ -584,7 +584,7 @@ class AcqLayout  implements PropertyChangeListener {
 //            IJ.log("no or singe landmarks");
             normalVec=new Vec3d(0,0,1);
         }    
-        IJ.log("normalVec: "+normalVec.toString());
+//        IJ.log("normalVec: "+normalVec.toString());
         //determine lowest corner to set z-pos when moving xy-stage
 
 //        RefArea rp = getLandmark(0);

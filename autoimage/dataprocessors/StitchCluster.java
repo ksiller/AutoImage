@@ -172,17 +172,18 @@ public class StitchCluster extends GroupProcessor<File> {
     }
     
     @Override
-    public List<File> processGroup(final Group<File> group) {
+    public List<File> processGroup(final Group<File> group) throws InterruptedException {
         IJ.log("-----");
         IJ.log(this.getClass().getName()+".processGroup: ");
         IJ.log("   Criteria: "+group.groupCriteria.toString());
         IJ.log("   Images: "+group.images.size()+" images");
+//        IJ.log("   stopRequested: "+stopRequested);
         if (!stopRequested && group!=null && group.images!=null && group.images.size()>1) {
 
             Callable stitchingTask=new Callable<List<File>>() {
 
                 @Override
-                public List<File> call() {
+                public List<File> call() throws InterruptedException {
                     jobNumber++;
                     IJ.log(    "processGroup: starting job # "+jobNumber);
             
@@ -402,10 +403,11 @@ public class StitchCluster extends GroupProcessor<File> {
                                 + "image_output=[Write to disk] ");
     //                            + "output_directory="+workDir);
 
-                            } catch (Exception ex) {
+                            } catch (Throwable ex) {
                                 IJ.log("    Stitching exception: "+ex);
                                 return new ArrayList<File>();
-                            }
+                            } 
+                            
     /*                        for (File e:elements) {
                                 String path=e.getParent();
                                // restoreMetadataFile(path,"metadata_backup","metadata.txt");                    
@@ -451,11 +453,11 @@ public class StitchCluster extends GroupProcessor<File> {
                                                 IJ.log("STITCHED FILE FOUND IN outputDir "+ outputDir);
                                                 resultFile=resultFile2;
                                             }   
-                                        try {
+//                                        try {
                                             Thread.sleep(100);
-                                        } catch (InterruptedException ex) {
-                                            Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
-                                        }
+//                                        } catch (InterruptedException ex) {
+//                                            Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
+//                                        }
                                     } 
 
                                     ImagePlus imp=IJ.openImage(resultFile.getAbsolutePath());
@@ -564,14 +566,22 @@ public class StitchCluster extends GroupProcessor<File> {
                 }
             };// end callable
             
+            //executor can't accept new jobs after shutdown call in requestStop()
+            //after shutdown, we set executor=null and need to create new instance
+            if (executor==null) {
+                executor=Executors.newSingleThreadExecutor();
+            }
             Future<List<File>> future=executor.submit(stitchingTask);
             try {
                 List<File> returnList=future.get();
                 return returnList;
-            } catch (InterruptedException ex) {
-                return new ArrayList<File>();
+//            } catch (InterruptedException ex) {
+                  //exception caused by timeout of future.get()
+//                return new ArrayList<File>();
             } catch (ExecutionException ex) {
-                return new ArrayList<File>();
+                //this caused by InterruptedException in callable, so rethrow the InterruptedException to enforce call of cleanUp()
+                IJ.log(this.getClass().getName()+": ExecutionException: caused by callable");
+                throw new InterruptedException();
             }
         } else {
             return new ArrayList<File>();
@@ -749,7 +759,10 @@ public class StitchCluster extends GroupProcessor<File> {
     @Override
     public void requestStop() {
         super.requestStop();
+        //block submission of new jobs
         executor.shutdown();
- //       executor.shutdownNow();
+//      should cancel running callable thread, but the stitching plugin can throw an uncaught exception
+//        List<Runnable> procs=executor.shutdownNow();
+        executor=null;
     }
 }

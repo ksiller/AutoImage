@@ -121,7 +121,7 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
     * createCopy can handle that
     * copy will be passed to analysisOutput_ 
     */
-   protected abstract List<E> processElement(E element);
+   protected abstract List<E> processElement(E element) throws InterruptedException;
    
    /* creates copy of element
     * if meta!=null, metadata in copied element will be replaced by meta, otherwise keep original metadata
@@ -200,16 +200,23 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
              return;
          }
          if (acceptElement(element)) { 
-            List<E> modifiedElements=processElement(element);
-            if (modifiedElements!=null) { //image analysis was successful and processed element should be passed to next processor
-            /* analyzers that form nodes need to place processed image in 
-             * modifiedOutput_ queue
-             * for last analyzer in tree branch (='leaf') modifiedOutput_ == null,
-             * which is handled in produceModified method
-             */
-                for (E modElement:modifiedElements)
-                    produceModified(modElement);
-            }
+             try {
+                 List<E> modifiedElements=processElement(element);
+                 if (modifiedElements!=null) { //image analysis was successful and processed element should be passed to next processor
+                     /* analyzers that form nodes need to place processed image in
+                     * modifiedOutput_ queue
+                     * for last analyzer in tree branch (='leaf') modifiedOutput_ == null,
+                     * which is handled in produceModified method
+                     */
+                     for (E modElement:modifiedElements)
+                         produceModified(modElement);
+                 }
+             } catch (InterruptedException ex) {
+                 //exit gracefully
+                 cleanUp();
+                 done=true;
+                 IJ.log(this.getClass().getName()+": InterruptedException caught");
+             }
          }   
       }   
    }   

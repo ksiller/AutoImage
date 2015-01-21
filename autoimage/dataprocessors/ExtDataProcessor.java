@@ -120,7 +120,8 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
         done=b;
     }
     
-    public void requestStop() {
+    @Override
+    public synchronized void requestStop() {
         IJ.log(this.getClass().getName()+": requestStop()");
         if (!done)
             stopRequested=true;

@@ -674,11 +674,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                             }    
                         };//end SwingWorker
                        
-                        JButton abortButton=new JButton("Abort Processing");
+                        final JButton abortButton=new JButton("Abort Processing");
                         abortButton.addActionListener(new ActionListener() {
                             @Override
                             public void actionPerformed(ActionEvent e) {
-                                IJ.showMessage("abort");
+                                abortButton.setEnabled(false);
                                 Enumeration<DefaultMutableTreeNode> en=node.preorderEnumeration();
                                 //get list of active processors
                                 while (en.hasMoreElements()) {
@@ -4564,10 +4564,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     
     private void enableGUI(boolean b) {
         moveToScreenCoordButton.setEnabled(b);
+        stageControlButton.setEnabled(b);
         setLandmarkButton.setEnabled(b && !acqLayout.isEmpty());
 //        findLandmarkButton.setEnabled(b);
         snapButton.setEnabled(b);
         liveButton.setEnabled(b);
+        autoExposureButton.setEnabled(b);
         zOffsetButton.setEnabled(b);
         commentButton.setEnabled(b);
         loadLayoutButton.setEnabled(b);
@@ -5251,7 +5253,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         }      
         
-        //check if autofocus function is available and set up tilemanagers
+        //check if autofocus function is available and set up tilemanagers for all acquisition sequences
         for (AcqSetting setting:acqSettings) {
             if (setting.isAutofocus() && !app.getAutofocusManager().hasDevice(setting.getAutofocusDevice())) {
                 JOptionPane.showMessageDialog(this,"Autofocus device "+setting.getAutofocusDevice()+ " not available");
@@ -5264,7 +5266,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 JSONObject procTreeObject = Utils.processortreeToJSONObject(setting.getImageProcessorTree(),setting.getImageProcessorTree());
                 DefaultMutableTreeNode newProcTree=Utils.createProcessorTree(procTreeObject);
                 setting.setImageProcTree(newProcTree);
-                IJ.showMessage("NEW TREE");
+                //update reference to image processor tree in GUI
+                if (setting == acqSettings.get(0)) {
+                    updateProcessorTreeView(setting);
+                }
             } catch (JSONException ex) {
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             } catch (ClassNotFoundException ex) {
@@ -6638,7 +6643,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         if (!selectedNode.isLeaf()) {
             JPanel guiPanel = new JPanel();
             guiPanel.setLayout(new BoxLayout(guiPanel, BoxLayout.PAGE_AXIS));
-            JRadioButton rb = new JRadioButton("Remove this processor and all children");
+            JRadioButton rb = new JRadioButton("Remove entire branch");
             rb.setActionCommand("remove");
             rb.setSelected(true);
             guiPanel.add(rb);
@@ -6704,9 +6709,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     processorTreeView.expandRow(i);      
             }
             
-        } else {                       
+        } else { //is leaf                      
             tm.removeNodeFromParent(selectedNode);
-        }    
+        }
+
     }//GEN-LAST:event_removeProcessorButtonActionPerformed
 
     private void addROIFinderButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addROIFinderButtonActionPerformed

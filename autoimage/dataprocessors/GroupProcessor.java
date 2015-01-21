@@ -12,7 +12,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import mmcorej.TaggedImage;
@@ -41,6 +40,7 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
         protected final static long IS_NOT_PROCESSED = 0;
         protected final static long IS_PROCESSING = 1;
         protected final static long IS_PROCESSED = 2;
+        protected final static long IS_INTERRUPTED =3;
         
         
         protected Group(JSONObject grpCriteria) {
@@ -106,7 +106,7 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
         criteriaKeys=criteria;
     }
 
-    protected abstract List<E> processGroup(final Group<E> group);
+    protected abstract List<E> processGroup(final Group<E> group) throws InterruptedException;
     
     protected boolean groupIsComplete(Group<E> group) {
         Long max=group.getMaxGroupSize();
@@ -116,7 +116,7 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
     protected abstract long determineMaxGroupSize(JSONObject meta) throws JSONException;
     
     @Override
-    protected List<E> processElement(E element) { 
+    protected List<E> processElement(E element) throws InterruptedException { 
         IJ.log(this.getClass().getName()+".processElement:");
         try {
             Group<E> currentGroup=null;
@@ -127,7 +127,7 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
                 */
                 if (grp.addToGroup(element)) {
                     currentGroup=grp;
-                IJ.log("    Added to group #"+i);
+                    IJ.log("    Added to group #"+i);
                     break;
                 }
                 i++;
@@ -180,22 +180,27 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
         int i=0;
         for (Group<E> grp:groupList) {
             if (!stopRequested && processIncompleteGrps && grp.status==Group.IS_NOT_PROCESSED) {
-                IJ.log(this.getClass().getName()+".cleanUp: processing group "+i);
-                grp.status=Group.IS_PROCESSING;
-                List<E> modifiedElements=processGroup(grp);
-                grp.status=Group.IS_PROCESSED;
-                if (modifiedElements!=null) { //image processing was successful
-                        //analyzers that form nodes need to place processed image in 
+                try {
+                    IJ.log(this.getClass().getName()+".cleanUp: processing group "+i);
+                    grp.status=Group.IS_PROCESSING;
+                    List<E> modifiedElements=processGroup(grp);
+                    grp.status=Group.IS_PROCESSED;
+                    if (modifiedElements!=null) { //image processing was successful
+                        //analyzers that form nodes need to place processed image in
                         //modifiedOutput_ queue
                         //for last analyzer in tree branch (='leaf') modifiedOutput_ = null,
                         //which is handled in produceModified method
-
-                    for (E element:modifiedElements)
-                        produceModified(element);
+                        
+                        for (E element:modifiedElements)
+                            produceModified(element);
+                    }
+                } catch (InterruptedException ex) {
+                    grp.status=Group.IS_INTERRUPTED;
+                    Logger.getLogger(GroupProcessor.class.getName()).log(Level.SEVERE, null, ex);
+                    IJ.log(this.getClass().getName()+": cleanUp - InterruptedException");
                 }
-            } else {
-                IJ.log(this.getClass().getName()+".cleanUp: group "+i+" already processed");
-            }
+            } 
+            IJ.log(this.getClass().getName()+".cleanUp: group "+i+" - Status("+grp.status+")");
             grp.images.clear();
             i++;
         }
