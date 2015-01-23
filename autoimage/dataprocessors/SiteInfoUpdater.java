@@ -42,18 +42,26 @@ public class SiteInfoUpdater extends ExtDataProcessor<TaggedImage> implements ID
         listenerExecutor = Executors.newFixedThreadPool(1);
     }
     
+    @Override
+    public boolean isSupportedDataType(Class<?> clazz) {
+        if (clazz==TaggedImage.class)
+            return true;
+        else
+            return false;
+    }
+    
     public void setPositionInfoList(ArrayList<JSONObject> sInfoList) {
         siteInfo=sInfoList;
     }
 
     @Override
-    public void addListener(IDataProcessorListener l) {
+    public synchronized void addListener(IDataProcessorListener l) {
         if (!listeners.contains(l))
             listeners.add(l);
     }
 
     @Override
-    public void removeListener(IDataProcessorListener l) {
+    public synchronized void removeListener(IDataProcessorListener l) {
         listeners.remove(l);
     }
 /**

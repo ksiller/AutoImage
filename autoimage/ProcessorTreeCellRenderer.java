@@ -7,7 +7,6 @@ package autoimage;
 import autoimage.dataprocessors.BranchedProcessor;
 import autoimage.dataprocessors.ExtDataProcessor;
 import autoimage.dataprocessors.ImageTagFilter;
-import autoimage.dataprocessors.MultiChMultiZAnalyzer;
 import autoimage.dataprocessors.RoiFinder;
 import autoimage.dataprocessors.ScriptAnalyzer;
 import ij.IJ;
@@ -39,7 +38,7 @@ public class ProcessorTreeCellRenderer extends DefaultTreeCellRenderer {
     final Icon scriptIcon=new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/script.png"));
     final Icon acqEngIcon=new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/microscope.png"));
     final Icon roiIcon=new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/roi.png"));
-    final Icon aMC_MZ_Icon=new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/MC-MZ-Analysis.png"));
+    //final Icon aMC_MZ_Icon=new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/MC-MZ-Analysis.png"));
     
     
     @Override
@@ -87,8 +86,8 @@ public class ProcessorTreeCellRenderer extends DefaultTreeCellRenderer {
             }
             if (dp instanceof ScriptAnalyzer)// || dp instanceof MC_ScriptAnalyzer)
                 setIcon(scriptIcon);
-            if (dp instanceof MultiChMultiZAnalyzer)
-                setIcon(aMC_MZ_Icon);
+ /*           if (dp instanceof MultiChMultiZAnalyzer)
+                setIcon(aMC_MZ_Icon);*/
             if (dp instanceof RoiFinder)
                 setIcon(roiIcon);
         } else {

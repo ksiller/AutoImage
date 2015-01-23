@@ -2,9 +2,10 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-package autoimage.dataprocessors;
+package autoimage.olddp;
 
 import autoimage.Utils;
+import autoimage.dataprocessors.BranchedProcessor;
 import ij.IJ;
 import java.io.File;
 import java.util.ArrayList;

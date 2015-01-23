@@ -80,6 +80,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -143,8 +144,6 @@ import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamWriter;
 import mmcorej.CMMCore;
 import mmcorej.Configuration;
 import mmcorej.StrVector;
@@ -413,6 +412,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     //                    TaggedImageStorage storage = new TaggedImageStorageMultipageTiff(sequenceDir.getAbsolutePath(), true, summaryMetadata, true, false, true);
                 MMImageCache imageCache = new MMImageCache(storage);
                 imageCache.addImageCacheListener(imageListener);
+                //setup and start new DisplayUpdater
                 displayUpdater = new DisplayUpdater(imageCache, acqSetting.getChannels(),acqSetting.getImagePixelSize());
                 displayUpdater.execute();
 
@@ -548,7 +548,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         JOptionPane.showMessageDialog(this,"AcqFrame.settingsChanged: acquisition settings changed");
     }
 
-    //ImageListener interface
+    //ImageCacheListener interface
     @Override
     public void imageReceived(TaggedImage ti) {
 /*        try {
@@ -578,6 +578,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         currentAcqSetting.getTileManager().clearList();
         IJ.log("Finished acquiring sequence: "+currentAcqSetting.getName()+"\n");
 
+        /* 
+            string!=null: passed  by ImageCache when it receives a "Poison" image (=acquisition is done)
+        
+            string==null: used by AcqFrame to indicate acquisition has been aborted 
+        */
         if (string!=null) {
             
             try {
@@ -749,6 +754,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     
     
     //IDataProcessorListener
+    //called by implementations of IDataProcessorNotifier (for example SiteInfoUpdater
     @Override
     public void imageProcessed(final JSONObject metadata, final DataProcessor source) {
         if (source instanceof SiteInfoUpdater && ((SiteInfoUpdater)source).getProcName().equals(ProcessorTree.PROC_NAME_ACQ_ENG)) {
@@ -2585,7 +2591,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         addChannelFilterButton = new javax.swing.JButton();
         addZFilterButton = new javax.swing.JButton();
         addScriptAnalyzerButton = new javax.swing.JButton();
-        addMC_MZ_AnalyzerButton = new javax.swing.JButton();
         removeProcessorButton = new javax.swing.JButton();
         addROIFinderButton = new javax.swing.JButton();
         editProcessorButton = new javax.swing.JButton();
@@ -3673,17 +3678,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
-        addMC_MZ_AnalyzerButton.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
-        addMC_MZ_AnalyzerButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/MC-MZ-Analysis.png"))); // NOI18N
-        addMC_MZ_AnalyzerButton.setToolTipText("Group Channel and Z-Position Analyzer");
-        addMC_MZ_AnalyzerButton.setMaximumSize(new java.awt.Dimension(24, 24));
-        addMC_MZ_AnalyzerButton.setMinimumSize(new java.awt.Dimension(24, 24));
-        addMC_MZ_AnalyzerButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                addMC_MZ_AnalyzerButtonActionPerformed(evt);
-            }
-        });
-
         removeProcessorButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/delete.png"))); // NOI18N
         removeProcessorButton.setToolTipText("Remove Data Processor/Image Analyzer ");
         removeProcessorButton.setMaximumSize(new java.awt.Dimension(24, 24));
@@ -3801,39 +3795,39 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(6, 6, 6)
                 .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel9Layout.createSequentialGroup()
-                        .add(0, 0, Short.MAX_VALUE)
                         .add(jScrollPane4, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 315, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .add(3, 3, 3)
-                        .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                            .add(jPanel9Layout.createSequentialGroup()
-                                .add(addFrameFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(addMC_MZ_AnalyzerButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                            .add(jPanel9Layout.createSequentialGroup()
-                                .add(addImageTagFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(addZFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                            .add(jPanel9Layout.createSequentialGroup()
-                                .add(addChannelFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(addAreaFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                            .add(jPanel9Layout.createSequentialGroup()
-                                .add(removeProcessorButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(editProcessorButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                        .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(jPanel9Layout.createSequentialGroup()
                                 .add(addDataProcFromFileButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                 .add(loadImagePipelineButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                             .add(jPanel9Layout.createSequentialGroup()
-                                .add(addScriptAnalyzerButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(addROIFinderButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                            .add(jPanel9Layout.createSequentialGroup()
-                                .add(loadProcTreeButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(saveProcTreeButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                            .add(addImageStorageButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                                    .add(jPanel9Layout.createSequentialGroup()
+                                        .add(addChannelFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                        .add(addZFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                                    .add(jPanel9Layout.createSequentialGroup()
+                                        .add(addFrameFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                        .add(addAreaFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                                    .add(jPanel9Layout.createSequentialGroup()
+                                        .add(removeProcessorButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                        .add(editProcessorButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                                    .add(jPanel9Layout.createSequentialGroup()
+                                        .add(loadProcTreeButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                        .add(saveProcTreeButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                                    .add(addImageStorageButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                    .add(jPanel9Layout.createSequentialGroup()
+                                        .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
+                                            .add(addImageTagFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                            .add(addScriptAnalyzerButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                        .add(addROIFinderButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                                .add(0, 0, Short.MAX_VALUE)))
                         .add(6, 6, 6))
                     .add(jPanel9Layout.createSequentialGroup()
                         .add(jLabel28)
@@ -3850,15 +3844,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     .add(jPanel9Layout.createSequentialGroup()
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(addZFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(addImageTagFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(addAreaFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(addChannelFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(addFrameFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(addMC_MZ_AnalyzerButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                            .add(addAreaFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(addFrameFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(addImageTagFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(addScriptAnalyzerButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
@@ -4618,7 +4610,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         addAreaFilterButton.setEnabled(b);
         addScriptAnalyzerButton.setEnabled(b);
         addROIFinderButton.setEnabled(b);
-        addMC_MZ_AnalyzerButton.setEnabled(b);
         addDataProcFromFileButton.setEnabled(b);
         loadImagePipelineButton.setEnabled(b && imagePipelineSupported);
         addImageStorageButton.setEnabled(b);
@@ -6617,15 +6608,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }    
     }//GEN-LAST:event_addScriptAnalyzerButtonActionPerformed
 
-    private void addMC_MZ_AnalyzerButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addMC_MZ_AnalyzerButtonActionPerformed
-        DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode)
-                       processorTreeView.getLastSelectedPathComponent();
-        DefaultTreeModel tm=(DefaultTreeModel)processorTreeView.getModel();
-        if (selectedNode==null) {
-            JOptionPane.showMessageDialog(null, "Select Node in Processor Tree");
-        }
-    }//GEN-LAST:event_addMC_MZ_AnalyzerButtonActionPerformed
-
     private void removeProcessorButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_removeProcessorButtonActionPerformed
         DefaultMutableTreeNode selectedNode = (DefaultMutableTreeNode)
                        processorTreeView.getLastSelectedPathComponent();
@@ -7062,9 +7044,22 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         }
                     }
                     if (dp instanceof ExtDataProcessor) {
+                        ExtDataProcessor edp=(ExtDataProcessor)dp;
+                        if (Utils.isDescendantOfImageStorageNode((DefaultMutableTreeNode)tm.getRoot(), selectedNode) && !edp.isSupportedDataType(File.class)) {
+                            JOptionPane.showMessageDialog(null,"This DataProcessor cannot be inserted downstream of Image Storage node.");  
+                            return;
+                        }
+                        if (!Utils.isDescendantOfImageStorageNode((DefaultMutableTreeNode)tm.getRoot(), selectedNode) && !edp.isSupportedDataType(TaggedImage.class)) {
+                            JOptionPane.showMessageDialog(null,"This DataProcessor cannot be inserted upstream of Image Storage node.");  
+                            return;
+                        }
                         ((ExtDataProcessor)dp).makeConfigurationGUI();
                         ((ExtDataProcessor)dp).dispose();
                     } else {
+                        if (Utils.isDescendantOfImageStorageNode((DefaultMutableTreeNode)tm.getRoot(), selectedNode)) {
+                            JOptionPane.showMessageDialog(null,"This DataProcessor cannot be inserted downstream of Image Storage node.");  
+                            return;
+                        }
                         try {
                             StringBuilder s=new StringBuilder();
                             Method[] methods=dp.getClass().getDeclaredMethods();
@@ -8431,8 +8426,39 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         final ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
                         final Channel c = ctm.getRowData(row);
                         
-                        SwingUtilities.invokeLater(new Runnable() {
+                        final JFrame guiFrame=this;
 
+                        AutoExposureTool aet=new AutoExposureTool(app,chGroupStr,c.getName(),c.getExposure(),true);
+/*                        
+                        ExecutorService executor=Executors.newSingleThreadExecutor();
+                        Future<Double> future=executor.submit(aet);
+                        double exp;
+                        try {
+                            exp=future.get();
+                        } catch (InterruptedException ex) {
+                              //exception caused by timeout of future.get()
+            //                return new ArrayList<File>();
+                        } catch (ExecutionException ex) {
+                            //this caused by InterruptedException in callable, so rethrow the InterruptedException to enforce call of cleanUp()
+                            IJ.log(this.getClass().getName()+": ExecutionException: caused by callable");
+                        }
+                        
+//                            double exp=aet.getOptimalExposure();
+                            if (exp==-1) {
+                                JOptionPane.showMessageDialog(this,"Canceled");
+                            } else {
+                                int result=JOptionPane.showConfirmDialog(guiFrame,"Suggested exposure time for channel "+c.getName()+": "+formatNumber("0.0", exp)+" ms.\n"
+                                                + "Adjust exposure time to new value?","Auto-Exposure",JOptionPane.YES_NO_OPTION);
+                                            if (result==JOptionPane.YES_OPTION) {
+                                                c.setExposure(exp);
+                                                ctm.fireTableRowsUpdated(row, row);
+                                            }                            
+                            }
+*/                    
+                        enableGUI(false);
+                        acquireButton.setEnabled(false);
+                        SwingUtilities.invokeLater(new Runnable() {
+                            
                             @Override
                             public void run() {
                                 final JFrame frame=new JFrame("Auto-Exposure");
@@ -8440,7 +8466,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                 frame.setPreferredSize(new Dimension(400,120));
                                 frame.setResizable(false);
                                 frame.getContentPane().setLayout(new GridLayout(0,1));
-                                
+
                                 JLabel label=new JLabel("Channel '"+c.getName()+"': Testing exposure");
                                 final JLabel expLabel=new JLabel("");
 
@@ -8457,49 +8483,54 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                 final SwingWorker<Double, Double> worker = new SwingWorker<Double, Double>() {
 
                                     private double optimalExp;
-                                                                            
+                                    private ImageProcessor ip;
+
                                     @Override
                                     protected Double doInBackground() {
-                                            
+
                                         double newExp=c.getExposure();
                                         publish(newExp);
                                         double maxExp=-1;
                                         double minExp=1;
                                         boolean optimalExpFound=false;
+                                        int i=1;
                                         while (!optimalExpFound && !isCancelled()) {
-                                            ImageProcessor ip = snapImage(c.getName(), newExp , c.getZOffset());
+                                            ip = snapImage(c.getName(), newExp , c.getZOffset());
                                             ImageStatistics stats=ip.getStatistics();
-                                            if ((stats.max < Math.pow(2,core.getImageBitDepth()) / 2)
-                                                    || stats.maxCount < MAX_SATURATION*ip.getWidth()*ip.getHeight()){
+                                            if ((stats.max < Math.pow(2,core.getImageBitDepth())-1)
+                                            || stats.maxCount < MAX_SATURATION*ip.getWidth()*ip.getHeight()){
                                                 //underexposed
                                                 minExp=newExp;
                                                 if (maxExp==-1)
                                                     newExp*=2;
                                                 else
-                                                    newExp=(minExp+maxExp)/2;   
+                                                    newExp=(minExp+maxExp)/2;
                                                 if (newExp >= MAX_EXPOSURE) {
-                                                    break;
+                                                    newExp=MAX_EXPOSURE;
+                                                    maxExp=MAX_EXPOSURE;
                                                 }
                                             }  else {
                                                 //overexposed
                                                 maxExp=newExp;
-                                                newExp=(minExp+maxExp)/2;                                        
+                                                newExp=(minExp+maxExp)/2;
                                                 if (newExp <=0) {
                                                     break;
-                                                }    
-                                            }   
+                                                }
+                                            }
                                             publish(newExp);// Notify progress
-                                            optimalExpFound=Math.abs(maxExp/minExp - 1) < 0.05; 
+                                            optimalExpFound=Math.abs(maxExp/minExp - 1) < 0.025;
                                             try {
                                                 Thread.sleep(100);
                                             } catch (InterruptedException ex) {
                                                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                                             }
+                                            i++;
                                         }
                                         if (!isCancelled()) {
                                             optimalExp=(maxExp+minExp)/2;
-                                        } else
+                                        } else {
                                             optimalExp=-1;
+                                        }    
                                         return optimalExp;
                                     }
 
@@ -8512,17 +8543,24 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                     @Override
                                     protected void done() {
                                         frame.dispose();
+                                        new ImagePlus("Auto-Exposure: "+c.getName(),ip).show();
                                         if (!isCancelled()) {
-                                            int result=JOptionPane.showConfirmDialog(null,"Suggested exposure time for channel "+c.getName()+": "+formatNumber("0.0", optimalExp)+" ms.\n"
+                                            if (optimalExp==MAX_EXPOSURE) {
+                                                JOptionPane.showMessageDialog(guiFrame, "Reached maximum exposure ("+MAX_EXPOSURE+" ms).");
+                                            }
+                                            optimalExp=0.1*(Math.round(optimalExp*10));
+                                            int result=JOptionPane.showConfirmDialog(guiFrame,"Suggested exposure time for channel "+c.getName()+": "+formatNumber("0.0", optimalExp)+" ms.\n"
                                                 + "Adjust exposure time to new value?","Auto-Exposure",JOptionPane.YES_NO_OPTION);
                                             if (result==JOptionPane.YES_OPTION) {
                                                 c.setExposure(optimalExp);
                                                 ctm.fireTableRowsUpdated(row, row);
                                             }
                                         }
+                                        enableGUI(true);
+                                        acquireButton.setEnabled(acqLayout.getNoOfMappedStagePos()>0);
                                     }
 
-                                };
+                                }; //end SwingWorker
 
                                 frame.addWindowListener(new WindowAdapter() {
                                     @Override
@@ -8530,7 +8568,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                         worker.cancel(true);
                                     }
                                 });
-                                
+
                                 JButton cancelButton=new JButton("Cancel");
                                 cancelButton.addActionListener(new ActionListener() {
                                     @Override
@@ -8541,19 +8579,15 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                 JPanel buttonPanel=new JPanel();
                                 buttonPanel.add(cancelButton);
                                 frame.getContentPane().add(buttonPanel);
-                                
+
                                 frame.pack();
                                 frame.setLocationRelativeTo(null);
                                 frame.setVisible(true);
 
                                 worker.execute();
 
-                            }
-                        });
-
-                        
-                        
-                        
+                            } //end run()
+                        });//end invokeLater()
                     }
                 }  
             } else {
@@ -8677,7 +8711,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JButton addFrameFilterButton;
     private javax.swing.JButton addImageStorageButton;
     private javax.swing.JButton addImageTagFilterButton;
-    private javax.swing.JButton addMC_MZ_AnalyzerButton;
     private javax.swing.JButton addROIFinderButton;
     private javax.swing.JButton addScriptAnalyzerButton;
     private javax.swing.JButton addZFilterButton;

@@ -63,13 +63,20 @@ public class ScriptAnalyzer extends BranchedProcessor<File>  {
         this(script,args,path, false);
     }
     
-    
     public ScriptAnalyzer(String script, String args, String path, boolean saveRT) {
         super("ScriptAnalyzer: "+new File(script).getName()+" ["+args+"]", path);
         script_=script;
         args_=args;
         saveRT_=saveRT;
         rTable_=null;
+    }
+    
+    @Override
+    public boolean isSupportedDataType(Class<?> clazz) {
+        if (clazz==java.io.File.class)
+            return true;
+        else
+            return false;
     }
     
     @Override

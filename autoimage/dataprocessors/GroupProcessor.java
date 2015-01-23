@@ -106,6 +106,14 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
         criteriaKeys=criteria;
     }
 
+    @Override
+    public boolean isSupportedDataType(Class<?> clazz) {
+        if (clazz==java.io.File.class)
+            return true;
+        else
+            return false;
+    }
+    
     protected abstract List<E> processGroup(final Group<E> group) throws InterruptedException;
     
     protected boolean groupIsComplete(Group<E> group) {

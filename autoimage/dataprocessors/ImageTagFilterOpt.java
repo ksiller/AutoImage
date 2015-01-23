@@ -42,7 +42,7 @@ public abstract class ImageTagFilterOpt<E,T> extends ImageTagFilter<E,T> impleme
     
     @Override
     public List<String> getOptions() {
-            return options_;
+        return options_;
     }
     
     @Override

@@ -33,6 +33,14 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
         return obj;
     }
     
+    public boolean isSupportedDataType(Class<?> clazz) {
+        if (clazz==TaggedImage.class || java.io.File.class==clazz)
+            return true;
+        else 
+            return false;
+    }
+    
+    
     public void setParameters(JSONObject obj) throws JSONException {
         procName=obj.getString("ProcName");
     }

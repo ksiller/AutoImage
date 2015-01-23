@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.JOptionPane;
 import javax.swing.tree.DefaultMutableTreeNode;
 import mmcorej.TaggedImage;
 import org.apache.commons.math.linear.Array2DRowRealMatrix;
@@ -567,4 +568,5 @@ public class Utils {
     public static String getExtension(File f) {
         return f.getName().substring(f.getName().lastIndexOf("."));
     }
+    
 }
