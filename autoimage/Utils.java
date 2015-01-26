@@ -569,4 +569,54 @@ public class Utils {
         return f.getName().substring(f.getName().lastIndexOf("."));
     }
     
+    public void leastSquareFitFor3DPlane(List<RefArea> refPoints) {
+        //convert into coordinate arrays
+        double x[] = new double[refPoints.size()];
+        double y[] = new double[refPoints.size()];
+        double z[] = new double[refPoints.size()];
+        double xm=0;//avarage x
+        double ym=0;//average y
+        double zm=0;//average z
+        int i=0;
+        for (RefArea ra:refPoints) {
+            x[i]=ra.getStageCoordX();
+            y[i]=ra.getStageCoordY();
+            z[i]=ra.getStageCoordZ()-ra.getLayoutCoordZ();
+            xm+=x[i];
+            ym+=y[i];
+            zm+=z[i];
+            i++;
+        }
+        xm/=refPoints.size();
+        ym/=refPoints.size();
+        zm/=refPoints.size();
+        //subtract mean to avoid illdefined equations down the line
+        for (i=0; i< x.length; i++) {
+            x[i]=x[i]-xm;
+            y[i]=y[i]-ym;
+            z[i]=z[i]-zm;
+        }
+        //create matrix
+        double m[][] = new double[3][3];
+        m[0][0]=0;
+        for (i=0; i<x.length; i++) {
+            m[0][0]+=x[i]*x[i];
+            m[0][1]+=x[i]*y[i];
+            m[0][2]+=x[i];
+            m[1][0]+=x[i]*y[i];
+            m[1][1]+=y[i]*y[i];
+            m[1][2]+=y[i];
+            m[2][0]+=x[i];
+            m[2][1]+=y[i];
+        }
+        m[2][2]=1;
+        
+        double n[] = new double[3];
+        for (i=0; i<x.length; i++) {
+            n[0]+=x[i]*z[i];
+            n[1]+=y[i]*z[i];
+            n[2]+=z[i];
+        }
+    }    
+    
 }

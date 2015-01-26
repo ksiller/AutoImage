@@ -12,6 +12,7 @@ import ij.ImageStack;
 import ij.gui.Overlay;
 import ij.gui.Roi;
 import ij.process.ByteProcessor;
+import ij.process.ColorProcessor;
 import ij.process.ImageProcessor;
 import ij.process.ShortProcessor;
 import java.awt.Color;
@@ -178,7 +179,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                         imp1.setDimensions(1, 1, 1);
                         imp1.show();
                         imp1.getCanvas().zoomOut(0,0);
-                        imp1.getCanvas().zoomOut(0,0);
+                        //imp1.getCanvas().zoomOut(0,0);
                     } else {
                         imp1.setProcessor(ip1);
                     }
@@ -192,7 +193,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                         imp2.setDimensions(1, 1, 1);
                         imp2.show();
                         imp2.getCanvas().zoomOut(0,0);
-                        imp2.getCanvas().zoomOut(0,0);
+                        //imp2.getCanvas().zoomOut(0,0);
                     } else {
                         imp2.setProcessor(ip2);
                     }
@@ -203,9 +204,10 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     ImageProcessor stackIp=null;
                     if (stitchedIp instanceof ByteProcessor) {
                         stackIp=new ByteProcessor(ip1.getWidth()*2,ip1.getHeight()*2);
-                    }
-                    if (stitchedIp instanceof ShortProcessor) {
+                    } else if (stitchedIp instanceof ShortProcessor) {
                         stackIp=new ShortProcessor(ip1.getWidth()*2,ip1.getHeight()*2);
+                    } else if (stitchedIp instanceof ColorProcessor) {
+                        stackIp=new ColorProcessor(ip1.getWidth()*2,ip1.getHeight()*2);
                     }
                     if (stackIp!=null) {
                         int width=stitchedIp.getWidth();
@@ -295,8 +297,10 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     if (stitchedIp instanceof ByteProcessor) {
                         stackIp=new ByteProcessor(ip1.getWidth()*2,ip1.getHeight()*2);
                     }
-                    if (stitchedIp instanceof ShortProcessor) {
+                    else if (stitchedIp instanceof ShortProcessor) {
                         stackIp=new ShortProcessor(ip1.getWidth()*2,ip1.getHeight()*2);
+                    } else if (stitchedIp instanceof ColorProcessor) {
+                        stackIp=new ColorProcessor(ip1.getWidth()*2,ip1.getHeight()*2);
                     }
                     if (stackIp!=null) {
                         int width=stitchedIp.getWidth();
@@ -357,8 +361,10 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     index++;
                     iteration++;
                 }
-                imp1.close();
-                imp2.close();
+                if (imp1!=null)
+                    imp1.close();
+                if (imp2!=null)
+                    imp2.close();
                 ImagePlus himp=new ImagePlus();
                 himp.setStack("Horizontal",hStack);
                 himp.setRoi(0, 0, maxWidth_H, maxHeight_H);
@@ -376,7 +382,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                 vimp.getCanvas().zoomOut(0, 0);
                 vimp.getCanvas().zoomOut(0, 0);
             } catch (Exception ex) {
-                Logger.getLogger(CameraRotDlg.class.getName()).log(Level.SEVERE, null, ex);
+                IJ.log(CameraRotDlg.class.getName()+": Exception - "+ex.getMessage());
                 isMeasuring=false;
                 progressBar.setValue(0);
                 progressBar.setString("");

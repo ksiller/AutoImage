@@ -25,6 +25,7 @@ import ij.Prefs;
 import ij.gui.GenericDialog;
 import ij.measure.Calibration;
 import ij.process.ByteProcessor;
+import ij.process.ColorProcessor;
 import ij.process.ImageProcessor;
 import ij.process.ImageStatistics;
 import ij.process.LUT;
@@ -169,6 +170,7 @@ import org.micromanager.api.TaggedImageAnalyzer;
 import org.micromanager.api.TaggedImageStorage;
 import org.micromanager.internalinterfaces.AcqSettingsListener;
 import org.micromanager.utils.ChannelSpec;
+import org.micromanager.utils.ImageUtils;
 import org.micromanager.utils.MMException;
 import org.micromanager.utils.MMScriptException;
 import org.micromanager.utils.ReportingUtils;
@@ -8005,31 +8007,40 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         for (int row : rows) {
                             Channel c = ctm.getRowData(row);
                             //snapAndDisplayImage(c.getName(),c.getExposure(),c.getZOffset(),c.getColor());
-                            ImageProcessor ip = snapImage(c.getName(), c.getExposure(), c.getZOffset());
+                            ImageProcessor ip = snapChannelImage(c.getName(), c.getExposure(), c.getZOffset());
                             if (stack==null)
                                 stack = new ImageStack(ip.getWidth(),ip.getHeight());
                             stack.addSlice(c.getName(),ip, i);
                             i++;
                         }
                         ImagePlus imp = new ImagePlus();
-                        imp.setStack(stack, rows.length, 1, 1);
+                        
                         imp.setTitle("Snap");
                         Calibration cal = imp.getCalibration();
                         cal.setUnit("um");
                         cal.pixelWidth = currentAcqSetting.getImagePixelSize();
                         cal.pixelHeight = currentAcqSetting.getImagePixelSize();
                         imp.setCalibration(cal);
-                        CompositeImage ci = new CompositeImage(imp);
-                        i = 0;
-                        LUT[] luts = new LUT[rows.length];
-                        for (int row : rows) {
-                            luts[i] = LUT.createLutFromColor(currentAcqSetting.getChannels().get(row).getColor());//ctm.getRowData(row).getColor());
-                            i++;
+                        if (stack.getBitDepth()==24) {
+                            //isRGB
+                            //show conventional ImagePlus
+                            //ignore channel color
+                            imp.setStack(stack);
+                            imp.show();
+                        } else {
+                            //show composite image with channel LUTs
+                            imp.setStack(stack, rows.length, 1, 1);
+                            CompositeImage ci = new CompositeImage(imp);
+                            i = 0;
+                            LUT[] luts = new LUT[rows.length];
+                            for (int row : rows) {
+                                luts[i] = LUT.createLutFromColor(currentAcqSetting.getChannels().get(row).getColor());//ctm.getRowData(row).getColor());
+                                i++;
+                            }
+                            ci.setLuts(luts);
+                            ci.show();
+                            IJ.run("Channels Tool...");
                         }
-                        ci.setLuts(luts);
-                        ci.show();
-                        IJ.run("Channels Tool...");
-                        
                         /* for future: handle ROIs
                         if (updatedROI && JOptionPane.showConfirmDialog(this,"Do you want to keep this camera ROI for acquisition setting '"
                                 +currentAcqSetting.getName()+"'?","",JOptionPane.YES_NO_OPTION)==JOptionPane.YES_OPTION) {
@@ -8495,7 +8506,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                         boolean optimalExpFound=false;
                                         int i=1;
                                         while (!optimalExpFound && !isCancelled()) {
-                                            ip = snapImage(c.getName(), newExp , c.getZOffset());
+                                            ip = snapChannelImage(c.getName(), newExp , 0);//c.getZOffset());
                                             ImageStatistics stats=ip.getStatistics();
                                             if ((stats.max < Math.pow(2,core.getImageBitDepth())-1)
                                             || stats.maxCount < MAX_SATURATION*ip.getWidth()*ip.getHeight()){
@@ -9777,52 +9788,69 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 //        IJ.log(focusDeviceStr);
         return !focusDeviceStr.equals("");
     }
-/*
-    private void snapAndDisplayImage(String ch, double exp, double zOffs, Color c) {
-        ImagePlus imp = new ImagePlus("Snap: " + ch, snapImage(ch, exp, zOffs));
-        if (imp != null) {
-            CompositeImage ci = new CompositeImage(imp);
-            ci.setChannelLut(LUT.createLutFromColor(c));
-            ci.show();
-        }
-    }
-*/
-    private ImageProcessor snapImage(String ch, double exp, double zOffs) {
+
+    private ImageProcessor snapChannelImage(String ch, double exp, double zOffs) {
         ImageProcessor ip = null;
         try {
-            core.setRelativePosition(zStageLabel, zOffs);
-            core.waitForDevice(zStageLabel);
+            if (zOffs!=0) {
+                core.setRelativePosition(zStageLabel, zOffs);
+                core.waitForDevice(zStageLabel);
+            }
+            ip=MMCoreUtils.snapImage(core, currentAcqSetting.getChannelGroupStr(), ch, exp);
 //            core.setConfig(channelGroupStr, ch);
-            core.setConfig(currentAcqSetting.getChannelGroupStr(), ch);
+/*            core.setConfig(currentAcqSetting.getChannelGroupStr(), ch);
             core.setExposure(exp);
             core.waitForSystem();
             core.snapImage();
-            if (core.getBytesPerPixel() == 1) {
-                // 8-bit grayscale pixels
-                byte[] img = (byte[]) core.getImage();
-                long w = core.getImageWidth();
-                long h = core.getImageHeight();
-                ByteProcessor bp = new ByteProcessor((int) w, (int) h, img);
-                ip = bp;
-            } else if (core.getBytesPerPixel() == 2) {
-                // 16-bit grayscale pixels
-                short[] img = (short[]) core.getImage();
-                long w = core.getImageWidth();
-                long h = core.getImageHeight();
-                ShortProcessor sp = new ShortProcessor((int) w, (int) h, img, null);
-                ip = sp;
-            } else {
-                /*                IJ.log("Dont' know how to handle images with " +
-                 core.getBytesPerPixel() + " byte pixels.");*/
-                JOptionPane.showMessageDialog(this,"Dont' know how to handle images with "
-                    + core.getBytesPerPixel() + " byte pixels.");
-                ip = null;
+            Object imgArray=core.getImage();
+            int w = (int)core.getImageWidth();
+            int h = (int)core.getImageHeight();
+            switch ((int)core.getBytesPerPixel()) {
+                case 1: {
+                    // 8-bit grayscale pixels
+                    byte[] img = (byte[]) imgArray;
+                    ByteProcessor bp = new ByteProcessor(w, h, img, null);
+                    ip = bp;
+                    break;
+                } 
+                case 2: {
+                    // 16-bit grayscale pixels
+                    short[] img = (short[]) imgArray;
+                    ShortProcessor sp = new ShortProcessor(w, h, img, null);
+                    ip = sp;
+                    break;
+                } 
+                case 4: {
+                    // color pixels
+                    int type=ImagePlus.COLOR_RGB;
+                    if (imgArray instanceof byte[]) {
+                        //convert byte[] to int[] 
+                        byte[] byteArray=(byte[])imgArray;
+                        int[] intArray = new int[byteArray.length/4];
+                        for (int i=0; i<intArray.length; ++i) {
+                            intArray[i] =  byteArray[4*i]
+                  	                 + (byteArray[4*i + 1] << 8)
+                  	                 + (byteArray[4*i + 2] << 16);
+                  	}
+	                imgArray = intArray;
+	            }
+	            ip=new ColorProcessor(w, h, (int[]) imgArray);
+                    IJ.log(this.getClass().getName()+": "+Long.toString(core.getBytesPerPixel())+" bytes/pixel)");        
+                    break;
+                }
+                default: {
+                    ip=null;
+                    IJ.log(this.getClass().getName()+": Unknown image type ("+Long.toString(core.getBytesPerPixel())+" bytes/pixel)");        
+                    break;
+                }
+            }*/
+            if (zOffs!=0) {
+                core.setRelativePosition(zStageLabel, -zOffs);
+                core.waitForDevice(zStageLabel);
             }
-            core.setRelativePosition(zStageLabel, -zOffs);
-            core.waitForDevice(zStageLabel);
         } catch (Exception ex) {
-//            IJ.log("AcqFrame.snapAndDisplayImage: Problem.");
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            IJ.log("AcqFrame.snapAndDisplayImage: Exception - "+ex.getMessage()+".");
+            Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
             ip = null;
         }
         return ip;

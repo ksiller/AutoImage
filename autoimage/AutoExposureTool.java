@@ -9,6 +9,7 @@ package autoimage;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.process.ByteProcessor;
+import ij.process.ColorProcessor;
 import ij.process.ImageProcessor;
 import ij.process.ImageStatistics;
 import ij.process.ShortProcessor;
@@ -62,7 +63,7 @@ public class AutoExposureTool implements Callable<Double> {
         this.core=gui.getMMCore();
         showImages=show;
     }
-      
+    /*  
     private ImageProcessor snapImage(double exp) {
         ImageProcessor ip = null;
         try {
@@ -70,38 +71,54 @@ public class AutoExposureTool implements Callable<Double> {
             core.setExposure(exp);
             core.waitForSystem();
             core.snapImage();
+
+            Object imgArray = core.getImage();
+            long w = core.getImageWidth();
+            long h = core.getImageHeight();
             
-            if (core.getBytesPerPixel() == 1) {
-                // 8-bit grayscale pixels
-                byte[] img = (byte[]) core.getImage();
-                long w = core.getImageWidth();
-                long h = core.getImageHeight();
-                ByteProcessor bp = new ByteProcessor((int) w, (int) h, img);
-                ip = bp;
-            } else if (core.getBytesPerPixel() == 2) {
-                // 16-bit grayscale pixels
-                short[] img = (short[]) core.getImage();
-                long w = core.getImageWidth();
-                long h = core.getImageHeight();
-                ShortProcessor sp = new ShortProcessor((int) w, (int) h, img, null);
-                ip = sp;
-            } else {
-                /*                IJ.log("Dont' know how to handle images with " +
-                 core.getBytesPerPixel() + " byte pixels.");*/
-                IJ.log("Dont' know how to handle images with "
-                    + core.getBytesPerPixel() + " byte pixels.");
-                ip = null;
+            switch ((int)core.getBytesPerPixel()) {
+                case 1: {
+                    // 8-bit grayscale pixels
+                    byte[] img = (byte[]) imgArray;
+                    ByteProcessor bp = new ByteProcessor((int) w, (int) h, img);
+                    ip = bp;
+                    break;
+                } case 2: {
+                    // 16-bit grayscale pixels
+                    short[] img = (short[]) imgArray;
+                    ShortProcessor sp = new ShortProcessor((int) w, (int) h, img, null);
+                    ip = sp;
+                    break;
+                } case 4: {
+                    // color pixels
+                    int type=ImagePlus.COLOR_RGB;
+                    if (imgArray instanceof byte[]) {
+                        //convert byte[] to int[] 
+                        byte[] byteArray=(byte[])imgArray;
+                        int[] intArray = new int[byteArray.length/4];
+                        for (int i=0; i<intArray.length; ++i) {
+                            intArray[i] =  byteArray[4*i]
+                  	                 + (byteArray[4*i + 1] << 8)
+                  	                 + (byteArray[4*i + 2] << 16);
+                  	}
+	                imgArray = intArray;
+	            }
+	            ip=new ColorProcessor((int)w, (int)h, (int[]) imgArray);
+                    break;
+                }
+                default: {
+                    IJ.log(this.getClass().getName()+": Unknown image type ("+Long.toString(core.getBytesPerPixel())+" bytes/pixel)");        
+                    break;
+                }
             }
-            
-            //ip=ImageUtils.makeProcessor(core, (Object[])core.getImage());
         } catch (Exception ex) {
             IJ.log(this.getClass().getName()+" snapImage: Exception.");
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
             ip = null;
         }
         return ip;
     }
-    
+    */
     @Override
     public Double call() {
         final JFrame frame=new JFrame("Auto-Exposure");
@@ -138,7 +155,7 @@ public class AutoExposureTool implements Callable<Double> {
                 double minExp=1;
                 boolean optimalExpFound=false;
                 while (!optimalExpFound && !isCancelled()) {
-                    ip = snapImage(newExp);
+                    ip = MMCoreUtils.snapImage(core, channelGroup, channel, newExp);
                     ImageStatistics stats=ip.getStatistics();
                     if ((stats.max < Math.pow(2,core.getImageBitDepth())-1)
                         || stats.maxCount < MAX_SATURATION*ip.getWidth()*ip.getHeight()){
