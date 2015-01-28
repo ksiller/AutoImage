@@ -1231,6 +1231,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         private final List<ImagePlus> impList;
         private final ImageCache imageCache;
         private double pixelSize;
+        private boolean isFirstImage=true;
 
         public DisplayUpdater(ImageCache ic, List<Channel> channels, Double pixelSize) {
             super();
@@ -1271,7 +1272,16 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     final JSONObject metadata = lastImage.tags;
                     final Object pixel = lastImage.pix;
                     ImageProcessor ip = Utils.createImageProcessor(lastImage);
-                    if (ip!=null) {
+                    if (ip==null && isFirstImage) {
+                        isFirstImage=false;
+                        SwingUtilities.invokeLater(new Runnable() {                          
+                            @Override
+                            public void run() {
+                                JOptionPane.showMessageDialog(null,"Cannot display this image format.\n"
+                                + "The acquisition, image storage, and image processsing will not be affected.");
+                            }
+                        });
+                    } else {    
                         boolean newWindow=false;
                         ImagePlus imp=null;
                         try {
@@ -1290,7 +1300,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                 newWindow=false;
                             }    
                             JSONArray color=metadata.getJSONObject(MMTags.Root.SUMMARY).getJSONArray(MMTags.Summary.COLORS);
-                            if (color!=null)
+                            if (color!=null&& !(ip instanceof ColorProcessor))
                                 ip.setLut(LUT.createLutFromColor(new Color(color.getInt(index))));
                         } catch (JSONException je) {
                             IJ.log("DisplayUpdater.process: JSONException - cannot parse image metadata title");
@@ -3197,8 +3207,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         });
 
         snapButton.setFont(new java.awt.Font("SansSerif", 0, 12)); // NOI18N
-        snapButton.setText("Snap");
-        snapButton.setToolTipText("Snap Image(s) using selected Channel Configurations ");
+        snapButton.setIcon(new javax.swing.ImageIcon("/Users/Karsten/NetBeansProjects/Advanced_MDA/src/autoimage/resources/camera.png")); // NOI18N
+        snapButton.setToolTipText("Snap image(s) using selected channels");
         snapButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 snapButtonActionPerformed(evt);
@@ -3206,8 +3216,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         });
 
         liveButton.setFont(new java.awt.Font("SansSerif", 0, 12)); // NOI18N
-        liveButton.setText("Live");
-        liveButton.setToolTipText("Live Acquisition using selected Channel Configuration");
+        liveButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/camera_go.png"))); // NOI18N
+        liveButton.setToolTipText("Live acquisition using selected channel ");
         liveButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 liveButtonActionPerformed(evt);
@@ -3216,7 +3226,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
         zOffsetButton.setFont(new java.awt.Font("SansSerif", 0, 12)); // NOI18N
         zOffsetButton.setText("z-Offset");
-        zOffsetButton.setToolTipText("Live Acquisition using selected Channel Configuration");
+        zOffsetButton.setToolTipText("Set channel z-offsets");
         zOffsetButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 zOffsetButtonActionPerformed(evt);
@@ -3225,7 +3235,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
         autoExposureButton.setFont(new java.awt.Font("SansSerif", 0, 12)); // NOI18N
         autoExposureButton.setText("Auto-Exp");
-        autoExposureButton.setToolTipText("Snap Image(s) using selected Channel Configurations ");
+        autoExposureButton.setToolTipText("Determine optimal exposure time for channel");
         autoExposureButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 autoExposureButtonActionPerformed(evt);
@@ -3802,35 +3812,35 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(jPanel9Layout.createSequentialGroup()
                                 .add(addDataProcFromFileButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .add(6, 6, 6)
                                 .add(loadImagePipelineButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                             .add(jPanel9Layout.createSequentialGroup()
                                 .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                                     .add(jPanel9Layout.createSequentialGroup()
                                         .add(addChannelFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                        .add(6, 6, 6)
                                         .add(addZFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                                     .add(jPanel9Layout.createSequentialGroup()
                                         .add(addFrameFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                        .add(6, 6, 6)
                                         .add(addAreaFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                                     .add(jPanel9Layout.createSequentialGroup()
                                         .add(removeProcessorButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                        .add(6, 6, 6)
                                         .add(editProcessorButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                                     .add(jPanel9Layout.createSequentialGroup()
                                         .add(loadProcTreeButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                        .add(6, 6, 6)
                                         .add(saveProcTreeButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                                     .add(addImageStorageButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                     .add(jPanel9Layout.createSequentialGroup()
                                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
                                             .add(addImageTagFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                                             .add(addScriptAnalyzerButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                        .add(6, 6, 6)
                                         .add(addROIFinderButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
                                 .add(0, 0, Short.MAX_VALUE)))
-                        .add(6, 6, 6))
+                        .add(0, 0, 0))
                     .add(jPanel9Layout.createSequentialGroup()
                         .add(jLabel28)
                         .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
@@ -3847,27 +3857,27 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(addZFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(addChannelFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(6, 6, 6)
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(addAreaFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(addFrameFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(6, 6, 6)
                         .add(addImageTagFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(6, 6, 6)
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(addScriptAnalyzerButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(addROIFinderButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(6, 6, 6)
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(addDataProcFromFileButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(loadImagePipelineButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(6, 6, 6)
                         .add(addImageStorageButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .add(18, 18, 18)
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(loadProcTreeButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(saveProcTreeButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(6, 6, 6)
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
                             .add(editProcessorButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(removeProcessorButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
@@ -8007,7 +8017,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         for (int row : rows) {
                             Channel c = ctm.getRowData(row);
                             //snapAndDisplayImage(c.getName(),c.getExposure(),c.getZOffset(),c.getColor());
-                            ImageProcessor ip = snapChannelImage(c.getName(), c.getExposure(), c.getZOffset());
+                            ImageProcessor ip = snapImageWithZOffset(c.getName(), c.getExposure(), c.getZOffset());
                             if (stack==null)
                                 stack = new ImageStack(ip.getWidth(),ip.getHeight());
                             stack.addSlice(c.getName(),ip, i);
@@ -8360,7 +8370,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         } else {
             text="<html><b>AF method: not selected</b></html>";
         }
-//        autofocusButton.setToolTipText(text);
         autofocusCheckBox.setToolTipText(text);
     } 
     
@@ -8386,225 +8395,226 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         if (ae != null) {
             ae.stopCellEditing();
         }
-        /*        AcqSetting setting=null;
-        if (acqSettings!=null && acqSettings.size()>cAcqSettingIdx) {
-            setting=acqSettings.get(cAcqSettingIdx);
-        }*/
+        if (core.getBytesPerPixel() > 2) {
+            JOptionPane.showMessageDialog(this, "This function is only supported for cameras producing 8-bit or 16-bit grayscale images.");
+            return;            
+        }
         if (channelTable.getSelectedRowCount() != 1) {
-            JOptionPane.showMessageDialog(this, "Select one channel");
-        } else {
-            try {
-                if (!currentAcqSetting.getObjective().equals(core.getProperty(objectiveDevStr, "Label"))) {
-                    JOptionPane.showMessageDialog(this, "Switching to "+currentAcqSetting.getObjective()+" objective.");
-                }
-            } catch (Exception ex) {
-                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            JOptionPane.showMessageDialog(this, "Select one channel.");
+            return;
+        }
+        try {
+            if (!currentAcqSetting.getObjective().equals(core.getProperty(objectiveDevStr, "Label"))) {
+                JOptionPane.showMessageDialog(this, "Switching to "+currentAcqSetting.getObjective()+" objective.");
             }
-            if (setObjectiveAndBinning(currentAcqSetting, true)) {
-                String chGroupStr=MMCoreUtils.loadAvailableChannelConfigs(this,currentAcqSetting.getChannelGroupStr(),core);
-                if (!chGroupStr.equals(currentAcqSetting.getChannelGroupStr())) {
-                    currentAcqSetting.setChannelGroupStr(chGroupStr);
-                    initializeChannelTable(currentAcqSetting);
-                } else {
-                    if (chGroupStr!=null) {
-                        final int row = channelTable.getSelectedRow();
+        } catch (Exception ex) {
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        if (setObjectiveAndBinning(currentAcqSetting, true)) {
+            String chGroupStr=MMCoreUtils.loadAvailableChannelConfigs(this,currentAcqSetting.getChannelGroupStr(),core);
+            if (!chGroupStr.equals(currentAcqSetting.getChannelGroupStr())) {
+                currentAcqSetting.setChannelGroupStr(chGroupStr);
+                initializeChannelTable(currentAcqSetting);
+            } else {
+                if (chGroupStr!=null) {
+                    final int row = channelTable.getSelectedRow();
 //                        ImageStack stack = new ImageStack(cCameraPixX / currentAcqSetting.getBinning(), cCameraPixY / currentAcqSetting.getBinning());
-                        
-                        //read out currentROI setting and update ROI in detector of current AcqSetting
-                        FieldOfView fov=currentAcqSetting.getFieldOfView();
-                        Rectangle snapROI=fov.getROI_Pixel(currentAcqSetting.getBinning());
-                        Rectangle coreROI=null;
-                        boolean updatedROI=false;
-                        
-                        try {
-                            coreROI=core.getROI();
-                            if (coreROI !=null 
-                                    && (coreROI.width != fov.getROI_Pixel(currentAcqSetting.getBinning()).width 
-                                    || coreROI.height != fov.getROI_Pixel(currentAcqSetting.getBinning()).height)) {
-                                JOptionPane.showMessageDialog(this, "ROIs are not supported. Clearing ROI.");
+
+                    //read out currentROI setting and update ROI in detector of current AcqSetting
+                    FieldOfView fov=currentAcqSetting.getFieldOfView();
+                    Rectangle snapROI=fov.getROI_Pixel(currentAcqSetting.getBinning());
+                    Rectangle coreROI=null;
+                    boolean updatedROI=false;
+
+                    try {
+                        coreROI=core.getROI();
+                        if (coreROI !=null 
+                                && (coreROI.width != fov.getROI_Pixel(currentAcqSetting.getBinning()).width 
+                                || coreROI.height != fov.getROI_Pixel(currentAcqSetting.getBinning()).height)) {
+                            JOptionPane.showMessageDialog(this, "ROIs are not supported. Clearing ROI.");
 //                                fov.clearROI();
-                                core.clearROI();
-                                for (AcqSetting setting:acqSettings) {
+                            core.clearROI();
+                            for (AcqSetting setting:acqSettings) {
 //                                    FieldOfView fov=new FieldOfView(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel(),currentDetector.getFieldRotation());
 //                                    setting.setFieldOfView(fov);
-                                    setting.getFieldOfView().clearROI();
-                                }
-                            }    
-                        } catch (Exception ex) {
-                            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                        }
-
-                        final ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-                        final Channel c = ctm.getRowData(row);
-                        
-                        final JFrame guiFrame=this;
-
-                        AutoExposureTool aet=new AutoExposureTool(app,chGroupStr,c.getName(),c.getExposure(),true);
-/*                        
-                        ExecutorService executor=Executors.newSingleThreadExecutor();
-                        Future<Double> future=executor.submit(aet);
-                        double exp;
-                        try {
-                            exp=future.get();
-                        } catch (InterruptedException ex) {
-                              //exception caused by timeout of future.get()
-            //                return new ArrayList<File>();
-                        } catch (ExecutionException ex) {
-                            //this caused by InterruptedException in callable, so rethrow the InterruptedException to enforce call of cleanUp()
-                            IJ.log(this.getClass().getName()+": ExecutionException: caused by callable");
-                        }
-                        
-//                            double exp=aet.getOptimalExposure();
-                            if (exp==-1) {
-                                JOptionPane.showMessageDialog(this,"Canceled");
-                            } else {
-                                int result=JOptionPane.showConfirmDialog(guiFrame,"Suggested exposure time for channel "+c.getName()+": "+formatNumber("0.0", exp)+" ms.\n"
-                                                + "Adjust exposure time to new value?","Auto-Exposure",JOptionPane.YES_NO_OPTION);
-                                            if (result==JOptionPane.YES_OPTION) {
-                                                c.setExposure(exp);
-                                                ctm.fireTableRowsUpdated(row, row);
-                                            }                            
+                                setting.getFieldOfView().clearROI();
                             }
-*/                    
-                        enableGUI(false);
-                        acquireButton.setEnabled(false);
-                        SwingUtilities.invokeLater(new Runnable() {
-                            
-                            @Override
-                            public void run() {
-                                final JFrame frame=new JFrame("Auto-Exposure");
-                                frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-                                frame.setPreferredSize(new Dimension(400,120));
-                                frame.setResizable(false);
-                                frame.getContentPane().setLayout(new GridLayout(0,1));
-
-                                JLabel label=new JLabel("Channel '"+c.getName()+"': Testing exposure");
-                                final JLabel expLabel=new JLabel("");
-
-                                JPanel panel = new JPanel();
-                                panel.setLayout(new BoxLayout(panel, BoxLayout.LINE_AXIS));
-                                panel.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
-                                panel.add(label);
-                                panel.add(Box.createRigidArea(new Dimension(10, 0)));
-                                panel.add(expLabel);
-                                panel.add(Box.createHorizontalGlue());
-
-                                frame.getContentPane().add(panel);
-
-                                final SwingWorker<Double, Double> worker = new SwingWorker<Double, Double>() {
-
-                                    private double optimalExp;
-                                    private ImageProcessor ip;
-
-                                    @Override
-                                    protected Double doInBackground() {
-
-                                        double newExp=c.getExposure();
-                                        publish(newExp);
-                                        double maxExp=-1;
-                                        double minExp=1;
-                                        boolean optimalExpFound=false;
-                                        int i=1;
-                                        while (!optimalExpFound && !isCancelled()) {
-                                            ip = snapChannelImage(c.getName(), newExp , 0);//c.getZOffset());
-                                            ImageStatistics stats=ip.getStatistics();
-                                            if ((stats.max < Math.pow(2,core.getImageBitDepth())-1)
-                                            || stats.maxCount < MAX_SATURATION*ip.getWidth()*ip.getHeight()){
-                                                //underexposed
-                                                minExp=newExp;
-                                                if (maxExp==-1)
-                                                    newExp*=2;
-                                                else
-                                                    newExp=(minExp+maxExp)/2;
-                                                if (newExp >= MAX_EXPOSURE) {
-                                                    newExp=MAX_EXPOSURE;
-                                                    maxExp=MAX_EXPOSURE;
-                                                }
-                                            }  else {
-                                                //overexposed
-                                                maxExp=newExp;
-                                                newExp=(minExp+maxExp)/2;
-                                                if (newExp <=0) {
-                                                    break;
-                                                }
-                                            }
-                                            publish(newExp);// Notify progress
-                                            optimalExpFound=Math.abs(maxExp/minExp - 1) < 0.025;
-                                            try {
-                                                Thread.sleep(100);
-                                            } catch (InterruptedException ex) {
-                                                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                                            }
-                                            i++;
-                                        }
-                                        if (!isCancelled()) {
-                                            optimalExp=(maxExp+minExp)/2;
-                                        } else {
-                                            optimalExp=-1;
-                                        }    
-                                        return optimalExp;
-                                    }
-
-                                    @Override
-                                    protected void process(List<Double> exp) {
-                                        String msg=formatNumber("0.0", exp.get(exp.size()-1))+" ms";
-                                        expLabel.setText(msg);
-                                    }
-
-                                    @Override
-                                    protected void done() {
-                                        frame.dispose();
-                                        new ImagePlus("Auto-Exposure: "+c.getName(),ip).show();
-                                        if (!isCancelled()) {
-                                            if (optimalExp==MAX_EXPOSURE) {
-                                                JOptionPane.showMessageDialog(guiFrame, "Reached maximum exposure ("+MAX_EXPOSURE+" ms).");
-                                            }
-                                            optimalExp=0.1*(Math.round(optimalExp*10));
-                                            int result=JOptionPane.showConfirmDialog(guiFrame,"Suggested exposure time for channel "+c.getName()+": "+formatNumber("0.0", optimalExp)+" ms.\n"
-                                                + "Adjust exposure time to new value?","Auto-Exposure",JOptionPane.YES_NO_OPTION);
-                                            if (result==JOptionPane.YES_OPTION) {
-                                                c.setExposure(optimalExp);
-                                                ctm.fireTableRowsUpdated(row, row);
-                                            }
-                                        }
-                                        enableGUI(true);
-                                        acquireButton.setEnabled(acqLayout.getNoOfMappedStagePos()>0);
-                                    }
-
-                                }; //end SwingWorker
-
-                                frame.addWindowListener(new WindowAdapter() {
-                                    @Override
-                                    public void windowClosing(WindowEvent e) {
-                                        worker.cancel(true);
-                                    }
-                                });
-
-                                JButton cancelButton=new JButton("Cancel");
-                                cancelButton.addActionListener(new ActionListener() {
-                                    @Override
-                                    public void actionPerformed(ActionEvent e) {
-                                        worker.cancel(true);
-                                    }
-                                });
-                                JPanel buttonPanel=new JPanel();
-                                buttonPanel.add(cancelButton);
-                                frame.getContentPane().add(buttonPanel);
-
-                                frame.pack();
-                                frame.setLocationRelativeTo(null);
-                                frame.setVisible(true);
-
-                                worker.execute();
-
-                            } //end run()
-                        });//end invokeLater()
+                        }    
+                    } catch (Exception ex) {
+                        Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                     }
-                }  
-            } else {
-                currentAcqSetting.setObjectiveDevStr(changeConfigGroupStr("Objective",""));
-            }
-        }
+
+                    final ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
+                    final Channel c = ctm.getRowData(row);
+
+                    final JFrame guiFrame=this;
+
+/*                    
+                    AutoExposureTool aet=new AutoExposureTool(app,chGroupStr,c.getName(),c.getExposure(),true);
+                        
+                    ExecutorService executor=Executors.newSingleThreadExecutor();
+                    Future<Double> future=executor.submit(aet);
+                    double exp;
+                    try {
+                        exp=future.get();
+                    } catch (InterruptedException ex) {
+                          //exception caused by timeout of future.get()
+        //                return new ArrayList<File>();
+                    } catch (ExecutionException ex) {
+                        //this caused by InterruptedException in callable, so rethrow the InterruptedException to enforce call of cleanUp()
+                        IJ.log(this.getClass().getName()+": ExecutionException: caused by callable");
+                    }
+
+//                            double exp=aet.getOptimalExposure();
+                        if (exp==-1) {
+                            JOptionPane.showMessageDialog(this,"Canceled");
+                        } else {
+                            int result=JOptionPane.showConfirmDialog(guiFrame,"Suggested exposure time for channel "+c.getName()+": "+formatNumber("0.0", exp)+" ms.\n"
+                                            + "Adjust exposure time to new value?","Auto-Exposure",JOptionPane.YES_NO_OPTION);
+                                        if (result==JOptionPane.YES_OPTION) {
+                                            c.setExposure(exp);
+                                            ctm.fireTableRowsUpdated(row, row);
+                                        }                            
+                        }
+*/                    
+                    enableGUI(false);
+                    acquireButton.setEnabled(false);
+                    SwingUtilities.invokeLater(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            final JFrame frame=new JFrame("Auto-Exposure");
+                            frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+                            frame.setPreferredSize(new Dimension(400,120));
+                            frame.setResizable(false);
+                            frame.getContentPane().setLayout(new GridLayout(0,1));
+
+                            JLabel label=new JLabel("Channel '"+c.getName()+"': Testing exposure");
+                            final JLabel expLabel=new JLabel("");
+
+                            JPanel panel = new JPanel();
+                            panel.setLayout(new BoxLayout(panel, BoxLayout.LINE_AXIS));
+                            panel.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
+                            panel.add(label);
+                            panel.add(Box.createRigidArea(new Dimension(10, 0)));
+                            panel.add(expLabel);
+                            panel.add(Box.createHorizontalGlue());
+
+                            frame.getContentPane().add(panel);
+
+                            final SwingWorker<Double, Double> worker = new SwingWorker<Double, Double>() {
+
+                                private double optimalExp;
+                                private ImageProcessor ip;
+
+                                @Override
+                                protected Double doInBackground() {
+
+                                    double newExp=c.getExposure();
+                                    publish(newExp);
+                                    double maxExp=-1;
+                                    double minExp=1;
+                                    boolean optimalExpFound=false;
+                                    int i=1;
+                                    while (!optimalExpFound && !isCancelled()) {
+                                        ip = snapImageWithZOffset(c.getName(), newExp , 0);//c.getZOffset());
+                                        ImageStatistics stats=ip.getStatistics();
+                                        if ((stats.max < Math.pow(2,core.getImageBitDepth())-1)
+                                        || stats.maxCount < MAX_SATURATION*ip.getWidth()*ip.getHeight()){
+                                            //underexposed
+                                            minExp=newExp;
+                                            if (maxExp==-1)
+                                                newExp*=2;
+                                            else
+                                                newExp=(minExp+maxExp)/2;
+                                            if (newExp >= MAX_EXPOSURE) {
+                                                newExp=MAX_EXPOSURE;
+                                                maxExp=MAX_EXPOSURE;
+                                            }
+                                        }  else {
+                                            //overexposed
+                                            maxExp=newExp;
+                                            newExp=(minExp+maxExp)/2;
+                                            if (newExp <=0) {
+                                                break;
+                                            }
+                                        }
+                                        publish(newExp);// Notify progress
+                                        optimalExpFound=Math.abs(maxExp/minExp - 1) < 0.025;
+                                        try {
+                                            Thread.sleep(100);
+                                        } catch (InterruptedException ex) {
+                                            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                                        }
+                                        i++;
+                                    }
+                                    if (!isCancelled()) {
+                                        optimalExp=(maxExp+minExp)/2;
+                                    } else {
+                                        optimalExp=-1;
+                                    }    
+                                    return optimalExp;
+                                }
+
+                                @Override
+                                protected void process(List<Double> exp) {
+                                    String msg=formatNumber("0.0", exp.get(exp.size()-1))+" ms";
+                                    expLabel.setText(msg);
+                                }
+
+                                @Override
+                                protected void done() {
+                                    frame.dispose();
+                                    new ImagePlus("Auto-Exposure: "+c.getName(),ip).show();
+                                    if (!isCancelled()) {
+                                        if (optimalExp==MAX_EXPOSURE) {
+                                            JOptionPane.showMessageDialog(guiFrame, "Reached maximum exposure ("+MAX_EXPOSURE+" ms).");
+                                        }
+                                        optimalExp=0.1*(Math.round(optimalExp*10));
+                                        int result=JOptionPane.showConfirmDialog(guiFrame,"Suggested exposure time for channel "+c.getName()+": "+formatNumber("0.0", optimalExp)+" ms.\n"
+                                            + "Adjust exposure time to new value?","Auto-Exposure",JOptionPane.YES_NO_OPTION);
+                                        if (result==JOptionPane.YES_OPTION) {
+                                            c.setExposure(optimalExp);
+                                            ctm.fireTableRowsUpdated(row, row);
+                                        }
+                                    }
+                                    enableGUI(true);
+                                    acquireButton.setEnabled(acqLayout.getNoOfMappedStagePos()>0);
+                                }
+
+                            }; //end SwingWorker
+
+                            frame.addWindowListener(new WindowAdapter() {
+                                @Override
+                                public void windowClosing(WindowEvent e) {
+                                    worker.cancel(true);
+                                }
+                            });
+
+                            JButton cancelButton=new JButton("Cancel");
+                            cancelButton.addActionListener(new ActionListener() {
+                                @Override
+                                public void actionPerformed(ActionEvent e) {
+                                    worker.cancel(true);
+                                }
+                            });
+                            JPanel buttonPanel=new JPanel();
+                            buttonPanel.add(cancelButton);
+                            frame.getContentPane().add(buttonPanel);
+
+                            frame.pack();
+                            frame.setLocationRelativeTo(null);
+                            frame.setVisible(true);
+
+                            worker.execute();
+
+                        } //end run()
+                    });//end invokeLater()
+                }
+            }  
+        } else {
+            currentAcqSetting.setObjectiveDevStr(changeConfigGroupStr("Objective",""));
+        }        
     }//GEN-LAST:event_autoExposureButtonActionPerformed
 
 
@@ -9789,7 +9799,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         return !focusDeviceStr.equals("");
     }
 
-    private ImageProcessor snapChannelImage(String ch, double exp, double zOffs) {
+    private ImageProcessor snapImageWithZOffset(String ch, double exp, double zOffs) {
         ImageProcessor ip = null;
         try {
             if (zOffs!=0) {
@@ -9797,53 +9807,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 core.waitForDevice(zStageLabel);
             }
             ip=MMCoreUtils.snapImage(core, currentAcqSetting.getChannelGroupStr(), ch, exp);
-//            core.setConfig(channelGroupStr, ch);
-/*            core.setConfig(currentAcqSetting.getChannelGroupStr(), ch);
-            core.setExposure(exp);
-            core.waitForSystem();
-            core.snapImage();
-            Object imgArray=core.getImage();
-            int w = (int)core.getImageWidth();
-            int h = (int)core.getImageHeight();
-            switch ((int)core.getBytesPerPixel()) {
-                case 1: {
-                    // 8-bit grayscale pixels
-                    byte[] img = (byte[]) imgArray;
-                    ByteProcessor bp = new ByteProcessor(w, h, img, null);
-                    ip = bp;
-                    break;
-                } 
-                case 2: {
-                    // 16-bit grayscale pixels
-                    short[] img = (short[]) imgArray;
-                    ShortProcessor sp = new ShortProcessor(w, h, img, null);
-                    ip = sp;
-                    break;
-                } 
-                case 4: {
-                    // color pixels
-                    int type=ImagePlus.COLOR_RGB;
-                    if (imgArray instanceof byte[]) {
-                        //convert byte[] to int[] 
-                        byte[] byteArray=(byte[])imgArray;
-                        int[] intArray = new int[byteArray.length/4];
-                        for (int i=0; i<intArray.length; ++i) {
-                            intArray[i] =  byteArray[4*i]
-                  	                 + (byteArray[4*i + 1] << 8)
-                  	                 + (byteArray[4*i + 2] << 16);
-                  	}
-	                imgArray = intArray;
-	            }
-	            ip=new ColorProcessor(w, h, (int[]) imgArray);
-                    IJ.log(this.getClass().getName()+": "+Long.toString(core.getBytesPerPixel())+" bytes/pixel)");        
-                    break;
-                }
-                default: {
-                    ip=null;
-                    IJ.log(this.getClass().getName()+": Unknown image type ("+Long.toString(core.getBytesPerPixel())+" bytes/pixel)");        
-                    break;
-                }
-            }*/
             if (zOffs!=0) {
                 core.setRelativePosition(zStageLabel, -zOffs);
                 core.waitForDevice(zStageLabel);

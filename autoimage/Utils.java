@@ -12,6 +12,7 @@ import ij.ImagePlus;
 import ij.io.Opener;
 import ij.measure.Calibration;
 import ij.process.ByteProcessor;
+import ij.process.ColorProcessor;
 import ij.process.ImageProcessor;
 import ij.process.ShortProcessor;
 import java.awt.geom.AffineTransform;
@@ -67,7 +68,19 @@ public class Utils {
             } else if (pixType.equals("GRAY16")) {
                 ip = new ShortProcessor(width, height, (short[]) ti.pix, null);
             } else if (pixType.equals("RGB32")) {
-                //cannot handle this
+                if (ti.pix instanceof byte[]) {
+                    //convert byte[] to int[] 
+                    byte[] byteArray=(byte[])ti.pix;
+                    int[] intArray = new int[byteArray.length/4];
+                    for (int i=0; i<intArray.length; ++i) {
+                        intArray[i] =  byteArray[4*i]
+                                     + (byteArray[4*i + 1] << 8)
+                                     + (byteArray[4*i + 2] << 16);
+                    }
+                    ip=new ColorProcessor(width, height, intArray);
+                } else {
+                    ip=new ColorProcessor(width, height, (int[]) ti.pix);
+                }
             } else if (pixType.equals("RGB64")) {
                 //cannot handle this
             } else {
@@ -166,7 +179,8 @@ public class Utils {
     
     public static JSONObject parseMetadata(final File dataFile) throws JSONException {
         JSONObject md = null;
-        ImagePlus imp = new Opener().openImage(dataFile.getAbsolutePath());
+//        ImagePlus imp = new Opener().openImage(dataFile.getAbsolutePath());
+        ImagePlus imp = IJ.openImage(dataFile.getAbsolutePath());
         if (imp != null) {
             if (imp.getProperty("Info") != null) {
                 md = new JSONObject((String) imp.getProperty("Info"));

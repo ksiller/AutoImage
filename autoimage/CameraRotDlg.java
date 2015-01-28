@@ -52,6 +52,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
     private static int iterations;
     private boolean isMeasuring;
     private CameraRotationTask rotMeasureTask;
+    private static boolean showImages=false;
 //    private LiveModeMonitor liveModeMonitor =null;
 //    private Rectangle oldRoi; //stores cameraROI so it can be rstored when closing
     private Measurement measurement;//stores camera rotation(in rad) and pixelsize
@@ -365,22 +366,24 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     imp1.close();
                 if (imp2!=null)
                     imp2.close();
-                ImagePlus himp=new ImagePlus();
-                himp.setStack("Horizontal",hStack);
-                himp.setRoi(0, 0, maxWidth_H, maxHeight_H);
-                IJ.run(himp,"Crop","");
-                himp.setOverlay(overlay_h);
-                himp.show();
-                himp.getCanvas().zoomOut(0, 0);
-                himp.getCanvas().zoomOut(0, 0);
-                ImagePlus vimp=new ImagePlus();
-                vimp.setStack("Vertical",vStack);
-                vimp.setRoi(0, 0, maxWidth_V, maxHeight_V);
-                IJ.run(vimp,"Crop","");
-                vimp.setOverlay(overlay_v);
-                vimp.show();
-                vimp.getCanvas().zoomOut(0, 0);
-                vimp.getCanvas().zoomOut(0, 0);
+                if (showImages) {
+                    ImagePlus himp=new ImagePlus();
+                    himp.setStack("Horizontal",hStack);
+                    himp.setRoi(0, 0, maxWidth_H, maxHeight_H);
+                    IJ.run(himp,"Crop","");
+                    himp.setOverlay(overlay_h);
+                    himp.show();
+                    himp.getCanvas().zoomOut(0, 0);
+                    himp.getCanvas().zoomOut(0, 0);
+                    ImagePlus vimp=new ImagePlus();
+                    vimp.setStack("Vertical",vStack);
+                    vimp.setRoi(0, 0, maxWidth_V, maxHeight_V);
+                    IJ.run(vimp,"Crop","");
+                    vimp.setOverlay(overlay_v);
+                    vimp.show();
+                    vimp.getCanvas().zoomOut(0, 0);
+                    vimp.getCanvas().zoomOut(0, 0);
+                }
             } catch (Exception ex) {
                 IJ.log(CameraRotDlg.class.getName()+": Exception - "+ex.getMessage());
                 isMeasuring=false;
@@ -404,6 +407,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
             DefaultTableModel model=(DefaultTableModel)resultTable.getModel();
             for (Object[] row:measurements) {
                 model.addRow(row);
+/*
                 String s=Integer.toString((Integer)row[0])+";"
                         +Double.toString((Double)row[1])+";"
                         +Double.toString((Double)row[2])+";"
@@ -413,6 +417,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                         +Double.toString((Double)row[6])+";"
                         +Double.toString((Double)row[7])+";"
                         +Double.toString((Double)row[8])+";";
+                */
             }    
             int progress=progressBar.getValue()+1;
             progressBar.setValue(progress);
@@ -620,6 +625,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         stepSizeField = new javax.swing.JFormattedTextField();
         progressBar = new javax.swing.JProgressBar();
         liveButton = new javax.swing.JButton();
+        showImagesCB = new javax.swing.JCheckBox();
 
         org.jdesktop.layout.GroupLayout jDialog1Layout = new org.jdesktop.layout.GroupLayout(jDialog1.getContentPane());
         jDialog1.getContentPane().setLayout(jDialog1Layout);
@@ -758,7 +764,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
             jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel1Layout.createSequentialGroup()
                 .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jSeparator1)
+                    .add(jSeparator1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 99, Short.MAX_VALUE)
                     .add(jPanel1Layout.createSequentialGroup()
                         .add(6, 6, 6)
                         .add(jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
@@ -805,6 +811,13 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
             }
         });
 
+        showImagesCB.setText("Show result images");
+        showImagesCB.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                showImagesCBActionPerformed(evt);
+            }
+        });
+
         org.jdesktop.layout.GroupLayout layout = new org.jdesktop.layout.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
@@ -833,7 +846,10 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                             .add(layout.createSequentialGroup()
                                 .add(jLabel9)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(iterationsComboBox, 0, 1, Short.MAX_VALUE))))
+                                .add(iterationsComboBox, 0, 1, Short.MAX_VALUE)))
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(showImagesCB)
+                        .add(0, 0, Short.MAX_VALUE))
                     .add(layout.createSequentialGroup()
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
                             .add(rotationAngleTable, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 492, Short.MAX_VALUE)
@@ -865,7 +881,8 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     .add(jLabel4)
                     .add(iterationsComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(jLabel9)
-                    .add(stepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(stepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(showImagesCB))
                 .add(6, 6, 6)
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
                     .add(layout.createSequentialGroup()
@@ -881,9 +898,8 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     .add(rotationAngleTable, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE))
                 .add(6, 6, 6)
                 .add(progressBar, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .add(6, 6, 6)
-                .add(jPanel1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .add(12, 12, 12))
+                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                .add(jPanel1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
         pack();
@@ -1018,6 +1034,15 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         dispose();
     }//GEN-LAST:event_cancelButtonActionPerformed
 
+    private void showImagesCBActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showImagesCBActionPerformed
+        showImages=showImagesCB.isSelected();
+    }//GEN-LAST:event_showImagesCBActionPerformed
+
+    public void setShowImages(boolean b) {
+        showImages=b;
+        if (showImagesCB!=null)
+            showImagesCB.setEnabled(b);
+    }
     
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton cancelButton;
@@ -1047,6 +1072,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
     private javax.swing.JProgressBar progressBar;
     private javax.swing.JTable resultTable;
     private javax.swing.JScrollPane rotationAngleTable;
+    private javax.swing.JCheckBox showImagesCB;
     private javax.swing.JFormattedTextField stepSizeField;
     // End of variables declaration//GEN-END:variables
 }

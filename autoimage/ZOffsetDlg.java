@@ -29,11 +29,13 @@ import javax.swing.JCheckBox;
 import javax.swing.JOptionPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.AbstractTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableCellRenderer;
 import mmcorej.CMMCore;
 import mmcorej.StrVector;
@@ -164,13 +166,10 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
 
         public final String[] COLUMN_NAMES = new String[]{"Reference","Configuration", "Exposure", "z-Offset", "Stage Z-Position", "View", "Focus"};
         private List<ChannelData> channelData;
-        private boolean referenceSet;
 
         public ConfigTableModel(List<ChannelData> cl) {
             super();
-//            result=null;
             setData(cl);
-            referenceSet=hasReferenceSet();
         }
 
         private boolean hasReferenceSet() {
@@ -206,7 +205,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
         public List<ChannelData> getData() {
             return channelData;
         }
-
+        
         @Override
         public int getRowCount() {
             return channelData.size();
@@ -239,7 +238,8 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
                 } else if (colIndex == 2) {
                     return c.getExposure();
                 } else if (colIndex == 3) {
-                    return (c.isSet() && referenceSet ? Double.toString(c.getZOffset()) : "?");
+//                    return (c.isSet() && referenceSet ? Double.toString(c.getZOffset()) : "?");
+                    return (Double.toString(c.getZOffset()));
                 } else if (colIndex == 4) {
                     return (c.isSet() ? Double.toString(c.getStageZPos()) : "?");
                 } else if (colIndex == 5) {
@@ -288,7 +288,6 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
                         c.setReference((Boolean) value);
      //                   fireTableCellUpdated(rowIndex, colIndex);
                     }
-                    referenceSet=hasReferenceSet();
                     this.fireTableRowsUpdated(0,getRowCount());
                 } else if (colIndex == 1) {
                     c.setConfigName((String) value);
@@ -307,19 +306,23 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
                     c.setStageZPos((Double) value);
                     fireTableCellUpdated(rowIndex, colIndex);
                 } else if (colIndex == 5) {
+                    //Live mode
 //                    c.setLiveButton((JButton) value);
                     fireTableCellUpdated(rowIndex, colIndex);
                 } else if (colIndex == 6) {
-                    int setPos=0;
+                    //Set as reference position
+                    /*int setPos=0;
                     for (ChannelData cd:channelData) {
                         if (cd.isSet()) {
                             setPos++;
                         }
                     }
+                    
                     if (setPos == 0) {//first one to be set will be reference
                         c.setReference(true);
                         fireTableCellUpdated(rowIndex,0);
-                    }    
+                    } 
+                    */
                     fireTableCellUpdated(rowIndex, colIndex);
                 } else if (colIndex == 7) {
                     c.isSet(new Boolean((Boolean) value));
@@ -464,7 +467,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
                             @Override
                             public void run() {
                                 gui.getSnapLiveWin().toFront();
-                                gui.getSnapLiveWin().repaint();
+//                                gui.getSnapLiveWin().repaint();
                             }
                         });
                     } else {
@@ -483,14 +486,21 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
                         } else {
                             //set new zOffset*/
 /*                        }*/
-                        if (cd.isReference()) {
-                            row=0;
-                            for (ChannelData c:model.getData()) {
-                                model.setValueAt(c.getStageZPos()-cd.getStageZPos(), row,3);
-                                row++;
+                        if (model.hasReferenceSet()) {
+                            if (cd.isReference()) {
+                                //this is the reference channel, 
+                                //so all channels with a set stage position need to be updated
+                                row=0;
+                                for (ChannelData c:model.getData()) {
+                                    if (c.isSet()) {
+                                        model.setValueAt(c.getStageZPos()-cd.getStageZPos(), row,3);
+                                    }
+                                    row++;
+                                }
+                            } else {
+                                //set zOffset=0 for this channel nly
+                                model.setValueAt(cd.getStageZPos()-model.getRefStageZPosition(), row,3); 
                             }
-                        } else {   
-                            model.setValueAt(cd.getStageZPos()-model.getRefStageZPosition(), row,3); 
                         }    
                     } catch (Exception ex) {
                         Logger.getLogger(ZOffsetDlg.class.getName()).log(Level.SEVERE, null, ex);
@@ -512,6 +522,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
         protected void fireEditingStopped() {
           super.fireEditingStopped();
         }
+        
     }
     
     public ZOffsetDlg(java.awt.Frame parent, final ScriptInterface gui, String chGroupStr, boolean modal) {
@@ -673,6 +684,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
           with default ChannelData for each available config within group
     */
     public boolean updateGroupMap() {
+        String currentGroup=(String)groupComboBox.getSelectedItem();
         List<String> keysToRemove=new ArrayList<String>();
 //        IJ.log("updateGroupMap....");
         StrVector availableGroups=core.getAvailableConfigGroups();
@@ -720,7 +732,10 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
         //update groupComboBox
         groupComboBox.setModel(new DefaultComboBoxModel(availableGroups.toArray()));
         if (currentGroupRemoved)
-            groupComboBox.setSelectedItem(0);
+            groupComboBox.setSelectedIndex(0);
+        else {
+            groupComboBox.setSelectedItem(currentGroup);
+        }
 //        IJ.log("updateGroupMap....completed: "+groupMap.size()+" groups");
         return (keysToRemove.size() > 0 || availableGroupList.size() > 0);
     }
@@ -755,6 +770,12 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
         channelTable.getColumnModel().getColumn(5).setCellEditor(be);
         channelTable.getColumnModel().getColumn(6).setCellRenderer(br);
         channelTable.getColumnModel().getColumn(6).setCellEditor(be);
+        //set right justification for z-Offset and stage position column
+        DefaultTableCellRenderer rightRenderer = new DefaultTableCellRenderer();
+        rightRenderer.setHorizontalAlignment(DefaultTableCellRenderer.RIGHT);
+        channelTable.getColumnModel().getColumn(3).setCellRenderer(rightRenderer);        
+        channelTable.getColumnModel().getColumn(4).setCellRenderer(rightRenderer);        
+
 
         channelTable.getModel().addTableModelListener(this);
 //        IJ.log("setChannelConfigs... completed. "+dm.getRowCount()+" rows");
@@ -812,6 +833,7 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
         stagePosLabel.setText("jLabel3");
 
         refreshButton.setText("Refresh");
+        refreshButton.setToolTipText("Reload available Configuration Groups");
         refreshButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 refreshButtonActionPerformed(evt);
@@ -917,6 +939,10 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
         AbstractCellEditor ace = (AbstractCellEditor) channelTable.getCellEditor();
         if (ace != null) {
             ace.stopCellEditing();
+        }
+        if (!((ConfigTableModel)channelTable.getModel()).hasReferenceSet()) {
+           JOptionPane.showMessageDialog(this, "A reference channel needs to be selected.");
+           return;
         }
         dispose();
     }//GEN-LAST:event_applyButtonActionPerformed

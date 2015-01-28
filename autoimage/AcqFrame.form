@@ -1127,8 +1127,10 @@
                                 <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
                                   <Font name="SansSerif" size="12" style="0"/>
                                 </Property>
-                                <Property name="text" type="java.lang.String" value="Snap"/>
-                                <Property name="toolTipText" type="java.lang.String" value="Snap Image(s) using selected Channel Configurations "/>
+                                <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                  <Image iconType="2" name="/Users/Karsten/NetBeansProjects/Advanced_MDA/src/autoimage/resources/camera.png"/>
+                                </Property>
+                                <Property name="toolTipText" type="java.lang.String" value="Snap image(s) using selected channels"/>
                               </Properties>
                               <Events>
                                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="snapButtonActionPerformed"/>
@@ -1139,8 +1141,10 @@
                                 <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
                                   <Font name="SansSerif" size="12" style="0"/>
                                 </Property>
-                                <Property name="text" type="java.lang.String" value="Live"/>
-                                <Property name="toolTipText" type="java.lang.String" value="Live Acquisition using selected Channel Configuration"/>
+                                <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                                  <Image iconType="3" name="/autoimage/resources/camera_go.png"/>
+                                </Property>
+                                <Property name="toolTipText" type="java.lang.String" value="Live acquisition using selected channel "/>
                               </Properties>
                               <Events>
                                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="liveButtonActionPerformed"/>
@@ -1152,7 +1156,7 @@
                                   <Font name="SansSerif" size="12" style="0"/>
                                 </Property>
                                 <Property name="text" type="java.lang.String" value="z-Offset"/>
-                                <Property name="toolTipText" type="java.lang.String" value="Live Acquisition using selected Channel Configuration"/>
+                                <Property name="toolTipText" type="java.lang.String" value="Set channel z-offsets"/>
                               </Properties>
                               <Events>
                                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="zOffsetButtonActionPerformed"/>
@@ -1164,7 +1168,7 @@
                                   <Font name="SansSerif" size="12" style="0"/>
                                 </Property>
                                 <Property name="text" type="java.lang.String" value="Auto-Exp"/>
-                                <Property name="toolTipText" type="java.lang.String" value="Snap Image(s) using selected Channel Configurations "/>
+                                <Property name="toolTipText" type="java.lang.String" value="Determine optimal exposure time for channel"/>
                               </Properties>
                               <Events>
                                 <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="autoExposureButtonActionPerformed"/>
@@ -1677,29 +1681,29 @@
                                   <Group type="103" groupAlignment="0" attributes="0">
                                       <Group type="102" attributes="0">
                                           <Component id="addDataProcFromFileButton" min="-2" pref="22" max="-2" attributes="0"/>
-                                          <EmptySpace max="32767" attributes="0"/>
+                                          <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                           <Component id="loadImagePipelineButton" min="-2" pref="22" max="-2" attributes="0"/>
                                       </Group>
                                       <Group type="102" attributes="0">
                                           <Group type="103" groupAlignment="0" attributes="0">
                                               <Group type="102" attributes="0">
                                                   <Component id="addChannelFilterButton" min="-2" pref="22" max="-2" attributes="0"/>
-                                                  <EmptySpace max="-2" attributes="0"/>
+                                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                                   <Component id="addZFilterButton" min="-2" pref="22" max="-2" attributes="0"/>
                                               </Group>
                                               <Group type="102" attributes="0">
                                                   <Component id="addFrameFilterButton" min="-2" pref="22" max="-2" attributes="0"/>
-                                                  <EmptySpace max="-2" attributes="0"/>
+                                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                                   <Component id="addAreaFilterButton" min="-2" pref="22" max="-2" attributes="0"/>
                                               </Group>
                                               <Group type="102" alignment="0" attributes="0">
                                                   <Component id="removeProcessorButton" min="-2" pref="22" max="-2" attributes="0"/>
-                                                  <EmptySpace max="-2" attributes="0"/>
+                                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                                   <Component id="editProcessorButton" min="-2" pref="22" max="-2" attributes="0"/>
                                               </Group>
                                               <Group type="102" attributes="0">
                                                   <Component id="loadProcTreeButton" min="-2" pref="22" max="-2" attributes="0"/>
-                                                  <EmptySpace max="-2" attributes="0"/>
+                                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                                   <Component id="saveProcTreeButton" min="-2" pref="22" max="-2" attributes="0"/>
                                               </Group>
                                               <Component id="addImageStorageButton" min="-2" pref="22" max="-2" attributes="0"/>
@@ -1708,14 +1712,14 @@
                                                       <Component id="addImageTagFilterButton" min="-2" pref="22" max="-2" attributes="0"/>
                                                       <Component id="addScriptAnalyzerButton" min="-2" pref="22" max="-2" attributes="0"/>
                                                   </Group>
-                                                  <EmptySpace max="-2" attributes="0"/>
+                                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                                   <Component id="addROIFinderButton" min="-2" pref="22" max="-2" attributes="0"/>
                                               </Group>
                                           </Group>
                                           <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
                                       </Group>
                                   </Group>
-                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
+                                  <EmptySpace min="0" pref="0" max="-2" attributes="0"/>
                               </Group>
                               <Group type="102" attributes="0">
                                   <Component id="jLabel28" min="-2" max="-2" attributes="0"/>
@@ -1738,31 +1742,31 @@
                                       <Component id="addZFilterButton" min="-2" pref="22" max="-2" attributes="0"/>
                                       <Component id="addChannelFilterButton" min="-2" pref="22" max="-2" attributes="0"/>
                                   </Group>
-                                  <EmptySpace max="-2" attributes="0"/>
+                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                   <Group type="103" groupAlignment="0" attributes="0">
                                       <Component id="addAreaFilterButton" min="-2" pref="22" max="-2" attributes="0"/>
                                       <Component id="addFrameFilterButton" min="-2" pref="22" max="-2" attributes="0"/>
                                   </Group>
-                                  <EmptySpace max="-2" attributes="0"/>
+                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                   <Component id="addImageTagFilterButton" min="-2" pref="22" max="-2" attributes="0"/>
-                                  <EmptySpace max="-2" attributes="0"/>
+                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                   <Group type="103" groupAlignment="0" attributes="0">
                                       <Component id="addScriptAnalyzerButton" min="-2" pref="22" max="-2" attributes="0"/>
                                       <Component id="addROIFinderButton" min="-2" pref="22" max="-2" attributes="0"/>
                                   </Group>
-                                  <EmptySpace max="-2" attributes="0"/>
+                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                   <Group type="103" groupAlignment="0" attributes="0">
                                       <Component id="addDataProcFromFileButton" min="-2" pref="22" max="-2" attributes="0"/>
                                       <Component id="loadImagePipelineButton" min="-2" pref="22" max="-2" attributes="0"/>
                                   </Group>
-                                  <EmptySpace max="-2" attributes="0"/>
+                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                   <Component id="addImageStorageButton" min="-2" pref="22" max="-2" attributes="0"/>
                                   <EmptySpace type="separate" max="-2" attributes="0"/>
                                   <Group type="103" groupAlignment="0" attributes="0">
                                       <Component id="loadProcTreeButton" min="-2" pref="22" max="-2" attributes="0"/>
                                       <Component id="saveProcTreeButton" min="-2" pref="22" max="-2" attributes="0"/>
                                   </Group>
-                                  <EmptySpace max="-2" attributes="0"/>
+                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                   <Group type="103" groupAlignment="1" attributes="0">
                                       <Component id="editProcessorButton" min="-2" pref="22" max="-2" attributes="0"/>
                                       <Component id="removeProcessorButton" min="-2" pref="22" max="-2" attributes="0"/>

@@ -102,7 +102,7 @@ public class MMCoreUtils {
                     break;
                 } 
                 case 4: {
-                    // color pixels
+                    // color pixels: RGB32
                     int type=ImagePlus.COLOR_RGB;
                     if (imgArray instanceof byte[]) {
                         //convert byte[] to int[] 
@@ -134,8 +134,7 @@ public class MMCoreUtils {
                     IJ.log("before Color ip");
 	            ip=new ColorProcessor(w, h, (int[]) imgArray);
                     IJ.log("after Color ip");*/
-                    ip=ImageUtils.makeProcessor(core, imgArray);
-                    IJ.log("after ImageUtils.makeProcessor "+ Boolean.toString(ip!=null));
+                    IJ.log("MMCoreUtils.snapImage: "+Long.toString(core.getBytesPerPixel())+" bytes/pixel) not suppported");
                     break;
                 }
                 default: {
