@@ -4,6 +4,7 @@
  */
 package autoimage.dataprocessors;
 
+import autoimage.ExtImageTags;
 import autoimage.Utils;
 import ij.IJ;
 import ij.ImagePlus;
@@ -12,7 +13,9 @@ import java.awt.Component;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.BoxLayout;
@@ -40,8 +43,11 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
     
     protected String key_; //key to retrieve property of JSONObject in TaggedImages that will be filtered
     protected List<T> values_; //accepted values for property retrieved with key_
-    protected long imageNumberForThisDim=0; //used to adjust dimension properties of TaggedImage (# of 'CHANNELS', 'FRAMES', 'SLICES')
-    protected TaggedImageStorageDiskDefault storage=null;
+    protected long imagesAfterFiltering; //used to adjust dimension properties of TaggedImage (# of 'CHANNELS', 'FRAMES', 'SLICES')
+    protected TaggedImageStorageDiskDefault storage;
+    protected JSONObject newSummary;
+    protected Map<String,Long> sitesPerArea;
+    protected Map<String,List<String>> clustersPerArea;
             
     public ImageTagFilter() {
         this("Filter","",null);
@@ -52,6 +58,14 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
     }
     
     public abstract boolean equalValue(T t1, T t2);
+    
+    protected void initialize() {
+        storage=null;
+        newSummary=null;
+        imagesAfterFiltering=0;
+        sitesPerArea=new HashMap<String, Long>();
+        clustersPerArea=new HashMap<String, List<String>>();
+    }
     
     public ImageTagFilter(String pName, String key, List<T> values) {
         super(pName);
@@ -89,15 +103,7 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
         JSONObject obj=super.getParameters();
         obj.put("FilterKey", key_);
         JSONArray vals=new JSONArray(values_);
-/*        for (T v:values_) {
-            IJ.log(this.getClass().getSimpleName()+".getParameters: get "+v.getClass().getName());
-            if (v instanceof Integer)
-                vals.put((Long)v);
-            else
-                vals.put(v);
-        }*/
         obj.put("FilterValues", vals);
-//        IJ.log("---");
         return obj;
     } 
     
@@ -117,7 +123,6 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
     public abstract T valueOf(String v);
     
     public void setValuesFromStr(List<String> values) {
-//        this.values_=values;
         values_.clear();
         for (String value:values)
             values_.add(valueOf(value));
@@ -148,7 +153,7 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
             try {
                 tags=Utils.parseMetadata((File)element);
             } catch (JSONException ex) {
-                IJ.log("    "+this.getClass().getName()+".acceptElement: problem parsing 1");
+                IJ.log("    "+this.getClass().getName()+".acceptElement: problem parsing metadata");
                 Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
                 return false;
             }
@@ -165,7 +170,7 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
                     return false;
                 }    
             } catch (JSONException ex) {
-                IJ.log("    "+this.getClass().getName()+".acceptElement: problem parsing 2");
+                IJ.log("    "+this.getClass().getName()+".acceptElement: key '"+key_+"' does not exist.");
                 Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
                 return false;
             }
@@ -173,11 +178,6 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
             return false; 
     }
    
-    @Override
-    public void run() {
-        imageNumberForThisDim=0;
-        super.run();
-    }
     
     @Override
     public JSONObject updateTagValue(JSONObject meta,String newDir, String newPrefix, boolean isTaggedImage) throws JSONException {
@@ -186,115 +186,433 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
             summary.put(MMTags.Summary.DIRECTORY,newDir);
         if (!isTaggedImage && newPrefix!=null)
             summary.put(MMTags.Summary.PREFIX,newPrefix);
+        
         if (key_.equals(MMTags.Image.CHANNEL_INDEX) 
                         || key_.equals(MMTags.Image.CHANNEL_NAME)
                         || key_.equals(MMTags.Image.CHANNEL)) {
-//                IJ.log(this.getClass().getName()+": updating channel info");
-                    String thisChannel=meta.getString(MMTags.Image.CHANNEL_NAME);
-                    JSONArray chNames=summary.getJSONArray(MMTags.Summary.NAMES);
-                    JSONArray chColor=summary.getJSONArray(MMTags.Summary.COLORS);
-                    JSONArray chMin=summary.getJSONArray("ChContrastMin");//MMTags.Summary.CHANNEL_MINS);
-                    JSONArray chMax=summary.getJSONArray("ChContrastMax");//MMTags.Summary.CHANNEL_MAXES);
-                    JSONArray foundCh=new JSONArray();
-                    JSONArray foundChColor=new JSONArray();
-                    JSONArray foundChMin=new JSONArray();
-                    JSONArray foundChMax=new JSONArray();
-                    int newNoOfChannels=0;
-                    for (int i=0; i<chNames.length(); i++) {
-                        if (((List<String>)values_).contains((String)chNames.get(i))) {
-                            foundCh.put(chNames.get(i));
-                            foundChColor.put(chColor.get(i));
-                            foundChMin.put(chMin.get(i));
-                            foundChMax.put(chMax.get(i));
-                            newNoOfChannels++;
-                        }
-                    }    
-                    int newChIndex=0;
-                    for (newChIndex=0; newChIndex<foundCh.length();newChIndex++) {
-                        if (thisChannel.equals(foundCh.get(newChIndex))) {
-                           meta.put(MMTags.Image.CHANNEL_INDEX, newChIndex);
-                           break;
-                        }
-                    }
-                    //update total # of channels, channel name array, channel color array, channel min contrast array, channel max contrast array
-                    summary.put(MMTags.Summary.CHANNELS, newNoOfChannels);//can't use values_.size() since filter may contain values not used during acqusition
-                    summary.put(MMTags.Summary.NAMES, foundCh);
-                    summary.put(MMTags.Summary.COLORS, foundChColor);
-                    summary.put("ChContrastMin",foundChMin);//MMTags.Summary.CHANNEL_MINS, foundChMin);
-                    summary.put("ChContrastMax",foundChMax);//MMTags.Summary.CHANNEL_MAXES, foundChMax);
-        } if (key_.equals(MMTags.Image.FRAME_INDEX) 
+            String thisChannel=meta.getString(MMTags.Image.CHANNEL_NAME);
+            JSONArray chNames=summary.getJSONArray(MMTags.Summary.NAMES);
+            JSONArray chColor=summary.getJSONArray(MMTags.Summary.COLORS);
+            JSONArray chMin=summary.getJSONArray("ChContrastMin");//MMTags.Summary.CHANNEL_MINS);
+            JSONArray chMax=summary.getJSONArray("ChContrastMax");//MMTags.Summary.CHANNEL_MAXES);
+            JSONArray foundCh=new JSONArray();
+            JSONArray foundChColor=new JSONArray();
+            JSONArray foundChMin=new JSONArray();
+            JSONArray foundChMax=new JSONArray();
+            int newNoOfChannels=0;
+            for (int i=0; i<chNames.length(); i++) {
+                if (((List<String>)values_).contains((String)chNames.get(i))) {
+                    foundCh.put(chNames.get(i));
+                    foundChColor.put(chColor.get(i));
+                    foundChMin.put(chMin.get(i));
+                    foundChMax.put(chMax.get(i));
+                    newNoOfChannels++;
+                }
+            }    
+            int newChIndex=0;
+            for (newChIndex=0; newChIndex<foundCh.length();newChIndex++) {
+                if (thisChannel.equals(foundCh.get(newChIndex))) {
+                   meta.put(MMTags.Image.CHANNEL_INDEX, newChIndex);
+                   break;
+                }
+            }
+            //update total # of channels, channel name array, channel color array, channel min contrast array, channel max contrast array
+            summary.put(MMTags.Summary.CHANNELS, newNoOfChannels);//can't use values_.size() since filter may contain values not used during acqusition
+            summary.put(MMTags.Summary.NAMES, foundCh);
+            summary.put(MMTags.Summary.COLORS, foundChColor);
+            summary.put("ChContrastMin",foundChMin);//MMTags.Summary.CHANNEL_MINS, foundChMin);
+            summary.put("ChContrastMax",foundChMax);//MMTags.Summary.CHANNEL_MAXES, foundChMax);
+            
+        } else if (key_.equals(MMTags.Image.FRAME_INDEX) 
                         || key_.equals(MMTags.Image.FRAME)) {
-//                IJ.log(this.getClass().getName()+": updating frame info");
-                    if (imageNumberForThisDim==0) {
-                        long currentNoOfFrames=summary.getLong(MMTags.Summary.FRAMES);                        
-                        for (T value : values_) {
-                            if ((Long)value < currentNoOfFrames) {
-                                imageNumberForThisDim++;
-                            }
-                        }    
+            if (imagesAfterFiltering==0) {//
+                long currentNoOfFrames=summary.getLong(MMTags.Summary.FRAMES);                        
+                for (T value : values_) {
+                    if ((Long)value < currentNoOfFrames) {
+                        imagesAfterFiltering++;
                     }
-                    Long oldIdx = meta.getLong(MMTags.Image.FRAME_INDEX);
-                    for (int i=0; i<values_.size(); i++) {
-                        if (oldIdx.equals((Long)values_.get(i))) {
-//                            IJ.log("WRITING FRAMEINDEX: "+i);
-                            meta.put(MMTags.Image.FRAME_INDEX,i);
-                            meta.put(MMTags.Image.FRAME,i);
-                            break;
-                        } else {
-//                            IJ.log("LEAVING FRAMEINDEX: "+oldIdx);                            
-                        }
-                    }    
-                    summary.put(MMTags.Summary.FRAMES, imageNumberForThisDim);
-        } if (key_.equals(MMTags.Image.SLICE_INDEX) 
+                }    
+            }
+            Long oldIdx = meta.getLong(MMTags.Image.FRAME_INDEX);
+            for (int i=0; i<values_.size(); i++) {
+                if (oldIdx.equals((Long)values_.get(i))) {
+                    meta.put(MMTags.Image.FRAME_INDEX,i);
+                    meta.put(MMTags.Image.FRAME,i);
+                    break;
+                } else {
+                }
+            }    
+            summary.put(MMTags.Summary.FRAMES, imagesAfterFiltering);
+        } else if (key_.equals(MMTags.Image.SLICE_INDEX) 
                         || key_.equals(MMTags.Image.SLICE)) {
-//            IJ.log(this.getClass().getName()+": updating slice info");
-//                    if (isTaggedImage) {
-                        if (imageNumberForThisDim==0) {
-                            long currentNoOfSlices=summary.getLong(MMTags.Summary.SLICES);
-//                            IJ.log("CURRENTNOOFSLICES: "+currentNoOfSlices);
-                            for (T value:values_) {
-                                if ((Long)value < currentNoOfSlices) {
-                                    imageNumberForThisDim++;
-                                }
-                            }    
-/*                            for (int i=0; i<values_.size(); i++) {
-                                T v=(T)values_.get(i);
-                                if ((Long)v < currentNoOfSlices) {
-                                    imageNumberForThisDim++;
-                                }
-                            }    */
+            if (imagesAfterFiltering==0) {
+                long currentNoOfSlices=summary.getLong(MMTags.Summary.SLICES);
+                for (T value:values_) {
+                    if ((Long)value < currentNoOfSlices) {
+                        imagesAfterFiltering++;
+                    }
+                }    
+            }
+            Long oldIdx = meta.getLong(MMTags.Image.SLICE_INDEX);
+            for (int i=0; i<values_.size(); i++) {
+                if (oldIdx.equals((Long)values_.get(i))) {
+                    meta.put(MMTags.Image.SLICE,i);
+                    meta.put(MMTags.Image.SLICE_INDEX,i);
+                    break;
+                } 
+            }    
+            summary.put(MMTags.Summary.SLICES, imagesAfterFiltering);
+        } 
+        
+        else if (key_.equals(ExtImageTags.AREA_NAME)) {
+            String area = meta.getString(ExtImageTags.AREA_NAME);
+            JSONArray newPosArray;
+            if (newSummary==null) {
+                JSONArray oldPosArray=summary.getJSONArray(ExtImageTags.POSITION_ARRAY);
+                newPosArray = new JSONArray();//holds new position list for new summary data
+                List<String> areaClusterList=new ArrayList<String>();//holds unique area-cluster name combinations==total clsuter #
+                for (int i=0; i<oldPosArray.length(); i++) {
+                    JSONObject posEntry=oldPosArray.getJSONObject(i);
+                    String posLabel=posEntry.getString(ExtImageTags.POSITION_LABEL);
+                    String cArea=posLabel.substring(0, posLabel.indexOf("-"));                    
+                    String areaClusterName=posLabel.substring(0, posLabel.indexOf("-Site"));
+                    if (values_.contains((T)cArea)) {
+                        imagesAfterFiltering++;
+                        newPosArray.put(posEntry);
+                        if (!areaClusterList.contains(areaClusterName)) {
+                            areaClusterList.add(areaClusterName);
                         }
-//                        IJ.log("IMAGENNOFORTHISDIM: "+imageNumberForThisDim);
-                        Long oldIdx = meta.getLong(MMTags.Image.SLICE_INDEX);
-                        for (int i=0; i<values_.size(); i++) {
-                            if (oldIdx.equals((Long)values_.get(i))) {
-//                                IJ.log("WRITING SLICEINDEX: "+i);
-                                meta.put(MMTags.Image.SLICE,i);
-                                meta.put(MMTags.Image.SLICE_INDEX,i);
-                                break;
-                            } 
-                        }    
-/*                    } else {
-                        if (imageNumberForThisDim==0) {
-                            long currentNoOfSlices=summary.getLong(MMTags.Summary.SLICES);
-                            for (int i=0; i<values_.size(); i++) {
-                                T v=(T)values_.get(i);
-                                if ((Long)v < currentNoOfSlices) {
-                                    imageNumberForThisDim++;
-                                } 
-                            }
-                        }    
-                        Long oldIdx = meta.getLong(MMTags.Image.SLICE_INDEX);
-                        for (int i=0; i<values_.size(); i++) {
-                            if (oldIdx.equals((Long)values_.get(i))) {
-                                meta.put(MMTags.Image.SLICE_INDEX,i);
-                                break;
-                            } 
-                        }        
-                    }    */
-//                        IJ.log("WRITING SUMMARY SLICES: "+imageNumberForThisDim);
-                    summary.put(MMTags.Summary.SLICES, imageNumberForThisDim);
+                        if (sitesPerArea.containsKey(cArea)) {
+                            long c=sitesPerArea.get(cArea);
+                            sitesPerArea.put(cArea, c+1);
+                        } else {
+                            sitesPerArea.put(cArea, 1l);
+                        }           
+                    }  
+                }            
+                //update "InitialPositionList" in Summary
+                summary.put(ExtImageTags.POSITION_ARRAY,newPosArray);
+                //update other position related summary metadata
+                summary.put(ExtImageTags.CLUSTERS, (long)areaClusterList.size()); 
+                summary.put(MMTags.Summary.POSITIONS, (long)newPosArray.length());
+                summary.put(ExtImageTags.AREAS, (long)sitesPerArea.size());
+                //cache updated summary data so it doesn't have to be determined for subsequent accepted images
+                newSummary=new JSONObject(summary.toString());
+                
+            } else {
+                //replace summary metadata with copy of newSummary metadata
+                summary=new JSONObject(newSummary.toString());
+                newPosArray=summary.getJSONArray(ExtImageTags.POSITION_ARRAY);
+            }
+
+            //update POS_INDEX
+            long posIndex=0;
+            for (int i=0; i<newPosArray.length(); i++) {
+                JSONObject posEntry=newPosArray.getJSONObject(i);
+                String posLabel=posEntry.getString(ExtImageTags.POSITION_LABEL);
+                if (posLabel.equals(meta.get(MMTags.Image.POS_NAME))) {
+                    posIndex=i;
+                    break;
+                }
+            }
+            meta.put(MMTags.Image.POS_INDEX,posIndex); 
+            meta.put(MMTags.Root.SUMMARY, summary);
+            
+            IJ.log("SUMMARY: Areas: "+summary.getLong(ExtImageTags.AREAS)+"; Clusters: "+summary.getLong(ExtImageTags.CLUSTERS)+"; Positions: "+summary.getLong(MMTags.Summary.POSITIONS));
+            IJ.log("IMAGE: Clusters_In_Area: "+meta.get(ExtImageTags.CLUSTERS_IN_AREA)+"; Sites_In_Area: "+meta.get(ExtImageTags.SITES_IN_AREA)+"; PositioIndex: "+meta.get(MMTags.Image.POS_INDEX));
+        } 
+/*        
+        else if (key_.equals(ExtImageTags.AREA_INDEX)) {
+            long areaIndex = meta.getLong(ExtImageTags.AREA_INDEX);
+//            long clusterIndex = meta.getLong(ExtImageTags.CLUSTER_INDEX);
+//            long siteIndex = meta.getLong(ExtImageTags.SITE_INDEX);
+            JSONArray newPosArray;
+            if (newSummary==null) {
+                JSONArray oldPosArray=summary.getJSONArray(ExtImageTags.POSITION_ARRAY);
+                newPosArray = new JSONArray();
+                long i=0;
+                String lastArea="";
+                long index=-1;
+                List<String> areaClusterList=new ArrayList<String>();//holds unique area-cluster name combinations==total clsuter #
+                while (i<oldPosArray.length()) {
+                    JSONObject posEntry=oldPosArray.getJSONObject((int)i);
+                    String posLabel=posEntry.getString(ExtImageTags.POSITION_LABEL);
+                    String areaClusterName=posLabel.substring(0, posLabel.indexOf("-Site"));
+                    String a=posLabel.substring(0, posLabel.indexOf("-"));
+                    IJ.log("a: "+a+"; lastArea: "+lastArea);
+                    if (!a.equals(lastArea)) {
+                        lastArea=a;
+                        index++;
+                    }
+                    if (values_.contains(index)) {
+                        imagesAfterFiltering++;
+                        newPosArray.put(posEntry);
+                        if (!areaClusterList.contains(areaClusterName)) {
+                            areaClusterList.add(areaClusterName);
+                        }                        
+                        IJ.log("YES");
+//                        break;
+                    } else {
+                        IJ.log("NO");
+                    }    
+                    i++;
+                }            
+                //update "InitialPositionList" in Summary
+                summary.put(ExtImageTags.POSITION_ARRAY,newPosArray);
+                //update other position related summary metadata
+                summary.put(ExtImageTags.CLUSTERS, areaClusterList.size()); 
+                summary.put(MMTags.Summary.POSITIONS, newPosArray.length());
+                summary.put(ExtImageTags.AREAS, sitesPerArea.size());
+                //cache updated summary data so it doesn't have to be determined for subsequent accepted images
+                newSummary=new JSONObject(summary.toString());
+            } else {
+                //replace summary metadata with copy of newSummary metadata
+                summary=new JSONObject(newSummary.toString());
+                newPosArray=summary.getJSONArray(ExtImageTags.POSITION_ARRAY);
+            }
+
+            //update POS_INDEX
+            long posIndex=0;
+            for (int i=0; i<newPosArray.length(); i++) {
+                JSONObject posEntry=newPosArray.getJSONObject(i);
+                String posLabel=posEntry.getString(ExtImageTags.POSITION_LABEL);
+                if (posLabel.equals(meta.get(MMTags.Image.POS_NAME))) {
+                    posIndex=i;
+                    break;
+                }
+            }
+            meta.put(MMTags.Image.POS_INDEX,posIndex);    
         }
+*/        
+        else if (key_.equals(ExtImageTags.CLUSTER_INDEX)) {
+            JSONArray newPosArray;
+            if (newSummary==null) {
+                JSONArray oldPosArray=summary.getJSONArray(ExtImageTags.POSITION_ARRAY);
+                newPosArray = new JSONArray();
+                List<String> areaClusterList=new ArrayList<String>();//holds unique area-cluster name combinations==total clsuter #
+                for (int i=0; i<oldPosArray.length(); i++) {
+                    JSONObject posEntry=oldPosArray.getJSONObject((int)i);
+                    String posLabel=posEntry.getString(ExtImageTags.POSITION_LABEL);
+                    String area=posLabel.substring(0, posLabel.indexOf("-Cluster"));
+                    String cluster=posLabel.substring(posLabel.indexOf("Cluster")+7, posLabel.indexOf("-Site"));
+                    String areaClusterName=posLabel.substring(0, posLabel.indexOf("-Site"));
+                    Long cIndex=Long.parseLong(cluster);
+                    if (values_.contains((T)cIndex)) {
+                        imagesAfterFiltering++;
+                        newPosArray.put(posEntry);
+                        if (!areaClusterList.contains(areaClusterName)) {
+                            areaClusterList.add(areaClusterName);
+                        }
+                        if (sitesPerArea.containsKey(area)) {
+                            long c=sitesPerArea.get(area);
+                            sitesPerArea.put(area, c+1);
+                        } else {
+                            sitesPerArea.put(area, 1l);
+                        }           
+                        if (clustersPerArea.containsKey(area)) {
+                            List<String> cList=clustersPerArea.get(area);
+                            //add unique cluster names
+                            if (!cList.contains(cluster))
+                                cList.add(cluster);
+                        } else {
+                            //create new entry for area and add first cluster
+                            List<String> cList=new ArrayList<String>();
+                            cList.add(cluster);
+                            clustersPerArea.put(area, cList);
+                        }           
+                    }    
+                }            
+                //update "InitialPositionList" in Summary
+                summary.put(ExtImageTags.POSITION_ARRAY,newPosArray);
+                //update other position related summary metadata
+                summary.put(ExtImageTags.CLUSTERS, (long)areaClusterList.size()); 
+                summary.put(MMTags.Summary.POSITIONS, (long)newPosArray.length());
+                summary.put(ExtImageTags.AREAS, (long)sitesPerArea.size());
+                //cache updated summary data so it doesn't have to be determined for subsequent accepted images
+                newSummary=new JSONObject(summary.toString());
+            } else {
+                //replace summary metadata with copy of newSummary metadata
+                summary=new JSONObject(newSummary.toString());
+                newPosArray=summary.getJSONArray(ExtImageTags.POSITION_ARRAY);
+            }
+            
+            //update CLUSTERS_IN_AREA
+            String area=meta.getString(ExtImageTags.AREA_NAME);
+            meta.put(ExtImageTags.CLUSTERS_IN_AREA, (long)clustersPerArea.get(area).size());
+
+            //update SITES_IN_AREA
+            meta.put(ExtImageTags.SITES_IN_AREA, sitesPerArea.get(area));
+
+            //update POS_INDEX
+            long posIndex=0;
+            for (int i=0; i<newPosArray.length(); i++) {
+                JSONObject posEntry=newPosArray.getJSONObject(i);
+                String posLabel=posEntry.getString(ExtImageTags.POSITION_LABEL);
+                if (posLabel.equals(meta.get(MMTags.Image.POS_NAME))) {
+                    posIndex=i;
+                    break;
+                }
+            }
+            meta.put(MMTags.Image.POS_INDEX,posIndex);    
+            meta.put(MMTags.Root.SUMMARY, summary);
+
+            IJ.log("SUMMARY: Areas: "+summary.getLong(ExtImageTags.AREAS)+"; Clusters: "+summary.getLong(ExtImageTags.CLUSTERS)+"; Positions: "+summary.getLong(MMTags.Summary.POSITIONS));
+            IJ.log("IMAGE: Clusters_In_Area: "+meta.get(ExtImageTags.CLUSTERS_IN_AREA)+"; Sites_In_Area: "+meta.get(ExtImageTags.SITES_IN_AREA)+"; PositioIndex: "+meta.get(MMTags.Image.POS_INDEX));
+        }
+        
+        else if (key_.equals(MMTags.Image.POS_INDEX)) {
+            JSONArray newPosArray;
+            if (newSummary==null) {
+                JSONArray oldPosArray=summary.getJSONArray(ExtImageTags.POSITION_ARRAY);
+                newPosArray = new JSONArray();
+                List<String> areaClusterList=new ArrayList<String>();//holds unique area-cluster name combinations==total cluster #
+                //create new position list and collect unique area-cluster name conbinations (== total clusters)
+                for (int i=0; i<values_.size(); i++) {
+                    long fPosIndex=(Long)values_.get(i);
+                    if (fPosIndex < oldPosArray.length()) {
+                        JSONObject posEntry=oldPosArray.getJSONObject((int)fPosIndex);
+                        String posLabel=posEntry.getString(ExtImageTags.POSITION_LABEL);
+                        String areaClusterName=posLabel.substring(0, posLabel.indexOf("-Site"));
+                        String area=posLabel.substring(0, posLabel.indexOf("-Cluster"));
+                        String cluster=posLabel.substring(posLabel.indexOf("Cluster")+7, posLabel.indexOf("-Site"));
+                        newPosArray.put(posEntry);
+                        if (!areaClusterList.contains(areaClusterName)) {
+                            areaClusterList.add(areaClusterName);
+                        }
+                        if (sitesPerArea.containsKey(area)) {
+                            long c=sitesPerArea.get(area);
+                            sitesPerArea.put(area, c);
+                        } else {
+                            sitesPerArea.put(area, 1l);
+                        }           
+                        if (clustersPerArea.containsKey(area)) {
+                            List<String> cList=clustersPerArea.get(area);
+                            //add unique cluster names
+                            if (!cList.contains(cluster))
+                                cList.add(cluster);
+                        } else {
+                            //create new entry for area and add first cluster
+                            List<String> cList=new ArrayList<String>();
+                            cList.add(cluster);
+                            clustersPerArea.put(area, cList);
+                        }           
+                    }    
+                }            
+                //update "InitialPositionList" in Summary
+                summary.put(ExtImageTags.POSITION_ARRAY,newPosArray);
+                //update other position related summary metadata
+                summary.put(ExtImageTags.CLUSTERS, (long)areaClusterList.size()); 
+                summary.put(MMTags.Summary.POSITIONS, (long)newPosArray.length());
+                summary.put(ExtImageTags.AREAS, (long)sitesPerArea.size());
+                //cache updated summary data so it doesn't have to be determined for subsequent accepted images
+                newSummary=new JSONObject(summary.toString());
+            } else {
+                //replace summary metadata with copy of newSummary metadata
+                summary=new JSONObject(newSummary.toString());
+                newPosArray=summary.getJSONArray(ExtImageTags.POSITION_ARRAY);
+            }
+            
+            //update CLUSTERS_IN_AREA
+            String area=meta.getString(ExtImageTags.AREA_NAME);
+            meta.put(ExtImageTags.CLUSTERS_IN_AREA, (long)clustersPerArea.get(area).size());
+
+            //update SITES_IN_AREA
+            meta.put(ExtImageTags.SITES_IN_AREA, sitesPerArea.get(area));
+
+            //update POS_INDEX
+            long posIndex=0;
+            for (int i=0; i<newPosArray.length(); i++) {
+                JSONObject posEntry=newPosArray.getJSONObject(i);
+                String posLabel=posEntry.getString(ExtImageTags.POSITION_LABEL);
+                if (posLabel.equals(meta.get(MMTags.Image.POS_NAME))) {
+                    posIndex=i;
+                    break;
+                }
+            }
+            meta.put(MMTags.Image.POS_INDEX,posIndex);    
+            meta.put(MMTags.Root.SUMMARY, summary);
+
+            IJ.log("SUMMARY: Areas: "+summary.getLong(ExtImageTags.AREAS)+"; Clusters: "+summary.getLong(ExtImageTags.CLUSTERS)+"; Positions: "+summary.getLong(MMTags.Summary.POSITIONS));
+            IJ.log("IMAGE: Clusters_In_Area: "+meta.get(ExtImageTags.CLUSTERS_IN_AREA)+"; Sites_In_Area: "+meta.get(ExtImageTags.SITES_IN_AREA)+"; PositioIndex: "+meta.get(MMTags.Image.POS_INDEX));
+        }        
+       
+        else if (key_.equals(ExtImageTags.SITE_INDEX)) {
+            JSONArray newPosArray;
+            if (newSummary==null) {
+                JSONArray oldPosArray=summary.getJSONArray(ExtImageTags.POSITION_ARRAY);
+                newPosArray = new JSONArray();
+                List<String> areaClusterList=new ArrayList<String>();//holds unique area-cluster name combinations==total clsuter #
+                for (int i=0; i<oldPosArray.length(); i++) {
+                    JSONObject posEntry=oldPosArray.getJSONObject((int)i);
+                    String posLabel=posEntry.getString(ExtImageTags.POSITION_LABEL);
+                    String area=posLabel.substring(0, posLabel.indexOf("-Cluster"));
+                    String cluster=posLabel.substring(posLabel.indexOf("Cluster")+7, posLabel.indexOf("-Site"));
+                    String site=posLabel.substring(posLabel.indexOf("Site")+4);
+                    IJ.log("Site: "+site);
+                    String areaClusterName=posLabel.substring(0, posLabel.indexOf("-Site"));
+                    Long sIndex=Long.parseLong(site);
+                    if (values_.contains((T)sIndex)) {
+                        imagesAfterFiltering++;
+                        newPosArray.put(posEntry);
+                        if (!areaClusterList.contains(areaClusterName)) {
+                            areaClusterList.add(areaClusterName);
+                        }
+                        if (sitesPerArea.containsKey(area)) {
+                            long c=sitesPerArea.get(area);
+                            sitesPerArea.put(area, c+1);
+                        } else {
+                            sitesPerArea.put(area, 1l);
+                        }           
+                        if (clustersPerArea.containsKey(area)) {
+                            List<String> cList=clustersPerArea.get(area);
+                            //add unique cluster names
+                            if (!cList.contains(cluster))
+                                cList.add(cluster);
+                        } else {
+                            //create new entry for area and add first cluster
+                            List<String> cList=new ArrayList<String>();
+                            cList.add(cluster);
+                            clustersPerArea.put(area, cList);
+                        }           
+                    }    
+                }            
+                //update "InitialPositionList" in Summary
+                summary.put(ExtImageTags.POSITION_ARRAY,newPosArray);
+                //update other position related summary metadata
+                summary.put(ExtImageTags.CLUSTERS, areaClusterList.size()); 
+                summary.put(MMTags.Summary.POSITIONS, newPosArray.length());
+                summary.put(ExtImageTags.AREAS, sitesPerArea.size());
+                //cache updated summary data so it doesn't have to be determined for subsequent accepted images
+                newSummary=new JSONObject(summary.toString());
+            } else {
+                //replace summary metadata with copy of newSummary metadata
+                summary=new JSONObject(newSummary.toString());
+                newPosArray=summary.getJSONArray(ExtImageTags.POSITION_ARRAY);
+            }
+            
+            //update CLUSTERS_IN_AREA
+            String area=meta.getString(ExtImageTags.AREA_NAME);
+            meta.put(ExtImageTags.CLUSTERS_IN_AREA, (long)clustersPerArea.get(area).size());
+
+            //update SITES_IN_AREA
+            meta.put(ExtImageTags.SITES_IN_AREA, sitesPerArea.get(area));
+
+            //update POS_INDEX
+            long posIndex=0;
+            for (int i=0; i<newPosArray.length(); i++) {
+                JSONObject posEntry=newPosArray.getJSONObject(i);
+                String posLabel=posEntry.getString(ExtImageTags.POSITION_LABEL);
+                if (posLabel.equals(meta.get(MMTags.Image.POS_NAME))) {
+                    posIndex=i;
+                    break;
+                }
+            }
+            meta.put(MMTags.Image.POS_INDEX,posIndex);    
+            meta.put(MMTags.Root.SUMMARY, summary);
+
+            IJ.log("SUMMARY: Areas: "+summary.getLong(ExtImageTags.AREAS)+"; Clusters: "+summary.getLong(ExtImageTags.CLUSTERS)+"; Positions: "+summary.getLong(MMTags.Summary.POSITIONS));
+            IJ.log("IMAGE: Clusters_In_Area: "+meta.get(ExtImageTags.CLUSTERS_IN_AREA)+"; Sites_In_Area: "+meta.get(ExtImageTags.SITES_IN_AREA)+"; PositioIndex: "+meta.get(MMTags.Image.POS_INDEX));
+        }        
         return meta;
     }
     
@@ -307,54 +625,41 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
         E copy=null;
         if (element instanceof File) {
             TaggedImage ti=null;
-            ImagePlus imp=null;
+            ImagePlus imp=null; 
             imp=IJ.openImage(((File)element).getAbsolutePath());
-            if (imp.getProperty("Info") != null) {
+            if (imp!=null && imp.getProperty("Info") != null) {
 //                TaggedImageStorageDiskDefault storage=null;
                 try {
                     meta = new JSONObject((String)imp.getProperty("Info"));
                     String newDir=new File(workDir).getParentFile().getAbsolutePath();
-//                    String newDir=new File(workDir).getAbsolutePath();
                     ImageProcessor ip=imp.getProcessor();
                     ti=ImageUtils.makeTaggedImage(ip);
                     ti.tags=new JSONObject(meta.toString());
-//                    String newPrefix=ti.tags.getString("PositionName");
                     String newPrefix=new File(workDir).getName();
-//                    ti.tags=updateTagValue(ti.tags, workDir, newPrefix, false);
+                    //update metadata
                     ti.tags=updateTagValue(ti.tags, newDir, newPrefix, false);
                     if (storage==null) {
                         storage = new TaggedImageStorageDiskDefault (workDir,true,ti.tags.getJSONObject(MMTags.Root.SUMMARY));
                     }
                     storage.putImage(ti);
-/*                    JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
-                    File copiedFile=new File(new File(new File(summary.getString(MMTags.Summary.DIRECTORY), 
-                                                summary.getString(MMTags.Summary.PREFIX)),
-                                                meta.getString("PositionName")),
-                                                    ((File)element).getName());*/
-//                    File copiedFile=new File(new File(new File(summary.getString(MMTags.Summary.DIRECTORY), 
-//                                                summary.getString(MMTags.Summary.PREFIX)),
-//                                                meta.getString("PositionName")),
-//                                                    meta.getString("FileName"));
 
-//                    File copiedFile=new File(new File(workDir,newPrefix),
-//                                                    ti.tags.getString("FileName"));
                     String posName="";
                     File copiedFile=new File(new File(new File(newDir,newPrefix),meta.getString("PositionName")),
                                                     ti.tags.getString("FileName"));
                     copy=(E)copiedFile;
-                } catch (Exception ex) {
-                    IJ.log(this.getClass().getName()+ ": problem: create copy. "+ex);
+                } catch (JSONException ex) {
+                    IJ.log(this.getClass().getName()+ ": Cannot retrieve 'Info' metadata from file. "+ex);
                     Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
-                    copy=super.createCopy(element);
+                    copy=createCopy(element);
+                } catch (Exception ex) {
+                    IJ.log(this.getClass().getName()+ ": Error writing file to storage. "+ex);
+                    Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
                 }
-//                if (storage!=null) {
-//                    storage.close();           
-//                }
             } else {
-                copy=super.createCopy(element);
+                copy=createCopy(element);
             }
        } else if (element instanceof TaggedImage) {
-            copy=super.createCopy(element);
+            copy=createCopy(element);
             meta=((TaggedImage)element).tags;
             try {
                 meta=updateTagValue(meta,null,null, true);
@@ -414,8 +719,8 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
             String[] argArray=argField.getText().split("\\n");
             setValuesFromStr(Arrays.asList(argArray));
         } else {
-            key_="";
-            values_.clear();
+//            key_="";
+//            values_.clear();
         }   
     }
     
@@ -426,6 +731,7 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
             //set to null so a new storage will be created when processor runs again
             storage=null;
         }
-        imageNumberForThisDim=0;
+        imagesAfterFiltering=0;
+        newSummary=null;
     }
 }

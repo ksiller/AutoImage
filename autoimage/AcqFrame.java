@@ -24,6 +24,7 @@ import ij.ImageStack;
 import ij.Prefs;
 import ij.gui.GenericDialog;
 import ij.measure.Calibration;
+import ij.plugin.RGBStackMerge;
 import ij.process.ByteProcessor;
 import ij.process.ColorProcessor;
 import ij.process.ImageProcessor;
@@ -8011,42 +8012,56 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         } catch (Exception ex) {
                             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                         }*/
-                        ImageStack stack=null;
+                        ImagePlus[] impArray=new ImagePlus[rows.length];
                         int i = 0;
                         ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
                         for (int row : rows) {
                             Channel c = ctm.getRowData(row);
-                            //snapAndDisplayImage(c.getName(),c.getExposure(),c.getZOffset(),c.getColor());
-                            ImageProcessor ip = snapImageWithZOffset(c.getName(), c.getExposure(), c.getZOffset());
-                            if (stack==null)
+                            ImagePlus imp = MMCoreUtils.snapImagePlus(core, currentAcqSetting.getChannelGroupStr(),c.getName(), c.getExposure(), c.getZOffset(), false);
+                            if (imp==null) {
+                                JOptionPane.showMessageDialog(this, "Cannot snap image(s). Possible unknown image format.");
+                                return;
+                            }
+                            impArray[i]=imp;
+/*                            if (stack==null)
                                 stack = new ImageStack(ip.getWidth(),ip.getHeight());
-                            stack.addSlice(c.getName(),ip, i);
+                            stack.addSlice(c.getName(),ip, i);*/
                             i++;
+            
                         }
-                        ImagePlus imp = new ImagePlus();
-                        
-                        imp.setTitle("Snap");
-                        Calibration cal = imp.getCalibration();
-                        cal.setUnit("um");
-                        cal.pixelWidth = currentAcqSetting.getImagePixelSize();
-                        cal.pixelHeight = currentAcqSetting.getImagePixelSize();
-                        imp.setCalibration(cal);
-                        if (stack.getBitDepth()==24) {
-                            //isRGB
-                            //show conventional ImagePlus
-                            //ignore channel color
-                            imp.setStack(stack);
-                            imp.show();
+
+                        if (impArray[0].getProcessor() instanceof ColorProcessor || impArray[0].isComposite()) {
+                            //RGB32 or RGB64
+                            for (ImagePlus cimp: impArray) {
+                                cimp.setTitle("Snap: " +cimp.getTitle());
+                                cimp.show();
+                            }                 
                         } else {
                             //show composite image with channel LUTs
-                            imp.setStack(stack, rows.length, 1, 1);
-                            CompositeImage ci = new CompositeImage(imp);
+//                            imp.setStack(stack, rows.length, 1, 1);
+                            ImagePlus hyperImp;
+                            if (impArray.length > 1) {
+                                RGBStackMerge merger=new RGBStackMerge();
+                                hyperImp=merger.mergeHyperstacks(impArray, true);
+                            } else {
+                                hyperImp=impArray[0];
+                            }
+                            Calibration cal = impArray[0].getCalibration();
+                            cal.setUnit("um");
+                            cal.pixelWidth = currentAcqSetting.getImagePixelSize();
+                            cal.pixelHeight = currentAcqSetting.getImagePixelSize();
+                            hyperImp.setCalibration(cal);
+
+                            CompositeImage ci = new CompositeImage(hyperImp);
+/*                            CompositeImage ci = new CompositeImage(imp);*/
                             i = 0;
                             LUT[] luts = new LUT[rows.length];
                             for (int row : rows) {
-                                luts[i] = LUT.createLutFromColor(currentAcqSetting.getChannels().get(row).getColor());//ctm.getRowData(row).getColor());
+                                Channel ch=currentAcqSetting.getChannels().get(row);
+                                luts[i] = LUT.createLutFromColor(ch.getColor());//ctm.getRowData(row).getColor());
                                 i++;
                             }
+                            ci.setTitle("Snap");
                             ci.setLuts(luts);
                             ci.show();
                             IJ.run("Channels Tool...");
@@ -8441,11 +8456,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                             }
                         }    
                     } catch (Exception ex) {
+                        IJ.log(this.getClass().getName()+".autoExposureButtonActionPerformed: Exception - "+ex.getMessage());
                         Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                     }
 
                     final ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
                     final Channel c = ctm.getRowData(row);
+                    final String channelGroup=currentAcqSetting.getChannelGroupStr();
 
                     final JFrame guiFrame=this;
 
@@ -8505,7 +8522,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                             final SwingWorker<Double, Double> worker = new SwingWorker<Double, Double>() {
 
                                 private double optimalExp;
-                                private ImageProcessor ip;
+                                private ImageProcessor[] ipArray;
 
                                 @Override
                                 protected Double doInBackground() {
@@ -8517,10 +8534,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                     boolean optimalExpFound=false;
                                     int i=1;
                                     while (!optimalExpFound && !isCancelled()) {
-                                        ip = snapImageWithZOffset(c.getName(), newExp , 0);//c.getZOffset());
-                                        ImageStatistics stats=ip.getStatistics();
-                                        if ((stats.max < Math.pow(2,core.getImageBitDepth())-1)
-                                        || stats.maxCount < MAX_SATURATION*ip.getWidth()*ip.getHeight()){
+                                        ipArray = MMCoreUtils.snapImageWithZOffset(core, channelGroup,c.getName(), newExp , 0);//c.getZOffset());
+                                        if (ipArray==null && ipArray.length>1) {
+                                            break;
+                                        }
+                                        ImageStatistics stats=ipArray[0].getStatistics();
+                                        if ((stats.max < Math.pow(2,core.getImageBitDepth())-1) // less than 50% dynamic range
+                                        || stats.maxCount < MAX_SATURATION*ipArray[0].getWidth()*ipArray[0].getHeight()){
                                             //underexposed
                                             minExp=newExp;
                                             if (maxExp==-1)
@@ -8565,7 +8585,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                 @Override
                                 protected void done() {
                                     frame.dispose();
-                                    new ImagePlus("Auto-Exposure: "+c.getName(),ip).show();
+                                    if (ipArray==null) {
+                                        //problem with snapping images
+                                        JOptionPane.showMessageDialog(guiFrame, "Problem with image acquisition.");
+                                    }
+                                    new ImagePlus("Auto-Exposure: "+c.getName(),ipArray[0]).show();
                                     if (!isCancelled()) {
                                         if (optimalExp==MAX_EXPOSURE) {
                                             JOptionPane.showMessageDialog(guiFrame, "Reached maximum exposure ("+MAX_EXPOSURE+" ms).");
@@ -9797,26 +9821,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         String focusDeviceStr = core.getFocusDevice();
 //        IJ.log(focusDeviceStr);
         return !focusDeviceStr.equals("");
-    }
-
-    private ImageProcessor snapImageWithZOffset(String ch, double exp, double zOffs) {
-        ImageProcessor ip = null;
-        try {
-            if (zOffs!=0) {
-                core.setRelativePosition(zStageLabel, zOffs);
-                core.waitForDevice(zStageLabel);
-            }
-            ip=MMCoreUtils.snapImage(core, currentAcqSetting.getChannelGroupStr(), ch, exp);
-            if (zOffs!=0) {
-                core.setRelativePosition(zStageLabel, -zOffs);
-                core.waitForDevice(zStageLabel);
-            }
-        } catch (Exception ex) {
-            IJ.log("AcqFrame.snapAndDisplayImage: Exception - "+ex.getMessage()+".");
-            Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
-            ip = null;
-        }
-        return ip;
     }
 
     private void moveToAbsoluteXYPos(double x, double y) {

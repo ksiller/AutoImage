@@ -4,6 +4,7 @@
  */
 package autoimage.dataprocessors;
 
+import autoimage.ExtImageTags;
 import autoimage.IDataProcessorListener;
 import autoimage.IDataProcessorNotifier;
 import ij.IJ;
@@ -17,6 +18,7 @@ import mmcorej.TaggedImage;
 import org.json.JSONObject;
 import org.micromanager.acquisition.TaggedImageQueue;
 import org.micromanager.api.DataProcessor;
+import org.micromanager.api.MMTags;
 import org.micromanager.utils.MDUtils;
 import org.micromanager.utils.ReportingUtils;
 
@@ -83,6 +85,10 @@ public class SiteInfoUpdater extends ExtDataProcessor<TaggedImage> implements ID
                             tags.put(key, si.get(key));
                         }
                     }
+                    tags.put(ExtImageTags.CHANNEL_INDEX_ORIG,tags.get(MMTags.Image.CHANNEL_INDEX));
+                    tags.put(ExtImageTags.POS_INDEX_ORIG,tags.get(MMTags.Image.POS_INDEX));
+                    tags.put(ExtImageTags.SLICE_INDEX_ORIG,tags.get(MMTags.Image.SLICE_INDEX));
+                    tags.put(ExtImageTags.FRAME_INDEX_ORIG,tags.get(MMTags.Image.FRAME_INDEX));
                 } catch (Exception ex) {
                     ReportingUtils.logError(ex);
                 } finally {

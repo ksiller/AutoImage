@@ -173,11 +173,6 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
             return false;
    }
 
-   
-   protected void cleanUp() {
-       //empty
-       //can be used to freeup allocated resources or complete processing on cached elements (see MutliChannelImageStackAnalyzer)
-   }
 
    @Override
    protected void process() {

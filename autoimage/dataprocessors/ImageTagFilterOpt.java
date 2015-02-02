@@ -102,8 +102,8 @@ public abstract class ImageTagFilterOpt<E,T> extends ImageTagFilter<E,T> impleme
                 }    
             }
         } else {
-            key_="";
-            values_.clear();
+//            key_="";
+//            values_.clear();
         }
     }
 }

@@ -20,10 +20,13 @@ import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.geom.Point2D;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.AbstractCellEditor;
@@ -31,6 +34,7 @@ import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
+import javax.swing.SwingWorker.StateValue;
 import javax.swing.table.DefaultTableModel;
 import mmcorej.CMMCore;
 import mmcorej.StrVector;
@@ -117,10 +121,10 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         measureButton.setEnabled(!isLive);
     }
     
-    private class CameraRotationTask extends SwingWorker<Void,Object[]> {
+    private class CameraRotationTask extends SwingWorker<Boolean,Object[]> {
 
         @Override
-        protected Void doInBackground() {
+        protected Boolean doInBackground() {
             try {
                 exposureField.commitEdit();
             } catch (ParseException ex) {
@@ -132,6 +136,8 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
             double yPos;
             ImagePlus imp1=null;
             ImagePlus imp2=null;
+            ImagePlus vimp=null;
+            ImagePlus himp=null;
             try {
                 xPos = core.getXPosition(xyStageName);
                 yPos = core.getYPosition(xyStageName);
@@ -166,12 +172,22 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     imp2=null;
                 }    
                 for (Point2D stagePos:stagePosList) {
-                    if (isCancelled()) return null;
+                    if (isCancelled()) {
+                        if (imp1!=null)
+                            imp1.close();
+                        if (imp2!=null)
+                            imp2.close();
+                        return null;
+                    }    
                     //horizontal step along x-axis to right
                     core.setXYPosition(xyStageName, stagePos.getX(),stagePos.getY());
-                    ImageProcessor ip1=MMCoreUtils.snapImage(core, channelGroupStr, channelName, exposure);
+                    ImageProcessor[] ipArray1=MMCoreUtils.snapImage(core, channelGroupStr, channelName, exposure);
+                    if (ipArray1==null || ipArray1.length<1) {
+                        return false;
+                    }
+                    ImageProcessor ip1=ipArray1[0];
                     if (ip1==null)
-                        return null;
+                        return false;
                     if (hStack==null) {
                         hStack=new ImageStack(ip1.getWidth()*2, ip1.getHeight()*2);
                     }
@@ -184,11 +200,21 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     } else {
                         imp1.setProcessor(ip1);
                     }
-                    if (isCancelled()) return null;
-                    core.setXYPosition(xyStageName, stagePos.getX()+stageStepSize,stagePos.getY());
-                    ImageProcessor ip2=MMCoreUtils.snapImage(core, channelGroupStr, channelName, exposure);
-                    if (ip2==null)
+                    if (isCancelled()) {
+                        if (imp1!=null)
+                            imp1.close();
+                        if (imp2!=null)
+                            imp2.close();
                         return null;
+                    }    
+                    core.setXYPosition(xyStageName, stagePos.getX()+stageStepSize,stagePos.getY());
+                    ImageProcessor[] ipArray2=MMCoreUtils.snapImage(core, channelGroupStr, channelName, exposure);
+                    if (ipArray2==null || ipArray2.length < 1) {
+                        return false;
+                    }
+                    ImageProcessor ip2=ipArray2[0];
+                    if (ip2==null)
+                        return false;
                     if (imp2==null) {
                         imp2=new ImagePlus("Camera_Rotation:_image_2",ip2);
                         imp2.setDimensions(1, 1, 1);
@@ -198,7 +224,13 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     } else {
                         imp2.setProcessor(ip2);
                     }
-                    if (isCancelled()) return null;
+                    if (isCancelled()) {
+                        if (imp1!=null)
+                            imp1.close();
+                        if (imp2!=null)
+                            imp2.close();
+                        return null;
+                    }    
                     IJ.run("Pairwise stitching", "first_image=Camera_Rotation:_image_1 second_image=Camera_Rotation:_image_2 fusion_method=[Linear Blending] check_peaks=5 compute_overlap subpixel_accuracy x=0.0000 y=0.0000 registration_channel_image_1=[Only channel 1] registration_channel_image_2=[Only channel 1]");
                     ImagePlus stitched=ij.WindowManager.getCurrentImage();
                     ImageProcessor stitchedIp=stitched.getProcessor();
@@ -273,23 +305,42 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     data[5]=new Double(deltaX);
                     data[6]=new Double(deltaY);
 
-                    if (isCancelled()) return null;
-                    //vertical step along y-axis down
-                    core.setXYPosition(xyStageName, stagePos.getX(),stagePos.getY());
-                    ip1=MMCoreUtils.snapImage(core, channelGroupStr, channelName, exposure);
-                    if (ip1==null)
+                    if (isCancelled()) {
+                        if (imp1!=null)
+                            imp1.close();
+                        if (imp2!=null)
+                            imp2.close();
                         return null;
-                    if (isCancelled()) return null;
+                    }    
+                   //vertical step along y-axis down
+                    core.setXYPosition(xyStageName, stagePos.getX(),stagePos.getY());
+                    ipArray1=MMCoreUtils.snapImage(core, channelGroupStr, channelName, exposure);
+                    if (ipArray1==null || ipArray1.length < 1)
+                        return false;
+                    ip1=ipArray1[0];
                     imp1.setProcessor(ip1);
                     if (vStack==null) {
                         vStack=new ImageStack(ip1.getWidth()*2, ip1.getHeight()*2);
                     }                
-                    if (isCancelled()) return null;
-                    core.setXYPosition(xyStageName, stagePos.getX(),stagePos.getY()+stageStepSize);
-                    ip2=MMCoreUtils.snapImage(core, channelGroupStr, channelName, exposure);
-                    if (ip2==null)
+                    if (isCancelled()) {
+                        if (imp1!=null)
+                            imp1.close();
+                        if (imp2!=null)
+                            imp2.close();
                         return null;
-                    if (isCancelled()) return null;
+                    }    
+                    core.setXYPosition(xyStageName, stagePos.getX(),stagePos.getY()+stageStepSize);
+                    ipArray2=MMCoreUtils.snapImage(core, channelGroupStr, channelName, exposure);
+                    if (ipArray2==null || ipArray2.length < 1)
+                        return false;
+                    if (isCancelled()) {
+                        if (imp1!=null)
+                            imp1.close();
+                        if (imp2!=null)
+                            imp2.close();
+                        return null;
+                    }    
+                    ip2=ipArray2[0];
                     imp2.setProcessor(ip2);
                     IJ.run("Pairwise stitching", "first_image=Camera_Rotation:_image_1 second_image=Camera_Rotation:_image_2 fusion_method=[Linear Blending] check_peaks=5 compute_overlap subpixel_accuracy x=0.0000 y=0.0000 registration_channel_image_1=[Only channel 1] registration_channel_image_2=[Only channel 1]");
                     stitched=ij.WindowManager.getCurrentImage();
@@ -367,7 +418,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                 if (imp2!=null)
                     imp2.close();
                 if (showImages) {
-                    ImagePlus himp=new ImagePlus();
+                    himp=new ImagePlus();
                     himp.setStack("Horizontal",hStack);
                     himp.setRoi(0, 0, maxWidth_H, maxHeight_H);
                     IJ.run(himp,"Crop","");
@@ -375,7 +426,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     himp.show();
                     himp.getCanvas().zoomOut(0, 0);
                     himp.getCanvas().zoomOut(0, 0);
-                    ImagePlus vimp=new ImagePlus();
+                    vimp=new ImagePlus();
                     vimp.setStack("Vertical",vStack);
                     vimp.setRoi(0, 0, maxWidth_V, maxHeight_V);
                     IJ.run(vimp,"Crop","");
@@ -395,11 +446,16 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     imp1.close();
                 if (imp2!=null)
                     imp2.close();
+                if (vimp!=null) 
+                    vimp.close();
+                if (himp!=null)
+                    himp.close();
                 measurement=new Measurement();
                 measurement.cameraAngle=FieldOfView.ROTATION_UNKNOWN;
                 measurement.pixelSize=-1;
+                return false;
             }
-            return null;
+            return true;
         }
     
         @Override
@@ -533,7 +589,6 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
 
             @Override
             public void windowActivated(WindowEvent e) {
-                IJ.log("CameraRotDlg.windowActivated");
                 liveModeChanged(gui.isLiveModeOn());
             }
         });
@@ -945,6 +1000,27 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                 progressBar.setString("0/"+Integer.toString(iterations));
 
                 rotMeasureTask=new CameraRotationTask();
+                rotMeasureTask.addPropertyChangeListener(new PropertyChangeListener() {
+
+                    @Override
+                    public void propertyChange(PropertyChangeEvent evt) {
+                        if (StateValue.DONE == rotMeasureTask.getState()) {
+                            try {
+                                Boolean success=rotMeasureTask.get();
+                                //success==true: do nothing
+                                //success==null: cancelled, do nothing
+                                if (success!=null && !success) {
+                                    //problem snapping images
+                                    JOptionPane.showMessageDialog(null,"Cannot snap images. Image format may not be supported");
+                                }
+                            } catch (InterruptedException ex) {
+                                Logger.getLogger(CameraRotDlg.class.getName()).log(Level.SEVERE, null, ex);
+                            } catch (ExecutionException ex) {
+                                Logger.getLogger(CameraRotDlg.class.getName()).log(Level.SEVERE, null, ex);
+                            }
+                        }
+                    }
+                });
                 rotMeasureTask.execute();
                 
             } catch (Exception ex) {

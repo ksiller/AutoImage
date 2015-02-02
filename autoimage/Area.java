@@ -812,21 +812,6 @@ public abstract class Area {
         return topLeftY;
     } 
     
-/*
-    public double getCenterX() {
-        if (centerPos==null) {
-            calculateCenterPos();
-        }
-        return centerPos.getX();
-    }
-    
-    public double getCenterY() {
-        if (centerPos==null) {
-            calculateCenterPos();
-        }
-        return centerPos.getY();
-    }
-   */ 
     public Point2D getCenterPos() {
         if (centerPos==null) {
             centerPos=calculateCenterPos();
@@ -914,13 +899,13 @@ public abstract class Area {
             info.put(ExtImageTags.AREA_INDEX,index);
             info.put(ExtImageTags.CLUSTERS_IN_AREA,noOfClusters);
             info.put(ExtImageTags.SITES_IN_AREA,tilePosList.size());
-            if (tileName.indexOf("Cluster")!=-1) {
+//            if (tileName.contains("Cluster")) {
                 int startIndex=tileName.indexOf("Cluster")+7;
                 int endIndex=tileName.indexOf("Site")-1;
                 info.put(ExtImageTags.CLUSTER_INDEX, Long.parseLong(tileName.substring(startIndex,endIndex)));
-            } else
-                info.put(ExtImageTags.CLUSTER_INDEX, "-1");
-            int startIndex=tileName.indexOf("Site")+4;
+//            } else
+//                info.put(ExtImageTags.CLUSTER_INDEX, "-1");
+            startIndex=tileName.indexOf("Site")+4;
             info.put(ExtImageTags.SITE_INDEX, Long.parseLong(tileName.substring(startIndex)));
             info.put(ExtImageTags.AREA_COMMENT, comment);
         } catch (JSONException ex) {

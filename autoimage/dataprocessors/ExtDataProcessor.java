@@ -112,9 +112,14 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
         }    
     }
     
+    protected void initialize() {}
+    
+    protected void cleanUp() {}
+    
     @Override
     public void run() {
         done=false;
+        initialize();
         //run() will check if stopRequested==true;
         super.run();
         done=true;

@@ -256,10 +256,16 @@ public class Utils {
                 Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-        tags[fieldArray.length]="Area";
-        tags[fieldArray.length+1]="ClusterIndex";
-        tags[fieldArray.length+2]="Comment";
-        tags[fieldArray.length+3]="SiteIndex";
+        tags[fieldArray.length]=ExtImageTags.AREA_NAME;
+//        tags[fieldArray.length+8]="AreaIndex";
+        tags[fieldArray.length+1]=ExtImageTags.CLUSTER_INDEX;
+        tags[fieldArray.length+2]=ExtImageTags.AREA_COMMENT;
+        tags[fieldArray.length+3]=ExtImageTags.SITE_INDEX;
+/*        
+        tags[fieldArray.length+4]=ExtImageTags.CHANNEL_INDEX_ORIG;
+        tags[fieldArray.length+5]=ExtImageTags.SLICE_INDEX_ORIG;
+        tags[fieldArray.length+6]=ExtImageTags.POS_INDEX_ORIG;
+        tags[fieldArray.length+7]=ExtImageTags.FRAME_INDEX_ORIG;*/
         Arrays.sort(tags);
         return tags;
     }
@@ -354,9 +360,9 @@ public class Utils {
         return map;
     }
     
-    public static boolean calibrateImage(ImagePlus imp, JSONObject meta) {
+    public static boolean calibrateImage(ImagePlus imp, JSONObject imageMeta) {
         try {
-            double pixSize=meta.getDouble("PixelSizeUm");
+            double pixSize=imageMeta.getDouble("PixelSizeUm");
             Calibration cal=imp.getCalibration();
             cal.pixelWidth=pixSize;
             cal.pixelHeight=pixSize;
