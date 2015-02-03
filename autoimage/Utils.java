@@ -11,6 +11,7 @@ import ij.IJ;
 import ij.ImagePlus;
 import ij.io.Opener;
 import ij.measure.Calibration;
+import ij.plugin.RGBStackMerge;
 import ij.process.ByteProcessor;
 import ij.process.ColorProcessor;
 import ij.process.ImageProcessor;
@@ -57,17 +58,24 @@ import org.micromanager.utils.ReportingUtils;
 public class Utils {
     
 
-    public static ImageProcessor createImageProcessor(TaggedImage ti) {
+    public static ImageProcessor[] createImageProcessor(TaggedImage ti, boolean scale) {
         try {
             int width = ti.tags.getInt(MMTags.Image.WIDTH);
             int height = ti.tags.getInt(MMTags.Image.HEIGHT);
             String pixType = ti.tags.getString(MMTags.Image.PIX_TYPE);
-            ImageProcessor ip=null;
+            ImageProcessor[] ipArray=null;
             if (pixType.equals("GRAY8")) {
-                ip = new ByteProcessor(width, height, (byte[]) ti.pix);
+                ipArray=new ImageProcessor[1];
+                ipArray[0] = new ByteProcessor(width, height, (byte[]) ti.pix);
+                if (!scale)
+                    ipArray[0].setMinAndMax(0, 255);
             } else if (pixType.equals("GRAY16")) {
-                ip = new ShortProcessor(width, height, (short[]) ti.pix, null);
+                ipArray=new ImageProcessor[1];
+                ipArray[0] = new ShortProcessor(width, height, (short[]) ti.pix, null);
+                if (!scale)
+                    ipArray[0].setMinAndMax(0, 65535);
             } else if (pixType.equals("RGB32")) {
+                ipArray=new ImageProcessor[1];
                 if (ti.pix instanceof byte[]) {
                     //convert byte[] to int[] 
                     byte[] byteArray=(byte[])ti.pix;
@@ -77,26 +85,52 @@ public class Utils {
                                      + (byteArray[4*i + 1] << 8)
                                      + (byteArray[4*i + 2] << 16);
                     }
-                    ip=new ColorProcessor(width, height, intArray);
+                    ipArray[0]=new ColorProcessor(width, height, intArray);
                 } else {
-                    ip=new ColorProcessor(width, height, (int[]) ti.pix);
+                    ipArray[0]=new ColorProcessor(width, height, (int[]) ti.pix);
                 }
+                if (!scale)
+                    ipArray[0].setMinAndMax(0, 255);
             } else if (pixType.equals("RGB64")) {
+                    if (ti.pix instanceof short[]) {
+                        short[] shortArray=(short[])ti.pix;
+                        ipArray=new ImageProcessor[3];
+                        for (int i=0; i<3; ++i) {//iterate over B, G, R channels
+                            short[] channelArray=new short[shortArray.length/4];
+                            for (int pixelPos=0; pixelPos<channelArray.length; pixelPos++) {
+                                channelArray[pixelPos] =  shortArray[4*pixelPos+i];
+                            }
+                            //create new ShortProcessor for this channel and add to array
+                            //return in R, G, B order
+                            ipArray[2-i]=new ShortProcessor(width, height, channelArray, null);
+                            if (!scale)
+                                ipArray[2-i].setMinAndMax(0, 65535);
+                  	}
+                    }
                 //cannot handle this
             } else {
-                ip=null;
+                ipArray=null;
             }    
-            return ip;
+            return ipArray;
         } catch (JSONException ex) {
             Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
             return null;
         }
     }
     
-    public static ImagePlus createImagePlus(TaggedImage ti) {
+    public static ImagePlus createImagePlus(TaggedImage ti, boolean scale) {
         try {
-            ImageProcessor ip=createImageProcessor(ti);
-            return new ImagePlus(ti.tags.getString(MMTags.Image.POS_NAME),ip);    
+            ImageProcessor[] ipArray=createImageProcessor(ti, scale);
+            if (ipArray!=null && ipArray.length==1) {
+                return new ImagePlus(ti.tags.getString(MMTags.Image.POS_NAME),ipArray[0]);
+            } else {
+                ImagePlus[] impArray=new ImagePlus[ipArray.length]; 
+                for (int i=0; i<ipArray.length; i++) {
+                    impArray[i]=new ImagePlus(Integer.toString(i),ipArray[i]);
+                }
+                RGBStackMerge merger=new RGBStackMerge();
+                return merger.mergeHyperstacks(impArray, false);
+            }
         } catch (JSONException ex) {
             Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
             return null;

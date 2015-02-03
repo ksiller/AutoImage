@@ -1238,15 +1238,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             super();
             finished = false;
             impList = new ArrayList<ImagePlus>();
-/*            for (Channel c : channels) {
-                ImagePlus imp=new ImagePlus(c.getName());
-                Calibration cal=imp.getCalibration();
-                cal.setUnit("um");
-                cal.pixelWidth = pixelSize;
-                cal.pixelHeight = pixelSize;                
-                imp.setCalibration(cal);
-                impList.add(imp);
-            }*/
             imageCache=ic;
             imageCache.addImageCacheListener(this);
             this.pixelSize=pixelSize;
@@ -1272,8 +1263,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
                     final JSONObject metadata = lastImage.tags;
                     final Object pixel = lastImage.pix;
-                    ImageProcessor ip = Utils.createImageProcessor(lastImage);
-                    if (ip==null && isFirstImage) {
+                    ImageProcessor[] ipArray = Utils.createImageProcessor(lastImage, false);
+                    if (ipArray==null && isFirstImage) {
                         isFirstImage=false;
                         SwingUtilities.invokeLater(new Runnable() {                          
                             @Override
@@ -1282,32 +1273,41 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                 + "The acquisition, image storage, and image processsing will not be affected.");
                             }
                         });
-                    } else {    
-                        boolean newWindow=false;
+                    } else if (ipArray!=null) {    
+//                        boolean newWindow=false;
                         ImagePlus imp=null;
                         try {
                             int index = metadata.getInt(MMTags.Image.CHANNEL_INDEX);
-                            if (index>=impList.size()) {
-                                imp=new ImagePlus(metadata.getString(MMTags.Image.CHANNEL_NAME));
+                            if (index>=impList.size() || impList.get(index)==null) {
+//                                    imp=new ImagePlus(metadata.getString(MMTags.Image.CHANNEL_NAME));
+                                imp=Utils.createImagePlus(lastImage, false);
+//                                imp.setTitle(metadata.getString(MMTags.Image.CHANNEL_NAME));
                                 impList.add(imp);
                                 Calibration cal=imp.getCalibration();
                                 cal.setUnit("um");
                                 cal.pixelWidth = pixelSize;
                                 cal.pixelHeight = pixelSize;                
                                 imp.setCalibration(cal);
-                                newWindow=true;
+//                                newWindow=true;
                             } else {
                                 imp = impList.get(index);
-                                newWindow=false;
+//                                newWindow=false;
                             }    
                             JSONArray color=metadata.getJSONObject(MMTags.Root.SUMMARY).getJSONArray(MMTags.Summary.COLORS);
-                            if (color!=null&& !(ip instanceof ColorProcessor))
-                                ip.setLut(LUT.createLutFromColor(new Color(color.getInt(index))));
+                            if (color!=null&& !(ipArray[0] instanceof ColorProcessor)) {
+                                //set LUT for 8-bit and 16-bit grayscale
+                                ipArray[0].setLut(LUT.createLutFromColor(new Color(color.getInt(index))));
+                            }    
                         } catch (JSONException je) {
                             IJ.log("DisplayUpdater.process: JSONException - cannot parse image metadata title");
                         }
-                        imp.setDisplayRange(0, 1024);
-                        imp.setProcessor(ip);
+                        if (ipArray.length==1) {
+                            imp.setProcessor(ipArray[0]);
+                        } else if (imp.isComposite()) {
+                            for (int i=0; i<ipArray.length; i++) {
+                                imp.getStack().setProcessor(ipArray[i],i+1);
+                            }
+                        }
                         try {
                             imp.setTitle(metadata.getString(MMTags.Image.CHANNEL) + ": Area " + metadata.getString(ExtImageTags.AREA_NAME) + ", t" + (metadata.getInt(MMTags.Image.FRAME_INDEX)) + ", z" + (metadata.getInt(MMTags.Image.SLICE_INDEX)));
                         } catch (JSONException je) {

@@ -6,6 +6,7 @@
 
 package autoimage;
 
+import ij.CompositeImage;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
@@ -181,25 +182,20 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     }    
                     //horizontal step along x-axis to right
                     core.setXYPosition(xyStageName, stagePos.getX(),stagePos.getY());
-                    ImageProcessor[] ipArray1=MMCoreUtils.snapImage(core, channelGroupStr, channelName, exposure);
-                    if (ipArray1==null || ipArray1.length<1) {
-                        return false;
-                    }
-                    ImageProcessor ip1=ipArray1[0];
-                    if (ip1==null)
-                        return false;
-                    if (hStack==null) {
-                        hStack=new ImageStack(ip1.getWidth()*2, ip1.getHeight()*2);
-                    }
+                    imp1=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,false);
                     if (imp1==null) {
-                        imp1=new ImagePlus("Camera_Rotation:_image_1",ip1);
-                        imp1.setDimensions(1, 1, 1);
-                        imp1.show();
-                        imp1.getCanvas().zoomOut(0,0);
-                        //imp1.getCanvas().zoomOut(0,0);
-                    } else {
-                        imp1.setProcessor(ip1);
+                        return false;
                     }
+                    if (imp1.getProcessor() instanceof ColorProcessor) {
+                        imp1=new CompositeImage(imp1, CompositeImage.COMPOSITE);
+                    }
+                    imp1.setTitle("Camera_Rotation:_image_1"); 
+                    if (hStack==null) {
+                        hStack=new ImageStack(imp1.getWidth()*2, imp1.getHeight()*2);
+                    }
+                    imp1.show();
+                    imp1.getCanvas().zoomOut(0, 0);
+                    imp1.getCanvas().zoomOut(0, 0);
                     if (isCancelled()) {
                         if (imp1!=null)
                             imp1.close();
@@ -208,53 +204,61 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                         return null;
                     }    
                     core.setXYPosition(xyStageName, stagePos.getX()+stageStepSize,stagePos.getY());
-                    ImageProcessor[] ipArray2=MMCoreUtils.snapImage(core, channelGroupStr, channelName, exposure);
-                    if (ipArray2==null || ipArray2.length < 1) {
-                        return false;
-                    }
-                    ImageProcessor ip2=ipArray2[0];
-                    if (ip2==null)
-                        return false;
+                    imp2=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,false);
                     if (imp2==null) {
-                        imp2=new ImagePlus("Camera_Rotation:_image_2",ip2);
-                        imp2.setDimensions(1, 1, 1);
-                        imp2.show();
-                        imp2.getCanvas().zoomOut(0,0);
-                        //imp2.getCanvas().zoomOut(0,0);
-                    } else {
-                        imp2.setProcessor(ip2);
-                    }
+                        return false;
+                    }                    
+                    if (imp2.getProcessor() instanceof ColorProcessor) {
+                        imp2=new CompositeImage(imp2, CompositeImage.COMPOSITE);
+                    }                    
+                    imp2.setTitle("Camera_Rotation:_image_2");  
+                    imp2.show();
+                    imp2.getCanvas().zoomOut(0,0);
+                    imp2.getCanvas().zoomOut(0,0);
                     if (isCancelled()) {
                         if (imp1!=null)
                             imp1.close();
                         if (imp2!=null)
                             imp2.close();
                         return null;
-                    }    
+                    }   
                     IJ.run("Pairwise stitching", "first_image=Camera_Rotation:_image_1 second_image=Camera_Rotation:_image_2 fusion_method=[Linear Blending] check_peaks=5 compute_overlap subpixel_accuracy x=0.0000 y=0.0000 registration_channel_image_1=[Only channel 1] registration_channel_image_2=[Only channel 1]");
                     ImagePlus stitched=ij.WindowManager.getCurrentImage();
-                    ImageProcessor stitchedIp=stitched.getProcessor();
-                    ImageProcessor stackIp=null;
-                    if (stitchedIp instanceof ByteProcessor) {
-                        stackIp=new ByteProcessor(ip1.getWidth()*2,ip1.getHeight()*2);
-                    } else if (stitchedIp instanceof ShortProcessor) {
-                        stackIp=new ShortProcessor(ip1.getWidth()*2,ip1.getHeight()*2);
-                    } else if (stitchedIp instanceof ColorProcessor) {
-                        stackIp=new ColorProcessor(ip1.getWidth()*2,ip1.getHeight()*2);
-                    }
-                    if (stackIp!=null) {
-                        int width=stitchedIp.getWidth();
-                        maxWidth_H=Math.max(width,maxWidth_H);
-                        maxHeight_H=Math.max(stitchedIp.getHeight(),maxHeight_H);
-                        for (int row=0; row<stitchedIp.getHeight(); row++) {
-                            int[] rowPixel=new int[width];
-                            stitchedIp.getRow(0, row, rowPixel, width);
-                            stackIp.putRow(0, row, rowPixel, width);
+                    if (showImages) {
+                        int channels=1;
+                        if (stitched.isComposite()) {
+                            channels=((CompositeImage)stitched).getNChannels();
                         }
-                        hStack.addSlice("Iteration "+Integer.toString(index),stackIp);
+                        for (int ch=0; ch<channels; ch++) {
+                            ImageProcessor stitchedIp;
+                            if (stitched.isComposite()) {
+                                stitchedIp=((CompositeImage)stitched).getProcessor(ch+1);
+                            } else {
+                                stitchedIp=stitched.getProcessor();
+                            }
+                            ImageProcessor stackIp=null;
+                            if (stitchedIp instanceof ByteProcessor) {
+                                stackIp=new ByteProcessor(imp1.getWidth()*2,imp1.getHeight()*2);
+                            } else if (stitchedIp instanceof ShortProcessor) {
+                                stackIp=new ShortProcessor(imp1.getWidth()*2,imp1.getHeight()*2);
+                            } else if (stitchedIp instanceof ColorProcessor) {
+                                stackIp=new ColorProcessor(imp1.getWidth()*2,imp1.getHeight()*2);
+                            }
+                            if (stackIp!=null) {
+                                int width=stitchedIp.getWidth();
+                                maxWidth_H=Math.max(width,maxWidth_H);
+                                maxHeight_H=Math.max(stitchedIp.getHeight(),maxHeight_H);
+                                for (int row=0; row<stitchedIp.getHeight(); row++) {
+                                    int[] rowPixel=new int[width];
+                                    stitchedIp.getRow(0, row, rowPixel, width);
+                                    stackIp.putRow(0, row, rowPixel, width);
+                                }
+                                hStack.addSlice("Iteration "+Integer.toString(index),stackIp);   
+                            }
+                        }
                     }
                     stitched.close();
-
+                    
                     //parse log for translation vector
                     String log=IJ.getLog();
                     int pos=log.lastIndexOf("shift (second relative to first)")+35;
@@ -286,12 +290,12 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                         roi2y = 0;
                         angleH=-angleH;
                     }    
-                    Roi roi1=new Roi(roi1x,roi1y,ip1.getWidth(),ip1.getHeight());
+                    Roi roi1=new Roi(roi1x,roi1y,imp1.getWidth(),imp1.getHeight());
                     roi1.setPosition(iteration);
                     roi1.setStrokeColor(Color.CYAN);
                     roi1.setName("Roi 1");
                     overlay_h.add(roi1);
-                    Roi roi2=new Roi(roi2x,roi2y,ip2.getWidth(),ip2.getHeight());
+                    Roi roi2=new Roi(roi2x,roi2y,imp2.getWidth(),imp2.getHeight());
                     roi2.setPosition(iteration);
                     roi2.setStrokeColor(Color.MAGENTA);
                     roi2.setName("Roi 2");
@@ -305,22 +309,28 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     data[5]=new Double(deltaX);
                     data[6]=new Double(deltaY);
 
+                    if (imp1!=null) 
+                        imp1.close();
+                    if (imp2!=null) 
+                        imp2.close();                    
                     if (isCancelled()) {
-                        if (imp1!=null)
-                            imp1.close();
-                        if (imp2!=null)
-                            imp2.close();
                         return null;
                     }    
                    //vertical step along y-axis down
                     core.setXYPosition(xyStageName, stagePos.getX(),stagePos.getY());
-                    ipArray1=MMCoreUtils.snapImage(core, channelGroupStr, channelName, exposure);
-                    if (ipArray1==null || ipArray1.length < 1)
+                    imp1=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,false);
+                    if (imp1==null) {//ipArray1==null || ipArray1.length<1) {
                         return false;
-                    ip1=ipArray1[0];
-                    imp1.setProcessor(ip1);
+                    }                    
+                    if (imp1.getProcessor() instanceof ColorProcessor) {
+                        imp1=new CompositeImage(imp1, CompositeImage.COMPOSITE);
+                    }                    
+                    imp1.setTitle("Camera_Rotation:_image_1");
+                    imp1.show();
+                    imp1.getCanvas().zoomOut(0, 0);
+                    imp1.getCanvas().zoomOut(0, 0);
                     if (vStack==null) {
-                        vStack=new ImageStack(ip1.getWidth()*2, ip1.getHeight()*2);
+                        vStack=new ImageStack(imp1.getWidth()*2, imp1.getHeight()*2);
                     }                
                     if (isCancelled()) {
                         if (imp1!=null)
@@ -330,9 +340,17 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                         return null;
                     }    
                     core.setXYPosition(xyStageName, stagePos.getX(),stagePos.getY()+stageStepSize);
-                    ipArray2=MMCoreUtils.snapImage(core, channelGroupStr, channelName, exposure);
-                    if (ipArray2==null || ipArray2.length < 1)
+                    imp2=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,false);
+                    if (imp2==null) {
                         return false;
+                    }                    
+                    if (imp2.getProcessor() instanceof ColorProcessor) {
+                        imp2=new CompositeImage(imp2, CompositeImage.COMPOSITE);
+                    }                    
+                    imp2.setTitle("Camera_Rotation:_image_2"); 
+                    imp2.show();
+                    imp2.getCanvas().zoomOut(0, 0);
+                    imp2.getCanvas().zoomOut(0, 0);
                     if (isCancelled()) {
                         if (imp1!=null)
                             imp1.close();
@@ -340,32 +358,44 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                             imp2.close();
                         return null;
                     }    
-                    ip2=ipArray2[0];
-                    imp2.setProcessor(ip2);
                     IJ.run("Pairwise stitching", "first_image=Camera_Rotation:_image_1 second_image=Camera_Rotation:_image_2 fusion_method=[Linear Blending] check_peaks=5 compute_overlap subpixel_accuracy x=0.0000 y=0.0000 registration_channel_image_1=[Only channel 1] registration_channel_image_2=[Only channel 1]");
+                    
                     stitched=ij.WindowManager.getCurrentImage();
-                    stitchedIp=stitched.getProcessor();
-                    stackIp=null;
-                    if (stitchedIp instanceof ByteProcessor) {
-                        stackIp=new ByteProcessor(ip1.getWidth()*2,ip1.getHeight()*2);
-                    }
-                    else if (stitchedIp instanceof ShortProcessor) {
-                        stackIp=new ShortProcessor(ip1.getWidth()*2,ip1.getHeight()*2);
-                    } else if (stitchedIp instanceof ColorProcessor) {
-                        stackIp=new ColorProcessor(ip1.getWidth()*2,ip1.getHeight()*2);
-                    }
-                    if (stackIp!=null) {
-                        int width=stitchedIp.getWidth();
-                        maxWidth_V=Math.max(width,maxWidth_V);
-                        maxHeight_V=Math.max(stitchedIp.getHeight(),maxHeight_V);
-                        for (int row=0; row<stitchedIp.getHeight(); row++) {
-                            int[] rowPixel=new int[width];
-                            stitchedIp.getRow(0, row, rowPixel, width);
-                            stackIp.putRow(0, row, rowPixel, width);
+                    if (showImages) {
+                        int channels=1;
+                        if (stitched.isComposite()) {
+                            channels=((CompositeImage)stitched).getNChannels();
                         }
-                        vStack.addSlice("Iteration "+Integer.toString(index),stackIp);
+                        for (int ch=0; ch<channels; ch++) {
+                            ImageProcessor stitchedIp;
+                            if (stitched.isComposite()) {
+                                stitchedIp=((CompositeImage)stitched).getProcessor(ch+1);
+                            } else {
+                                stitchedIp=stitched.getProcessor();
+                            }
+                            ImageProcessor stackIp=null;
+                            if (stitchedIp instanceof ByteProcessor) {
+                                stackIp=new ByteProcessor(imp1.getWidth()*2,imp1.getHeight()*2);
+                            } else if (stitchedIp instanceof ShortProcessor) {
+                                stackIp=new ShortProcessor(imp1.getWidth()*2,imp1.getHeight()*2);
+                            } else if (stitchedIp instanceof ColorProcessor) {
+                                stackIp=new ColorProcessor(imp1.getWidth()*2,imp1.getHeight()*2);
+                            }
+                            if (stackIp!=null) {
+                                int width=stitchedIp.getWidth();
+                                maxWidth_V=Math.max(width,maxWidth_V);
+                                maxHeight_V=Math.max(stitchedIp.getHeight(),maxHeight_V);
+                                for (int row=0; row<stitchedIp.getHeight(); row++) {
+                                    int[] rowPixel=new int[width];
+                                    stitchedIp.getRow(0, row, rowPixel, width);
+                                    stackIp.putRow(0, row, rowPixel, width);
+                                }
+                                vStack.addSlice("Iteration "+Integer.toString(index),stackIp);   
+                            }
+                        }
                     }
                     stitched.close();
+
 
                     //parse log for translation vector
                     log=IJ.getLog();
@@ -393,12 +423,12 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                         roi1y = -deltaY;
                         roi2y = 0;
                     }    
-                    roi1=new Roi(roi1x,roi1y,ip1.getWidth(),ip1.getHeight());
+                    roi1=new Roi(roi1x,roi1y,imp1.getWidth(),imp1.getHeight());
                     roi1.setPosition(iteration);
                     roi1.setStrokeColor(Color.CYAN);
                     roi1.setName("Roi 1");
                     overlay_v.add(roi1);
-                    roi2=new Roi(roi2x,roi2y,ip2.getWidth(),ip2.getHeight());
+                    roi2=new Roi(roi2x,roi2y,imp2.getWidth(),imp2.getHeight());
                     roi2.setPosition(iteration);
                     roi2.setStrokeColor(Color.MAGENTA);
                     roi2.setName("Roi 2");
@@ -409,25 +439,28 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     data[4]=new Double(pixSizeV);
                     data[7]=new Double(deltaX);
                     data[8]=new Double(deltaY);
+                    if (imp1!=null)
+                        imp1.close();
+                    if (imp2!=null)
+                        imp2.close();
                     publish(data);
                     index++;
                     iteration++;
                 }
-                if (imp1!=null)
-                    imp1.close();
-                if (imp2!=null)
-                    imp2.close();
                 if (showImages) {
-                    himp=new ImagePlus();
-                    himp.setStack("Horizontal",hStack);
+                    ImagePlus impH=new ImagePlus("Horizontal",hStack);
+                    impH.setDimensions(hStack.getSize()/iterations, 1, iterations);
+                    himp=new CompositeImage(impH,CompositeImage.COMPOSITE);                  
                     himp.setRoi(0, 0, maxWidth_H, maxHeight_H);
                     IJ.run(himp,"Crop","");
                     himp.setOverlay(overlay_h);
                     himp.show();
                     himp.getCanvas().zoomOut(0, 0);
                     himp.getCanvas().zoomOut(0, 0);
-                    vimp=new ImagePlus();
-                    vimp.setStack("Vertical",vStack);
+
+                    ImagePlus impV=new ImagePlus("Vertical",vStack);
+                    impV.setDimensions(vStack.getSize()/iterations, 1, iterations);
+                    vimp=new CompositeImage(impV,CompositeImage.COMPOSITE);
                     vimp.setRoi(0, 0, maxWidth_V, maxHeight_V);
                     IJ.run(vimp,"Crop","");
                     vimp.setOverlay(overlay_v);

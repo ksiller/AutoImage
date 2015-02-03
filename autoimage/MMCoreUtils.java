@@ -6,6 +6,7 @@
 
 package autoimage;
 
+import ij.CompositeImage;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.measure.Calibration;
@@ -263,4 +264,10 @@ public class MMCoreUtils {
         return imp;
     }
     
+    public static ImagePlus convertToComposite(ImagePlus imp) {                   
+        if (imp.getProcessor() instanceof ColorProcessor) {
+            return new CompositeImage(imp);
+        } else
+            return null;
+    }
 }
