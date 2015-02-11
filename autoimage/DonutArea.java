@@ -255,4 +255,14 @@ class DonutArea extends Area {
         return new Point2D.Double(topLeftX+width/2,topLeftY+ringWidth/2);
     }
 
+    @Override
+    public List<Point2D> getOutlinePoints() {
+        List<Point2D> list=new ArrayList<Point2D>(4);
+        list.add(new Point2D.Double(topLeftX, topLeftY));
+        list.add(new Point2D.Double(topLeftX+width, topLeftY));
+        list.add(new Point2D.Double(topLeftX+width, topLeftY+height));
+        list.add(new Point2D.Double(topLeftX, topLeftY+height));
+        return list;
+    }
+
 }

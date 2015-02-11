@@ -5,7 +5,9 @@
 package autoimage.dataprocessors;
 
 import autoimage.ExtImageTags;
+import autoimage.MMCoreUtils;
 import autoimage.Utils;
+import ij.CompositeImage;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.process.ImageProcessor;
@@ -628,13 +630,32 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
             ImagePlus imp=null; 
             imp=IJ.openImage(((File)element).getAbsolutePath());
             if (imp!=null && imp.getProperty("Info") != null) {
-//                TaggedImageStorageDiskDefault storage=null;
                 try {
                     meta = new JSONObject((String)imp.getProperty("Info"));
                     String newDir=new File(workDir).getParentFile().getAbsolutePath();
                     ImageProcessor ip=imp.getProcessor();
-                    ti=ImageUtils.makeTaggedImage(ip);
-                    ti.tags=new JSONObject(meta.toString());
+                    if (meta.getJSONObject(MMTags.Root.SUMMARY).getString(MMTags.Summary.PIX_TYPE).equals("RGB32")) {
+                        //RGB32 images hold pixel data in int[] --> convert to byte[]
+                        ti=new TaggedImage(MMCoreUtils.convertIntToByteArray((int[])ip.getPixels()),new JSONObject(meta.toString()));
+                    }
+                    else if (meta.getJSONObject(MMTags.Root.SUMMARY).getString(MMTags.Summary.PIX_TYPE).equals("RGB64")) {
+                        if (imp.isComposite()) {
+                            CompositeImage ci=(CompositeImage)imp;
+                            short[] totalArray=new short[ci.getWidth()*ci.getHeight()*4];
+                            for (int channel=0; channel< ci.getNChannels(); channel++) {
+                                ImageProcessor proc=imp.getStack().getProcessor(channel+1);
+                                short[] chPixels=(short[])proc.getPixels();
+                                for (int i=0;i<chPixels.length;i++) {
+                                    totalArray[(2-channel) + 4*i] = chPixels[i]; // B,G,R
+                                }
+                            }
+                            ti=new TaggedImage(totalArray,new JSONObject(meta.toString()));
+                        }
+                        
+                    } else {//8-bit or 16-bit grayscale
+                        ti=ImageUtils.makeTaggedImage(ip);
+                        ti.tags=new JSONObject(meta.toString());                        
+                    }
                     String newPrefix=new File(workDir).getName();
                     //update metadata
                     ti.tags=updateTagValue(ti.tags, newDir, newPrefix, false);
@@ -650,16 +671,17 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
                 } catch (JSONException ex) {
                     IJ.log(this.getClass().getName()+ ": Cannot retrieve 'Info' metadata from file. "+ex);
                     Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
-                    copy=createCopy(element);
+//                    copy=super.createCopy(element);
                 } catch (Exception ex) {
                     IJ.log(this.getClass().getName()+ ": Error writing file to storage. "+ex);
                     Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
                 }
             } else {
-                copy=createCopy(element);
+                IJ.log(this.getClass().getName()+": Cannot open image");
+//                copy=super.createCopy(element);
             }
        } else if (element instanceof TaggedImage) {
-            copy=createCopy(element);
+            copy=super.createCopy(element);
             meta=((TaggedImage)element).tags;
             try {
                 meta=updateTagValue(meta,null,null, true);

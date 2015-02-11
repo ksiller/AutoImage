@@ -23,10 +23,13 @@ import ij.ImagePlus;
 import ij.ImageStack;
 import ij.Prefs;
 import ij.gui.GenericDialog;
+import ij.gui.PolygonRoi;
+import ij.gui.Roi;
 import ij.measure.Calibration;
 import ij.plugin.RGBStackMerge;
 import ij.process.ByteProcessor;
 import ij.process.ColorProcessor;
+import ij.process.FloatPolygon;
 import ij.process.ImageProcessor;
 import ij.process.ImageStatistics;
 import ij.process.LUT;
@@ -41,6 +44,7 @@ import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.Point;
+import java.awt.Polygon;
 import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
@@ -50,6 +54,7 @@ import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
+import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.io.BufferedReader;
@@ -251,6 +256,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private boolean calculating;
     private boolean retilingAborted;
     private Area lastArea;
+    private String lastMergeOption="Encompassing Rectangle";
     
     private final Cursor zoomCursor;
     private static final Cursor moveToCursor = new Cursor(Cursor.CROSSHAIR_CURSOR);
@@ -263,6 +269,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     
     private static final double MAX_EXPOSURE = 2000;
     private static final double MAX_SATURATION = 0.015;
+    private static boolean SCALE_IMAGES = true;
     
     protected static final String TAG_ROOT_DIR = "ROOT_DIR";
     protected static final String TAG_EXP_BASE_NAME = "EXP_BASE_NAME";
@@ -760,6 +767,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     //called by implementations of IDataProcessorNotifier (for example SiteInfoUpdater
     @Override
     public void imageProcessed(final JSONObject metadata, final DataProcessor source) {
+        if (metadata==null)  {
+            return;
+        }
         if (source instanceof SiteInfoUpdater && ((SiteInfoUpdater)source).getProcName().equals(ProcessorTree.PROC_NAME_ACQ_ENG)) {
             SwingUtilities.invokeLater(new Runnable(){ 
                 @Override
@@ -1081,20 +1091,89 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     @Override
     public void mergeAreas(List<Area> mergingAreas) {
         if (mergingAreas!=null & mergingAreas.size()>1) {
-            double minX=mergingAreas.get(0).getTopLeftX();
-            double maxX=minX+mergingAreas.get(0).getWidth();
-            double minY=mergingAreas.get(0).getTopLeftY();
-            double maxY=minY+mergingAreas.get(0).getHeight();
-            double z=0;
-            for (Area area:mergingAreas) {
-//            for (int row=1;row<atm.getRowCount();row++) {
-                minX=Math.min(minX, area.getTopLeftX());
-                minY=Math.min(minY, area.getTopLeftY());
-                maxX=Math.max(maxX, area.getTopLeftX()+area.getWidth());
-                maxY=Math.max(maxY, area.getTopLeftY()+area.getHeight());
+            String[] options=new String [2];
+            options[0]="Encompassing Rectangle";
+            options[1]="Convex Hull";
+            //options[2]="Polygon";
+            boolean selectionMade=false;
+            while (!selectionMade) {
+                String selOption = (String)JOptionPane.showInputDialog(this, "Merge Area Options:", "Merging Areas",JOptionPane.PLAIN_MESSAGE,null,options,lastMergeOption);
+                if (selOption==null) {
+                    int result=JOptionPane.showConfirmDialog(this, "Do you want to abort the area merging operation?", "Merge Areas",JOptionPane.YES_NO_OPTION);
+                    if (result==JOptionPane.YES_OPTION) {
+                        return;
+                    } else {
+                    }
+                } else {
+                    selectionMade=true;
+                    lastMergeOption=selOption;
+                }
             }
             List<Area> layoutAreas=acqLayout.getAreaArray();
-            Area mergedArea=new RectArea(createNewAreaName(),acqLayout.createUniqueAreaId(),minX, minY, 0, maxX-minX, maxY-minY, false, "");
+            Area mergedArea=null;
+            if (lastMergeOption.equals("Encompassing Rectangle")) {
+                double minX=mergingAreas.get(0).getTopLeftX();
+                double maxX=minX+mergingAreas.get(0).getWidth();
+                double minY=mergingAreas.get(0).getTopLeftY();
+                double maxY=minY+mergingAreas.get(0).getHeight();
+//                double z=0;
+                for (Area area:mergingAreas) {
+                    minX=Math.min(minX, area.getTopLeftX());
+                    minY=Math.min(minY, area.getTopLeftY());
+                    maxX=Math.max(maxX, area.getTopLeftX()+area.getWidth());
+                    maxY=Math.max(maxY, area.getTopLeftY()+area.getHeight());
+                }
+                mergedArea=new RectArea(createNewAreaName(),acqLayout.createUniqueAreaId(),minX, minY, 0, maxX-minX, maxY-minY, false, "");
+            } else if (lastMergeOption.equals("Convex Hull")) {
+                Path2D poly=new Path2D.Double();
+                //poly.
+                ImageProcessor ip=new ByteProcessor(100,100);
+                List<Point2D> allPoints=new ArrayList<Point2D>();
+//                List<Double> yPoints=new ArrayList<Double>();
+                double minX=0;
+                double maxX=0;
+                double minY=0;
+                double maxY=0;
+                int iterat=0;
+                //get point list and find minX and minY (used as origin coordinates fro new polygon)
+                for (Area a:mergingAreas) {
+                    List<Point2D> points=a.getOutlinePoints();
+                    for (Point2D p:points) {
+                        if (iterat==0) {
+                            minX=p.getX();
+                            maxX=minX;
+                            minY=p.getY();
+                            maxY=minY;
+                        } else {
+                            minX=Math.min(minX, p.getX());
+                            minY=Math.min(minY, p.getY());
+                            maxX=Math.max(maxX, p.getX());
+                            maxY=Math.max(maxY, p.getY());
+                        }
+                        allPoints.add(p);
+//                        yPoints.add(p.getY());
+                        iterat++;
+                    }
+                }
+                //populate x and y point array
+                float[] x=new float[allPoints.size()];
+                float[] y=new float[allPoints.size()];
+                int i=0;
+                for (Point2D p:allPoints) {
+                    x[i]=(float)(p.getX()-minX);
+                    y[i]=(float)(p.getY()-minY);
+                    i++;
+                }
+                //create cpnvex hull ROI
+                PolygonRoi roi=new PolygonRoi(x,y,Roi.POLYGON);
+                Polygon convexHull=roi.getConvexHull();
+                //create point list for PolygonArea
+                List<Point2D> pList=new ArrayList<Point2D>();
+                for (i=0; i<convexHull.npoints; i++) {
+                    pList.add(new Point2D.Double(convexHull.xpoints[i],convexHull.ypoints[i]));
+                }
+                mergedArea=new PolygonArea(createNewAreaName(), acqLayout.createUniqueAreaId(), minX, minY, 0, pList, false, "");
+            }
             layoutAreas.removeAll(mergingAreas);
             layoutAreas.add(mergedArea);
 //            removeAllAreas();//in MergeAreasDlg
@@ -1263,7 +1342,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
                     final JSONObject metadata = lastImage.tags;
                     final Object pixel = lastImage.pix;
-                    ImageProcessor[] ipArray = Utils.createImageProcessor(lastImage, false);
+                    ImageProcessor[] ipArray = Utils.createImageProcessor(lastImage, SCALE_IMAGES);
                     if (ipArray==null && isFirstImage) {
                         isFirstImage=false;
                         SwingUtilities.invokeLater(new Runnable() {                          
@@ -1280,7 +1359,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                             int index = metadata.getInt(MMTags.Image.CHANNEL_INDEX);
                             if (index>=impList.size() || impList.get(index)==null) {
 //                                    imp=new ImagePlus(metadata.getString(MMTags.Image.CHANNEL_NAME));
-                                imp=Utils.createImagePlus(lastImage, false);
+                                imp=Utils.createImagePlus(lastImage, SCALE_IMAGES);
 //                                imp.setTitle(metadata.getString(MMTags.Image.CHANNEL_NAME));
                                 impList.add(imp);
                                 Calibration cal=imp.getCalibration();
@@ -1680,7 +1759,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 
                 StrVector groups=core.getAvailableConfigGroups();
                 String message = "Select configuration group that contains channel definitions";  
-                String value = (String)JOptionPane.showInputDialog(th.getTable(),  
+                String value = (String)JOptionPane.showInputDialog(
+                                                    th.getTable(),  
                                                     message,  
                                                     "Channel Group Selector",  
                                                     JOptionPane.INFORMATION_MESSAGE,  
@@ -3208,7 +3288,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         });
 
         snapButton.setFont(new java.awt.Font("SansSerif", 0, 12)); // NOI18N
-        snapButton.setIcon(new javax.swing.ImageIcon("/Users/Karsten/NetBeansProjects/Advanced_MDA/src/autoimage/resources/camera.png")); // NOI18N
+        snapButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/camera.png"))); // NOI18N
         snapButton.setToolTipText("Snap image(s) using selected channels");
         snapButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -3816,32 +3896,29 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                 .add(6, 6, 6)
                                 .add(loadImagePipelineButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                             .add(jPanel9Layout.createSequentialGroup()
-                                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                                    .add(jPanel9Layout.createSequentialGroup()
-                                        .add(addChannelFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                        .add(6, 6, 6)
-                                        .add(addZFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                                    .add(jPanel9Layout.createSequentialGroup()
-                                        .add(addFrameFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                        .add(6, 6, 6)
-                                        .add(addAreaFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                                    .add(jPanel9Layout.createSequentialGroup()
-                                        .add(removeProcessorButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                        .add(6, 6, 6)
-                                        .add(editProcessorButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                                    .add(jPanel9Layout.createSequentialGroup()
-                                        .add(loadProcTreeButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                        .add(6, 6, 6)
-                                        .add(saveProcTreeButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                                    .add(addImageStorageButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                    .add(jPanel9Layout.createSequentialGroup()
-                                        .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                                            .add(addImageTagFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                            .add(addScriptAnalyzerButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                                        .add(6, 6, 6)
-                                        .add(addROIFinderButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
-                                .add(0, 0, Short.MAX_VALUE)))
-                        .add(0, 0, 0))
+                                .add(addChannelFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .add(6, 6, 6)
+                                .add(addZFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                            .add(jPanel9Layout.createSequentialGroup()
+                                .add(addFrameFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .add(6, 6, 6)
+                                .add(addAreaFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                            .add(jPanel9Layout.createSequentialGroup()
+                                .add(removeProcessorButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .add(6, 6, 6)
+                                .add(editProcessorButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                            .add(jPanel9Layout.createSequentialGroup()
+                                .add(loadProcTreeButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                .add(6, 6, 6)
+                                .add(saveProcTreeButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                            .add(addImageStorageButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(jPanel9Layout.createSequentialGroup()
+                                .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
+                                    .add(addImageTagFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                                    .add(addScriptAnalyzerButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                                .add(6, 6, 6)
+                                .add(addROIFinderButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                        .add(0, 0, Short.MAX_VALUE))
                     .add(jPanel9Layout.createSequentialGroup()
                         .add(jLabel28)
                         .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))

@@ -207,5 +207,16 @@ class EllipseArea extends Area {
     public Point2D calculateDefaultPos() {
         return calculateCenterPos();
     }
+    
+    @Override
+    public List<Point2D> getOutlinePoints() {
+        List<Point2D> list=new ArrayList<Point2D>(4);
+        list.add(new Point2D.Double(topLeftX, topLeftY));
+        list.add(new Point2D.Double(topLeftX+width, topLeftY));
+        list.add(new Point2D.Double(topLeftX+width, topLeftY+height));
+        list.add(new Point2D.Double(topLeftX, topLeftY+height));
+        return list;
+    }
+
 
 }

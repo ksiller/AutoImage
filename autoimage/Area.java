@@ -1063,6 +1063,8 @@ public abstract class Area {
     abstract protected void addFieldsToJSONObject(JSONObject obj) throws JSONException;
 
     public abstract String getShape();
+    
+    public abstract List<Point2D> getOutlinePoints();
         
     public abstract Point2D calculateCenterPos();
     

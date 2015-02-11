@@ -292,4 +292,9 @@ public class PolygonArea extends Area {
         return centerOfMass(points);
     }
 
+    @Override
+    public List<Point2D> getOutlinePoints() {
+        return points;
+    }
+
 }

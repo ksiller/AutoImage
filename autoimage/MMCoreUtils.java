@@ -137,6 +137,22 @@ public class MMCoreUtils {
         return ip;
     }
     */
+    
+    public static byte[] convertIntToByteArray(int[] pixels) {
+        byte[] byteArray = null;
+        if (pixels instanceof int[]) {
+            //convert int[] to byte[] 
+            int[] intArray=(int[])pixels;
+            byteArray = new byte[intArray.length*4];
+            for (int i=0; i<intArray.length; ++i) {
+                byteArray[i*4 + 2] = (byte)(intArray[i] >> 16);
+                byteArray[i*4 + 1] = (byte)(intArray[i] >> 8);
+                byteArray[i*4] = (byte)(intArray[i]);
+            }
+        }
+        return byteArray;
+    }
+    
     public static ImageProcessor[] snapImage(CMMCore core, String chGroupStr, String ch, double exp) {
         ImageProcessor[] ipArray = null;
         try {
@@ -183,7 +199,6 @@ public class MMCoreUtils {
                     // color pixels: RGB64
                     if (imgArray instanceof short[]) {
                         short[] shortArray=(short[])imgArray;
-                        IJ.log("shortArray: "+shortArray.length);
                         ipArray=new ImageProcessor[3];
                         for (int i=0; i<3; ++i) {//iterate over B, G, R channels
                             short[] channelArray=new short[shortArray.length/4];
