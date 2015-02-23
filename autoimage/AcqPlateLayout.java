@@ -6,8 +6,10 @@
 
 package autoimage;
 
+import ij.IJ;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Comparator;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -61,17 +63,17 @@ public class AcqPlateLayout extends AcqLayout {
         areas = new ArrayList<Area>(areaNum);
         int id=1;
         String wellName;
-        for (int row=0; row<rows; row++) {
-            for (int column=0; column<columns; column++) {
+        for (int column=0; column<columns; column++) {
+            for (int row=0; row<rows; row++) {
                 if (row>=Area.PLATE_ALPHABET.length)
                     wellName=Integer.toString(id);
                 else
                     wellName=Area.PLATE_ALPHABET[row]+Integer.toString(column+1);
                 Area a=null;
                 if (wellShape.equals("Square"))
-                    a = new RectArea(wellName, id, oX+wellDistance*column, oY+wellDistance*row,0,wellDiameter,wellDiameter,false,"");
+                    a = new RectWellArea(wellName, id, oX+wellDistance*column, oY+wellDistance*row,0,wellDiameter,wellDiameter,false,"");
                 else if (wellShape.equals("Round"))
-                    a = new EllipseArea(wellName, id, oX+wellDistance*column, oY+wellDistance*row,0,configuration.wellDiameter,configuration.wellDiameter,false,"");
+                    a = new EllipseWellArea(wellName, id, oX+wellDistance*column, oY+wellDistance*row,0,configuration.wellDiameter,configuration.wellDiameter,false,"");
                 areas.add(a);
                 id++;
             }    
@@ -178,5 +180,31 @@ public class AcqPlateLayout extends AcqLayout {
     public double getWellDistance() {
         return wellDistance;
     }
+ 
+    @Override
+    public boolean isAreaMergingAllowed() {
+        return false;
+    }
+    
+    @Override
+    public boolean isAreaAdditionAllowed() {
+        return false;
+    }
+    
+    @Override
+    public boolean isAreaRemovalAllowed() {
+        return false;
+    }
+    
+    @Override
+    public boolean isAreaRenamingAllowed() {
+        return false;
+    }
+    
+    @Override
+    public Comparator getAreaNameComparator() {
+        return RectWellArea.NameComparator;
+    }
+
     
 }

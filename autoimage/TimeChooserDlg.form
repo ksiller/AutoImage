@@ -215,7 +215,7 @@
           <Font name="Lucida Grande" size="12" style="0"/>
         </Property>
         <Property name="model" type="javax.swing.SpinnerModel" editor="org.netbeans.modules.form.editors2.SpinnerModelEditor">
-          <SpinnerModel initial="1413403440000" maximum="1421355840000" minimum="1413403440000" stepSize="12" type="date"/>
+          <SpinnerModel initial="1424723174548" stepSize="12" type="date"/>
         </Property>
       </Properties>
     </Component>

@@ -20,6 +20,7 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -281,7 +282,7 @@ class AcqLayout  implements PropertyChangeListener {
 //            IJ.log("AcqLayout.trying to initialize area");
             Area area=Area.createFromJSONObject(areaObj);
 //            IJ.log("AcqLayout. area "+area.getName()+" initialized succesfully");
-            area.setId(i);
+//            area.setId(i);
             areas.add(area);
         }
         JSONArray landmarkArray=obj.getJSONArray(RefArea.TAG_LANDMARK_ARRAY);
@@ -1355,6 +1356,29 @@ class AcqLayout  implements PropertyChangeListener {
     public boolean isModifed() {
         return isModified;
     }
-        
+    
+    public boolean isAreaRenamingAllowed() {
+        return true;
+    }
+    
+    public boolean isAreaMergingAllowed() {
+        return true;
+    }
+    
+    public boolean isAreaAdditionAllowed() {
+        return true;
+    }
+    
+    public boolean isAreaRemovalAllowed() {
+        return true;
+    }
+    
+    public Comparator getAreaNameComparator() {
+        return Area.NameComparator;
+    }
+
+    public Comparator getTileNumberComparator() {
+        return Area.TileNumComparator;
+    }
 }
 

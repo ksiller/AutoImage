@@ -9,6 +9,7 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -27,6 +28,7 @@ public abstract class Area {
     static final String TAG_AREA_ARRAY = "AREA_ARRAY";
     static final String TAG_CLASS = "CLASS";
     static final String TAG_NAME = "NAME";
+    static final String TAG_ID="ID";
  //   static final String TAG_SHAPE = "SHAPE";
     static final String TAG_COMMENT = "COMMENT";
     static final String TAG_TOP_LEFT_X = "TOP_LEFT_X";
@@ -50,8 +52,8 @@ public abstract class Area {
 //    protected TilingSetting tiling;
     protected List<Tile> tilePosList;//has absolute layout positions in um
     protected int tileNumber;
-    protected int id;
-    protected int index;
+    protected int id; //unique identifier, reflects order of addition 
+    protected int index; //index in arraylist of selected areas; required for metadata annotation 
     protected double topLeftX; //in um
     protected double topLeftY; //in um
     protected Point2D centerPos;
@@ -119,16 +121,17 @@ public abstract class Area {
     public boolean isOptimizedForCameraRotation() {
         return optimizedForCameraRotation;
     }
-    
-    public void setAreaIndex(int index) {
-        this.index=index;
-    }
-    
+
     public int getNoOfClusters() {
         return noOfClusters;
     }
     
-    public int getAreaIndex() {
+    
+    public void setIndex(int index) {
+        this.index=index;
+    }
+    
+    public int getIndex() {
         return index;
     }
     
@@ -766,7 +769,7 @@ public abstract class Area {
         return id;
     }
     
-    public void setId(int id) {
+    protected void setId(int id) {
         this.id=id;
     }
     
@@ -1023,6 +1026,7 @@ public abstract class Area {
         Class clazz=Class.forName(className);
         Area area=(Area) clazz.newInstance();
         area.name=obj.getString(TAG_NAME);
+        area.id=obj.getInt(TAG_ID);
         area.width=obj.getDouble(TAG_WIDTH);
         area.height=obj.getDouble(TAG_HEIGHT);
         area.topLeftX=obj.getDouble(TAG_TOP_LEFT_X);
@@ -1039,6 +1043,7 @@ public abstract class Area {
         JSONObject obj=new JSONObject();
         obj.put(TAG_CLASS,this.getClass().getName());
         obj.put(TAG_NAME,name);
+        obj.put(TAG_ID,id);
         obj.put(TAG_WIDTH,width);
         obj.put(TAG_HEIGHT,height);
         obj.put(TAG_TOP_LEFT_X,topLeftX);
@@ -1049,6 +1054,32 @@ public abstract class Area {
         addFieldsToJSONObject(obj);
         return obj;
     }
+    
+    public static Comparator<String> NameComparator = new Comparator<String>() {
+
+        @Override
+	public int compare(String a1, String a2) {
+            String a1Name = a1.toUpperCase();
+            String a2Name = a2.toUpperCase();
+            return a1Name.compareTo(a2Name);
+        }
+    };
+        
+    public static Comparator<String> TileNumComparator = new Comparator<String>() {
+
+        @Override
+	public int compare(String a1, String a2) {
+            if (a1.contains("?"))
+                return -1;
+            if (a2.contains("?"))
+                return 1;
+            if (a1.contains("?") && a2.contains("?"))
+                return 0;
+            Integer a1tiles = Integer.parseInt(a1);
+            Integer a2tiles = Integer.parseInt(a2);;
+            return a1tiles.compareTo(a2tiles);
+        }
+    };
     
     /* 
     Used to convert JSONObject to Area
@@ -1083,5 +1114,6 @@ public abstract class Area {
     public abstract boolean isInsideRect(Rectangle2D.Double r);
     
     public abstract Area duplicate();
+    
       
 }

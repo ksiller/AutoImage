@@ -6,6 +6,7 @@
 
 package autoimage;
 
+import ij.IJ;
 import java.awt.event.ActionListener;
 import java.util.Calendar;
 import java.util.Date;
@@ -179,7 +180,7 @@ public class TimeChooserDlg extends javax.swing.JDialog {
         });
 
         monthSpinner.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        monthSpinner.setModel(new javax.swing.SpinnerDateModel(new java.util.Date(1413403440000L), new java.util.Date(1413403440000L), new java.util.Date(1421355840000L), java.util.Calendar.MINUTE));
+        monthSpinner.setModel(new javax.swing.SpinnerDateModel(new java.util.Date(1424723174548L), null, null, java.util.Calendar.MINUTE));
 
         nowButton.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         nowButton.setText("Now");
