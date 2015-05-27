@@ -112,6 +112,7 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
         }    
     }
     
+    //this will be called right before "run()" --> allows variable initialization before each run
     protected void initialize() {}
     
     protected void cleanUp() {}

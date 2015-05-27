@@ -1,11 +1,6 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package autoimage;
 
+import autoimage.TilingSetting;
 import java.awt.Graphics2D;
 import java.awt.Shape;
 import java.awt.geom.Point2D;
@@ -66,7 +61,8 @@ public class CompoundArea extends Area {
     }
 */
     @Override
-    public void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio) {
+    public void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio, boolean showZProfile) {
+        g2d.setColor(getFillColor(showZProfile));
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
@@ -132,7 +128,7 @@ public class CompoundArea extends Area {
     }
 
     @Override
-    public boolean isInsideRect(Rectangle2D.Double r) {
+    public boolean isInsideRect(Rectangle2D r) {
         return r.contains(area.getBounds2D());
     }
 
@@ -140,15 +136,21 @@ public class CompoundArea extends Area {
     public Area duplicate() {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
-
+/*
     @Override
-    public Point2D calculateCenterPos() {
-        return new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
+    public void calculateCenterPos() {
+        centerPos=new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
     }
 
     @Override
-    public Point2D calculateDefaultPos() {
-        return new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
+    public void calculateDefaultPos() {
+        defaultPos=new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
+    }
+*/    
+    @Override
+    public void calcCenterAndDefaultPos() {
+        centerPos=new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
+        defaultPos=centerPos;
     }
     
     @Override
@@ -160,5 +162,20 @@ public class CompoundArea extends Area {
         list.add(new Point2D.Double(topLeftX, topLeftY+height));
         return list;
     }
-   
+
+    @Override
+    public Area showConfigDialog(Rectangle2D bounds) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public int supportedLayouts() {
+//        return Area.SUPPORT_CUSTOM_LAYOUT;
+        //not supported yet
+        return 0;
+    }
+
+
+    
+    
 }

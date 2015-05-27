@@ -4,17 +4,11 @@
  */
 package autoimage;
 
-import static autoimage.AcqSetting.TAG_ACQ_SETTING;
-import static autoimage.AcqSetting.TAG_VERSION;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.util.Iterator;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 /**
  *

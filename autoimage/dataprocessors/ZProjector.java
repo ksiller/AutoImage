@@ -11,6 +11,7 @@ import autoimage.Utils;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
+import ij.plugin.HyperStackConverter;
 import ij.process.ImageProcessor;
 import ij.process.LUT;
 import java.awt.Component;
@@ -30,6 +31,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
+import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -44,6 +46,7 @@ import org.json.JSONObject;
 import org.micromanager.acquisition.TaggedImageStorageDiskDefault;
 import org.micromanager.api.MMTags;
 import org.micromanager.utils.ImageUtils;
+import org.micromanager.utils.MMException;
 
 /**
  *
@@ -98,10 +101,12 @@ public class ZProjector<E> extends GroupProcessor<E> {
     public String getToolTipText() {
         if (allSlices) {
             return "<html>Method: "+projMethod+"<br>"
-                + "Slices: All</html>";
+                + "Slices: All<br>"
+                + "Process 'on-the-fly': "+(processOnTheFly ? "yes": "no")+"</html>";
         } else {
             return "<html>Method: "+projMethod+"<br>"
-                + "Slices: "+Long.toString(startSlice)+"-"+Long.toString(endSlice)+"</html>";
+                + "Slices: "+Long.toString(startSlice)+"-"+Long.toString(endSlice)+"<br>"
+                + "Process 'on-the-fly': "+(processOnTheFly ? "yes": "no")+"</html>";
         }
     }
     
@@ -111,8 +116,10 @@ public class ZProjector<E> extends GroupProcessor<E> {
         IJ.log(this.getClass().getName()+".processGroup: ");
         IJ.log("   Criteria: "+group.groupCriteria.toString());
         IJ.log("   Images: "+group.images.size()+" images");
+        final String newDir=new File(workDir).getParentFile().getAbsolutePath();                        
+        final String newPrefix=new File(workDir).getName();
         
-        if (group!=null && group.images!=null && group.images.size()>1) {
+        if (group!=null && group.images!=null) {
 
             Callable projectionTask=new Callable<List<E>>() {
 
@@ -120,101 +127,115 @@ public class ZProjector<E> extends GroupProcessor<E> {
                 public List<E> call() {
                     List<E> results=new ArrayList<E>();
                     ImageStack stack=null;
-                    LUT lut=null;
+                    //LUT lut=null;
                     JSONObject meta=null;
+//                    boolean isRGB=false;
                     try {
                         //read images and place in single stack
                         double zPos=0;
-                        for (E image:group.images) {
-                            ImagePlus imp;
-//                            if (image instanceof java.io.File) {
-                                File file=(File)image;
-                                imp=IJ.openImage(file.getAbsolutePath());
-                                IJ.log("ZProject result (File): opened "+file.getAbsolutePath());
-                                meta=Utils.parseMetadata(file);
-                                IJ.log("ZProject result (File): parsed metadata for "+file.getAbsolutePath());
-//                            } 
-                                /*else if (image instanceof TaggedImage) {
-                                imp=Utils.createImagePlus((TaggedImage)image);
-                                //important: create copy of metadata otherwise saving fails
-                                meta=new JSONObject(((TaggedImage)image).tags.toString());
-                            } else {//unknown image type
-                                return results;
-                            }*/
-                            zPos+=meta.getDouble(MMTags.Image.ZUM);
-                            if (stack==null) {
-                                stack=imp.createEmptyStack();
+                        ImagePlus resultImp;
+                        if (group.images.size() > 1) {
+                            for (E image:group.images) {
+                                ImagePlus imp;
+    //                            if (image instanceof java.io.File) {
+                                    File file=(File)image;
+                                    imp=IJ.openImage(file.getAbsolutePath());
+                                    meta=Utils.parseMetadata(file);
+    //                            } 
+                                    /*else if (image instanceof TaggedImage) {
+                                    imp=Utils.createImagePlus((TaggedImage)image);
+                                    //important: create copy of metadata otherwise saving fails
+                                    meta=new JSONObject(((TaggedImage)image).tags.toString());
+                                } else {//unknown image type
+                                    return results;
+                                }*/
+                                zPos+=meta.getDouble(MMTags.Image.ZUM);
+                                if (stack==null) {
+                                    stack=imp.createEmptyStack();
+//                                    JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
+    //                                String pixType=summary.getString(MMTags.Summary.PIX_TYPE);
+    //                                isRGB=pixType.equals("RGB32") || pixType.equals("RGB64");
+    //                                int bitDepth=(pixType.equals("Gray16") || pixType.equals("RGB64")) ? 16 : 8;
+    //                                IJ.log("bitDepth="+Integer.toString(summary.getInt(MMTags.Summary.BIT_DEPTH)));
+                                    //isRGB=imp.getImageStack().isRGB();
+    //                                IJ.log("isRGB="+Boolean.toString(isRGB));
+                                    //impHyperStack=imp.createHyperStack("hyperstack", isRGB ? 3 : 1 ,group.images.size(), 1, bitDepth);
+                                }
+                                //slices in imp refer to channels here
+                                //RGB64 --> 3 slices (R, G, B)
+                                for (int z=1; z<=imp.getStackSize(); z++) {
+                                    ImageProcessor ip=imp.getImageStack().getProcessor(z);
+    //                                lut=ip.getLut();
+                                    stack.addSlice(ip.duplicate());
+                                }
                             }
-                            ImageProcessor ip=imp.getProcessor();
-                            lut=ip.getLut();
-                            stack.addSlice(ip.duplicate());
+                            zPos/=group.images.size();
+                            //IJ.log(lut.toString());
+                            ImagePlus stackImp=new ImagePlus("Hyperstack");
+                            stackImp.setStack(stack,stack.getSize() / group.images.size(),group.images.size(), 1);
+    //                        IJ.run(stackImp,"Re-order Hyperstack ...", "channels=[Channels (c)] slices=[Slices (z)] frames=[Frames (t)]");
+                            stackImp.setOpenAsHyperStack(true);
+                            IJ.save(stackImp,"/Users/Karsten/Desktop/hyperstack.tif");
+                            ij.plugin.ZProjector projector=new ij.plugin.ZProjector(stackImp);
+                            projector.setStartSlice(0);
+                            projector.setStopSlice(group.images.size()-1);
+                            if (projMethod.equals("Max Intensity")) {
+                                projector.setMethod(ij.plugin.ZProjector.MAX_METHOD);
+                            } else if (projMethod.equals("Min Intensity")) {
+                                projector.setMethod(ij.plugin.ZProjector.MIN_METHOD);
+                            } else if (projMethod.equals("Average Intensity")) {
+                                projector.setMethod(ij.plugin.ZProjector.AVG_METHOD);
+                            } else if (projMethod.equals("Sum Slices")) {
+                                projector.setMethod(ij.plugin.ZProjector.SUM_METHOD);
+                            } else if (projMethod.equals("Standard Deviation")) {
+                                projector.setMethod(ij.plugin.ZProjector.SD_METHOD);
+                            } else if (projMethod.equals("Median")) {
+                                projector.setMethod(ij.plugin.ZProjector.MEDIAN_METHOD);
+                            }
+                            IJ.log("isHyperStack="+Boolean.toString(stackImp.isHyperStack()));
+                            projector.doHyperStackProjection(true);
+                            resultImp=projector.getProjection();
+                            //update metadata
+                            meta.put(ExtImageTags.SLICE_INDEX_ORIG, 0);
+                            meta.put(MMTags.Image.ZUM, zPos);
+                        } else {
+                            IJ.log("SINGLE FILE");
+                            File file=(File)group.images.get(0);
+                            resultImp=IJ.openImage(file.getAbsolutePath());
+                            meta=Utils.parseMetadata(file);
                         }
-                        zPos/=group.images.size();
-                        IJ.log(lut.toString());
-                        ImagePlus zProjImp=new ImagePlus("Z-Proj",stack);
-                        ij.plugin.ZProjector projector=new ij.plugin.ZProjector(zProjImp);
-                        if (projMethod.equals("Max Intensity")) {
-                            projector.setMethod(ij.plugin.ZProjector.MAX_METHOD);
-                        } else if (projMethod.equals("Min Intensity")) {
-                            projector.setMethod(ij.plugin.ZProjector.MIN_METHOD);
-                        } else if (projMethod.equals("Average Intensity")) {
-                            projector.setMethod(ij.plugin.ZProjector.AVG_METHOD);
-                        } else if (projMethod.equals("Sum Slices")) {
-                            projector.setMethod(ij.plugin.ZProjector.SUM_METHOD);
-                        } else if (projMethod.equals("Standard Deviation")) {
-                            projector.setMethod(ij.plugin.ZProjector.SD_METHOD);
-                        } else if (projMethod.equals("Median")) {
-                            projector.setMethod(ij.plugin.ZProjector.MEDIAN_METHOD);
-                        }    
-                        projector.doProjection();
-                        ImagePlus resultImp=projector.getProjection();
-
-                        //create TaggedImage
-//                        IJ.log("before create TaggedImage");
-                        TaggedImage ti=ImageUtils.makeTaggedImage(resultImp.getProcessor());
-//                        IJ.log("after create TaggedImage");
+                        IJ.save(resultImp,"/Users/Karsten/Desktop/proj.tif");
 
                         //update metadata
-                        String newDir=new File(workDir).getParentFile().getAbsolutePath();                        
-                        String newPrefix=new File(workDir).getName();
                         meta.put(MMTags.Image.SLICE_INDEX, 0);
                         meta.put(MMTags.Image.SLICE, 0);
-//                        IJ.log("after updating summary data");
-                        ti.tags=meta;
+                        JSONObject summary = new JSONObject(meta.getJSONObject(MMTags.Root.SUMMARY).toString());
+                        summary.put(MMTags.Summary.SLICES, 1);
+                        meta.put(MMTags.Root.SUMMARY, summary);
+
+                        //create TaggedImage
+                        TaggedImage ti=Utils.createTaggedImage(resultImp,meta);
 /*
                         if (group.images.get(0) instanceof TaggedImage) {
-                            JSONObject summary = new JSONObject(meta.getJSONObject(MMTags.Root.SUMMARY).toString());
-                            summary.put(MMTags.Summary.SLICES, 1); 
-                            meta.put(MMTags.Root.SUMMARY, summary);
                             results.add((E)ti);
                             IJ.log("ZProject result (TAGGEDIMAGE): "+(new File(new File(workDir,meta.getString(MMTags.Image.POS_NAME)),
                                                     meta.getString("FileName"))).getAbsolutePath());
                         } else */
                         if (group.images.get(0) instanceof java.io.File) {
-                            JSONObject summary = new JSONObject(meta.getJSONObject(MMTags.Root.SUMMARY).toString());
-                            IJ.log(this.getClass().getName()+": Positions="+summary.getLong(MMTags.Summary.POSITIONS));
-                            meta.put(MMTags.Image.ZUM, zPos);
-                            summary.put(MMTags.Summary.SLICES, 1);
-                            meta.put(MMTags.Root.SUMMARY, summary);
                             if (storage==null) {
                                 summary.put(MMTags.Summary.DIRECTORY, newDir);
                                 summary.put(MMTags.Summary.PREFIX, newPrefix);
-//                                meta.put(MMTags.Root.SUMMARY, summary);
                                 storage = new TaggedImageStorageDiskDefault(workDir,true,summary);
                             }
-                            IJ.log("before putImage");
                             storage.putImage(ti);
-                            IJ.log("after putImage");
                             results.add((E)new File(new File(workDir,meta.getString(MMTags.Image.POS_NAME)),
                                                     meta.getString("FileName")));                    
                             IJ.log("ZProject result (FILE): "+((File)results.get(0)).getAbsolutePath());
                         }
-                        
                     } catch (JSONException ex) {
                         IJ.log(this.getClass().getName()+"Problem with processing group");
                         Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
                     } finally {
-//                        group.processed=true;
                         return results;
                     }
                 }
@@ -238,8 +259,8 @@ public class ZProjector<E> extends GroupProcessor<E> {
         try {
             JSONObject meta=Utils.parseMetadata((File)element);
             long slice=meta.getLong(MMTags.Image.SLICE_INDEX);
-            IJ.log(this.getClass().getName()+": "+slice+", "+startSlice+", "+endSlice);
-            if (startSlice==-1 || (slice >= startSlice && slice <=endSlice)) {
+            IJ.log(this.getClass().getName()+": current="+slice+", start="+startSlice+", end="+endSlice);
+            if (allSlices || (slice >= startSlice && slice <=endSlice)) {
                 IJ.log(this.getClass().getName()+": element accepted");
                 return true;
             } else {
@@ -259,24 +280,8 @@ public class ZProjector<E> extends GroupProcessor<E> {
 
     @Override
     public void cleanUp() {
-/*        IJ.log(this.getClass().getName()+".cleanUp: "+groupList.size()+" groups");
-        for (Group<E> grp:groupList) {
-            if (processIncompleteGrps && !grp.processed) {
-                List<E> modifiedElements=processGroup(grp);
-                if (modifiedElements!=null) { //image processing was successful
-                        //analyzers that form nodes need to place processed image in 
-                        //modifiedOutput_ queue
-                        //for last analyzer in tree branch (='leaf') modifiedOutput_ = null,
-                        //which is handled in produceModified method
-
-                    for (E element:modifiedElements)
-                        produceModified(element);
-                }
-            }
-            grp.images.clear();
-        }
-        clearGroups();*/
         super.cleanUp();
+        //close image storage
         if (storage != null) {
             storage.close();
             storage=null;
@@ -288,6 +293,9 @@ public class ZProjector<E> extends GroupProcessor<E> {
 
     @Override
     protected long determineMaxGroupSize(JSONObject meta) throws JSONException {
+        if (!processOnTheFly) {
+            return -1;
+        }
         long max=-1;
         try {
             JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
@@ -379,6 +387,10 @@ public class ZProjector<E> extends GroupProcessor<E> {
         projMethodCombo.setSelectedItem(projMethod);
         optionPanel.add(projMethodCombo);
         
+        JCheckBox procCB = new JCheckBox("Process On-the-Fly"); 
+        procCB.setSelected(processOnTheFly);
+        optionPanel.add(procCB);
+        
         int result = JOptionPane.showConfirmDialog(null, optionPanel, 
                 this.getClass().getName(), JOptionPane.OK_CANCEL_OPTION);
         if (result == JOptionPane.OK_OPTION) {
@@ -401,6 +413,7 @@ public class ZProjector<E> extends GroupProcessor<E> {
                 endSlice=startSlice;
                 startSlice=temp;
             }    
+            processOnTheFly=procCB.isSelected();
         }    
     }
 }

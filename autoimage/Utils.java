@@ -1,10 +1,5 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage;
 
-import autoimage.AcqSetting.ScheduledTime;
 import autoimage.dataprocessors.ExtDataProcessor;
 import autoimage.dataprocessors.SiteInfoUpdater;
 import ij.IJ;
@@ -35,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.swing.JOptionPane;
 import javax.swing.tree.DefaultMutableTreeNode;
 import mmcorej.TaggedImage;
 import org.apache.commons.math.linear.Array2DRowRealMatrix;
@@ -58,22 +52,73 @@ import org.micromanager.utils.ReportingUtils;
 public class Utils {
     
 
+    //shallow pixel array copy
+    public static TaggedImage createTaggedImage(ImagePlus imp, JSONObject meta) {
+        Object pix=null;
+        TaggedImage ti=null;
+        try {
+            String pixType = meta.getString(MMTags.Image.PIX_TYPE);
+            if (pixType.equals("GRAY8") || pixType.equals("GRAY16")) {
+                pix=imp.getProcessor().getPixels();
+            } else if (pixType.equals("RGB32")) {
+                pix=imp.getProcessor().getPixels();
+                if (pix instanceof int[]) {
+                    //convert int[] to byte[]
+                    int[] intArray = (int[]) pix;
+                    byte[] byteArray = new byte[intArray.length * 4];
+                    for (int i=0; i<intArray.length; i++) {
+                        byteArray[i*4] = (byte)(intArray[i]);
+                        byteArray[i*4 + 1] = (byte)(intArray[i] >> 8);
+                        byteArray[i*4 + 2] = (byte)(intArray[i] >> 16);
+                    }
+                    pix=byteArray;
+                } else {
+                }                
+            } else if (pixType.equals("RGB64")) {
+                ImageProcessor[] ipArray=new ImageProcessor[imp.getStackSize()];
+                for (int i=0; i<imp.getStackSize(); i++) {
+                    ipArray[i]=imp.getImageStack().getProcessor(i+1);
+                }
+                if (ipArray[0].getPixels() instanceof short[]) {
+                    short[] shortArray=new short[((short[])ipArray[0].getPixels()).length * 4];
+                    for (int i=0; i<3; i++) {//iterate over R, G, B channels
+                        short[] channelPix=(short[])ipArray[i].getPixels();
+                        for (int pixelPos=0; pixelPos<channelPix.length; pixelPos++) {
+                            //channel order in shortArray is B, G, R
+                            shortArray[4 * pixelPos + (2-i)] =  channelPix[pixelPos];
+                        }
+                    }
+                    pix=shortArray;
+                }
+            }
+            ti= new TaggedImage(pix,meta);
+        } catch (JSONException ex) {
+            Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return ti;
+    }
+    
     public static ImageProcessor[] createImageProcessor(TaggedImage ti, boolean scale) {
         try {
             int width = ti.tags.getInt(MMTags.Image.WIDTH);
             int height = ti.tags.getInt(MMTags.Image.HEIGHT);
             String pixType = ti.tags.getString(MMTags.Image.PIX_TYPE);
+            int cameraBitDepth=ti.tags.getInt((MMTags.Summary.BIT_DEPTH));
             ImageProcessor[] ipArray=null;
             if (pixType.equals("GRAY8")) {
                 ipArray=new ImageProcessor[1];
                 ipArray[0] = new ByteProcessor(width, height, (byte[]) ti.pix);
-                if (!scale)
-                    ipArray[0].setMinAndMax(0, 255);
+                if (!scale) {
+//                    ipArray[0].setMinAndMax(0, 255);
+                    ipArray[0].setMinAndMax(0,Math.pow(2,cameraBitDepth));
+                }    
             } else if (pixType.equals("GRAY16")) {
                 ipArray=new ImageProcessor[1];
                 ipArray[0] = new ShortProcessor(width, height, (short[]) ti.pix, null);
-                if (!scale)
-                    ipArray[0].setMinAndMax(0, 65535);
+                if (!scale) {
+//                    ipArray[0].setMinAndMax(0, 65535);
+                    ipArray[0].setMinAndMax(0,Math.pow(2,cameraBitDepth));
+                }    
             } else if (pixType.equals("RGB32")) {
                 ipArray=new ImageProcessor[1];
                 if (ti.pix instanceof byte[]) {
@@ -89,8 +134,10 @@ public class Utils {
                 } else {
                     ipArray[0]=new ColorProcessor(width, height, (int[]) ti.pix);
                 }
-                if (!scale)
-                    ipArray[0].setMinAndMax(0, 255);
+                if (!scale) {
+//                    ipArray[0].setMinAndMax(0, 255);
+                    ipArray[0].setMinAndMax(0,Math.pow(2,cameraBitDepth));
+                }
             } else if (pixType.equals("RGB64")) {
                     if (ti.pix instanceof short[]) {
                         short[] shortArray=(short[])ti.pix;
@@ -103,8 +150,10 @@ public class Utils {
                             //create new ShortProcessor for this channel and add to array
                             //return in R, G, B order
                             ipArray[2-i]=new ShortProcessor(width, height, channelArray, null);
-                            if (!scale)
-                                ipArray[2-i].setMinAndMax(0, 65535);
+                            if (!scale) {
+//                                ipArray[2-i].setMinAndMax(0, 65535);
+                                ipArray[2-i].setMinAndMax(0, Math.pow(2,cameraBitDepth));
+                            }    
                   	}
                     }
                 //cannot handle this
@@ -139,19 +188,7 @@ public class Utils {
     
     public static TaggedImage duplicateTaggedImage(TaggedImage ti) throws JSONException, MMScriptException {
        TaggedImage copyTI = new TaggedImage(ti.pix,ti.tags);
-/*       ImageProcessor proc=ImageUtils.makeProcessor(ti);
-       copyTI=ImageUtils.makeTaggedImage(
-                    proc.getPixelsCopy(), 
-                    MDUtils.getChannelIndex(ti.tags),
-                    MDUtils.getSliceIndex(ti.tags),
-                    MDUtils.getPositionIndex(ti.tags),
-                    MDUtils.getFrameIndex(ti.tags),
-                    MDUtils.getWidth(ti.tags),
-                    MDUtils.getHeight(ti.tags),
-                    ImageUtils.getImageProcessorType(proc));
-       */
         JSONObject newMeta=new JSONObject(ti.tags.toString());
-        IJ.log("Utils.duplicateTaggedImage: successful copy of metadata");
         int width = MDUtils.getWidth(ti.tags);
         int height = MDUtils.getHeight(ti.tags);
         String type = MDUtils.getPixelType(ti.tags);

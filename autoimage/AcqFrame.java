@@ -20,7 +20,6 @@ import autoimage.olddp.NoFilterSeqAnalyzer;
 import ij.CompositeImage;
 import ij.IJ;
 import ij.ImagePlus;
-import ij.ImageStack;
 import ij.Prefs;
 import ij.gui.GenericDialog;
 import ij.gui.PolygonRoi;
@@ -29,11 +28,9 @@ import ij.measure.Calibration;
 import ij.plugin.RGBStackMerge;
 import ij.process.ByteProcessor;
 import ij.process.ColorProcessor;
-import ij.process.FloatPolygon;
 import ij.process.ImageProcessor;
 import ij.process.ImageStatistics;
 import ij.process.LUT;
-import ij.process.ShortProcessor;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -75,7 +72,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
@@ -88,7 +84,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -126,6 +121,7 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JProgressBar;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
@@ -149,7 +145,9 @@ import javax.swing.table.TableRowSorter;
 import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.Document;
 import javax.swing.text.DocumentFilter;
+import javax.swing.text.PlainDocument;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
@@ -180,7 +178,6 @@ import org.micromanager.api.TaggedImageAnalyzer;
 import org.micromanager.api.TaggedImageStorage;
 import org.micromanager.internalinterfaces.AcqSettingsListener;
 import org.micromanager.utils.ChannelSpec;
-import org.micromanager.utils.ImageUtils;
 import org.micromanager.utils.MMException;
 import org.micromanager.utils.MMScriptException;
 import org.micromanager.utils.ReportingUtils;
@@ -287,11 +284,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     protected static final String TAG_PROCESSOR_TREE_FILE="PROCESSOR_TREE_FILE";
     
     //Menu items
-    private static final String CMD_NEW_DATA = "Acquire new data";
-    private static final String CMD_REVIEW_DATA = "Review data";
-    private static final String CMD_CAMERA_ROTATION = "Check camera rotation";
+    private static final String CMD_NEW_DATA = "Acquire New Data";
+    private static final String CMD_REVIEW_DATA = "Review Data";
+    private static final String CMD_CAMERA_ROTATION = "Check Camera Rotation";
     private static final String CMD_Z_OFFSET = "Set Z-Offset";
-    private static final String CMD_MANAGE_LAYOUT = "Manage plate layout";
+    private static final String CMD_MANAGE_PLATE_LAYOUT = "Manage Plate Layout";
+    private static final String CMD_MANAGE_CUSTOM_LAYOUT = "Manage Custom Layout";
 
     @Override
     public void slmExposureChanged(String string, double d) {
@@ -456,6 +454,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             IJ.log("Sequence '"+acqSetting.getName()+"' running");
         }   
     }
+
     //WindowListener interface
     @Override
     public void windowOpened(WindowEvent we) {
@@ -597,6 +596,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         acquisitionTask=null;
         final AcqSetting acqSetting=currentAcqSetting;
         currentAcqSetting.getTileManager().clearList();
+        IJ.log("imagingFinished: "+string);
         IJ.log("Finished acquiring sequence: "+currentAcqSetting.getName()+"\n");
 
         /* 
@@ -968,12 +968,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                     int result=JOptionPane.showConfirmDialog(null, "Do you want to add configuration "+cd.getConfigName()+" to the channel selection", "AutoImag: Set Z-Offset",JOptionPane.YES_NO_OPTION);
                                     if (result==JOptionPane.YES_OPTION) {
                                         currentAcqSetting.getChannels().add(new Channel(cd.getConfigName(),cd.getExposure(),cd.getZOffset(),new Color(127,127,127)));
-//                                        channelTable.setModel(new ChannelTableModel(currentAcqSetting.getChannels()));
-                                        initializeChannelTable(currentAcqSetting);
+//                                        initializeChannelTable(currentAcqSetting);
                                     }
                                 }
                             }
                         }
+                        initializeChannelTable(currentAcqSetting);
                     }    
                 }
             });
@@ -987,9 +987,23 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private void showManagePlateLayout(boolean modal) {
         PlateConfiguration plateConfig=new PlateConfiguration();
         LayoutPlateManagerDlg plateDialog=new LayoutPlateManagerDlg(this, modal);
-        plateConfig.fileLocation=Prefs.getHomeDir();
+        plateConfig.fileLocation="";
         plateDialog.setConfiguration(plateConfig);
         plateDialog.setVisible(true);        
+    }
+    
+    private void showManageCustomLayout(boolean modal) {
+        LayoutManagerDlg layoutDialog=new LayoutManagerDlg(this, modal);
+        if (!acqLayout.isEmpty && !(acqLayout instanceof AcqPlateLayout)) {
+            try {
+                layoutDialog.setCustomLayout(AcqLayout.createFromJSONObject(acqLayout.toJSONObject(),acqLayout.getFile()));
+            } catch (JSONException ex) {
+                layoutDialog.setCustomLayout(new AcqLayout());
+            }
+        } else {
+            layoutDialog.setCustomLayout(new AcqLayout());
+        }
+        layoutDialog.setVisible(true);        
     }
     
     @Override
@@ -1000,8 +1014,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         if (e.getActionCommand().equals(CMD_Z_OFFSET)) {
             showZOffsetDlg(false);
         }
-        if (e.getActionCommand().equals(CMD_MANAGE_LAYOUT)) {
+        if (e.getActionCommand().equals(CMD_MANAGE_PLATE_LAYOUT)) {
             showManagePlateLayout(true);
+        }
+        if (e.getActionCommand().equals(CMD_MANAGE_CUSTOM_LAYOUT)) {
+            showManageCustomLayout(true);
         }
     }
 
@@ -1226,10 +1243,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     Area a = acqLayout.getFirstContainingAreaAbs(stagePos[0], stagePos[1], currentAcqSetting.getTileWidth_UM(), currentAcqSetting.getTileHeight_UM());
                     if (a != lastArea) {
                         if (a != null) {
-                            areaLabel.setText(a.getName());
+                            areaLabel.setText("Area: "+a.getName());
                             a.setAcquiring(true);
                         } else {
-                            areaLabel.setText("");
+                            areaLabel.setText("Area:");
                         }
                         if (lastArea != null) {
                             lastArea.setAcquiring(false);
@@ -1423,7 +1440,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             while (!executor.isTerminated() && !this.isCancelled()) {
                 publish((int) Math.round((double) executor.getCompletedTaskCount() / executor.getTaskCount() * 100));
                 try {
-                    Thread.sleep(200);
+                    Thread.sleep(100);
                 } catch (InterruptedException e) {
                 }
             }
@@ -1521,7 +1538,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
         public AreaTableModel(List<Area> al) {
             super();
-            setData(al,false);
+            setData(al,true);
         }
 
         public void setData(List<Area> al, boolean updateView) {
@@ -1606,7 +1623,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     case 0: {
                         area.setSelectedForAcq((Boolean) value);
                         fireTableCellUpdated(rowIndex, colIndex);
-                        fireTableCellUpdated(rowIndex, 3);
+//                        fireTableCellUpdated(rowIndex, 3);
+                        updateTileCell(rowIndex);
                         break;
                     }
                     case 2: {
@@ -1657,9 +1675,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         @Param rowIdx: array of indices in model
         @Param lastPlusIndex: model rowindex that corresponds to 1 below selection in view
         */
-        public int rowDown(int[] rowIdx, int lastPlusOneIndex) {
+        public void rowDown(int[] rowIdx, int lastPlusOneIndex) {
             //create copy 
-            Area temp=areas.get(lastPlusOneIndex).duplicate();
+            Area temp=areas.get(lastPlusOneIndex);
             //move last entry in selection to 
             areas.set(lastPlusOneIndex, areas.get(rowIdx[rowIdx.length-1]));
             for (int i=rowIdx.length-1; i>0; i--) {
@@ -1667,7 +1685,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
             areas.set(rowIdx[0],temp);
             fireTableRowsUpdated(0,getRowCount()-1);
-            return 0;
+//            return 0;
         }
 
 /*        
@@ -1690,9 +1708,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         @Param rowIdx: array of indices in model
         @Param firstMinusOneIndex: model rowindex that corresponds to 1 below selection in view
         */
-        public int rowUp(int[] rowIdx, int firstMinusOneIndex) {
+        public void rowUp(int[] rowIdx, int firstMinusOneIndex) {
             //create copy 
-            Area temp=areas.get(firstMinusOneIndex).duplicate();
+            Area temp=areas.get(firstMinusOneIndex);
             //move last entry in selection to 
             areas.set(firstMinusOneIndex, areas.get(rowIdx[0]));
             for (int i=0; i<rowIdx.length-1; i++) {
@@ -1700,7 +1718,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
             areas.set(rowIdx[rowIdx.length-1],temp);
             fireTableRowsUpdated(0,getRowCount()-1);
-            return 0;
+//            return 0;
         }
 
         public void removeRow(Object element) {
@@ -1725,6 +1743,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
         private void setAreaRenamingAllowed(boolean renamingAllowed) {
             areaRenamingAllowed=renamingAllowed;
+        }
+
+        private void setRowData(int rowIdx, Area area) {
+            areas.set(rowIdx, area);
+            fireTableRowsUpdated(rowIdx,rowIdx);
         }
 
     }
@@ -2133,6 +2156,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }
     // end AcqSettingTableModel
 
+    /*
     class InNumberFilter extends DocumentFilter {
 
         @Override
@@ -2173,7 +2197,40 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         }
     }
+*/
+    
+    private class InvalidCharacterFilter extends DocumentFilter {
+        
+        private List<CharSequence> invalidCharacters;
+        
+        public void addInvalidCharacters(CharSequence invalid) {
+            if (invalidCharacters==null)
+                invalidCharacters=new ArrayList<CharSequence>();
+            if (!invalidCharacters.contains(invalid))
+                invalidCharacters.add(invalid);
+        }
+        
+        @Override
+        public void insertString(FilterBypass fb, int offset, String string,
+            AttributeSet attr) throws BadLocationException {
 
+            IJ.log("insertString");
+            Document doc = fb.getDocument();
+            StringBuilder sb = new StringBuilder();
+            sb.append(doc.getText(0, doc.getLength()));
+            sb.insert(offset, string);
+            for (CharSequence c:invalidCharacters) {
+                if (sb.toString().contains(c)) {
+                    JOptionPane.showMessageDialog(null,"Spaces are not allowed");
+                    return;
+                } else {
+                    IJ.showMessage("Ok");
+                }
+            }
+            super.insertString(fb, offset, string, attr);
+        }
+    }
+    
     class IntNumberVerifier extends InputVerifier {
 
         private int minValue;
@@ -2294,6 +2351,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
         instrumentOnline = false; //to ensure that during app initialization instrument does not respond 
         initComponents();
+        
+/*        AbstractDocument doc=(AbstractDocument)experimentTextField.getDocument();
+        InvalidCharacterFilter filter=new InvalidCharacterFilter();
+        filter.addInvalidCharacters(" ");
+        doc.setDocumentFilter(filter);
+*/        
         InputVerifier doubleVerifier = new InputVerifier() {
 
             @Override
@@ -2318,14 +2381,17 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         JMenuItem newData=new JMenuItem(CMD_NEW_DATA);
         newData.addActionListener(this);
         expMenu.add(newData);
-        JMenuItem reviewData=new JMenuItem(CMD_REVIEW_DATA);
-        reviewData.addActionListener(this);
-        expMenu.add(reviewData);
+//        JMenuItem reviewData=new JMenuItem(CMD_REVIEW_DATA);
+//        reviewData.addActionListener(this);
+//        expMenu.add(reviewData);
         
         JMenu utilMenu = new JMenu("Utilities");
-        JMenuItem manageLayout=new JMenuItem(CMD_MANAGE_LAYOUT);
-        manageLayout.addActionListener(this);
-        utilMenu.add(manageLayout);
+        JMenuItem managePlateLayout=new JMenuItem(CMD_MANAGE_PLATE_LAYOUT);
+        managePlateLayout.addActionListener(this);
+        utilMenu.add(managePlateLayout);
+        JMenuItem manageCustomLayout=new JMenuItem(CMD_MANAGE_CUSTOM_LAYOUT);
+        manageCustomLayout.addActionListener(this);
+        utilMenu.add(manageCustomLayout);
         JMenuItem checkCamRotation=new JMenuItem(CMD_CAMERA_ROTATION);
         checkCamRotation.addActionListener(this);
         utilMenu.add(checkCamRotation);
@@ -2354,11 +2420,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             TilingSetting.Mode.RANDOM,
             TilingSetting.Mode.RUNTIME};
 //            TilingSetting.Mode.FILE};
-//        tilingModeComboBox.removeAllItems();
         tilingModeComboBox.setModel(new DefaultComboBoxModel(tilingModeOptions));
-//        for (int i = 0; i < tilingModeOptions.length; i++) {
-//            tilingModeComboBox.addItem(tilingModeOptions[i]);
-//        }
 
         //initialize combobox to select TilingDirection
         Map<Object, Icon> icons = new HashMap<Object, Icon>();
@@ -2374,15 +2436,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             TilingSetting.DR_TILING,
             TilingSetting.UR_TILING,
             TilingSetting.DL_TILING,
-            TilingSetting.UR_TILING,
+            TilingSetting.UL_TILING,
             TilingSetting.RD_TILING,
             TilingSetting.LD_TILING,
             TilingSetting.RU_TILING,
-            TilingSetting.LU_TILING};
-//        tilingDirComboBox.removeAllItems();
-//        for (int i = 0; i < tilingDirOptions.length; i++) {
-//            tilingDirComboBox.addItem(tilingDirOptions[i]);
-//        }
+            TilingSetting.LU_TILING
+        };
         tilingDirComboBox.setModel(new DefaultComboBoxModel(tilingDirOptions));
         tilingDirComboBox.setRenderer(new DirectionIconListRenderer(icons));
 
@@ -2396,7 +2455,96 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         areaTable.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
         areaTable.setShowVerticalLines(true);
         areaTable.setShowHorizontalLines(false);
-        //areaTable.getModel().addTableModelListener(this);
+        areaTable.setAutoCreateRowSorter(false);
+        areaTable.addMouseListener(new MouseAdapter() {
+        
+            @Override
+            public void mousePressed(MouseEvent evt) {
+                if (evt.isPopupTrigger()) {
+                    int rowInView=areaTable.rowAtPoint(new Point(evt.getX(),evt.getY()));
+                    int colInView=areaTable.columnAtPoint(new Point(evt.getX(),evt.getY()));
+                    if (evt.getSource()==areaTable && !areaTable.isRowSelected(rowInView)) {
+                        areaTable.changeSelection(rowInView,colInView,false,false);
+                    }
+                    showPopUp(evt);
+                }
+            }
+            
+            @Override
+            public void mouseReleased(MouseEvent evt) {
+                if (evt.isPopupTrigger()) {
+                    showPopUp(evt);
+                }
+            }
+            
+            private void showPopUp(final MouseEvent evt) {
+                JPopupMenu popup = new JPopupMenu();
+                JMenuItem moveToItem=new JMenuItem("Move to");
+                popup.add(moveToItem);
+                moveToItem.addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        if (acqLayout.getNoOfMappedStagePos()<=0) {
+                            JOptionPane.showMessageDialog(null, "At least one landmark has to be mapped.");
+                        } else {
+                            int rowInView=areaTable.rowAtPoint(new Point(evt.getX(),evt.getY()));
+                            AreaTableModel model = (AreaTableModel)areaTable.getModel();
+                            moveToAreaDefaultPos(model.getRowData(areaTable.convertRowIndexToModel(rowInView)));
+                        }
+                }
+                });
+                if (acqLayout.isAreaRenamingAllowed()) {
+                    JMenuItem editItem=new JMenuItem("Edit");
+                    editItem.addActionListener(new ActionListener() {
+
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            int rowInView=areaTable.rowAtPoint(new Point(evt.getX(),evt.getY()));
+                            AreaTableModel model = (AreaTableModel)areaTable.getModel();
+                            int rowInModel=areaTable.convertRowIndexToModel(rowInView);
+                            Area area=model.getRowData(rowInModel);
+                            if (area!=null) {
+                                Area modArea;
+                                try {
+                                    //create copy
+                                    modArea = Area.createFromJSONObject(area.toJSONObject());
+                                    if (modArea.showConfigDialog(new Rectangle2D.Double(0,0,acqLayout.getWidth(),acqLayout.getLength()))!=null) {
+                                        //update areatablemodel
+                                        model.setRowData(rowInModel, modArea);
+                                        //recalculate tile positions
+                                        FieldOfView fov=currentAcqSetting.getFieldOfView();
+                                        modArea.calcTilePositions(
+                                                currentAcqSetting.getTileManager(), 
+                                                fov.getRoiWidth_UM(currentAcqSetting.getObjPixelSize()), 
+                                                fov.getRoiHeight_UM(currentAcqSetting.getObjPixelSize()), 
+                                                currentAcqSetting.getTilingSetting());
+                                        //update layout panel
+                                        acqLayoutPanel.repaint();
+                                        acqLayout.setModified(true);
+                                    } else {
+                                        //do nothing if editing was cancelled
+                                    }
+                                } catch (JSONException ex) {
+                                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                                } catch (ClassNotFoundException ex) {
+                                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                                } catch (InstantiationException ex) {
+                                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                                } catch (IllegalAccessException ex) {
+                                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                                } catch (InterruptedException ex) {
+                                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                                }
+                            }
+                        }
+                    });
+                    popup.add(editItem);
+                }
+                popup.show(areaTable, evt.getX(), evt.getY());
+            }
+        });
+//        areaTable.getModel().addTableModelListener(this);
 
         //
         ((AbstractDocument) clusterXField.getDocument()).setDocumentFilter(new NumberFilter(2, false));
@@ -2437,7 +2585,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         //load last settings
         expSettingsFile = new File(Prefs.getHomeDir(),"LastExpSettings.txt");
         loadExpSettings(expSettingsFile, true);
-//        IJ.showMessage("after loadExp "+(acqSettingTable.getColumnModel().getColumn(1).getCellEditor() instanceof StartTimeEditor ? "yes" : "no"));
 
         //format acgSettingTable
         acqSettingTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -2542,7 +2689,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         if (liveModeMonitor!=null) {
             liveModeMonitor.cancel(true);
         }
-        if (acqLayout.isModifed()) {
+        if (acqLayout.isModified()) {
             int save = JOptionPane.showConfirmDialog(null, "Acquisition layout has been modified.\n\nDo you want to save it?", "", JOptionPane.YES_NO_OPTION);
             if (save == JOptionPane.YES_OPTION) {
                 saveLayout();
@@ -2850,10 +2997,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     .add(jScrollPane2, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE))
                 .add(6, 6, 6)
                 .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
-                        .add(org.jdesktop.layout.GroupLayout.LEADING, areaDownButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .add(mergeAreasButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .add(org.jdesktop.layout.GroupLayout.LEADING, areaUpButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(areaDownButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(mergeAreasButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(areaUpButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(org.jdesktop.layout.GroupLayout.TRAILING, jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
                         .add(org.jdesktop.layout.GroupLayout.LEADING, removeAreaButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .add(org.jdesktop.layout.GroupLayout.LEADING, newAreaButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
@@ -2872,14 +3018,15 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(jPanel2Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(jPanel2Layout.createSequentialGroup()
                         .add(newAreaButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .add(0, 0, 0)
+                        .add(2, 2, 2)
                         .add(removeAreaButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(2, 2, 2)
                         .add(areaUpButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .add(0, 0, 0)
+                        .add(2, 2, 2)
                         .add(areaDownButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(mergeAreasButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                        .add(2, 2, 2)
+                        .add(mergeAreasButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(0, 0, Short.MAX_VALUE))
                     .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 319, Short.MAX_VALUE))
                 .add(3, 3, 3))
         );
@@ -3211,13 +3358,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                         .add(maxSitesLabel)
                         .add(maxSitesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                    .add(clusterLabel2)
                     .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                         .add(clusterXField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .add(clusterCheckBox))
                     .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                         .add(clusterYField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .add(clusterLabel1)))
+                        .add(clusterLabel1)
+                        .add(clusterLabel2)))
                 .add(3, 3, 3)
                 .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel4)
@@ -3353,8 +3500,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     .add(channelDownButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .add(2, 2, 2)
                 .add(jPanel6Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(snapButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(liveButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(snapButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(liveButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .add(2, 2, 2)
                 .add(autoExposureButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .add(2, 2, 2)
@@ -3862,7 +4009,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         });
 
         loadImagePipelineButton.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
-        loadImagePipelineButton.setText("IP");
+        loadImagePipelineButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/ip.png"))); // NOI18N
         loadImagePipelineButton.setToolTipText("Load active DataProcessor(s) in Image Processor Pipeline");
         loadImagePipelineButton.setMaximumSize(new java.awt.Dimension(24, 24));
         loadImagePipelineButton.setMinimumSize(new java.awt.Dimension(24, 24));
@@ -4352,49 +4499,41 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(0, 0, 0)
                 .add(statusPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(statusPanelLayout.createSequentialGroup()
-                        .add(statusPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(statusPanelLayout.createSequentialGroup()
-                                .add(jLabel29)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                                .add(stagePosXLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 84, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
-                                .add(jLabel30))
-                            .add(statusPanelLayout.createSequentialGroup()
-                                .add(zoomButton)
-                                .add(0, 0, 0)
-                                .add(selectButton)))
-                        .add(0, 0, 0)
-                        .add(statusPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(statusPanelLayout.createSequentialGroup()
-                                .add(stagePosYLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 90, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(jLabel31))
-                            .add(statusPanelLayout.createSequentialGroup()
-                                .add(commentButton)
-                                .add(0, 0, 0)
-                                .add(stageControlButton)
-                                .add(0, 0, 0)
-                                .add(moveToScreenCoordButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 77, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
-                        .add(0, 0, 0)
-                        .add(statusPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(statusPanelLayout.createSequentialGroup()
-                                .add(stagePosZLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 91, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(18, 18, 18)
-                                .add(cursorLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 39, Short.MAX_VALUE)
-                                .add(55, 55, 55))
-                            .add(statusPanelLayout.createSequentialGroup()
-                                .add(setLandmarkButton)
-                                .add(0, 0, 0)
-                                .add(showZProfileCheckBox)
-                                .add(0, 0, Short.MAX_VALUE))))
+                        .add(progressBar, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .add(10, 10, 10))
                     .add(statusPanelLayout.createSequentialGroup()
-                        .add(statusPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(statusPanelLayout.createSequentialGroup()
-                                .add(timepointLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 180, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(6, 6, 6)
-                                .add(areaLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 316, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                            .add(progressBar, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 545, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                        .add(0, 0, Short.MAX_VALUE))))
+                        .add(timepointLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 180, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(6, 6, 6)
+                        .add(areaLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 316, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(statusPanelLayout.createSequentialGroup()
+                        .add(jLabel29)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
+                        .add(stagePosXLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 84, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.UNRELATED)
+                        .add(jLabel30)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(stagePosYLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 90, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(12, 12, 12)
+                        .add(jLabel31)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(stagePosZLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 91, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(27, 27, 27)
+                        .add(cursorLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 210, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(statusPanelLayout.createSequentialGroup()
+                        .add(zoomButton)
+                        .add(0, 0, 0)
+                        .add(selectButton)
+                        .add(0, 0, 0)
+                        .add(commentButton)
+                        .add(0, 0, 0)
+                        .add(stageControlButton)
+                        .add(0, 0, 0)
+                        .add(moveToScreenCoordButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 77, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(0, 0, 0)
+                        .add(setLandmarkButton)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(showZProfileCheckBox)))
+                .add(5, 5, 5))
         );
         statusPanelLayout.setVerticalGroup(
             statusPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
@@ -4485,17 +4624,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     @Override
     public void tableChanged(TableModelEvent e) {
-//        IJ.log("AcqFrame.tableChanged: "+e.getType());
         int row = e.getFirstRow();
         int column = e.getColumn();
         if (e.getSource() == areaTable.getModel() && (e.getColumn() == 0 || e.getColumn() == TableModelEvent.ALL_COLUMNS || e.getType() == TableModelEvent.DELETE || e.getType() == TableModelEvent.INSERT)) {
-            /*            int id=(Integer)atm.getValueAt(row,4);
-             Area a=acqLayout.getAreaById(id);
-             a.setSelected((Boolean)atm.getValueAt(row, column));
-             IJ.log("AcqFrame.tableChanged: clicked checkbox in row "+Integer.toString(row)+", "+Boolean.toString(a.isSelected()));*/
-            /*            if (currentAcqSetting!=null) {
-             calcTilePositions(currengetTileWidth_UMgetTileWidth(),currengetTileHeight_UMetTileHeight(), currentAcqSetting.getTilingSetting());               
-             }   */
             AreaTableModel atm = (AreaTableModel) areaTable.getModel();
             if (recalculateTiles && column == 0 && (Boolean) atm.getValueAt(row, 0)) {
                 List<Area> al = new ArrayList<Area>(1);
@@ -5140,7 +5271,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         acquisitionTask.initialize();
                         timer.schedule(acquisitionTask, currentAcqSetting.getAbsoluteStart().getTime());
                     } catch (InterruptedException ex) {
-                        JOptionPane.showMessageDialog(null, "Canceled caught");
+                        IJ.log("Initialization canceled");
                         acquisitionTask=null;
                     } catch (MMException ex) {
                         JOptionPane.showMessageDialog(null, ex, "Error: "+currentAcqSetting.getName(), JOptionPane.ERROR_MESSAGE);
@@ -5223,6 +5354,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         @Override
                         protected void done() {
                             frame.dispose();
+                            progressBar.setValue(0);
+                            progressBar.setMaximum(acquisitionTask.getTotalImages());
+                            progressBar.setStringPainted(true);
                         }
 
                     };
@@ -5235,9 +5369,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
             timepointLabel.setText(setting.getName() + ", Timepoint: ");
             acquireButton.setText("Stop");
-            progressBar.setValue(0);
-            progressBar.setMaximum(acquisitionTask.getTotalImages());
-            progressBar.setStringPainted(true);
             returnValue=currentAcqSetting.getName();
         return returnValue;
     }
@@ -5722,6 +5853,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         File file;
         do {    
             JFileChooser fc= new JFileChooser(expSettingsFile);
+            fc.setSelectedFile(new File(expSettingsFile.getName()));
+            fc.setFileSelectionMode(JFileChooser.FILES_ONLY);
+            fc.setMultiSelectionEnabled(false);
+            fc.ensureFileIsVisible(expSettingsFile);            
             int result=fc.showSaveDialog(this);
             if (result == JOptionPane.CANCEL_OPTION)
                 return;
@@ -5801,6 +5936,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 //                    if (!isWaiting) {
                     if (acqEng2010.isRunning() && isAcquiring) {
                         acqEng2010.stop();
+//                        imagingFinished("stop processing");
                     } else {
                         if (acquisitionTask!=null) {
                             acquisitionTask.cancel();
@@ -6005,7 +6141,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }//GEN-LAST:event_browseImageDestPathButtonActionPerformed
 
     private void loadLayoutButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadLayoutButtonActionPerformed
-        if (acqLayout!=null && acqLayout.isModifed()) {
+        if (acqLayout!=null && acqLayout.isModified()) {
             int result=JOptionPane.showConfirmDialog(this, "Acquisition layout "+acqLayout.getName()
                     +" has been modified.\nDo you want to save it before opening a new layout?", 
                     "Acquisition Layout",
@@ -6283,7 +6419,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             if (rows.length > 0) {
                 AreaTableModel atm = (AreaTableModel) areaTable.getModel();
                 for (int i=0; i<rows.length; i++) {
-                    rows[0]=areaTable.convertRowIndexToModel(rows[i]);
+                    rows[i]=areaTable.convertRowIndexToModel(rows[i]);
                 }
                 atm.removeRows(rows);
                 acqLayout.setModified(true);
@@ -6313,15 +6449,19 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
              id=areas.get(areas.size()-1).getId()+1;*/
             double tileWidth=currentAcqSetting.getTileWidth_UM();
             double tileHeight = currentAcqSetting.getTileHeight_UM();
-            Vec3d lCoord = acqLayout.convertStagePosToLayoutPos(sX, sY, sZ);
-            Area a = new RectArea(createNewAreaName(), acqLayout.createUniqueAreaId(), lCoord.x - tileWidth / 2, lCoord.y - tileHeight / 2, lCoord.z, tileWidth, tileHeight, false, "");
-            areas.add(a);
-            initializeAreaTable();
-            //            AreaTableModel atm=(AreaTableModel)areaTable.getModel();
-            //            Object[] data = new Object[]{a.isSelected(), a.getName(),new Integer(0), a.getAnnotation(), a.getId()};
-            //            atm.addRow(data);
-            acqLayout.setModified(true);
-            acqLayoutPanel.repaint();
+            try {
+                Vec3d lCoord = acqLayout.convertStageToLayoutPos(sX, sY, sZ);
+                Area a = new RectArea(createNewAreaName(), acqLayout.createUniqueAreaId(), lCoord.x - tileWidth / 2, lCoord.y - tileHeight / 2, lCoord.z, tileWidth, tileHeight, false, "");
+                areas.add(a);
+                initializeAreaTable();
+                //            AreaTableModel atm=(AreaTableModel)areaTable.getModel();
+                //            Object[] data = new Object[]{a.isSelected(), a.getName(),new Integer(0), a.getAnnotation(), a.getId()};
+                //            atm.addRow(data);
+                acqLayout.setModified(true);
+                acqLayoutPanel.repaint();
+            } catch (Exception ex) {
+                
+            }
         }
     }//GEN-LAST:event_newAreaButtonActionPerformed
 
@@ -6333,7 +6473,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 int newSelRowInView=selRows[0]+1;
                 //
                 int lastPlusOneIndex=areaTable.convertRowIndexToModel(selRows[selRows.length-1]+1);
-                //convert view row indices retrived from table to corresponding indices in model
+                //convert view row indices retrieved from table to corresponding indices in model
                 for (int i=0; i<selRows.length; i++) {
                     selRows[i]=areaTable.convertRowIndexToModel(selRows[i]);
                 }
@@ -6352,7 +6492,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 int newSelRowInView=selRows[0]-1;
                 //
                 int firstMinusOneIndex=areaTable.convertRowIndexToModel(selRows[0]-1);
-                //convert view row indices retrived from table to corresponding indices in model
+                //convert view row indices retrieved from table to corresponding indices in model
                 for (int i=0; i<selRows.length; i++) {
                     selRows[i]=areaTable.convertRowIndexToModel(selRows[i]);
                 }
@@ -7882,7 +8022,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     private void tilingDirComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_tilingDirComboBoxActionPerformed
         if (!calculating && recalculateTiles) {
-            currentAcqSetting.setTilingDir((Byte) tilingDirComboBox.getSelectedItem());
+            if ((Byte) tilingDirComboBox.getSelectedItem()!=currentAcqSetting.getTilingDir()) {
+                currentAcqSetting.setTilingDir((Byte) tilingDirComboBox.getSelectedItem());
+                calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+            }
         }
     }//GEN-LAST:event_tilingDirComboBoxActionPerformed
 
@@ -8752,6 +8895,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
          return "XML files";
          }
          });*/
+        jfc.setSelectedFile(new File(acqLayout.getFile().getName()));
         jfc.setFileSelectionMode(JFileChooser.FILES_ONLY);
         jfc.setMultiSelectionEnabled(false);
         jfc.ensureFileIsVisible(acqLayout.getFile());
@@ -8769,8 +8913,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
             acqLayout.setName(f.getName());
             acqLayout.setFile(f);
+            IJ.log("before update");
             //get area order and update layout and areaTable model
             updateAreaListFromAreaTableView(true, true);
+            IJ.log("after update");
 //            acqLayout.saveLayoutToXMLFile(f);
 
             FileWriter fw;
@@ -9334,8 +9480,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     sb.append(line);
                 }
                 JSONObject expSettingsObj=new JSONObject(sb.toString());
-                
-//                layout=new AcqLayout(expSettingsObj.getJSONObject(AcqLayout.TAG_LAYOUT),file);
                 //returns null if problem with parsing of JSONObject
                 layout=AcqLayout.createFromJSONObject(expSettingsObj.getJSONObject(AcqLayout.TAG_LAYOUT), file);
                 settings=loadAcquisitionSettings(expSettingsObj.getJSONArray(AcqSetting.TAG_ACQ_SETTING_ARRAY));  
@@ -9361,7 +9505,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 IJ.log("    Layout not found. Initializing with empty layout."); 
                 JOptionPane.showMessageDialog(this, "Last used layout definition could not be found or read!\n"
                         + "Creating default layout.");
-//                layout=new AcqLayout(null,null);//creates emptyLayout
                 layout=new AcqLayout();//creates emptyLayout
             } else {
                 IJ.log("    Layout not found."); 
@@ -9426,7 +9569,20 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             setLandmarkFound(false);
             Area.setStageToLayoutRot(acqLayout.getStageToLayoutRot());
             RefArea.setStageToLayoutRot(acqLayout.getStageToLayoutRot());
-
+            
+            if (refPointListDialog!=null) {
+                if (stageMonitor!=null) {
+                    stageMonitor.removeListener(refPointListDialog);
+                }
+                refPointListDialog.dispose();
+            }                
+            refPointListDialog = new RefPointListDialog(this, app, acqLayout);
+            refPointListDialog.addWindowListener(this);
+            refPointListDialog.addListener(this);
+            if (stageMonitor!=null) {
+                stageMonitor.addListener(refPointListDialog);
+            }
+            
             acqLayoutPanel.setCursor(normCursor);
             recalculateTiles = false;
             for (AcqSetting as : acqSettings) {
@@ -9766,6 +9922,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }
     
     public List<Area> updateAreaListFromAreaTableView(boolean updateLayout, boolean updateTableModel) {
+        IJ.log("AcqFrame.updateAreaListFromAreaTableView()");
         List<Area> newList=new ArrayList<Area>(areaTable.getRowCount());
         for (int i=0;i < areaTable.getRowCount(); i++) {
             int id=(Integer)areaTable.getValueAt(i, 1);
@@ -9782,10 +9939,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }
         
     private void initializeAreaTable() {
-//      IJ.log("AcqFrame.initializeAreaTable");  
         if (acqLayout != null) {
-            areaTable.setModel(new AreaTableModel(acqLayout.getAreaArray()));
-            
+            List<Area> l=acqLayout.getAreaArray();
+            //remove existing rowsorter which will cause null pointer exception when calling getColumnClass on row 0 in empty area list tablemodel
+            areaTable.setRowSorter(null);
+            areaTable.setModel(new AreaTableModel(l));
         } else {
             areaTable.setModel(new AreaTableModel(null));
         }
@@ -9810,8 +9968,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
         areaTable.setRowSorter(sorter);
-        
-//       IJ.log("finished initilizeAreaTable");
     }
 
     //fovRotation: angle rad rotation of camera field of view relative to stage
@@ -9944,7 +10100,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         Vec3d normVec = acqLayout.getNormalVector();
         if (acqLayout.getNoOfMappedStagePos() > 0) {
 //            AcqSetting setting=acqSettings.get(cAcqSettingIdx);
-            Area a = acqLayout.getFirstContainingArea(lx, ly, currentAcqSetting.getTileWidth_UM(), currentAcqSetting.getTileHeight_UM());
+            Area a = acqLayout.getFirstContainingArea(lx, ly);
             double areaRelPosZ;
             if (a != null) {
                 areaRelPosZ = a.getRelPosZ();

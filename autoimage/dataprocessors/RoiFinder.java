@@ -5,14 +5,18 @@
 package autoimage.dataprocessors;
 
 import autoimage.ExtImageTags;
+import autoimage.RoiSeed;
 import autoimage.TileManager;
 import autoimage.Utils;
 import autoimage.Vec3d;
+import static autoimage.dataprocessors.ScriptAnalyzer.scriptDir;
 import bsh.EvalError;
 import bsh.Interpreter;
 import ij.IJ;
 import ij.Prefs;
 import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.geom.Point2D;
@@ -23,6 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -44,22 +49,23 @@ import org.micromanager.api.MMTags;
  */
 public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<String> {
     
-    protected List<Point2D> roiList;
+    protected List<RoiSeed> roiList;
+//    protected List<Point2D> roiList;
     protected List<String> options_;
     protected List<String> selectedSeq;
     private final List<TileManager> tileManagerList;
     private final ExecutorService listenerExecutor;
 
     public RoiFinder () {
-        this("","","",null,false);
+        this("","","",null);
     }
     
     public RoiFinder (final String script, final String args, String path, TileManager tileManager) {
-        this(script, args, path, tileManager,false);
+        this(false,script, args, path, tileManager,false);
     }
 
-    public RoiFinder (final String script, final String args, String path, TileManager tileManager, boolean saveRT) {
-        super(script, args, path, saveRT);
+    public RoiFinder (boolean procIncompl,final String script, final String args, String path, TileManager tileManager, boolean saveRT) {
+        super(procIncompl,script, args, path, saveRT);
         tileManagerList=new ArrayList<TileManager>();
         if (tileManager!=null)
             tileManagerList.add(tileManager);
@@ -104,8 +110,10 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
     }
     @Override
     public void setScriptVariables(Interpreter interpreter) throws EvalError {
-        roiList= new ArrayList<Point2D>();
+//        roiList= new ArrayList<Point2D>();
+        roiList= new ArrayList<RoiSeed>();
         interpreter.set("roiList",roiList);
+        interpreter.set("workDir",workDir);
     }
 
     public void addTileManager(TileManager tileManager) {
@@ -120,15 +128,16 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
         tileManagerList.clear();
     }
     
-    //File f is reference to working copy
+    //File files is reference to working copy
     @Override
-    protected void processResults(File f) {
+    protected void processResults(List<File> files) {
         IJ.log(    "    Processed Results:"+script_+".");
         try {
-            JSONObject meta=Utils.parseMetadata(f);
+            JSONObject meta=Utils.parseMetadata(files.get(0));
             String name=meta.getString(MMTags.Image.POS_NAME);
             int imgWidth=meta.getInt(MMTags.Image.WIDTH);
             int imgHeight=meta.getInt(MMTags.Image.HEIGHT);
+            double zStepSize=meta.getDouble(MMTags.Image.ZUM);
             JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
             double pixSize=summary.getDouble(MMTags.Summary.PIXSIZE);
             double detectorAngle=summary.getDouble(ExtImageTags.DETECTOR_ROTATION);
@@ -140,26 +149,51 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
             double sinus=Math.sin(detectorAngle);
             if (roiList.size()>0){
                 final List<Vec3d> stagePosList=new ArrayList<Vec3d>(roiList.size());
-                for (final Point2D point:roiList) {
+//                for (final Point2D point:roiList) {
+                for (final RoiSeed roi:roiList) {
                     //correct for detector rotation relative to stage
                     //1. translate to center -> dx/dy
-                    double dx=point.getX()-pixSize*imgWidth/2;
-                    double dy=point.getY()-pixSize*imgHeight/2;
+                    double dx;//offset from image center in micron
+                    double dy;//offset from image center in micron
+                    IJ.log("Roi: ("+roi.xPos+"/"+roi.yPos+"/"+roi.zPos+" ["+roi.unitXY+"/"+roi.unitXY+"/"+roi.unitZ+"]");
+                    if (RoiSeed.IS_PIXEL.equals(roi.unitXY)) {
+                        //if unitXY is not set, roi coordinates are in pixel
+                        //--> convert pixel to micron
+                        dx=pixSize*(roi.xPos-imgWidth/2);
+                        dy=pixSize*(roi.yPos-imgHeight/2);
+                    } else {
+                        //roi coordinates are in micron
+                        dx=roi.xPos-pixSize*imgWidth/2;
+                        dy=roi.yPos-pixSize*imgHeight/2;                        
+                    }
                     //2. rotate
                     double x = (cosinus * dx) - (sinus * dy);
                     double y = (sinus * dx) + (cosinus * dy);
                     //3. translate to stage position of image center
-                    stagePosList.add(new Vec3d(stageCenterX + x,stageCenterY + y,stageZ));
+                    double dz;
+                    if (RoiSeed.IS_PIXEL.equals(roi.unitZ)) {
+                        //if unitXY is not set, roi coordinates are in z-step increments
+                        //--> convert pixel to micron
+                        dz=roi.zPos*zStepSize;
+                    } else {
+                        //roi coordinates are in micron
+                        dz=roi.zPos;                        
+                    }
+                    IJ.log("    roi (image): ("+(roi.xPos)+"/"+(roi.yPos)+"/"+(roi.zPos)+" ["+roi.unitXY+"/"+roi.unitXY+"/"+roi.unitZ+"]");
+                    IJ.log("    roi (image): ("+(roi.xPos*pixSize)+"/"+(roi.yPos*pixSize)+"/"+(roi.zPos*pixSize)+" [um/um/um]");
+                    IJ.log("    stageCenter (image): ("+(stageCenterX)+"/"+(stageCenterY)+"/"+(stageZ)+" [um/um/um]");
+                    IJ.log("    converted: ("+(stageCenterX + x)+"/"+(stageCenterY + y)+"/"+(stageZ+dz)+" ["+roi.unitXY+"/"+roi.unitXY+"/"+roi.unitZ+"]");
+                    stagePosList.add(new Vec3d(stageCenterX + x,stageCenterY + y,stageZ+dz));
                 }
                 roiList.clear();
                     
                 synchronized (tileManagerList) {
-                    for (final TileManager rtm : tileManagerList) {
+                    for (final TileManager tm : tileManagerList) {
                         listenerExecutor.submit(
                            new Runnable() {
                               @Override
                               public void run() {
-                                rtm.stagePosListAdded(area,stagePosList,this);
+                                tm.stagePosListAdded(area,stagePosList,this);
                               }
                            });
                     }
@@ -200,14 +234,48 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
             optCB = new JCheckBox[0];
         }
         
+        
+        l=new JLabel("Separate Images for Analysis by:");
+        l.setAlignmentX(Component.LEFT_ALIGNMENT);
+        optionPanel.add(l);
+        
+        JPanel cbPanel=new JPanel();
+        cbPanel.setLayout(new GridLayout(0,2));
+        JCheckBox channelCB=new JCheckBox("Channels");
+        cbPanel.add(channelCB);
+        JCheckBox positionsCB=new JCheckBox("XY-Positions");
+        cbPanel.add(positionsCB);
+        JCheckBox slicesCB=new JCheckBox("Z-Positions");
+        cbPanel.add(slicesCB);
+        JCheckBox clustersCB=new JCheckBox("Clusters/Area");
+        cbPanel.add(clustersCB);
+        JCheckBox framesCB=new JCheckBox("Timepoints");
+        cbPanel.add(framesCB);
+        JCheckBox areasCB=new JCheckBox("Areas");
+        cbPanel.add(areasCB);
+        JCheckBox commentsCB=new JCheckBox("Comments");
+        cbPanel.add(commentsCB);
+        cbPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        
+        optionPanel.add(cbPanel);
+        Component filler=Box.createRigidArea(new Dimension (10,10));
+        optionPanel.add(filler);
+        
+        channelCB.setSelected(criteriaKeys.contains(MMTags.Image.CHANNEL) || criteriaKeys.contains(MMTags.Image.CHANNEL_INDEX));
+        slicesCB.setSelected(criteriaKeys.contains(MMTags.Image.SLICE) || criteriaKeys.contains(MMTags.Image.SLICE_INDEX));
+        framesCB.setSelected(criteriaKeys.contains(MMTags.Image.FRAME) || criteriaKeys.contains(MMTags.Image.FRAME_INDEX));
+        positionsCB.setSelected(criteriaKeys.contains(MMTags.Image.POS_NAME) || criteriaKeys.contains(MMTags.Image.POS_INDEX));
+        clustersCB.setSelected(criteriaKeys.contains(ExtImageTags.CLUSTER_INDEX));
+        areasCB.setSelected(criteriaKeys.contains(ExtImageTags.AREA_NAME) || criteriaKeys.contains(ExtImageTags.AREA_INDEX));
+        commentsCB.setSelected(criteriaKeys.contains(ExtImageTags.AREA_COMMENT));           
+            
         l=new JLabel("Script File:");
         l.setAlignmentX(Component.LEFT_ALIGNMENT);
-        optionPanel.add(l);     
+        optionPanel.add(l);
         JPanel filePanel = new JPanel();
         BoxLayout flayout = new BoxLayout(filePanel,BoxLayout.X_AXIS);
         final JFormattedTextField scriptField = new JFormattedTextField();
         scriptField.setColumns(30);
-//        if (script_!=null)
         scriptField.setValue(script_);
         l.setAlignmentX(Component.LEFT_ALIGNMENT);
         filePanel.add(scriptField);
@@ -217,7 +285,6 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
             @Override
             public void actionPerformed(ActionEvent event) {
                 JFileChooser fc=new JFileChooser();
-                
                 File scriptFile=new File(scriptField.getText()).getParentFile();
                 if (scriptFile != null)
                     fc.setCurrentDirectory(scriptFile);
@@ -232,12 +299,11 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
                 if (result == JFileChooser.APPROVE_OPTION) {
                     scriptField.setValue(fc.getSelectedFile().getAbsolutePath());
                     scriptDir=fc.getCurrentDirectory().getAbsolutePath();
-                }
+                }    
             }
         });
         filePanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         optionPanel.add(filePanel);
-
         l=new JLabel("Script Arguments:");
         l.setAlignmentX(Component.LEFT_ALIGNMENT);
         optionPanel.add(l);
@@ -251,14 +317,13 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
         argField.setText(args_.replace(" ","\n"));
         optionPanel.add(argField);
             
-        l=new JLabel("Save Numeric Results");
-        l.setAlignmentX(Component.LEFT_ALIGNMENT);
-        optionPanel.add(l);
-        JCheckBox saveCB = new JCheckBox();
-        saveCB.setAlignmentX(Component.LEFT_ALIGNMENT);
-//        if (sa!=null)
-            saveCB.setSelected(saveRT_);
+        JCheckBox saveCB = new JCheckBox("Save Numeric Results");
+        saveCB.setSelected(saveRT_);
         optionPanel.add(saveCB);
+        JCheckBox procCB = new JCheckBox("Process On-the-Fly"); 
+        procCB.setSelected(processOnTheFly);
+        optionPanel.add(procCB);
+        
         int result=-100;
         File scriptfile=null;
         do {    
@@ -275,9 +340,34 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
                 if (optCB[i].isSelected()) {
                     selectedSeq.add(optCB[i].getText());
                 }    
-            }script_=scriptField.getText();
+            }            
+            criteriaKeys=new ArrayList<String>();
+            if (channelCB.isSelected()) {
+                criteriaKeys.add(MMTags.Image.CHANNEL_INDEX);
+            }
+            if (slicesCB.isSelected()) {
+                criteriaKeys.add(MMTags.Image.SLICE_INDEX);
+            }
+            if (framesCB.isSelected()) {
+                criteriaKeys.add(MMTags.Image.FRAME_INDEX);
+            }
+            if (positionsCB.isSelected()) {
+                criteriaKeys.add(MMTags.Image.POS_INDEX);
+            }
+            if (clustersCB.isSelected()) {
+                criteriaKeys.add(ExtImageTags.CLUSTER_INDEX);
+                criteriaKeys.add(ExtImageTags.AREA_INDEX);
+            }
+            if (areasCB.isSelected()) {
+                criteriaKeys.add(ExtImageTags.AREA_INDEX);
+            }
+            if (commentsCB.isSelected()) {
+                criteriaKeys.add(ExtImageTags.AREA_COMMENT);
+            }
+            script_=scriptField.getText();
             args_=argField.getText().replaceAll("\n", " ");
             saveRT_=saveCB.isSelected();
+            processOnTheFly=procCB.isSelected();
         }
     }
 
