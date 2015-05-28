@@ -38,7 +38,7 @@
                       <Group type="103" groupAlignment="0" attributes="0">
                           <Group type="102" alignment="0" attributes="0">
                               <Group type="103" groupAlignment="1" max="-2" attributes="0">
-                                  <Component id="monthSpinner" alignment="0" pref="0" max="32767" attributes="0"/>
+                                  <Component id="absTimeSpinner" alignment="0" pref="0" max="32767" attributes="0"/>
                                   <Group type="102" attributes="0">
                                       <Component id="jLabel1" min="-2" max="-2" attributes="0"/>
                                       <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
@@ -92,7 +92,7 @@
               <Component id="absoluteButton" min="-2" max="-2" attributes="0"/>
               <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
               <Group type="103" groupAlignment="3" attributes="0">
-                  <Component id="monthSpinner" alignment="3" min="-2" max="-2" attributes="0"/>
+                  <Component id="absTimeSpinner" alignment="3" min="-2" max="-2" attributes="0"/>
                   <Component id="nowButton" alignment="3" min="-2" max="-2" attributes="0"/>
               </Group>
               <EmptySpace min="-2" pref="24" max="-2" attributes="0"/>
@@ -209,7 +209,7 @@
         <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="deltaSecSpinnerStateChanged"/>
       </Events>
     </Component>
-    <Component class="javax.swing.JSpinner" name="monthSpinner">
+    <Component class="javax.swing.JSpinner" name="absTimeSpinner">
       <Properties>
         <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
           <Font name="Lucida Grande" size="12" style="0"/>

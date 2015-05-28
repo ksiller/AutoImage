@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage;
 
 //import ij.IJ;
@@ -25,8 +21,6 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.swing.JPanel;
 import javax.swing.Scrollable;
 import javax.swing.SwingConstants;
@@ -353,7 +347,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
                 for (int i=0; i<areas.size(); i++) {
                     Area a=acqLayout.getAreaArray().get(i);
 //                    a.draw(g2d, getBorderDimPix(), physToPixelRatio, tileWidth, tileHeight,tSetting,true);
-                    a.drawArea(g2d, getBorderDimPix(), physToPixelRatio);
+                    a.drawArea(g2d, getBorderDimPix(), physToPixelRatio, showZProfile);
                 }
                 drawTileGridForAllSelectedAreas(g2d);
             }    
@@ -522,7 +516,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
             //scale so that length of n = 1
             n = Vec3d.normalized(n);
         } catch (Exception ex) {
-            Logger.getLogger(LayoutPanel.class.getName()).log(Level.SEVERE, null, ex);
+//            Logger.getLogger(LayoutPanel.class.getName()).log(Level.SEVERE, null, ex);
         }
         if (acqLayout.getLandmarks()!=null & acqLayout.getLandmarks().size()>1 & calcDist(0,0,n.x,n.y)>0) {
             //gradient center positioned in center of layout

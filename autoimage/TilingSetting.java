@@ -4,7 +4,6 @@
  */
 package autoimage;
 
-import ij.IJ;
 import org.json.JSONException;
 import org.json.JSONObject;
 

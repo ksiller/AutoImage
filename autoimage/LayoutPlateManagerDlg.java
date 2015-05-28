@@ -1,13 +1,6 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package autoimage;
 
 import ij.Prefs;
-import java.awt.Rectangle;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -25,14 +18,13 @@ import org.json.JSONObject;
 public class LayoutPlateManagerDlg extends javax.swing.JDialog {
 
     private PlateConfiguration startUpConfig;
-    private static String lastFileLocation = "";
-    /**
-     * Creates new form LayoutManagerPlate
-     */
+    private static String lastFileLocation="";
+
     public LayoutPlateManagerDlg(java.awt.Frame parent, boolean modal) {
         super(parent, modal);
         initComponents();
-//        config = new PlateConfiguration(); 
+        if (lastFileLocation.equals(""))
+            lastFileLocation=Prefs.getHomeDir();
     }
 
     /**
@@ -84,7 +76,6 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("Plate Layout Manager");
-        setMaximumSize(new java.awt.Dimension(454, 486));
         setMinimumSize(new java.awt.Dimension(454, 486));
         setResizable(false);
 
@@ -158,10 +149,10 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
         fileLocationLabel.setText("jLabel11");
 
         jLabel11.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel11.setText("Wells/column:");
+        jLabel11.setText("Well columns:");
 
         jLabel12.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel12.setText("Wells/row:");
+        jLabel12.setText("Well rows:");
 
         jLabel13.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel13.setText("Well-to-well distance (mm):");
@@ -280,13 +271,10 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
                                     .add(wellShapeComboBox, 0, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
                         .add(12, 12, 12))))
             .add(layout.createSequentialGroup()
+                .addContainerGap()
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(layout.createSequentialGroup()
-                        .addContainerGap()
-                        .add(jSeparator1))
-                    .add(layout.createSequentialGroup()
-                        .addContainerGap()
-                        .add(jSeparator2)))
+                    .add(jSeparator1)
+                    .add(jSeparator2))
                 .addContainerGap())
         );
 
@@ -368,7 +356,7 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
         if (configuration!=null) {
             platenameField.setValue(configuration.name);
             if (configuration.fileLocation.equals("")) {
-                configuration.fileLocation=Prefs.getHomeDir();
+                configuration.fileLocation=lastFileLocation;
             }
             fileLocationLabel.setText(configuration.fileLocation);
             plateWidthField.setValue(configuration.width/1000);
@@ -426,6 +414,8 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
                     break;
                 }
             }
+        } else {
+            dispose();
         }
     }//GEN-LAST:event_closeButtonActionPerformed
 
@@ -446,8 +436,11 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
         }
         AcqLayout acqLayout= new AcqPlateLayout(new File(config.fileLocation,config.name),config);
         JFileChooser jfc = new JFileChooser();
+        if ("".equals(config.fileLocation)) {
+            config.fileLocation=Prefs.getHomeDir();
+        }
         jfc.setCurrentDirectory(new File(config.fileLocation));
-        lastFileLocation=config.fileLocation;
+        jfc.setSelectedFile(new File(config.name));
         jfc.setFileSelectionMode(JFileChooser.FILES_ONLY);
         jfc.setMultiSelectionEnabled(false);
         jfc.ensureFileIsVisible(acqLayout.getFile());
@@ -490,7 +483,8 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
                 Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
             }
             platenameField.setText(acqLayout.getName());
-            fileLocationLabel.setText(acqLayout.getFile().getParent());
+            lastFileLocation=acqLayout.getFile().getParent();
+            fileLocationLabel.setText(lastFileLocation);
             acqLayout.setModified(false);
         }       
     }

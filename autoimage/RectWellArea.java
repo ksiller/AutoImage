@@ -1,11 +1,5 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage;
 
-import ij.IJ;
 import java.util.Comparator;
 
 /**
@@ -28,6 +22,10 @@ public class RectWellArea extends RectArea {
         super(n,id,ox,oy,oz,w,h,s,anot);
     }
 
+    @Override
+    public String getShape() {
+        return "Rectangular Well";
+    }
     
     public static Comparator<String> NameComparator = new Comparator<String>() {
 
@@ -65,6 +63,11 @@ public class RectWellArea extends RectArea {
         }
     };
     
+    @Override
+    public int supportedLayouts() {
+        return Area.SUPPORT_WELLPLATE_LAYOUT;
+    }
+
     
     
 }

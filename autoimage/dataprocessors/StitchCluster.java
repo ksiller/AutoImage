@@ -13,6 +13,7 @@ import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;
 import ij.plugin.PlugIn;
+import ij.plugin.RGBStackMerge;
 import ij.process.ImageProcessor;
 import java.awt.Component;
 import java.awt.GridLayout;
@@ -210,6 +211,8 @@ public class StitchCluster extends GroupProcessor<File> {
                             Long noOfSlices=summary.getLong(MMTags.Summary.SLICES);
                             Long noOfFrames=summary.getLong(MMTags.Summary.FRAMES);
 
+                            String imageType=MMTags.Summary.PIX_TYPE;
+                            boolean isRGB=imageType.equals("RGB32") || imageType.equals("RGB64");
     //                        int dim=2;
     //                        long selectedSliceIndex=0;
                             int dim=noOfSlices < 2 ? 2 : 3;
@@ -403,7 +406,7 @@ public class StitchCluster extends GroupProcessor<File> {
                                 + "image_output=[Write to disk] ");
     //                            + "output_directory="+workDir);
 
-                            } catch (Throwable ex) {
+                            } catch (Exception ex) {
                                 IJ.log("    Stitching exception: "+ex);
                                 return new ArrayList<File>();
                             } 
@@ -429,9 +432,19 @@ public class StitchCluster extends GroupProcessor<File> {
                                 }
 
                                 TaggedImageStorage storage = null;
+                                
+                                int channels;
+                                ImagePlus[] impColor=null;
+                                if (isRGB) {
+                                    channels=3;
+                                    impColor=new ImagePlus[3];
+                                    IJ.log("ISRGB");
+                                } else {
+                                    channels=foundCh.size();
+                                }    
                                 for (int t=0; t<noOfFrames; t++) {
                                 for (int j=0; j<noOfSlices; j++) {
-                                for (int i=0; i<foundCh.size(); i++) {
+                                for (int i=0; i<channels; i++) {
                                 //wait for result stitched image file
                                     if (Thread.currentThread().isInterrupted())
                                         return new ArrayList<File>();
@@ -446,7 +459,7 @@ public class StitchCluster extends GroupProcessor<File> {
             //                      File resultFile=new File(new File(workDir,prefix),name);                    
                                     //wait for result file to be saved
                                     while (!resultFile.exists()) {
-                                        if (Thread.currentThread().isInterrupted())
+                                        if (Thread.currentThread().isInterrupted() || stopRequested)
                                             return new ArrayList<File>();
                                         if (resultFile2!=null)
                                             if (resultFile2.exists()) {
@@ -461,12 +474,6 @@ public class StitchCluster extends GroupProcessor<File> {
                                     } 
 
                                     ImagePlus imp=IJ.openImage(resultFile.getAbsolutePath());
-    //                                IJ.log("Retrieved imageProcessor");
-                                    //if compute_overlap, tiles may have been rotated (if camera rotation was not correctly set) 
-                        /*            if (registerFile.exists()) {
-                                        double angle=calculateRotation(configFile, registerFile);
-                                        proc.rotate(angle);
-                                    }*/
                                     if (Thread.currentThread().isInterrupted())
                                         return new ArrayList<File>();
                                     if (!postStitchProcessing.equals("None") && cameraRot != FieldOfView.ROTATION_UNKNOWN) {
@@ -477,6 +484,9 @@ public class StitchCluster extends GroupProcessor<File> {
                                             imp.setRoi(new Roi((int)(imp.getWidth()-expectedWidth)/2,(int)(imp.getHeight()-expectedHeight)/2,(int)expectedWidth,(int)expectedHeight));
                                             IJ.run(imp, "Crop","");
                                         }
+                                    }
+                                    if (isRGB) {
+                                        impColor[i]=imp;
                                     }
                                     ImageProcessor proc=imp.getProcessor();
                                     TaggedImage ti=null;
@@ -492,7 +502,11 @@ public class StitchCluster extends GroupProcessor<File> {
                                             }
                                             newSummary.put(MMTags.Summary.SLICES, noOfSlices); 
                                             newSummary.put(MMTags.Summary.POSITIONS, 1); 
-                                            newSummary.put(MMTags.Summary.CHANNELS, noOfCh); 
+                                            if (!isRGB) {
+                                                newSummary.put(MMTags.Summary.CHANNELS, noOfCh); 
+                                            } else {
+                                                newSummary.put(MMTags.Summary.CHANNELS, 1); 
+                                            }
                                             newSummary.put(MMTags.Summary.FRAMES, noOfFrames); 
                                             newSummary.put(MMTags.Summary.WIDTH,imp.getWidth()); 
                                             newSummary.put(MMTags.Summary.HEIGHT,imp.getHeight()); 
@@ -531,10 +545,17 @@ public class StitchCluster extends GroupProcessor<File> {
             //                            IJ.log("xMin(pix): "+Double.toString(xMin)+", xMax(pix): "+Double.toString(xMax)+", yMin(pix): "+Double.toString(yMin)+", yMax(pix): "+Double.toString(yMax));
             //                            IJ.log("xMax(pix)-xMin(pix): "+Double.toString(xMax-xMin)+", yMax(pix)-yMin(pix): "+Double.toString(yMax-yMin)+", imp.getWidth()-->um="+Double.toString(imp.getWidth()*pixSize)+", imp.getHeight()-->um="+Double.toString(imp.getHeight()*pixSize));
             //                            IJ.log("Creating new TaggedImage");
-                                        ti=new TaggedImage(proc.getPixels(),meta);
-                                        storage.putImage(ti);
-                                        stitchedFiles.add(new File(new File(workDir,prefix), ti.tags.getString("FileName")));
-                                        IJ.log("    "+stitchedFiles.get(stitchedFiles.size()-1).getAbsolutePath());
+                                        if (!isRGB || (isRGB && i==2)) {
+                                            if (isRGB) {
+                                                RGBStackMerge merger=new RGBStackMerge();
+                                                ImagePlus resultImp=merger.mergeHyperstacks(impColor, false);    
+                                                proc=resultImp.getProcessor();
+                                            }
+                                            ti=new TaggedImage(proc.getPixels(),meta);
+                                            storage.putImage(ti);
+                                            stitchedFiles.add(new File(new File(workDir,prefix), ti.tags.getString("FileName")));
+                                            IJ.log("    "+stitchedFiles.get(stitchedFiles.size()-1).getAbsolutePath());
+                                        }
                                     } catch (Exception ex) {
                                         IJ.log("    Problem saving to storage: "+ti.tags.getString("FileName"));
                                         Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
@@ -592,8 +613,8 @@ public class StitchCluster extends GroupProcessor<File> {
     public void makeConfigurationGUI() {
         JPanel optionPanel = new JPanel();
         GridLayout layout = new GridLayout(0,2);
-
         optionPanel.setLayout(layout);
+        
         JLabel l=new JLabel("Fusion method:",JLabel.RIGHT);
         l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
         optionPanel.add(l);
@@ -745,14 +766,15 @@ public class StitchCluster extends GroupProcessor<File> {
         return meta;
     }
 
-    @Override
+/*    @Override
     protected boolean groupIsComplete(Group<File> group) {
         //this will force to wait with processing until after POISON is received
         return false;
     }
-
+*/
     @Override
     protected long determineMaxGroupSize(JSONObject meta) throws JSONException {
+        //this will force to wait with processing until after File.POISON is received
         return -1;
     }
     
@@ -761,7 +783,9 @@ public class StitchCluster extends GroupProcessor<File> {
         super.requestStop();
         //block submission of new jobs
         executor.shutdown();
-//      should cancel running callable thread, but the stitching plugin can throw an uncaught exception
+/*      Should cancel running callable thread, but the stitching plugin can throw an uncaught exception.
+        For now, let Stitching plugin process current job to ensure graceful exit
+*/      
 //        List<Runnable> procs=executor.shutdownNow();
         executor=null;
     }

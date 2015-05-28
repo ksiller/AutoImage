@@ -1,30 +1,32 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage;
 
 import static autoimage.Area.COLOR_ACQUIRING_AREA;
 import static autoimage.Area.COLOR_AREA_BORDER;
 import static autoimage.Area.COLOR_MERGE_AREA_BORDER;
 import static autoimage.Area.COLOR_SELECTED_AREA_BORDER;
-import static autoimage.Area.TAG_CLASS;
-import ij.IJ;
 import java.awt.Graphics2D;
+import java.awt.GridLayout;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import javax.swing.BorderFactory;
+import javax.swing.JFormattedTextField;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
 import org.json.JSONException;
 import org.json.JSONObject;
+
 
 /**
  *
  * @author Karsten
  */
-class DonutArea extends Area {
+public class DonutArea extends Area {
     private double ringWidth;
     
     public DonutArea() {
@@ -41,8 +43,7 @@ class DonutArea extends Area {
         super(n,id,ox,oy,oz,w,h,s,anot);
         this.ringWidth=ringWidth;
     }
-    
-    
+        
     public void setRingWidth(double rw) {
         ringWidth=rw;
     }
@@ -55,76 +56,9 @@ class DonutArea extends Area {
     public String getShape() {
         return "Donut";
     }
-    
-    
-/*
-@Override
-    public String[] getXMLTags() {
-        String[] s = new String[8];
-        s[0]="SHAPE";
-        s[1]="NAME";
-        s[2]="WIDTH";
-        s[3]="HEIGHT";
-        s[4]="TOP_LEFT_X";
-        s[5]="TOP_LEFT_Y";
-        s[6]="REL_POS_Z";
-        s[7]="RING_WIDTH";
-        return s;
-    }
-   */    
-    
-/*    
-    @Override
-    public boolean setAreaParams (List<String> params) {
-//        if (super.setAreaParams(params)) {
-        if (params.size()>=9) {
-//            shape=params.get(1);
-            name=params.get(2);
-            width=Double.parseDouble(params.get(3));
-            height=Double.parseDouble(params.get(4));
-            ringWidth=Double.parseDouble(params.get(5));
-            topLeftX=Double.parseDouble(params.get(6));
-            topLeftY=Double.parseDouble(params.get(7));
-            relPosZ=Double.parseDouble(params.get(8));
-            selectedForAcq=Boolean.parseBoolean(params.get(9));
-            return true;
-        } else {
-//            shape=getShape();
-            name="undefined";
-            width=1;
-            height=1;
-            topLeftX=0;
-            topLeftY=0;
-            relPosZ=0;
-            selectedForAcq=false;
-            return false;
-        }
-    }
-
-    @Override
-    protected Map<String,String> createParamHashMap() {
-        Map<String,String> map = super.createParamHashMap();
-        map.put(TAG_CLASS,this.getClass().getName());
-        map.put(TAG_RING_WIDTH,Double.toString(ringWidth));
-        return map;
-    }
-    
-    @Override
-    public void setAreaParams (Map<String,String> params) {
-        if (params!=null) {
-            super.setAreaParams(params);
-            String s=params.get(TAG_RING_WIDTH);
-            if (s!=null)
-                ringWidth=Double.parseDouble(s);
-
-        }
-    }    
-*/    
+        
     @Override
     public void initializeFromJSONObject(JSONObject obj) throws JSONException {
-//        IJ.log("initializing: "+this.getClass().getName());
-//        super.initializeFromJSONObject(obj);
-//      initialize 'Donut' specific fields, inherited fields initialized by parent class
         if (obj!=null)
             ringWidth=obj.getDouble(TAG_RING_WIDTH);
         else
@@ -136,25 +70,15 @@ class DonutArea extends Area {
         if (obj!=null)
             obj.put(TAG_RING_WIDTH,ringWidth);
     }
-    
-/*    
+        
     @Override
-    public double getCenterX () {
-        return topLeftX+width/2;
-    }
-    
-    @Override
-    public double getCenterY () {
-        return topLeftY+height/2;
-    }
-*/    
-    @Override
-    public void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio) {
-        if (acquiring) {
+    public void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio, boolean showZProfile) {
+        g2d.setColor(getFillColor(showZProfile));
+/*        if (acquiring) {
             g2d.setColor(COLOR_ACQUIRING_AREA);
         } else
             g2d.setColor(COLOR_UNSELECTED_AREA);
-        int x = bdPix + (int) Math.round(topLeftX*physToPixelRatio);
+*/        int x = bdPix + (int) Math.round(topLeftX*physToPixelRatio);
         int y = bdPix + (int) Math.round(topLeftY*physToPixelRatio);
         int w = (int) Math.round(width*physToPixelRatio);
         int h = (int) Math.round(height*physToPixelRatio);  
@@ -168,6 +92,9 @@ class DonutArea extends Area {
         java.awt.geom.Area hole = new java.awt.geom.Area(new Ellipse2D.Double(holeX, holeY, holeWidth, holeHeight));
         donut.subtract(hole);
         g2d.fill(donut);
+        g2d.setColor(getBorderColor());
+/*        
+
         if (selectedForMerge)
             g2d.setColor(COLOR_MERGE_AREA_BORDER);
         else
@@ -175,8 +102,9 @@ class DonutArea extends Area {
                 g2d.setColor(COLOR_SELECTED_AREA_BORDER);
             else    
                 g2d.setColor(COLOR_AREA_BORDER);
+*/
         g2d.draw(new Ellipse2D.Double(x, y, w,h)); 
-        if (selectedForMerge)
+/*        if (selectedForMerge)
             g2d.setColor(COLOR_MERGE_AREA_BORDER);
         else {
             if (selectedForAcq)
@@ -184,6 +112,7 @@ class DonutArea extends Area {
             else    
                 g2d.setColor(COLOR_AREA_BORDER);
         }        
+        */
         g2d.draw(new Ellipse2D.Double(holeX, holeY, holeWidth, holeHeight)); 
     }
     
@@ -220,8 +149,8 @@ class DonutArea extends Area {
 
     //checks if rectangle encloses this entire area
     @Override
-    public boolean isInsideRect(Rectangle2D.Double r) { 
-        return ((topLeftX>r.x) && (topLeftX+width<r.x+r.width) && (topLeftY>r.y) && (topLeftY+height<r.y+r.height));
+    public boolean isInsideRect(Rectangle2D r) { 
+        return ((topLeftX>=r.getX()) && (topLeftX+width<=r.getX()+r.getWidth()) && (topLeftY>=r.getY()) && (topLeftY+height<=r.getY()+r.getHeight()));
     } 
 
     @Override
@@ -246,13 +175,9 @@ class DonutArea extends Area {
     }
 
     @Override
-    public Point2D calculateCenterPos() {
-        return new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
-    }
-
-    @Override
-    public Point2D calculateDefaultPos() {
-        return new Point2D.Double(topLeftX+width/2,topLeftY+ringWidth/2);
+    public void calcCenterAndDefaultPos() {
+        centerPos=new Point2D.Double(topLeftX+width/2,topLeftY+ringWidth/2);
+        defaultPos=new Point2D.Double(topLeftX+width/2,topLeftY+ringWidth/2);
     }
 
     @Override
@@ -265,4 +190,198 @@ class DonutArea extends Area {
         return list;
     }
 
+    @Override
+    public Area showConfigDialog(Rectangle2D bounds) {
+        JPanel optionPanel = new JPanel();
+        GridLayout layout = new GridLayout(0,4);
+        optionPanel.setLayout(layout);
+        
+        JLabel l=new JLabel("Name:",JLabel.RIGHT);
+        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        optionPanel.add(l);
+        JFormattedTextField nameField = new JFormattedTextField();
+        nameField.setColumns(10);
+        nameField.setValue(new String(name));
+        optionPanel.add(nameField);
+
+        l=new JLabel("Relative Z (mm):",JLabel.RIGHT);
+        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        optionPanel.add(l);
+        JFormattedTextField zField = new JFormattedTextField();
+        zField.setColumns(10);
+        zField.setValue(new Double(relPosZ / 1000));
+        optionPanel.add(zField);
+             
+        l=new JLabel("Origin X (mm):",JLabel.RIGHT);
+        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        optionPanel.add(l);
+        final JFormattedTextField topLeftXField = new JFormattedTextField();
+        topLeftXField.setColumns(10);
+        topLeftXField.setValue(new Double(topLeftX / 1000));
+        optionPanel.add(topLeftXField);
+        
+        l=new JLabel("Center X (mm):",JLabel.RIGHT);
+        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        optionPanel.add(l);
+        final JFormattedTextField centerXField = new JFormattedTextField();
+        centerXField.setColumns(10);
+        centerXField.setValue(new Double(getCenterPos().getX() / 1000));
+        optionPanel.add(centerXField);
+
+        l=new JLabel("Origin Y (mm):",JLabel.RIGHT);
+        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        optionPanel.add(l);
+        final JFormattedTextField topLeftYField = new JFormattedTextField();
+        topLeftYField.setColumns(10);
+        topLeftYField.setValue(new Double(topLeftY / 1000));
+        optionPanel.add(topLeftYField);
+        
+        l=new JLabel("Center Y (mm):",JLabel.RIGHT);
+        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        optionPanel.add(l);
+        final JFormattedTextField centerYField = new JFormattedTextField();
+        centerYField.setColumns(10);
+        centerYField.setValue(new Double(getCenterPos().getY() / 1000));
+        optionPanel.add(centerYField);
+
+        l=new JLabel("Width (mm):",JLabel.RIGHT);
+        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        optionPanel.add(l);
+        final JFormattedTextField widthField = new JFormattedTextField();
+        widthField.setColumns(10);
+        widthField.setValue(new Double(width / 1000));
+        optionPanel.add(widthField);
+
+        l=new JLabel("Height (mm):",JLabel.RIGHT);
+        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        optionPanel.add(l);
+        final JFormattedTextField heightField = new JFormattedTextField();
+        heightField.setColumns(10);
+        heightField.setValue(new Double(height / 1000));
+        optionPanel.add(heightField);
+        
+        l=new JLabel("Ringwidth (mm):",JLabel.RIGHT);
+        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        optionPanel.add(l);
+        final JFormattedTextField ringwidthField = new JFormattedTextField();
+        ringwidthField.setColumns(10);
+        ringwidthField.setValue(new Double(ringWidth / 1000));
+        optionPanel.add(ringwidthField);
+        
+        topLeftXField.addPropertyChangeListener("value",new PropertyChangeListener() {
+
+            @Override
+            public void propertyChange(PropertyChangeEvent evt) {
+                if (evt.getSource() == topLeftXField) {
+                    double newValue = ((Number)topLeftXField.getValue()).doubleValue() * 1000;
+                    if (newValue != topLeftX) {
+                        setTopLeftX(newValue);
+                        centerXField.setValue(new Double(getCenterPos().getX() / 1000));
+                    }
+                }
+            }
+        });
+
+        centerXField.addPropertyChangeListener("value",new PropertyChangeListener() {
+
+            @Override
+            public void propertyChange(PropertyChangeEvent evt) {
+                if (evt.getSource() == centerXField) {
+                    double newValue = ((Number)centerXField.getValue()).doubleValue() * 1000;
+                    if (newValue != getCenterPos().getX()) {
+                        setTopLeftX(newValue-width/2);
+                        topLeftXField.setValue(new Double(topLeftX / 1000));
+                    }
+                }
+            }
+        });
+        
+        topLeftYField.addPropertyChangeListener("value",new PropertyChangeListener() {
+
+            @Override
+            public void propertyChange(PropertyChangeEvent evt) {
+                if (evt.getSource() == topLeftYField) {
+                    double newValue = ((Number)topLeftYField.getValue()).doubleValue() * 1000;
+                    if (newValue != topLeftY) {
+                        setTopLeftY(newValue);//recalculates center pos
+                        centerYField.setValue(new Double(getCenterPos().getY() / 1000));
+                    }
+                }
+            }
+        });
+
+        centerYField.addPropertyChangeListener("value",new PropertyChangeListener() {
+
+            @Override
+            public void propertyChange(PropertyChangeEvent evt) {
+                if (evt.getSource() == centerYField) {
+                    double newValue = ((Number)centerYField.getValue()).doubleValue() * 1000;
+                    if (newValue != getCenterPos().getY()) {
+                        setTopLeftY(newValue-height/2);
+                        topLeftYField.setValue(new Double(topLeftY / 1000));
+                    }
+                }
+            }
+        });
+        
+        widthField.addPropertyChangeListener("value",new PropertyChangeListener() {
+
+            @Override
+            public void propertyChange(PropertyChangeEvent evt) {
+                if (evt.getSource() == widthField) {
+                    double newValue = ((Number)widthField.getValue()).doubleValue() * 1000;
+                    if (newValue != width) {
+                        setWidth(newValue);
+                        centerXField.setValue(new Double(getCenterPos().getX() / 1000));
+                    }
+                }
+            }
+        });
+
+        heightField.addPropertyChangeListener("value",new PropertyChangeListener() {
+
+            @Override
+            public void propertyChange(PropertyChangeEvent evt) {
+                if (evt.getSource() == heightField) {
+                    double newValue = ((Number)heightField.getValue()).doubleValue() * 1000;
+                    if (newValue != height) {
+                        setHeight(newValue);
+                        centerYField.setValue(new Double(getCenterPos().getY() / 1000));
+                    }
+                }
+            }
+        });
+        
+        int result;
+        do {
+            result = JOptionPane.showConfirmDialog(null, optionPanel, 
+                getShape()+": Configuration", JOptionPane.OK_CANCEL_OPTION);
+            if (result == JOptionPane.OK_OPTION && !isInsideRect(bounds)) {
+                JOptionPane.showMessageDialog(null,"The area does not fit into the layout.");
+            }
+        } while (result == JOptionPane.OK_OPTION && !isInsideRect(bounds));
+        
+        if (result == JOptionPane.CANCEL_OPTION) {
+            return null;
+        } else {
+            setName((String)nameField.getValue());
+            setTopLeft(((Number)topLeftXField.getValue()).doubleValue()*1000, ((Number)topLeftYField.getValue()).doubleValue()*1000);
+            setWidth(((Number)widthField.getValue()).doubleValue()*1000);
+            setHeight(((Number)heightField.getValue()).doubleValue()*1000);
+            //center pos will be set automatically
+            setRelPosZ(((Number)zField.getValue()).doubleValue()*1000);            
+            setRingWidth(((Number)ringwidthField.getValue()).doubleValue()*1000);
+            return this;
+        }
+            
+    }
+
+    @Override
+    public int supportedLayouts() {
+        return Area.SUPPORT_CUSTOM_LAYOUT;
+    }
+
+
+    
+    
 }

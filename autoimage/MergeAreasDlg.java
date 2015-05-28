@@ -1,9 +1,3 @@
-/**
- *
- * @author Karsten, modified from PositionListDlg.java authored by Nenad Amodaj and Nico Stuurman
- */
-
-
 package autoimage;
 
 import ij.IJ;
@@ -170,19 +164,15 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
    }
 
    public MergeAreasDlg(AcqFrame aFrame, AcqLayout al, ScriptInterface gui) {
-      super();
+      super(aFrame);
       listeners=new ArrayList<IMergeAreaListener>();
       listenerExecutor = Executors.newFixedThreadPool(1);
       addWindowListener(new WindowAdapter() {
          @Override
          public void windowClosing(WindowEvent arg0) {
-//            savePosition();
-//            IJ.showMessage("window closing");
-             IJ.log("MergeAreasDlg.windowClosing");
             removeAllAreas();
          }
       });
-//      acqFrame=aFrame;
       acqLayout=al;
       setTitle("Merge Areas");
       SpringLayout springLayout = new SpringLayout();

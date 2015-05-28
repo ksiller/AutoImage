@@ -331,7 +331,7 @@ public class AcqSetting {
             try {
                 device=autofocusSettings.getString(TAG_AUTOFOCUS_DEVICE_NAME);
             } catch (JSONException ex) {
-                Logger.getLogger(AcqSetting.class.getName()).log(Level.SEVERE, null, ex);
+//                Logger.getLogger(AcqSetting.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
         return device;

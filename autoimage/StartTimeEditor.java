@@ -1,9 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package autoimage;
 
 import java.awt.Component;
@@ -23,34 +17,12 @@ public class StartTimeEditor extends AbstractCellEditor
     AcqSetting.ScheduledTime startTime;
     JButton button;//component in table
     TimeChooserDlg timeChooser;
-//    JDialog dialog;
     protected static final String EDIT = "edit";
  
     public StartTimeEditor() {
-//        IJ.log("StartTimeEditor.constructor");
         button = new JButton();
         button.setActionCommand(EDIT);//when cell is pressed in table
         button.addActionListener(this);
-/*
-        button.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                IJ.log("StartTimeEditor.actionPerformed");
-                if (EDIT.equals(e.getActionCommand())) {
-                    //The user has clicked the cell, so
-                    //bring up the dialog.
-                    IJ.log("before setStartTime");    
-                    timeChooser.setStartTime(new AcqSetting.ScheduledTime(startTime.type,startTime.startTimeMS));
-                    IJ.log("after setStartTime");    
-                    timeChooser.setVisible(true);
-                    IJ.log("after setVisible");    
-
-                    //Make the renderer reappear.
-                    fireEditingStopped();
-                }
-            }
-        });
-            */
         button.setBorderPainted(false);
  
         timeChooser = new TimeChooserDlg(null,true);
@@ -61,8 +33,7 @@ public class StartTimeEditor extends AbstractCellEditor
     @Override
     public void actionPerformed(ActionEvent e) {
         if (EDIT.equals(e.getActionCommand())) {
-            //The user has clicked the cell, so
-            //bring up the dialog.
+            //bring up TimeChooserDlg.
             timeChooser.setStartTime(new AcqSetting.ScheduledTime(startTime.type,startTime.startTimeMS));
             timeChooser.setVisible(true);
 
@@ -72,6 +43,7 @@ public class StartTimeEditor extends AbstractCellEditor
             startTime = timeChooser.getStartTime();
         }
         if (e.getActionCommand().equals("Cancel")) {
+            //ignore changes
         }
     }
     

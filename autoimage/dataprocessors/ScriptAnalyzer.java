@@ -6,15 +6,20 @@ package autoimage.dataprocessors;
 
 import autoimage.ExtImageTags;
 import autoimage.ImageFileQueue;
+import autoimage.MMCoreUtils;
 import autoimage.Utils;
 import bsh.EvalError;
 import bsh.Interpreter;
 import bsh.TargetError;
+import ij.CompositeImage;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.Prefs;
 import ij.measure.ResultsTable;
+import ij.process.ImageProcessor;
 import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedReader;
@@ -26,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -35,10 +41,13 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
+import mmcorej.TaggedImage;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.micromanager.acquisition.TaggedImageStorageDiskDefault;
 import org.micromanager.api.MMTags;
+import org.micromanager.utils.ImageUtils;
 
 
     
@@ -46,29 +55,39 @@ import org.micromanager.api.MMTags;
  *
  * @author Karsten
  */
-public class ScriptAnalyzer extends BranchedProcessor<File>  {
+public class ScriptAnalyzer extends GroupProcessor<File>  {
     
     protected String script_;
     protected String args_;
     protected boolean saveRT_;
     protected ResultsTable rTable_; //new table for each image
     protected static String scriptDir = "";
+    protected TaggedImageStorageDiskDefault storage;
+    protected boolean processOnTheFly;
     
     
     public ScriptAnalyzer() {
-        this("","","",false);
+        this(false,"","","",false);
     }
     
-    public ScriptAnalyzer(final String script, final String args, final String path) {
-        this(script,args,path, false);
+    public ScriptAnalyzer(boolean procIncomplete, final String script, final String args, final String path) {
+        this(procIncomplete,script,args,path, false);
     }
     
-    public ScriptAnalyzer(String script, String args, String path, boolean saveRT) {
-        super("ScriptAnalyzer: "+new File(script).getName()+" ["+args+"]", path);
+    public ScriptAnalyzer(boolean procIncomplete, String script, String args, String path, boolean saveRT) {
+        super("ScriptAnalyzer: "+new File(script).getName()+" ["+args+"]", path,null,procIncomplete);
         script_=script;
         args_=args;
         saveRT_=saveRT;
         rTable_=null;
+        
+        processIncompleteGrps=true;
+        processOnTheFly=true;
+    }
+    
+    @Override
+    protected void initialize() {
+        storage=null;
     }
     
     @Override
@@ -137,10 +156,77 @@ public class ScriptAnalyzer extends BranchedProcessor<File>  {
         args_=args;
     }
     
-    protected boolean saveResultsTable(File modFile) {
+    
+    //creates copy of element
+    //if meta!=null, metadata in copied element will be replaced by meta, otherwise keep original metadata
+    @Override
+    protected File createCopy(File element) {
+        JSONObject meta=null;
+        File copy=null;
+        TaggedImage ti=null;
+        ImagePlus imp=null; 
+        imp=IJ.openImage(((File)element).getAbsolutePath());
+        if (imp!=null && imp.getProperty("Info") != null) {
+            try {
+                meta = new JSONObject((String)imp.getProperty("Info"));
+                String newDir=new File(workDir).getParentFile().getAbsolutePath();
+                ImageProcessor ip=imp.getProcessor();
+                if (meta.getJSONObject(MMTags.Root.SUMMARY).getString(MMTags.Summary.PIX_TYPE).equals("RGB32")) {
+                    //RGB32 images hold pixel data in int[] --> convert to byte[]
+                    ti=new TaggedImage(MMCoreUtils.convertIntToByteArray((int[])ip.getPixels()),new JSONObject(meta.toString()));
+                }
+                else if (meta.getJSONObject(MMTags.Root.SUMMARY).getString(MMTags.Summary.PIX_TYPE).equals("RGB64")) {
+                    if (imp.isComposite()) {
+                        CompositeImage ci=(CompositeImage)imp;
+                        short[] totalArray=new short[ci.getWidth()*ci.getHeight()*4];
+                        for (int channel=0; channel< ci.getNChannels(); channel++) {
+                            ImageProcessor proc=imp.getStack().getProcessor(channel+1);
+                            short[] chPixels=(short[])proc.getPixels();
+                            for (int i=0;i<chPixels.length;i++) {
+                                totalArray[(2-channel) + 4*i] = chPixels[i]; // B,G,R
+                            }
+                        }
+                        ti=new TaggedImage(totalArray,new JSONObject(meta.toString()));
+                    }
+
+                } else {//8-bit or 16-bit grayscale
+                    ti=ImageUtils.makeTaggedImage(ip);
+                    ti.tags=new JSONObject(meta.toString());                        
+                }
+                String newPrefix=new File(workDir).getName();
+                //update metadata
+                ti.tags=updateTagValue(ti.tags, newDir, newPrefix, true);
+                if (storage==null) {
+                    storage = new TaggedImageStorageDiskDefault (workDir,true,ti.tags.getJSONObject(MMTags.Root.SUMMARY));
+                }
+                storage.putImage(ti);
+
+                String posName="";
+                File copiedFile=new File(new File(new File(newDir,newPrefix),meta.getString("PositionName")),
+                                                ti.tags.getString("FileName"));
+                copy=copiedFile;
+            } catch (JSONException ex) {
+                IJ.log(this.getClass().getName()+ ": Cannot retrieve 'Info' metadata from file. "+ex);
+                Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
+//                    copy=super.createCopy(element);
+            } catch (Exception ex) {
+                IJ.log(this.getClass().getName()+ ": Error writing file to storage. "+ex);
+                Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        } else {
+            IJ.log(this.getClass().getName()+": Cannot open image");
+//                copy=super.createCopy(element);
+        }
+       return copy;
+    }    
+
+    protected boolean saveResultsTable(List<File> modFiles) {
+        if (rTable_==null) {
+            return false;
+        }
         File rtFile=null;
         try {
-            JSONObject meta=Utils.parseMetadata(modFile);
+            JSONObject meta=Utils.parseMetadata(modFiles.get(0));
             String area = meta.getString(ExtImageTags.AREA_NAME);
             String cluster=Long.toString(meta.getLong(ExtImageTags.CLUSTER_INDEX));
             String site=Long.toString(meta.getLong(ExtImageTags.SITE_INDEX));
@@ -149,11 +235,8 @@ public class ScriptAnalyzer extends BranchedProcessor<File>  {
             String cSlice=Long.toString(meta.getLong(MMTags.Image.SLICE_INDEX));
             IJ.log("cframe: "+cFrame);
             IJ.log("cSlice: "+cSlice);
-            File path;
-            if (!cluster.equals("-1"))
-                path=new File(workDir,area+"-Cluster"+cluster+"-Site"+site);
-            else
-                path=new File(workDir,area+"-Site"+site);
+/*            File path;
+            path=new File(workDir,area+"-Cluster"+cluster+"-Site"+site);
             try {
                 if (!path.exists()) {
                     path.mkdirs(); 
@@ -161,15 +244,37 @@ public class ScriptAnalyzer extends BranchedProcessor<File>  {
             } catch (Exception e) {
                 IJ.log("  Cannot create directory");
             }    
-
+*/
+            String resultName="Results-";
+            if (criteriaKeys.contains(ExtImageTags.AREA_COMMENT)) {
+                resultName+=meta.getString(ExtImageTags.AREA_COMMENT);
+            }
+            if (criteriaKeys.contains(MMTags.Image.POS_INDEX)) {
+                resultName+="-"+area+"-Cluster"+cluster+"-Site"+site;
+            } else {
+                if (criteriaKeys.contains(ExtImageTags.CLUSTER_INDEX)) {
+                    resultName+="-"+area+"-Cluster"+cluster;
+                } else {
+                    if (criteriaKeys.contains(ExtImageTags.AREA_INDEX)) {
+                        resultName+="-"+area;
+                    }
+                }
+            }
+            if (criteriaKeys.contains(MMTags.Image.FRAME_INDEX)) {
+                resultName+="-Frame"+cFrame;
+            }
+            if (criteriaKeys.contains(MMTags.Image.CHANNEL_INDEX)) {
+                resultName+="-"+channel;
+            }
+            if (criteriaKeys.contains(MMTags.Image.SLICE_INDEX)) {
+                resultName+="-Slice"+cSlice;
+            }
+            //remove double "--";
+            resultName=resultName.replaceAll("--", "-");
+            resultName+=".txt";
             String scriptName=new File(script_).getName();
             IJ.log("  script: "+scriptName);
-            rtFile=new File(path.getPath(),
-                "Results-"+scriptName.substring(0, scriptName.indexOf("."))
-                +"-"+cFrame//String.format("%09d", cFrame)
-                +"-"+channel
-                +"-"+cSlice//String.format("%03d", cSlice)
-                +".txt");
+            rtFile=new File(workDir,resultName);
             IJ.log("    saving RT: "+rtFile.getAbsolutePath());
             rTable_.saveAs(rtFile.getAbsolutePath());
             return true;
@@ -186,20 +291,37 @@ public class ScriptAnalyzer extends BranchedProcessor<File>  {
         
     }
     
-    private boolean executePy(File f) {
+    private boolean executePy(List<File> files, String dirForResults) {
         IJ.log(    "Excuting Py script:"+script_+"; args="+args_);
-        JSONObject params = new JSONObject();
+/*        JSONObject params = new JSONObject();
         try {
             params.put("workdir",workDir);
             JSONArray fileArray=new JSONArray();
-            fileArray.put(f.getAbsolutePath());
-            params.put("imageFiles",f);
+            for (File f:files) {
+                fileArray.put(f.getAbsolutePath());
+            }
+            params.put("imageFiles",fileArray);
             params.put("args", args_);
         } catch (JSONException ex) {
             Logger.getLogger(ScriptAnalyzer.class.getName()).log(Level.SEVERE, null, ex);
+        }*/
+        String fileList=new String();
+        for (File f:files) {
+            if (!f.exists()) {
+                IJ.log("Problem executing script - File not found: "+f.getAbsolutePath());
+                return false;
+            }
+            fileList+=" filename="+f.getAbsolutePath();
         }
         try {
-           Process process = Runtime.getRuntime().exec("python "+script_+" "+params.toString());
+//           Process process = Runtime.getRuntime().exec("python "+script_+" "+params.toString());
+//           Process process = Runtime.getRuntime().exec("python "+script_+" \"workDir="+workDir+fileList+" "+args_+"\"");
+           String arg[] = {
+               "python",
+               script_,
+               "workDir="+dirForResults+fileList+" "+args_
+           }; 
+           Process process = Runtime.getRuntime().exec(arg);
 //                process.waitFor();
                 BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                 String returnStr;
@@ -210,31 +332,28 @@ public class ScriptAnalyzer extends BranchedProcessor<File>  {
         } catch (IOException ex) {
             IJ.log("Problem executing script: "+script_);
             Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
+            return false;
         } catch (Exception ex) {
             IJ.log("exception: "+ex);
+            return false;
         }
         return true;
     }
     
-    private boolean executeBsh(File f) {
-        ImagePlus imp=IJ.openImage(f.getAbsolutePath());    
-        if (imp!=null) {
+    private boolean executeBsh(List<File> files, String dirForResults) {
+        String sourceFiles[]=new String[files.size()];
+            if (files.size()>0) {
             try {
+                int i=0;
+                for (File f:files) {
+                    sourceFiles[i]=f.getAbsolutePath();
+                    i++;
+                }
                 Interpreter interpreter=new bsh.Interpreter();
-                interpreter.set("imp",imp);
-                interpreter.set("args",args_);
-                interpreter.set("sourceFile",f.getAbsolutePath());
+                interpreter.set("args","workDir="+dirForResults+" "+args_);
+                interpreter.set("sourceFiles",sourceFiles);
                 setScriptVariables(interpreter);
                 interpreter.source(script_);
-                /*
-                JSONObject meta=Utils.parseMetadata(f);
-                String area=meta.getString("Area");
-                String cluster=meta.getString("Cluster");
-                String site=meta.getString("Site");
-                String subDir=area+"-Cluster"+cluster+"-Site"+site;
-
-                IJ.saveAsTiff(imp, new File(workDir,new File(,f.getName()).getAbsolutePath()));
-                */
                 rTable_=(ResultsTable)interpreter.get("rt");
                 getScriptVariables(interpreter);
                 IJ.log(    "Bsh Script executed:"+script_+".");
@@ -251,19 +370,34 @@ public class ScriptAnalyzer extends BranchedProcessor<File>  {
             } catch (IOException ex) {
                 IJ.log("    "+this.getClass().getName()+"I/O Error in script "+script_+".");
                 return false;
+            } catch (Exception ex) {
+                IJ.log("    "+this.getClass().getName()+"General exception in script "+script_+". "+ex.getMessage());
             } finally {
-                imp.close();
             }    
         }    
         return true;
     }
         
-    private boolean execute(File modFile) {
-        if (modFile!=null) {
+    private boolean execute(List<File> files) {
+        if (files!=null && files.size()>0) {
+            String dirForResults=files.get(0).getParent();
+            if (!dirForResults.contains(workDir)) {
+                dirForResults=workDir;
+            } else {
+                /* check if all files are within same subdir in workdir, 
+                  if so, use this subdir instead of workDir as target dir for script result files
+                */
+                for (File f:files) {
+                    if (!f.getParent().equals(dirForResults)) {
+                        dirForResults=workDir;
+                        break;
+                    }
+                }
+            }
             if (script_.indexOf(".bsh")!=-1)
-                return executeBsh(modFile);
+                return executeBsh(files, dirForResults);
             else if (script_.indexOf(".py")!=-1)
-                return executePy(modFile);
+                return executePy(files, dirForResults);
             else
                return false;
         } else {
@@ -271,46 +405,29 @@ public class ScriptAnalyzer extends BranchedProcessor<File>  {
         }    
     }
         
-    protected void processResults(File modFile) {
-        IJ.log("    Processed File:"+modFile.getAbsolutePath()+".");
+    protected void processResults(List<File> modFiles) {
+        for (File f:modFiles) {
+            IJ.log("    Processed File:"+f.getAbsolutePath()+".");
+        }
         IJ.log("    Processed Results:"+script_+".");
     }
     
     @Override
-    protected List<File> processElement(File f) {
-/*        JSONObject meta=Utils.parseMetadata(f);
-        try {
-            String area = meta.getString("Area");
-            String cluster=Long.toString(meta.getLong("ClusterIndex"));
-            String site=Long.toString(meta.getLong("SiteIndex"));
-            File path;
-            if (!cluster.equals("-1"))
-                path=new File(workDir,area+"-Cluster"+cluster+"-Site"+site);
-            else
-                path=new File(workDir,area+"-Site"+site);
-         //   ImagePlus imp=IJ.openImage(f.getAbsolutePath());
-         //   IJ.saveAsTiff(imp, tempDir.getAbsolutePath());
-            if (!path.exists()) {
-                path.mkdirs(); 
-            }    
-            File modFile=new File(path,f.getName());
-            try {
-                Utils.copyFile(f,modFile);
-            } catch (IOException ex) {
-                Logger.getLogger(ScriptAnalyzer.class.getName()).log(Level.SEVERE, null, ex);
-                modFile=f;
-                IJ.log("Problem: copying file for "+script_);
-            }*/
-            File modFile=createCopy(f);
-            if (execute(modFile)) {
-                if (saveRT_ && rTable_!=null) {
-                    saveResultsTable(modFile);
-                }
-                processResults(modFile);
+    protected List<File> processGroup(final Group<File> group)  throws InterruptedException {
+            IJ.log("ProcessGroup: "+group.images.size()+" files");
+            List<File> modFiles=new ArrayList<File>(group.images.size());
+            for (File f:group.images) {
+                IJ.log("    "+f.getAbsolutePath());
+                modFiles.add(createCopy(f));
+                
             }
-            List<File> list = new ArrayList<File>(1);
-            list.add(modFile);
-            return list;
+            if (execute(modFiles)) {
+                if (saveRT_ ) {
+                    saveResultsTable(modFiles);
+                }
+                processResults(modFiles);
+            }
+            return modFiles;
     }
 
     @Override
@@ -322,9 +439,43 @@ public class ScriptAnalyzer extends BranchedProcessor<File>  {
     public void makeConfigurationGUI() {
         JPanel optionPanel = new JPanel();
         BoxLayout layout = new BoxLayout(optionPanel,BoxLayout.Y_AXIS);
-
         optionPanel.setLayout(layout);
-        JLabel l=new JLabel("Script File:");
+        
+        JLabel l=new JLabel("Separate Images for Analysis by:");
+        l.setAlignmentX(Component.LEFT_ALIGNMENT);
+        optionPanel.add(l);
+        
+        JPanel cbPanel=new JPanel();
+        cbPanel.setLayout(new GridLayout(0,2));
+        JCheckBox channelCB=new JCheckBox("Channels");
+        cbPanel.add(channelCB);
+        JCheckBox positionsCB=new JCheckBox("XY-Positions");
+        cbPanel.add(positionsCB);
+        JCheckBox slicesCB=new JCheckBox("Z-Positions");
+        cbPanel.add(slicesCB);
+        JCheckBox clustersCB=new JCheckBox("Clusters/Area");
+        cbPanel.add(clustersCB);
+        JCheckBox framesCB=new JCheckBox("Timepoints");
+        cbPanel.add(framesCB);
+        JCheckBox areasCB=new JCheckBox("Areas");
+        cbPanel.add(areasCB);
+        JCheckBox commentsCB=new JCheckBox("Comments");
+        cbPanel.add(commentsCB);
+        cbPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        
+        optionPanel.add(cbPanel);
+        Component filler=Box.createRigidArea(new Dimension (10,10));
+        optionPanel.add(filler);
+        
+        channelCB.setSelected(criteriaKeys.contains(MMTags.Image.CHANNEL) || criteriaKeys.contains(MMTags.Image.CHANNEL_INDEX));
+        slicesCB.setSelected(criteriaKeys.contains(MMTags.Image.SLICE) || criteriaKeys.contains(MMTags.Image.SLICE_INDEX));
+        framesCB.setSelected(criteriaKeys.contains(MMTags.Image.FRAME) || criteriaKeys.contains(MMTags.Image.FRAME_INDEX));
+        positionsCB.setSelected(criteriaKeys.contains(MMTags.Image.POS_NAME) || criteriaKeys.contains(MMTags.Image.POS_INDEX));
+        clustersCB.setSelected(criteriaKeys.contains(ExtImageTags.CLUSTER_INDEX));
+        areasCB.setSelected(criteriaKeys.contains(ExtImageTags.AREA_NAME) || criteriaKeys.contains(ExtImageTags.AREA_INDEX));
+        commentsCB.setSelected(criteriaKeys.contains(ExtImageTags.AREA_COMMENT));           
+            
+        l=new JLabel("Script File:");
         l.setAlignmentX(Component.LEFT_ALIGNMENT);
         optionPanel.add(l);
         JPanel filePanel = new JPanel();
@@ -372,13 +523,13 @@ public class ScriptAnalyzer extends BranchedProcessor<File>  {
         argField.setText(args_.replace(" ","\n"));
         optionPanel.add(argField);
             
-        l=new JLabel("Save Numeric Results");
-        l.setAlignmentX(Component.LEFT_ALIGNMENT);
-        optionPanel.add(l);
-        JCheckBox saveCB = new JCheckBox();
-        saveCB.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JCheckBox saveCB = new JCheckBox("Save Numeric Results");
         saveCB.setSelected(saveRT_);
         optionPanel.add(saveCB);
+        JCheckBox procCB = new JCheckBox("Process On-the-Fly"); 
+        procCB.setSelected(processOnTheFly);
+        optionPanel.add(procCB);
+        
         int result=-100;
         File scriptfile=null;
         do {    
@@ -390,11 +541,84 @@ public class ScriptAnalyzer extends BranchedProcessor<File>  {
             scriptfile=new File(scriptField.getText());
         } while (result == JOptionPane.OK_OPTION && !scriptfile.exists());
         if (result == JOptionPane.OK_OPTION) {
+            criteriaKeys=new ArrayList<String>();
+            if (channelCB.isSelected()) {
+                criteriaKeys.add(MMTags.Image.CHANNEL_INDEX);
+            }
+            if (slicesCB.isSelected()) {
+                criteriaKeys.add(MMTags.Image.SLICE_INDEX);
+            }
+            if (framesCB.isSelected()) {
+                criteriaKeys.add(MMTags.Image.FRAME_INDEX);
+            }
+            if (positionsCB.isSelected()) {
+                criteriaKeys.add(MMTags.Image.POS_INDEX);
+            }
+            if (clustersCB.isSelected()) {
+                criteriaKeys.add(ExtImageTags.CLUSTER_INDEX);
+                criteriaKeys.add(ExtImageTags.AREA_INDEX);
+            }
+            if (areasCB.isSelected()) {
+                criteriaKeys.add(ExtImageTags.AREA_INDEX);
+            }
+            if (commentsCB.isSelected()) {
+                criteriaKeys.add(ExtImageTags.AREA_COMMENT);
+            }
             script_=scriptField.getText();
             args_=argField.getText().replaceAll("\n", " ");
             saveRT_=saveCB.isSelected();
+            processOnTheFly=procCB.isSelected();
         }
     }
 
 
+    @Override
+    protected long determineMaxGroupSize(JSONObject meta) throws JSONException {
+        if (!processOnTheFly || criteriaKeys.contains(ExtImageTags.AREA_COMMENT)) {
+            IJ.log("Not processing on the fly, or group size unknown");
+            return -1;
+        } else {
+            JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
+            int channels=(criteriaKeys.contains(MMTags.Image.CHANNEL_INDEX) ? 1 : summary.getInt(MMTags.Summary.CHANNELS));
+            int slices=(criteriaKeys.contains(MMTags.Image.SLICE_INDEX) ? 1 : summary.getInt(MMTags.Summary.SLICES));
+            int frames=(criteriaKeys.contains(MMTags.Image.FRAME_INDEX) ? 1 : summary.getInt(MMTags.Summary.FRAMES));
+            int sitesInArea=meta.getInt(ExtImageTags.SITES_IN_AREA);
+            int clustersInArea=meta.getInt(ExtImageTags.CLUSTERS_IN_AREA);
+            if (criteriaKeys.contains(MMTags.Image.POS_INDEX)) {
+                return channels*slices*frames;
+            }
+            if (criteriaKeys.contains(ExtImageTags.CLUSTER_INDEX)) {
+                return channels*slices*frames*Math.round((sitesInArea/clustersInArea));
+            }
+            if (criteriaKeys.contains(ExtImageTags.AREA_INDEX)) {
+                return channels*slices*frames*sitesInArea;
+            } else {
+                int positions=summary.getInt(MMTags.Summary.POSITIONS);
+                return channels*slices*frames*positions;
+            }
+        }
+    }
+
+    @Override
+    public JSONObject updateTagValue(JSONObject meta, String newDir, String newPrefix, boolean updateSummary) throws JSONException {
+        JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
+        if (newDir!=null && updateSummary)
+            summary.put(MMTags.Summary.DIRECTORY,newDir);
+        if (newPrefix!=null && updateSummary)
+            summary.put(MMTags.Summary.PREFIX,newPrefix);
+        return meta;
+    }
+
+    @Override
+    protected void cleanUp() {
+        super.cleanUp();
+        if (storage!=null) {
+            storage.close(); 
+            //set to null so a new storage will be created when processor runs again
+            storage=null;
+        }
+
+    }
+
 }
+

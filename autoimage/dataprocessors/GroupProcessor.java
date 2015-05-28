@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import mmcorej.TaggedImage;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -28,7 +29,9 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
     protected List<Group> groupList;
     protected List<String> criteriaKeys; 
     protected boolean processIncompleteGrps;//if true, groups will be processed at cleanup even if not complete
-    
+    protected boolean processOnTheFly;
+
+    public final static String CRITERIA_TAG = "Criteria";
 
     protected class Group<E> {
         protected List<E> images;
@@ -103,9 +106,42 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
     public GroupProcessor(final String pName, final String path,final List<String> criteria, boolean procIncomplete) {
         super(pName, path);
         groupList=new ArrayList<Group>();
-        criteriaKeys=criteria;
+        if (criteria!=null)
+            criteriaKeys=criteria;
+        else 
+            criteriaKeys=new ArrayList<String>();
+        processOnTheFly=true;
     }
 
+    @Override
+    public void setParameters(JSONObject obj) throws JSONException {
+        super.setParameters(obj);
+        JSONArray criteriaArray=obj.getJSONArray(CRITERIA_TAG);
+        criteriaKeys=new ArrayList<String>(criteriaArray.length());
+        for (int i=0; i<criteriaArray.length(); i++) {
+            criteriaKeys.add(criteriaArray.getString(i));
+        } 
+        processOnTheFly=obj.getBoolean("ProcessOnTheFly");
+    }
+    
+    @Override
+    public JSONObject getParameters() throws JSONException {
+        JSONObject obj=super.getParameters();
+        JSONArray criteriaArray=new JSONArray(criteriaKeys);
+        obj.put(CRITERIA_TAG, criteriaArray);
+        obj.put("ProcessOnTheFly", processOnTheFly);
+        return obj;
+    } 
+    
+    public boolean isProcessOnTheFly() {
+        return processOnTheFly;
+    }
+    
+    public void setProcessOnTheFly(boolean b) {
+        processOnTheFly=b;
+    }
+    
+    //processes only File image data by default 
     @Override
     public boolean isSupportedDataType(Class<?> clazz) {
         if (clazz==java.io.File.class)
@@ -116,7 +152,7 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
     
     protected abstract List<E> processGroup(final Group<E> group) throws InterruptedException;
     
-    protected boolean groupIsComplete(Group<E> group) {
+    private boolean groupIsComplete(Group<E> group) {
         Long max=group.getMaxGroupSize();
         return (max!=null && max != -1 && group.images.size()>=max);
     }
@@ -130,8 +166,8 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
             Group<E> currentGroup=null;
             int i=0;
             for (Group grp:groupList) {
-                /* checks if elements meta tag matches group's criteria
-                   if yes, it adds the element to the group and returns true
+                /* grp.addToGroup checks if element's metadata tags match group's criteria.
+                   If yes, it adds the element to the group and returns true
                 */
                 if (grp.addToGroup(element)) {
                     currentGroup=grp;
@@ -140,7 +176,7 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
                 }
                 i++;
             }    
-            if (currentGroup==null) {//new to create new group
+            if (currentGroup==null) {//need to create new group
                 currentGroup=new Group<E>(null);
                 JSONObject meta=Utils.readMetadata(element,false);
                 try {
@@ -149,6 +185,7 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
                     IJ.log("    Setting maxGroupSize="+max);
                 } catch (JSONException jex) {
                     //leave as -1 (default), which by default means that group will be processed during cleanup 
+                    currentGroup.setMaxGroupSize(-1);
                     IJ.log("    Setting maxGroupSize=-1");
                 }    
 //                IJ.log("    Creating new group");
