@@ -6,7 +6,7 @@ package autoimage;
 
 import autoimage.dataprocessors.BranchedProcessor;
 import autoimage.dataprocessors.ExtDataProcessor;
-import autoimage.dataprocessors.ImageTagFilter;
+import autoimage.dataprocessors.FilterProcessor;
 import autoimage.dataprocessors.RoiFinder;
 import autoimage.dataprocessors.ScriptAnalyzer;
 import ij.IJ;
@@ -71,8 +71,8 @@ public class ProcessorTreeCellRenderer extends DefaultTreeCellRenderer {
                 setIcon(acqEngIcon);
             if (pName.contains(ProcessorTree.PROC_NAME_IMAGE_STORAGE))
                 setIcon(imageStorageIcon);
-            if (dp instanceof ImageTagFilter) {
-                String tagName=((ImageTagFilter)dp).getKey();
+            if (dp instanceof FilterProcessor) {
+                String tagName=((FilterProcessor)dp).getKey();
                 if (tagName.toLowerCase().contains("channel"))
                     setIcon(fChannelIcon);
                 else if (tagName.toLowerCase().contains("area"))

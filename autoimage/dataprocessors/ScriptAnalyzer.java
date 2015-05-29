@@ -1,22 +1,14 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage.dataprocessors;
 
 import autoimage.ExtImageTags;
 import autoimage.ImageFileQueue;
-import autoimage.MMCoreUtils;
 import autoimage.Utils;
 import bsh.EvalError;
 import bsh.Interpreter;
 import bsh.TargetError;
-import ij.CompositeImage;
 import ij.IJ;
-import ij.ImagePlus;
 import ij.Prefs;
 import ij.measure.ResultsTable;
-import ij.process.ImageProcessor;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridLayout;
@@ -41,19 +33,18 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
-import mmcorej.TaggedImage;
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.micromanager.acquisition.TaggedImageStorageDiskDefault;
 import org.micromanager.api.MMTags;
-import org.micromanager.utils.ImageUtils;
 
 
     
 /**
- *
- * @author Karsten
+ * Executes script calls for processing of image groups.
+ * Processing parameters can be passed on as arguments to interpreter. 
+ * Arguments are defined as String in GUI.
+ * 
+ * @author Karsten Siller
  */
 public class ScriptAnalyzer extends GroupProcessor<File>  {
     
@@ -62,8 +53,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
     protected boolean saveRT_;
     protected ResultsTable rTable_; //new table for each image
     protected static String scriptDir = "";
-    protected TaggedImageStorageDiskDefault storage;
-    protected boolean processOnTheFly;
+//    protected TaggedImageStorageDiskDefault storage;
     
     
     public ScriptAnalyzer() {
@@ -84,18 +74,15 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
         processIncompleteGrps=true;
         processOnTheFly=true;
     }
-    
+/*    
     @Override
     protected void initialize() {
         storage=null;
     }
-    
+*/    
     @Override
     public boolean isSupportedDataType(Class<?> clazz) {
-        if (clazz==java.io.File.class)
-            return true;
-        else
-            return false;
+        return clazz==java.io.File.class;
     }
     
     @Override
@@ -156,7 +143,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
         args_=args;
     }
     
-    
+    /*
     //creates copy of element
     //if meta!=null, metadata in copied element will be replaced by meta, otherwise keep original metadata
     @Override
@@ -172,7 +159,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
                 String newDir=new File(workDir).getParentFile().getAbsolutePath();
                 ImageProcessor ip=imp.getProcessor();
                 if (meta.getJSONObject(MMTags.Root.SUMMARY).getString(MMTags.Summary.PIX_TYPE).equals("RGB32")) {
-                    //RGB32 images hold pixel data in int[] --> convert to byte[]
+                    //RGB32 elements hold pixel data in int[] --> convert to byte[]
                     ti=new TaggedImage(MMCoreUtils.convertIntToByteArray((int[])ip.getPixels()),new JSONObject(meta.toString()));
                 }
                 else if (meta.getJSONObject(MMTags.Root.SUMMARY).getString(MMTags.Summary.PIX_TYPE).equals("RGB64")) {
@@ -207,11 +194,11 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
                 copy=copiedFile;
             } catch (JSONException ex) {
                 IJ.log(this.getClass().getName()+ ": Cannot retrieve 'Info' metadata from file. "+ex);
-                Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
 //                    copy=super.createCopy(element);
             } catch (Exception ex) {
                 IJ.log(this.getClass().getName()+ ": Error writing file to storage. "+ex);
-                Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
             }
         } else {
             IJ.log(this.getClass().getName()+": Cannot open image");
@@ -219,7 +206,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
         }
        return copy;
     }    
-
+*/
     protected boolean saveResultsTable(List<File> modFiles) {
         if (rTable_==null) {
             return false;
@@ -414,9 +401,9 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
     
     @Override
     protected List<File> processGroup(final Group<File> group)  throws InterruptedException {
-            IJ.log("ProcessGroup: "+group.images.size()+" files");
-            List<File> modFiles=new ArrayList<File>(group.images.size());
-            for (File f:group.images) {
+            IJ.log("ProcessGroup: "+group.elements.size()+" files");
+            List<File> modFiles=new ArrayList<File>(group.elements.size());
+            for (File f:group.elements) {
                 IJ.log("    "+f.getAbsolutePath());
                 modFiles.add(createCopy(f));
                 
@@ -609,6 +596,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
         return meta;
     }
 
+/*
     @Override
     protected void cleanUp() {
         super.cleanUp();
@@ -619,6 +607,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
         }
 
     }
-
+*/
+    
 }
 

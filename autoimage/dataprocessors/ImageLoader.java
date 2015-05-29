@@ -1,9 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package autoimage.dataprocessors;
 
 import autoimage.ExtImageTags;
@@ -29,15 +23,31 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.micromanager.acquisition.TaggedImageQueue;
 import org.micromanager.api.MMTags;
-import org.micromanager.utils.MDUtils;
 
 /**
- *
- * @author Karsten
+ * This class is used to simulate image acquisition in demo mode.
+ * Images are loaded on the fly from an existing AutoImage acquisition data set
+ * and the loaded pixel arrays replace the acquired image pixel array.
+ * 
+ * This is useful to demonstrate acquisition in offline mode, or to test 
+ * image processing modules offline on existing data sets.
+ * 
+ * This processor processes TaggedImages and should be added immediately 
+ * downstream of "Acquisition Engine" and somewhere upstream of the "Image Storage" 
+ * node in the image processing tree
+ * 
+ * Note:
+ * - Pixel array dimension (image size) and pixel type have to be matching.
+ * - offline data set needs to contain images for the corresponding 
+ *   areas, clusters, sites, channels, timepoints (frames) and focal planes (slices)  
+ * 
+ * 
+ * @author Karsten Siller
+ * 
  */
 public class ImageLoader extends ExtDataProcessor<TaggedImage> {
     
-    String imagePath = "";
+    String imagePath = "";//path to saved acquisition data set
     
     
     @Override
@@ -151,6 +161,11 @@ public class ImageLoader extends ExtDataProcessor<TaggedImage> {
         if (result == JOptionPane.OK_OPTION) {
             imagePath=pathField.getText();
         }
+    }
+
+    @Override
+    public boolean isSupportedDataType(Class<?> clazz) {
+        return clazz==TaggedImage.class;
     }
     
 }

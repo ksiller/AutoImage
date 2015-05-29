@@ -1,14 +1,15 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage.dataprocessors;
 
 import java.util.List;
 
 /**
- *
- * @author Karsten
+ * This interface should be implemented by a FilterProcessor that provides the 
+ * user with a list of defined options for selection.
+ * For example: a List<String> that contains available channel names, 
+ * see class ImageTagFilterOptString
+ * 
+ * @author Karsten Siller
+ * @param <T> type of selectable option
  */
 public interface IDataProcessorOption<T> {
         

@@ -7,7 +7,7 @@ package autoimage;
 
 import autoimage.dataprocessors.BranchedProcessor;
 import autoimage.dataprocessors.ExtDataProcessor;
-import autoimage.dataprocessors.ImageTagFilter;
+import autoimage.dataprocessors.FilterProcessor;
 import autoimage.dataprocessors.ImageTagFilterLong;
 import autoimage.dataprocessors.ImageTagFilterOpt;
 import autoimage.dataprocessors.ImageTagFilterOptLong;
@@ -6684,10 +6684,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }//GEN-LAST:event_acqSettingUpButtonActionPerformed
 
-    private ImageTagFilter createImageTagFilter(String procName, String tag, List<String> args, boolean isFile) {
+    private FilterProcessor createImageTagFilter(String procName, String tag, List<String> args, boolean isFile) {
         if (procName==null)
             procName=tag;
-        ImageTagFilter itf;
+        FilterProcessor itf;
         if (tag.contains("Index")) {
 /*            if (isFile) {
                 List<Integer> argsInteger= new ArrayList<Integer>(args.size());
@@ -6751,11 +6751,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             JOptionPane.showMessageDialog(null, "Select Node in Processor Tree");
             return;
         }
-/*        ImageTagFilter itf=showImageTagFilterDlg(null,selectedNode);
+/*        FilterProcessor itf=showImageTagFilterDlg(null,selectedNode);
         if (itf!=null)
             createAndAddProcessorNode(selectedNode,itf);
-        ImageTagFilter itf=showImageTagFilterDlg(null,selectedNode);*/
-        ImageTagFilter itf = new ImageTagFilterString(ExtImageTags.AREA_NAME,null);
+        FilterProcessor itf=showImageTagFilterDlg(null,selectedNode);*/
+        FilterProcessor itf = new ImageTagFilterString(ExtImageTags.AREA_NAME,null);
         itf.makeConfigurationGUI();
         itf.dispose();
         if (!"".equals(itf.getKey())) {
@@ -6774,7 +6774,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             JOptionPane.showMessageDialog(null, "Select Node in Processor Tree");
             return;
         }
-//        ImageTagFilter itf=showChannelFilterDlg(null, selectedNode);
+//        FilterProcessor itf=showChannelFilterDlg(null, selectedNode);
 //        if (itf!=null)
 //            createAndAddProcessorNode(selectedNode, itf);
         ImageTagFilterOptString itf=new ImageTagFilterOptString(MMTags.Image.CHANNEL_NAME,null);
@@ -6801,7 +6801,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             JOptionPane.showMessageDialog(null, "Select Node in Processor Tree");
             return;
         }
-//        ImageTagFilter itf=showZFilterDlg(null, selectedNode);
+//        FilterProcessor itf=showZFilterDlg(null, selectedNode);
 //        if (itf!=null)
 //            createAndAddProcessorNode(selectedNode, itf);
 //        ImageTagFilterOpt itf;
@@ -6988,15 +6988,15 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 //        if (dp instanceof ScriptAnalyzer)
 //            showScriptAnalyzerDlg((ScriptAnalyzer)dp, selectedNode);
 //        else 
-//        if (dp instanceof ImageTagFilter && ((ImageTagFilter)dp).getKey().toLowerCase().equals("channel"))
-//            showChannelFilterDlg((ImageTagFilter)dp, selectedNode);
+//        if (dp instanceof FilterProcessor && ((FilterProcessor)dp).getKey().toLowerCase().equals("channel"))
+//            showChannelFilterDlg((FilterProcessor)dp, selectedNode);
 //        else 
-//          if (dp instanceof ImageTagFilter && ((ImageTagFilter)dp).getKey().toLowerCase().contains("sliceindex"))
-//            showZFilterDlg((ImageTagFilter)dp, selectedNode);
-//        else if (dp instanceof ImageTagFilter && ((ImageTagFilter)dp).getKey().toLowerCase().contains("area"))
-//            showAreaFilterDlg((ImageTagFilter)dp, selectedNode);
-//        else if (dp instanceof ImageTagFilter)
-//            showImageTagFilterDlg((ImageTagFilter)dp, selectedNode);  
+//          if (dp instanceof FilterProcessor && ((FilterProcessor)dp).getKey().toLowerCase().contains("sliceindex"))
+//            showZFilterDlg((FilterProcessor)dp, selectedNode);
+//        else if (dp instanceof FilterProcessor && ((FilterProcessor)dp).getKey().toLowerCase().contains("area"))
+//            showAreaFilterDlg((FilterProcessor)dp, selectedNode);
+//        else if (dp instanceof FilterProcessor)
+//            showImageTagFilterDlg((FilterProcessor)dp, selectedNode);  
         if (dp instanceof RoiFinder) {
             List<String> list = new ArrayList<String>();
             for (AcqSetting setting:acqSettings) {
@@ -7068,7 +7068,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             JOptionPane.showMessageDialog(null, "Select Node in Processor Tree");
             return;
         }
-//        ImageTagFilter itf=showAreaFilterDlg(null, selectedNode);
+//        FilterProcessor itf=showAreaFilterDlg(null, selectedNode);
 //        if (itf!=null)
 //            createAndAddProcessorNode(selectedNode,itf);    
         ImageTagFilterOptString itf=new ImageTagFilterOptString(ExtImageTags.AREA_NAME,null);

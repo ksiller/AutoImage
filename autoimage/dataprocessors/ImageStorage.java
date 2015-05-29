@@ -1,14 +1,7 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package autoimage.dataprocessors;
 
 import autoimage.Utils;
 import ij.IJ;
-import ij.ImagePlus;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,16 +12,16 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.micromanager.acquisition.TaggedImageStorageDiskDefault;
 import org.micromanager.api.MMTags;
-import org.micromanager.utils.ImageUtils;
 import org.micromanager.utils.MMException;
 
 /**
- *
- * @author Karsten
+ * This class saves incoming stream of elements (TaggedImage or java.io.File) in 
+ * MicroManager compatible data set
+ * 
+ * @author Karsten Siller
  */
 public class ImageStorage<E> extends BranchedProcessor<E> {
     
-    protected TaggedImageStorageDiskDefault storage=null;
 
     @Override
     protected boolean acceptElement(E element) {

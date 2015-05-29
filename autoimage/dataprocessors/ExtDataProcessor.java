@@ -14,15 +14,21 @@ import org.micromanager.acquisition.TaggedImageQueue;
 import org.micromanager.api.DataProcessor;
 
 /**
- *
- * @author Karsten
+ * Basic class that extends of DataProcessor interface
+ * - manages a "workDir" where the processor can store results/modified images
+ * - processsing parameters are configured as JSONObject representation
+ * - provides label for display and tooltip function for GUI
+ * - added processing status variables
+ * - NOTE: ExtDataProcessor handles UNBRANCHED ELEMENT BlockingQueue
+ * 
+ * @author Karsten Siller
  * @param <E>
  */
 public class ExtDataProcessor<E> extends DataProcessor<E>{
 
-    protected String procName;
-    protected String toolTipText;
-    protected String workDir;
+    protected String procName;//used as abel in GUI
+    protected String toolTipText;//used in GUI
+    protected String workDir;//path where processor can save results/images
     protected volatile boolean done;
     protected volatile boolean stopRequested;
     
@@ -33,14 +39,12 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
         return obj;
     }
     
+    //override this if processor can handle data types other than TaggedImage or java.io.File
     public boolean isSupportedDataType(Class<?> clazz) {
-        if (clazz==TaggedImage.class || java.io.File.class==clazz)
-            return true;
-        else 
-            return false;
+        return clazz==TaggedImage.class || clazz==java.io.File.class;
     }
     
-    
+    //JSONObject contains processor label and configurable parameters
     public void setParameters(JSONObject obj) throws JSONException {
         procName=obj.getString("ProcName");
     }
@@ -53,6 +57,8 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
         this(pName,"");
     }
     
+    //name: label of processor
+    //path: assigned working directory where processor should save reults/images
     public ExtDataProcessor (String pName, String path) {
         super();
         setName(this.getClass().getSimpleName());
@@ -72,6 +78,7 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
         procName=pn;
     }
     
+    //path: assigned working directory where processor should save reults/images
     public void setWorkDir(String path) {
         workDir=path;
     }
@@ -80,13 +87,16 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
         return workDir;
     }
     
+    //used in GUI
     public void setToolTipText(String text) {
         toolTipText=text;
     }
+    
     public String getToolTipText() {
         return toolTipText;
     }
     
+    //should launch a GUI dialog to set processing parameters
     @Override
     public void makeConfigurationGUI() {}
     
@@ -94,10 +104,13 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
     @Override
     public void dispose() {}
     
+    //handles polling elements from BlockingQueue and
     @Override
     protected void process() {
         try {
+            //retrieve element from upstream BlockingQueue
             E element = poll();
+            //push element to output queue
             produce(element);
             if (element instanceof TaggedImage && TaggedImageQueue.isPoison((TaggedImage)element)) {
                 IJ.log(getClass().getSimpleName()+" "+procName+" : Poison");
@@ -112,16 +125,17 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
         }    
     }
     
-    //this will be called right before "run()" --> allows variable initialization before each run
+    //called immediately before "run()" --> allows variable initialization before each run
     protected void initialize() {}
     
+    //
     protected void cleanUp() {}
     
     @Override
     public void run() {
         done=false;
         initialize();
-        //run() will check if stopRequested==true;
+        //super.run() will check if stopRequested==true;
         super.run();
         done=true;
     }

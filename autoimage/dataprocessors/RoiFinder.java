@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage.dataprocessors;
 
 import autoimage.ExtImageTags;
@@ -19,7 +15,6 @@ import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.geom.Point2D;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -76,11 +71,6 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
     @Override
     public JSONObject getParameters() throws JSONException {
         JSONObject obj=super.getParameters();
-/*        JSONArray opts=new JSONArray();
-        for (String opt:options_) {
-            opts.put(opt);
-        }
-        obj.put("Options", opts);*/
         JSONArray names=new JSONArray();
         for (String name:selectedSeq) {
             names.put(name);
@@ -92,11 +82,6 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
     @Override
     public void setParameters(JSONObject obj) throws JSONException {
         super.setParameters(obj);
-/*        JSONArray opts=obj.getJSONArray("Options");
-        options_=new ArrayList<String>();
-        for (int i=0; i<opts.length(); i++) {
-            options_.add(opts.getString(i));
-        }*/
         JSONArray names=obj.getJSONArray("SettingNames");
         selectedSeq=new ArrayList<String>();
         for (int i=0; i<names.length(); i++) {
@@ -108,9 +93,9 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
     public String getProcName() {
         return "ROI-Finder: "+new File(script_).getName()+" ["+args_+"]";
     }
+    
     @Override
     public void setScriptVariables(Interpreter interpreter) throws EvalError {
-//        roiList= new ArrayList<Point2D>();
         roiList= new ArrayList<RoiSeed>();
         interpreter.set("roiList",roiList);
         interpreter.set("workDir",workDir);
@@ -128,7 +113,7 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
         tileManagerList.clear();
     }
     
-    //File files is reference to working copy
+    //files is list of working copies
     @Override
     protected void processResults(List<File> files) {
         IJ.log(    "    Processed Results:"+script_+".");
@@ -149,7 +134,6 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
             double sinus=Math.sin(detectorAngle);
             if (roiList.size()>0){
                 final List<Vec3d> stagePosList=new ArrayList<Vec3d>(roiList.size());
-//                for (final Point2D point:roiList) {
                 for (final RoiSeed roi:roiList) {
                     //correct for detector rotation relative to stage
                     //1. translate to center -> dx/dy

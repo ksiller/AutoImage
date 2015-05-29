@@ -1,16 +1,8 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage.dataprocessors;
 
 import autoimage.ExtImageTags;
-import autoimage.MMCoreUtils;
 import autoimage.Utils;
-import ij.CompositeImage;
 import ij.IJ;
-import ij.ImagePlus;
-import ij.process.ImageProcessor;
 import java.awt.Component;
 import java.io.File;
 import java.util.ArrayList;
@@ -30,46 +22,34 @@ import mmcorej.TaggedImage;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.micromanager.acquisition.TaggedImageStorageDiskDefault;
 import org.micromanager.api.MMTags;
-import org.micromanager.utils.ImageUtils;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
+ * @param <E> element type in BlockingQueue (e.g. TaggedImage or File)
+ * @param <T> tag value type
  */
 
-//E: element type in BlockingQueue (either TaggedImage or File)
-//T: tag value type
-public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implements IMetaDataModifier {
+public abstract class FilterProcessor<E,T> extends BranchedProcessor<E> implements IMetaDataModifier {
     
     protected String key_; //key to retrieve property of JSONObject in TaggedImages that will be filtered
     protected List<T> values_; //accepted values for property retrieved with key_
     protected long imagesAfterFiltering; //used to adjust dimension properties of TaggedImage (# of 'CHANNELS', 'FRAMES', 'SLICES')
-    protected TaggedImageStorageDiskDefault storage;
+//    protected TaggedImageStorageDiskDefault storage;
     protected JSONObject newSummary;
     protected Map<String,Long> sitesPerArea;
     protected Map<String,List<String>> clustersPerArea;
             
-    public ImageTagFilter() {
+    public FilterProcessor() {
         this("Filter","",null);
     }
     
-    public ImageTagFilter(String key, List<T> values) {
+    public FilterProcessor(String key, List<T> values) {
         this("Filter",key,values);
     }
     
-    public abstract boolean equalValue(T t1, T t2);
-    
-    protected void initialize() {
-        storage=null;
-        newSummary=null;
-        imagesAfterFiltering=0;
-        sitesPerArea=new HashMap<String, Long>();
-        clustersPerArea=new HashMap<String, List<String>>();
-    }
-    
-    public ImageTagFilter(String pName, String key, List<T> values) {
+    public FilterProcessor(String pName, String key, List<T> values) {
         super(pName);
         this.key_=key;
         if (values!=null)
@@ -78,26 +58,38 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
             this.values_=new ArrayList<T>();
     }
 
+    public boolean equalValue(T t1, T t2) {
+        return t1.equals(t2);
+    }
+    
+    //converts String representation of value v into <T> object
+    public abstract T valueOf(String v);
+                
+    @Override
+    protected void initialize() {
+        super.initialize();
+        newSummary=null;
+        imagesAfterFiltering=0;
+        sitesPerArea=new HashMap<String, Long>();
+        clustersPerArea=new HashMap<String, List<String>>();
+    }
+    
     
     @Override
     public void setParameters(JSONObject obj) throws JSONException {
         super.setParameters(obj);
         key_=obj.getString("FilterKey");
         JSONArray vals=obj.getJSONArray("FilterValues");
-//        String valueClassName=obj.getString("ValueClassName");
         values_=new ArrayList<T>(vals.length());
         for (int i=0; i<vals.length(); i++) {
             T v;
-//            IJ.log(this.getClass().getSimpleName()+".setParameters: set vals.get(i): "+vals.get(i).getClass().getName());
             if (vals.get(i) instanceof Integer){ 
                 v=(T)new Long(vals.getInt(i)); 
             }else {
                 v=(T)vals.get(i);
             }    
-//            IJ.log(this.getClass().getSimpleName()+".setParameters: set (T)v: "+v.getClass().getName());
             values_.add(v);
         } 
-//        IJ.log("---");
     }
     
     @Override
@@ -122,8 +114,6 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
         key_=key;
     }
     
-    public abstract T valueOf(String v);
-    
     public void setValuesFromStr(List<String> values) {
         values_.clear();
         for (String value:values)
@@ -136,7 +126,6 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
    
     protected boolean listContainsElement(T value) {
         if (value instanceof Integer) {
-//            IJ.log(this.getClass().getName()+": Integer found, converting to Long");
             return values_.contains(new Long((Integer)value));   
         } else {
             return values_.contains(value);
@@ -156,7 +145,7 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
                 tags=Utils.parseMetadata((File)element);
             } catch (JSONException ex) {
                 IJ.log("    "+this.getClass().getName()+".acceptElement: problem parsing metadata");
-                Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
                 return false;
             }
         } else
@@ -173,7 +162,7 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
                 }    
             } catch (JSONException ex) {
                 IJ.log("    "+this.getClass().getName()+".acceptElement: key '"+key_+"' does not exist.");
-                Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
                 return false;
             }
          } else
@@ -184,6 +173,7 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
     @Override
     public JSONObject updateTagValue(JSONObject meta,String newDir, String newPrefix, boolean isTaggedImage) throws JSONException {
         JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
+        //TaggedImage specific summary update
         if (!isTaggedImage && newDir!=null)
             summary.put(MMTags.Summary.DIRECTORY,newDir);
         if (!isTaggedImage && newPrefix!=null)
@@ -272,7 +262,7 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
             if (newSummary==null) {
                 JSONArray oldPosArray=summary.getJSONArray(ExtImageTags.POSITION_ARRAY);
                 newPosArray = new JSONArray();//holds new position list for new summary data
-                List<String> areaClusterList=new ArrayList<String>();//holds unique area-cluster name combinations==total clsuter #
+                List<String> areaClusterList=new ArrayList<String>();//holds unique area-cluster name combinations => total cluster #
                 for (int i=0; i<oldPosArray.length(); i++) {
                     JSONObject posEntry=oldPosArray.getJSONObject(i);
                     String posLabel=posEntry.getString(ExtImageTags.POSITION_LABEL);
@@ -618,7 +608,7 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
         return meta;
     }
     
-   
+/*   
     //creates copy of element
     //if meta!=null, metadata in copied element will be replaced by meta, otherwise keep original metadata
     @Override
@@ -670,11 +660,11 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
                     copy=(E)copiedFile;
                 } catch (JSONException ex) {
                     IJ.log(this.getClass().getName()+ ": Cannot retrieve 'Info' metadata from file. "+ex);
-                    Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
 //                    copy=super.createCopy(element);
                 } catch (Exception ex) {
                     IJ.log(this.getClass().getName()+ ": Error writing file to storage. "+ex);
-                    Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
                 }
             } else {
                 IJ.log(this.getClass().getName()+": Cannot open image");
@@ -687,12 +677,13 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
                 meta=updateTagValue(meta,null,null, true);
                 ((TaggedImage)copy).tags=meta;
             } catch (JSONException ex) {
-                Logger.getLogger(ImageTagFilter.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
             }
        }
        return copy;
     }    
-        
+      */
+    
     @Override
     protected List<E> processElement(E element) {
         // create copy, update metadata and pass accepted elements through
@@ -711,8 +702,7 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
         l.setAlignmentX(Component.LEFT_ALIGNMENT);
         optionPanel.add(l);   
         JComboBox tagComboBox= new JComboBox(Utils.getAvailableImageTags());
-//        if (itf!=null)
-            tagComboBox.setSelectedItem(key_);
+        tagComboBox.setSelectedItem(key_);
         tagComboBox.setAlignmentX(Component.LEFT_ALIGNMENT);
         optionPanel.add(tagComboBox);
                         
@@ -740,20 +730,18 @@ public abstract class ImageTagFilter<E,T> extends BranchedProcessor<E> implement
             key_=(String)tagComboBox.getSelectedItem();
             String[] argArray=argField.getText().split("\\n");
             setValuesFromStr(Arrays.asList(argArray));
-        } else {
-//            key_="";
-//            values_.clear();
         }   
     }
     
     @Override
     protected void cleanUp() {
-        if (storage!=null) {
-            storage.close(); 
-            //set to null so a new storage will be created when processor runs again
-            storage=null;
-        }
+        super.cleanUp();
         imagesAfterFiltering=0;
         newSummary=null;
+    }
+    
+    @Override
+    public boolean isSupportedDataType(Class<?> clazz) {
+        return clazz==TaggedImage.class || clazz==java.io.File.class;
     }
 }

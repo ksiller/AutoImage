@@ -1,9 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package autoimage.dataprocessors;
 
 import autoimage.Utils;
@@ -20,24 +14,31 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- *
- * @author Karsten
- * @param <E> File or TaggedImage
+ * GroupProcessor processes element groups in batches
+ * - groups are formed by unique value combinations of all criteriaKeys
+ * 
+ * 
+ * @author Karsten Siller
+ * @param <E> element type, e.g. java.io.File or TaggedImage
  */
 public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements IMetaDataModifier {
 
-    protected List<Group> groupList;
-    protected List<String> criteriaKeys; 
+    protected List<Group> groupList;//provides bins for elements
+    protected List<String> criteriaKeys;//metadata tags that are used to create groups
     protected boolean processIncompleteGrps;//if true, groups will be processed at cleanup even if not complete
-    protected boolean processOnTheFly;
+    protected boolean processOnTheFly;//if true, processing is launched for a group as soon as all its elements are collected 
 
     public final static String CRITERIA_TAG = "Criteria";
 
+    /**
+     * a Group is a container for elements that should be processed together
+     * 
+     * @param <E> element type, e.g. java.io.File or TaggedImage
+     */
     protected class Group<E> {
-        protected List<E> images;
-//        protected boolean listComplete;
-        protected long status;
-        protected JSONObject groupCriteria;
+        protected List<E> elements; //"images" 
+        protected long status;//not processed, processing, processed, interrupted
+        protected JSONObject groupCriteria;//String key refers to metadata tag, Object value refers to metadata value for this key
         protected long maxGroupSize=-1; //-1 unknown --> process all groups during clean up
         
         protected final static long IS_NOT_PROCESSED = 0;
@@ -48,8 +49,7 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
         
         protected Group(JSONObject grpCriteria) {
             status=IS_NOT_PROCESSED;
-//            listComplete=false;
-            images=new ArrayList<E>();
+            elements=new ArrayList<E>();
             if (grpCriteria == null) {
                 groupCriteria = new JSONObject();
             } else {
@@ -57,19 +57,28 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
             }
         }
         
+        //metadata key-value paris are added to group criteria
         protected void addCriterium(String key, Object value) throws JSONException {
             groupCriteria.put(key,value);
         }
         
+        //compares element's metadata with group's criteria to determine if element is part of this group
         protected boolean belongsToGroup(JSONObject imgMeta) throws JSONException {
-//            IJ.log("   belongsToGroup....");
+            if (imgMeta==null) { 
+                //cannot parse metadata --> reject by default
+                return false;
+            }    
+            //iterate over all criteria for this group
             Iterator it=groupCriteria.keys();
             while (it.hasNext()) {
                 String key=(String)it.next();
+                //compare imgMeta data with group's criteria
                 if (!groupCriteria.get(key).equals(imgMeta.get(key))) {
+                   //no match --> does not belong to this group
                    return false; 
                 }
             }
+            //all criteria are matching --> belongs to this group
             return true;
         }
         
@@ -82,17 +91,19 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
                 meta=((TaggedImage)img).tags;
             }
             if (belongsToGroup(meta)) {
-                images.add(img);
+                elements.add(img);
                 return true;
             } else {
                 return false;
             }
         }
         
+        //needs to be called with max!=-1 for "on-the-fly" processing; 
         private void setMaxGroupSize(long max) {
             maxGroupSize=max;
         }
         
+        //used to determine if groups is complete
         private long getMaxGroupSize() {
             return maxGroupSize;
         }
@@ -143,18 +154,14 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
     
     //processes only File image data by default 
     @Override
-    public boolean isSupportedDataType(Class<?> clazz) {
-        if (clazz==java.io.File.class)
-            return true;
-        else
-            return false;
-    }
+    public abstract boolean isSupportedDataType(Class<?> clazz);
     
     protected abstract List<E> processGroup(final Group<E> group) throws InterruptedException;
     
-    private boolean groupIsComplete(Group<E> group) {
+    //should return true if group is complete
+    private boolean isGroupReady(Group<E> group) {
         Long max=group.getMaxGroupSize();
-        return (max!=null && max != -1 && group.images.size()>=max);
+        return (max!=null && max != -1 && group.elements.size()>=max);
     }
     
     protected abstract long determineMaxGroupSize(JSONObject meta) throws JSONException;
@@ -182,13 +189,10 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
                 try {
                     long max=determineMaxGroupSize(meta);
                     currentGroup.setMaxGroupSize(max);
-                    IJ.log("    Setting maxGroupSize="+max);
                 } catch (JSONException jex) {
                     //leave as -1 (default), which by default means that group will be processed during cleanup 
                     currentGroup.setMaxGroupSize(-1);
-                    IJ.log("    Setting maxGroupSize=-1");
                 }    
-//                IJ.log("    Creating new group");
                 for (String key:criteriaKeys) {
                     currentGroup.addCriterium(key, meta.get(key));
 //                    IJ.log("    Added Criterium: "+key+", "+meta.get(key).toString());
@@ -198,7 +202,7 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
                 IJ.log("    Added to group #"+(groupList.size()-1));
                 IJ.log("    "+groupList.size()+" groups");
             }
-            if (!stopRequested && groupIsComplete(currentGroup) && currentGroup.status==Group.IS_NOT_PROCESSED) {
+            if (!stopRequested && isGroupReady(currentGroup) && currentGroup.status==Group.IS_NOT_PROCESSED) {
                 currentGroup.status=Group.IS_PROCESSING;
                 List<E> results=processGroup(currentGroup);
                 currentGroup.status=Group.IS_PROCESSED;
@@ -246,7 +250,7 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
                 }
             } 
             IJ.log(this.getClass().getName()+".cleanUp: group "+i+" - Status("+grp.status+")");
-            grp.images.clear();
+            grp.elements.clear();
             i++;
         }
         clearGroups();

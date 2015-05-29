@@ -1,9 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package autoimage.dataprocessors;
 
 import autoimage.ExtImageTags;
@@ -11,10 +5,7 @@ import autoimage.Utils;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
-import ij.plugin.HyperStackConverter;
 import ij.process.ImageProcessor;
-import ij.process.LUT;
-import java.awt.Component;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -45,12 +36,11 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.micromanager.acquisition.TaggedImageStorageDiskDefault;
 import org.micromanager.api.MMTags;
-import org.micromanager.utils.ImageUtils;
-import org.micromanager.utils.MMException;
 
 /**
- *
- * @author Karsten
+ * Executes Z-projections using ImageJ's ZProjector class
+ * 
+ * @author Karsten Siller
  */
 public class ZProjector<E> extends GroupProcessor<E> {
     
@@ -60,7 +50,7 @@ public class ZProjector<E> extends GroupProcessor<E> {
     private long endSlice;
 
     private static ExecutorService executor=Executors.newSingleThreadExecutor();
-    protected TaggedImageStorageDiskDefault storage=null;
+//    protected TaggedImageStorageDiskDefault storage=null;
 
     public ZProjector() {
         super("Z-Projector");
@@ -78,7 +68,8 @@ public class ZProjector<E> extends GroupProcessor<E> {
         startSlice=0;
         endSlice=0;
     }
-@Override
+    
+    @Override
     public JSONObject getParameters() throws JSONException {
         JSONObject obj=super.getParameters();
         obj.put("ProjectionMethod", projMethod);
@@ -115,11 +106,11 @@ public class ZProjector<E> extends GroupProcessor<E> {
         IJ.log("-----");
         IJ.log(this.getClass().getName()+".processGroup: ");
         IJ.log("   Criteria: "+group.groupCriteria.toString());
-        IJ.log("   Images: "+group.images.size()+" images");
+        IJ.log("   Images: "+group.elements.size()+" images");
         final String newDir=new File(workDir).getParentFile().getAbsolutePath();                        
         final String newPrefix=new File(workDir).getName();
         
-        if (group!=null && group.images!=null) {
+        if (group!=null && group.elements!=null) {
 
             Callable projectionTask=new Callable<List<E>>() {
 
@@ -131,11 +122,11 @@ public class ZProjector<E> extends GroupProcessor<E> {
                     JSONObject meta=null;
 //                    boolean isRGB=false;
                     try {
-                        //read images and place in single stack
+                        //read elements and place in single stack
                         double zPos=0;
                         ImagePlus resultImp;
-                        if (group.images.size() > 1) {
-                            for (E image:group.images) {
+                        if (group.elements.size() > 1) {
+                            for (E image:group.elements) {
                                 ImagePlus imp;
     //                            if (image instanceof java.io.File) {
                                     File file=(File)image;
@@ -159,7 +150,7 @@ public class ZProjector<E> extends GroupProcessor<E> {
     //                                IJ.log("bitDepth="+Integer.toString(summary.getInt(MMTags.Summary.BIT_DEPTH)));
                                     //isRGB=imp.getImageStack().isRGB();
     //                                IJ.log("isRGB="+Boolean.toString(isRGB));
-                                    //impHyperStack=imp.createHyperStack("hyperstack", isRGB ? 3 : 1 ,group.images.size(), 1, bitDepth);
+                                    //impHyperStack=imp.createHyperStack("hyperstack", isRGB ? 3 : 1 ,group.elements.size(), 1, bitDepth);
                                 }
                                 //slices in imp refer to channels here
                                 //RGB64 --> 3 slices (R, G, B)
@@ -169,16 +160,16 @@ public class ZProjector<E> extends GroupProcessor<E> {
                                     stack.addSlice(ip.duplicate());
                                 }
                             }
-                            zPos/=group.images.size();
+                            zPos/=group.elements.size();
                             //IJ.log(lut.toString());
                             ImagePlus stackImp=new ImagePlus("Hyperstack");
-                            stackImp.setStack(stack,stack.getSize() / group.images.size(),group.images.size(), 1);
+                            stackImp.setStack(stack,stack.getSize() / group.elements.size(),group.elements.size(), 1);
     //                        IJ.run(stackImp,"Re-order Hyperstack ...", "channels=[Channels (c)] slices=[Slices (z)] frames=[Frames (t)]");
                             stackImp.setOpenAsHyperStack(true);
                             IJ.save(stackImp,"/Users/Karsten/Desktop/hyperstack.tif");
                             ij.plugin.ZProjector projector=new ij.plugin.ZProjector(stackImp);
                             projector.setStartSlice(0);
-                            projector.setStopSlice(group.images.size()-1);
+                            projector.setStopSlice(group.elements.size()-1);
                             if (projMethod.equals("Max Intensity")) {
                                 projector.setMethod(ij.plugin.ZProjector.MAX_METHOD);
                             } else if (projMethod.equals("Min Intensity")) {
@@ -200,7 +191,7 @@ public class ZProjector<E> extends GroupProcessor<E> {
                             meta.put(MMTags.Image.ZUM, zPos);
                         } else {
                             IJ.log("SINGLE FILE");
-                            File file=(File)group.images.get(0);
+                            File file=(File)group.elements.get(0);
                             resultImp=IJ.openImage(file.getAbsolutePath());
                             meta=Utils.parseMetadata(file);
                         }
@@ -216,12 +207,12 @@ public class ZProjector<E> extends GroupProcessor<E> {
                         //create TaggedImage
                         TaggedImage ti=Utils.createTaggedImage(resultImp,meta);
 /*
-                        if (group.images.get(0) instanceof TaggedImage) {
+                        if (group.elements.get(0) instanceof TaggedImage) {
                             results.add((E)ti);
                             IJ.log("ZProject result (TAGGEDIMAGE): "+(new File(new File(workDir,meta.getString(MMTags.Image.POS_NAME)),
                                                     meta.getString("FileName"))).getAbsolutePath());
                         } else */
-                        if (group.images.get(0) instanceof java.io.File) {
+                        if (group.elements.get(0) instanceof java.io.File) {
                             if (storage==null) {
                                 summary.put(MMTags.Summary.DIRECTORY, newDir);
                                 summary.put(MMTags.Summary.PREFIX, newPrefix);
@@ -254,6 +245,7 @@ public class ZProjector<E> extends GroupProcessor<E> {
         }
     }
     
+    //filters image elements based on user defined slice index parameters
     @Override
     protected boolean acceptElement(E element) {
         try {
@@ -273,6 +265,7 @@ public class ZProjector<E> extends GroupProcessor<E> {
         }
     }
 
+/*    
     @Override
     public JSONObject updateTagValue(JSONObject meta, String newDir, String newPrefix, boolean updateSummary) throws JSONException {
         return meta;
@@ -290,7 +283,7 @@ public class ZProjector<E> extends GroupProcessor<E> {
             //need to modify 'SLICES' in all metadata summary files
         }
     }
-
+*/
     @Override
     protected long determineMaxGroupSize(JSONObject meta) throws JSONException {
         if (!processOnTheFly) {
@@ -415,5 +408,10 @@ public class ZProjector<E> extends GroupProcessor<E> {
             }    
             processOnTheFly=procCB.isSelected();
         }    
+    }
+
+    @Override
+    public boolean isSupportedDataType(Class<?> clazz) {
+        return clazz==java.io.File.class;
     }
 }

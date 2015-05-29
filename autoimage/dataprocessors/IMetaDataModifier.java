@@ -1,17 +1,13 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package autoimage.dataprocessors;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- *
- * @author Karsten
+ * This interface should be implemented for ExtDataProcessors that modify metadata, 
+ * e.g. FilterProcessor, GroupProcessor
+ * 
+ * @author Karsten Siller
  */
 public interface IMetaDataModifier {
     

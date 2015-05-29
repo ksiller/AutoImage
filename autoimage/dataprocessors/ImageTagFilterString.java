@@ -1,16 +1,14 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage.dataprocessors;
 
 import java.util.List;
 
 /**
- *
- * @author Karsten
+ * Class that specifically handles filtering using free text values representing String objects
+ * 
+ * @author Karsten Siller
+ * @param <E> element type in BlockingQueue (e.g. TaggedImage or File)
  */
-public class ImageTagFilterString<E> extends ImageTagFilter<E,String> {
+public class ImageTagFilterString<E> extends FilterProcessor<E,String> {
 
     public ImageTagFilterString() {
         this("",null);
@@ -25,9 +23,11 @@ public class ImageTagFilterString<E> extends ImageTagFilter<E,String> {
         return v;
     }
 
+/*
     @Override
     public boolean equalValue(String t1, String t2) {
         return (t1.equals(t2));
     }
+*/
     
 }

@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage.dataprocessors;
 
 import java.awt.BorderLayout;
@@ -19,10 +15,16 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 
 /**
- *
- * @author Karsten
+ * Basic extension of FilterProcessor class that allows user to select filter 
+ * values from a predefined list.
+ * In the configuration GUI, filter value options are displayed as an array of 
+ * checkboxes.
+ * 
+ * @author Karsten Siller
+ * @param <E> element type in BlockingQueue (e.g. TaggedImage or File)
+ * @param <T> type of option value, e.g. String for channel names, Long for slice index
  */
-public abstract class ImageTagFilterOpt<E,T> extends ImageTagFilter<E,T> implements IDataProcessorOption<String> {
+public abstract class ImageTagFilterOpt<E,T> extends FilterProcessor<E,T> implements IDataProcessorOption<String> {
 
     List<String> options_;
         
@@ -46,10 +48,6 @@ public abstract class ImageTagFilterOpt<E,T> extends ImageTagFilter<E,T> impleme
     }
     
     @Override
-    public abstract T valueOf(String v);
-
-
-    @Override
     public void makeConfigurationGUI() {
         JPanel guiPanel = new JPanel();
         BoxLayout layout = new BoxLayout(guiPanel,BoxLayout.Y_AXIS);
@@ -61,6 +59,8 @@ public abstract class ImageTagFilterOpt<E,T> extends ImageTagFilter<E,T> impleme
         label.setAlignmentX(Component.LEFT_ALIGNMENT);
         guiPanel.add(label);
 
+        //create a JPanel with an array of checkboxes representing selectable 
+        //options, and place checkbox array in JScrollPane
         float n=options_.size();
         int columns=(int)Math.floor(Math.sqrt(n)/1.5);
         if (columns<1)
@@ -70,9 +70,6 @@ public abstract class ImageTagFilterOpt<E,T> extends ImageTagFilter<E,T> impleme
         cbPanel.setLayout(new GridLayout(rows,columns));
         
         JCheckBox[] optCB = new JCheckBox[(int)options_.size()];
-//        List<String> options=null;
-//        if (itf!=null)
-//            options=itf.getValues();
         int i=0;
         for (String opt:options_) {
             optCB[i] = new JCheckBox(opt);
@@ -84,7 +81,6 @@ public abstract class ImageTagFilterOpt<E,T> extends ImageTagFilter<E,T> impleme
 
         JScrollPane scrollPane = new JScrollPane();
         scrollPane.getViewport().add(cbPanel);
-       // scrollPane.setSize(500,300);
         scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
         guiPanel.add(scrollPane,BorderLayout.WEST);
 
@@ -101,9 +97,6 @@ public abstract class ImageTagFilterOpt<E,T> extends ImageTagFilter<E,T> impleme
                     values_.add(valueOf(optCB[i].getText()));
                 }    
             }
-        } else {
-//            key_="";
-//            values_.clear();
         }
     }
 }
