@@ -6,6 +6,7 @@ package autoimage.olddp;
 
 import autoimage.ExtImageTags;
 import autoimage.ImageFileQueue;
+import autoimage.MMCoreUtils;
 import autoimage.Utils;
 import autoimage.dataprocessors.BranchedProcessor;
 import bsh.EvalError;
@@ -141,7 +142,7 @@ public class ScriptAnalyzerOld extends BranchedProcessor<File>  {
     protected boolean saveResultsTable(File modFile) {
         File rtFile=null;
         try {
-            JSONObject meta=Utils.parseMetadata(modFile);
+            JSONObject meta=MMCoreUtils.parseMetadataFromFile(modFile);
             String area = meta.getString(ExtImageTags.AREA_NAME);
             String cluster=Long.toString(meta.getLong(ExtImageTags.CLUSTER_INDEX));
             String site=Long.toString(meta.getLong(ExtImageTags.SITE_INDEX));
@@ -228,7 +229,7 @@ public class ScriptAnalyzerOld extends BranchedProcessor<File>  {
                 setScriptVariables(interpreter);
                 interpreter.source(script_);
                 /*
-                JSONObject meta=Utils.parseMetadata(f);
+                JSONObject meta=Utils.parseMetadataFromFile(f);
                 String area=meta.getString("Area");
                 String cluster=meta.getString("Cluster");
                 String site=meta.getString("Site");
@@ -279,7 +280,7 @@ public class ScriptAnalyzerOld extends BranchedProcessor<File>  {
     
     @Override
     protected List<File> processElement(File f) {
-/*        JSONObject meta=Utils.parseMetadata(f);
+/*        JSONObject meta=Utils.parseMetadataFromFile(f);
         try {
             String area = meta.getString("Area");
             String cluster=Long.toString(meta.getLong("ClusterIndex"));

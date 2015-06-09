@@ -1,9 +1,12 @@
-package autoimage;
+package autoimage.area;
 
-import static autoimage.Area.COLOR_ACQUIRING_AREA;
-import static autoimage.Area.COLOR_AREA_BORDER;
-import static autoimage.Area.COLOR_MERGE_AREA_BORDER;
-import static autoimage.Area.COLOR_SELECTED_AREA_BORDER;
+//import static autoimage.Area.COLOR_ACQUIRING_AREA;
+//import static autoimage.Area.COLOR_AREA_BORDER;
+//import static autoimage.Area.COLOR_MERGE_AREA_BORDER;
+//import static autoimage.Area.COLOR_SELECTED_AREA_BORDER;
+import autoimage.Tile;
+import autoimage.TilingSetting;
+import autoimage.area.Area;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.geom.Ellipse2D;
@@ -21,99 +24,130 @@ import javax.swing.JPanel;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-
 /**
  *
  * @author Karsten
  */
-public class DonutArea extends Area {
-    private double ringWidth;
-    
-    public DonutArea() {
+class EllipseArea extends Area {
+
+    public EllipseArea() {
         super();
-        ringWidth=0;
     }
     
-    public DonutArea(String n) { //expects name identifier
+    public EllipseArea(String n) { //expects name identifier
         super(n);
-        ringWidth=0;
     }
     
-    public DonutArea(String n, int id, double ox, double oy, double oz, double w, double h, double ringWidth, boolean s, String anot) {
+    public EllipseArea(String n, int id, double ox, double oy, double oz, double w, double h, boolean s, String anot) {
         super(n,id,ox,oy,oz,w,h,s,anot);
-        this.ringWidth=ringWidth;
     }
-        
-    public void setRingWidth(double rw) {
-        ringWidth=rw;
-    }
-    
-    public double getRingWidth() {
-        return ringWidth;
-    }
+
+    /*
+    public EllipseArea duplicate(EllipseArea a) {
+        EllipseArea newArea = new EllipseArea(a.getName());
+        newArea.shape=a.getShape();
+        newArea.id=a.getId();
+        newArea.topLeftX=a.getTopLeftX();
+        newArea.topLeftY=a.getTopLeftY();
+        newArea.relPosZ=a.getRelPosZ();
+        newArea.width=a.getWidth();
+        newArea.height=a.getHeight();
+        newArea.selectedForAcq=a.isSelectedForAcq();
+        newArea.comment=a.getComment();
+        newArea.acquiring=a.isAcquiring();
+        newArea.tilingMode=a.getTilingMode();
+        newArea.tileOverlap=a.tileOverlap;
+        newArea.tilePosList=new ArrayList<Tile>(a.getTilePositions());
+        return newArea;
+    }*/
+
     
     @Override
     public String getShape() {
-        return "Donut";
-    }
-        
-    @Override
-    public void initializeFromJSONObject(JSONObject obj) throws JSONException {
-        if (obj!=null)
-            ringWidth=obj.getDouble(TAG_RING_WIDTH);
-        else
-            ringWidth=1;
+        return "Ellipse";
     }
 
-    @Override
-    protected void addFieldsToJSONObject(JSONObject obj) throws JSONException {
-        if (obj!=null)
-            obj.put(TAG_RING_WIDTH,ringWidth);
+/*@Override
+    public String[] getXMLTags() {
+        String[] s = new String[7];
+        s[0]="SHAPE";
+        s[1]="NAME";
+        s[2]="WIDTH";
+        s[3]="HEIGHT";
+        s[4]="TOP_LEFT_X";
+        s[5]="TOP_LEFT_Y";
+        s[6]="REL_POS_Z";
+        return s;
     }
-        
+*/  
+    /*
+    @Override
+    public boolean setAreaParams (List<String> params) {
+         //if (super.setAreaParams(params)) {
+         if (params.size()>=8) {
+//            shape=params.get(1);
+            name=params.get(2);
+            width=Double.parseDouble(params.get(3));
+            height=Double.parseDouble(params.get(4));
+            topLeftX=Double.parseDouble(params.get(5));
+            topLeftY=Double.parseDouble(params.get(6));
+            relPosZ=Double.parseDouble(params.get(7));
+            selectedForAcq=Boolean.parseBoolean(params.get(8));
+            return true;
+        } else {
+            name="undefined";
+            width=1;
+            height=1;
+            topLeftX=0;
+            topLeftY=0;
+            relPosZ=0;
+            selectedForAcq=false;
+            return false;
+        }
+    }
+    
+    @Override
+    protected Map<String,String> createParamHashMap() {
+        Map<String,String> map = super.createParamHashMap();
+        map.put(TAG_CLASS,this.getClass().getName());
+        return map;
+    }
+*/
+
+/*   @Override
+    public double getCenterX () {
+        return topLeftX+width/2;
+    }
+    
+    @Override
+    public double getCenterY () {
+        return topLeftY+height/2;
+    }
+*/    
     @Override
     public void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio, boolean showZProfile) {
-        g2d.setColor(getFillColor(showZProfile));
 /*        if (acquiring) {
             g2d.setColor(COLOR_ACQUIRING_AREA);
         } else
             g2d.setColor(COLOR_UNSELECTED_AREA);
-*/        int x = bdPix + (int) Math.round(topLeftX*physToPixelRatio);
+*/        
+        g2d.setColor(getFillColor(showZProfile));
+        int x = bdPix + (int) Math.round(topLeftX*physToPixelRatio);
         int y = bdPix + (int) Math.round(topLeftY*physToPixelRatio);
         int w = (int) Math.round(width*physToPixelRatio);
-        int h = (int) Math.round(height*physToPixelRatio);  
-        
-        int holeX = bdPix + (int) Math.round((topLeftX+ringWidth)*physToPixelRatio);
-        int holeY = bdPix + (int) Math.round((topLeftY+ringWidth)*physToPixelRatio);
-        int holeWidth = (int) Math.round((width-2*ringWidth)*physToPixelRatio);
-        int holeHeight = (int) Math.round((height-2*ringWidth)*physToPixelRatio);    
-
-        java.awt.geom.Area donut = new java.awt.geom.Area(new Ellipse2D.Double(x, y, w, h));
-        java.awt.geom.Area hole = new java.awt.geom.Area(new Ellipse2D.Double(holeX, holeY, holeWidth, holeHeight));
-        donut.subtract(hole);
-        g2d.fill(donut);
+        int h = (int) Math.round(height*physToPixelRatio);    
+        g2d.fillOval(x,y,w,h); 
         g2d.setColor(getBorderColor());
 /*        
-
         if (selectedForMerge)
-            g2d.setColor(COLOR_MERGE_AREA_BORDER);
-        else
-            if (selectedForAcq)
-                g2d.setColor(COLOR_SELECTED_AREA_BORDER);
-            else    
-                g2d.setColor(COLOR_AREA_BORDER);
-*/
-        g2d.draw(new Ellipse2D.Double(x, y, w,h)); 
-/*        if (selectedForMerge)
             g2d.setColor(COLOR_MERGE_AREA_BORDER);
         else {
             if (selectedForAcq)
                 g2d.setColor(COLOR_SELECTED_AREA_BORDER);
             else    
                 g2d.setColor(COLOR_AREA_BORDER);
-        }        
-        */
-        g2d.draw(new Ellipse2D.Double(holeX, holeY, holeWidth, holeHeight)); 
+        }*/
+        g2d.draw(new Ellipse2D.Double(x, y, w,h)); 
     }
     
     
@@ -122,41 +156,34 @@ public class DonutArea extends Area {
         drawTileByTileOvl(g2d, bdPix, physToPixelRatio, fovX, fovY, setting);
     }
     
-    //checks if coordinate is inside area
+    
     @Override
-    public boolean isInArea(double x, double y) {
-        Ellipse2D.Double o=new Ellipse2D.Double(topLeftX, topLeftY, width, height);
-        Ellipse2D.Double i=new Ellipse2D.Double(topLeftX+ringWidth, topLeftY+ringWidth, width-2*ringWidth, height-2*ringWidth);
-        return o.contains(x,y) && !i.contains(x,y);
+    public boolean isInArea(double x, double y) {//checks of coordinate is inside area
+        Ellipse2D.Double e=new Ellipse2D.Double(topLeftX, topLeftY, width, height);
+        return e.contains(x,y);
     }
 
     @Override
-    public boolean isFovInsideArea(double x, double y, double fovX, double fovY) {//checks if FOV is inside area; x,y coordinates are cnter of FOV
-        Ellipse2D.Double areaO = new Ellipse2D.Double(topLeftX,topLeftY,width,height);
-        Ellipse2D.Double areaI = new Ellipse2D.Double(topLeftX+ringWidth, topLeftY+ringWidth, width-2*ringWidth, height-2*ringWidth);
-        Rectangle2D.Double fov = new Rectangle2D.Double(x-fovX/2,y-fovY/2,fovX,fovY);
-        return areaO.contains(fov) &&!areaI.intersects(fov);
+    public boolean isFovInsideArea(double x, double y, double fovX, double fovY) {//checks of coordinate is inside area
+        Ellipse2D.Double area = new Ellipse2D.Double(topLeftX,topLeftY,width,height);
+        return area.contains(x-fovX/2,y-fovY/2,fovX,fovY);
     }
-    
-    //checks if field of view rectangle touches this area 
+
     @Override
     public boolean doesFovTouchArea(double x, double y, double fovX, double fovY) {//checks of coordinate is inside area
-        Ellipse2D.Double areaO = new Ellipse2D.Double(topLeftX,topLeftY,width,height);
-        Ellipse2D.Double areaI = new Ellipse2D.Double(topLeftX+ringWidth, topLeftY+ringWidth, width-2*ringWidth, height-2*ringWidth);
-        Rectangle2D.Double fov = new Rectangle2D.Double(x-fovX/2,y-fovY/2,fovX,fovY);
-        return areaO.intersects(fov) &&!areaI.contains(fov);
+        Ellipse2D.Double area = new Ellipse2D.Double(topLeftX,topLeftY,width,height);
+        return area.intersects(x-fovX/2,y-fovY/2,fovX,fovY);
     }
 
-    //checks if rectangle encloses this entire area
     @Override
-    public boolean isInsideRect(Rectangle2D r) { 
+    public boolean isInsideRect(Rectangle2D r) { //checks if entire area is inside rectangle
         return ((topLeftX>=r.getX()) && (topLeftX+width<=r.getX()+r.getWidth()) && (topLeftY>=r.getY()) && (topLeftY+height<=r.getY()+r.getHeight()));
     } 
 
     @Override
     public Area duplicate() {
-        DonutArea newArea = new DonutArea(this.getName());
-//        newArea.shape=this.getShape();
+        EllipseArea newArea = new EllipseArea(this.getName());
+//        EllipseArea.shape=this.getShape();
         newArea.setId(this.getId());
         newArea.setTopLeftX(this.topLeftX);
         newArea.setTopLeftY(this.topLeftY);
@@ -169,17 +196,39 @@ public class DonutArea extends Area {
         newArea.setAcquiring(this.acquiring);
 //        newArea.setTilingSetting(this.tiling.duplicate());
         newArea.tilePosList=new ArrayList<Tile>(this.getTilePositions());
-        newArea.setRingWidth(this.ringWidth);
         newArea.setUnknownTileNum(this.hasUnknownTileNum());
         return newArea;
     }
 
     @Override
-    public void calcCenterAndDefaultPos() {
-        centerPos=new Point2D.Double(topLeftX+width/2,topLeftY+ringWidth/2);
-        defaultPos=new Point2D.Double(topLeftX+width/2,topLeftY+ringWidth/2);
+    protected void initializeFromJSONObject(JSONObject obj) throws JSONException {
     }
 
+    @Override
+    protected void addFieldsToJSONObject(JSONObject obj) throws JSONException {
+    }
+
+/*    
+    @Override
+    public void calculateCenterPos() {
+        centerPos= new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
+    }
+
+    @Override
+    public void calculateDefaultPos() {
+        if (centerPos==null)
+            calculateCenterPos();
+        defaultPos=centerPos;
+    }
+*/
+    
+    @Override
+    public void calcCenterAndDefaultPos() {
+        centerPos= new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
+        defaultPos=centerPos;
+    }
+    
+    
     @Override
     public List<Point2D> getOutlinePoints() {
         List<Point2D> list=new ArrayList<Point2D>(4);
@@ -259,15 +308,7 @@ public class DonutArea extends Area {
         heightField.setColumns(10);
         heightField.setValue(new Double(height / 1000));
         optionPanel.add(heightField);
-        
-        l=new JLabel("Ringwidth (mm):",JLabel.RIGHT);
-        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
-        optionPanel.add(l);
-        final JFormattedTextField ringwidthField = new JFormattedTextField();
-        ringwidthField.setColumns(10);
-        ringwidthField.setValue(new Double(ringWidth / 1000));
-        optionPanel.add(ringwidthField);
-        
+                
         topLeftXField.addPropertyChangeListener("value",new PropertyChangeListener() {
 
             @Override
@@ -360,28 +401,25 @@ public class DonutArea extends Area {
                 JOptionPane.showMessageDialog(null,"The area does not fit into the layout.");
             }
         } while (result == JOptionPane.OK_OPTION && !isInsideRect(bounds));
-        
+
         if (result == JOptionPane.CANCEL_OPTION) {
             return null;
-        } else {
+        } else {           
             setName((String)nameField.getValue());
             setTopLeft(((Number)topLeftXField.getValue()).doubleValue()*1000, ((Number)topLeftYField.getValue()).doubleValue()*1000);
             setWidth(((Number)widthField.getValue()).doubleValue()*1000);
             setHeight(((Number)heightField.getValue()).doubleValue()*1000);
             //center pos will be set automatically
             setRelPosZ(((Number)zField.getValue()).doubleValue()*1000);            
-            setRingWidth(((Number)ringwidthField.getValue()).doubleValue()*1000);
             return this;
         }
-            
     }
-
+    
     @Override
     public int supportedLayouts() {
         return Area.SUPPORT_CUSTOM_LAYOUT;
     }
 
 
-    
-    
+
 }

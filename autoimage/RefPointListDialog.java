@@ -4,6 +4,7 @@
  */
 package autoimage;
 
+import autoimage.area.Area;
 import ij.IJ;
 import java.awt.event.WindowEvent;
 import java.awt.geom.AffineTransform;
@@ -316,9 +317,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("Set Landmarks");
-        setMaximumSize(new java.awt.Dimension(2147483647, 300));
         setMinimumSize(new java.awt.Dimension(527, 300));
-        setPreferredSize(new java.awt.Dimension(527, 300));
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowClosing(java.awt.event.WindowEvent evt) {
                 formWindowClosing(evt);
@@ -393,7 +392,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
                 .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(layout.createSequentialGroup()
                         .add(6, 6, 6)
-                        .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 515, Short.MAX_VALUE))
+                        .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 588, Short.MAX_VALUE))
                     .add(layout.createSequentialGroup()
                         .add(20, 20, 20)
                         .add(layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
@@ -579,7 +578,8 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
             RefAreaTableModel model=(RefAreaTableModel)refPointTable.getModel();
             RefArea refArea=model.getRowData(row);
             if (!refArea.isStagePosFound()) {
-                JOptionPane.showMessageDialog(this, "Stage position not mapped. Cannot move to this landmark.");    
+                JOptionPane.showMessageDialog(this, "Stage position not mapped. Cannot move to this landmark.");
+                return;
             }
             try {
                 double stageX=(Double)model.getValueAt(row,1);

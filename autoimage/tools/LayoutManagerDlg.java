@@ -1,6 +1,11 @@
-package autoimage;
+package autoimage.tools;
 
 //import autoimage.area.Area;
+import autoimage.AcqFrame;
+import autoimage.AcqLayout;
+import autoimage.AcqPlateLayout;
+import autoimage.area.Area;
+import autoimage.Utils;
 import autoimage.guiutils.NumberTableCellRenderer;
 import ij.IJ;
 import ij.Prefs;
@@ -584,9 +589,9 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         startUpLayout.setName((String)platenameField.getValue());
         startUpLayout.setFile(new File(fileLocationLabel.getText(),startUpLayout.getName()));
         //convert dimensions from mm to um
-        startUpLayout.width=((Number)plateWidthField.getValue()).doubleValue() * 1000;
-        startUpLayout.length=((Number)plateLengthField.getValue()).doubleValue() * 1000;
-        startUpLayout.height=((Number)plateHeightField.getValue()).doubleValue() * 1000;
+        startUpLayout.setWidth(((Number)plateWidthField.getValue()).doubleValue() * 1000);
+        startUpLayout.setLength(((Number)plateLengthField.getValue()).doubleValue() * 1000);
+        startUpLayout.setHeight(((Number)plateHeightField.getValue()).doubleValue() * 1000);
         return startUpLayout;
     }
 

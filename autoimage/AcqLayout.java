@@ -4,6 +4,7 @@
  */
 package autoimage;
 
+import autoimage.area.Area;
 import ij.IJ;
 import java.awt.Toolkit;
 import java.awt.geom.AffineTransform;
@@ -324,6 +325,18 @@ public class AcqLayout  implements PropertyChangeListener {
         double centerY=tileOffset.getY()/2;
         return (!(a[0].contains(centerX, centerY) && a[3].contains(centerX, centerY)) 
                                         || (a[1].contains(centerX, centerY) && a[2].contains(centerX, centerY)));
+    }
+    
+    public void setWidth(double w) {
+        width=w;
+    }
+    
+    public void setHeight(double h) {
+        height=h;
+    }
+    
+    public void setLength(double l) {
+        length=l;
     }
     
     //returns minimal relative tile overlap (0 <= tileOverlap <=1) to eliminate all gaps

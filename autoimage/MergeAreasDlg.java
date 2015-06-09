@@ -1,5 +1,6 @@
 package autoimage;
 
+import autoimage.area.Area;
 import ij.IJ;
 import java.awt.Dimension;
 import java.awt.Font;

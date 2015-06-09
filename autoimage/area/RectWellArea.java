@@ -1,5 +1,7 @@
-package autoimage;
+package autoimage.area;
 
+import autoimage.area.RectArea;
+import autoimage.area.Area;
 import java.util.Comparator;
 
 /**

@@ -1,14 +1,9 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage;
 
-import java.awt.geom.Point2D;
-
 /**
- *
- * @author Karsten
+ * Provides basic 3D vector operations
+ * 
+ * @author Karsten Siller
  */
 public class Vec3d {
     public double x;

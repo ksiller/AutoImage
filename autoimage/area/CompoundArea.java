@@ -1,5 +1,7 @@
-package autoimage;
+package autoimage.area;
 
+import autoimage.area.Area;
+import autoimage.TilingSetting;
 import autoimage.TilingSetting;
 import java.awt.Graphics2D;
 import java.awt.Shape;

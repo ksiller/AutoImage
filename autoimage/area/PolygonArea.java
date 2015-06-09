@@ -1,5 +1,8 @@
-package autoimage;
+package autoimage.area;
 
+import autoimage.Tile;
+import autoimage.TilingSetting;
+import autoimage.area.Area;
 import autoimage.guiutils.NumberTableCellRenderer;
 import ij.IJ;
 import java.awt.Dimension;

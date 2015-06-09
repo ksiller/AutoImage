@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage;
 
 import java.awt.Color;
@@ -12,12 +8,11 @@ import org.json.JSONObject;
  *
  * @author Karsten Siller
  */
-class Channel {
+public class Channel {
     
     private String name;
     private double exposure;
     private double zOffset;
-   // private boolean stitch;
     private Color color;
     
     public final static String TAG_CHANNEL_ARRAY = "CHANNEL_ARRAY";
@@ -25,7 +20,6 @@ class Channel {
     public final static String TAG_NAME = "NAME";
     public final static String TAG_EXPOSURE = "EXPOSURE";
     public final static String TAG_Z_OFFSET = "Z_OFFSET";
-//    public final static String TAG_STITCH = "STITCH";
     public final static String TAG_COLOR = "COLOR";
     
     
@@ -83,10 +77,6 @@ class Channel {
         return zOffset;
     }
     
- /*   public boolean getStitch() {
-        return stitch;
-    }*/
-    
     public Color getColor() {
         return color;
     }
@@ -102,10 +92,6 @@ class Channel {
     public void setZOffset(double zo) {
         zOffset=zo;
     }
-
-/*    public void setStitch(boolean st) {
-        stitch=st;
-    }*/
 
     public void setColor(Color c) {
         color=c;

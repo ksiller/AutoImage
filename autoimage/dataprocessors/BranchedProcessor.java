@@ -204,9 +204,10 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
                 IJ.log(this.getClass().getName()+": Cannot open image");
             }
        } else if (element instanceof TaggedImage) {
-            try {
-                copy=(E)Utils.duplicateTaggedImage((TaggedImage)element);
-                ((TaggedImage)copy).tags=updateTagValue(((TaggedImage)copy).tags,null,null, true);
+            try {                
+                TaggedImage modTI=MMCoreUtils.duplicateTaggedImage((TaggedImage)element);
+                modTI.tags=updateTagValue(modTI.tags,null,null, true);
+                copy=(E)modTI;
             } catch (JSONException ex) {
                 IJ.log(this.getClass().getName()+ ": Cannot retrieve 'Info' metadata from file. "+ex);
                 Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
@@ -223,7 +224,7 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
         if (element instanceof File) {
             File f =(File)element;
             try {
-                JSONObject meta=Utils.parseMetadata(f);
+                JSONObject meta=Utils.parseMetadataFromFile(f);
                 String path=Utils.createPathForSite(f,workDir,true);
                 if (path==null)
                     path=workDir;

@@ -1,6 +1,7 @@
 package autoimage;
 
 //import ij.IJ;
+import autoimage.area.Area;
 import ij.IJ;
 import java.awt.AlphaComposite;
 import java.awt.BasicStroke;

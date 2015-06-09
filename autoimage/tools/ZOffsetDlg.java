@@ -4,8 +4,11 @@
  * and open the template in the editor.
  */
 
-package autoimage;
+package autoimage.tools;
 
+import autoimage.Channel;
+import autoimage.ILiveListener;
+import autoimage.IStageMonitorListener;
 import ij.IJ;
 import java.awt.Component;
 import java.awt.Frame;
@@ -90,15 +93,13 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
     }
 
     
-    protected class ChannelData {
+    public class ChannelData {
         private boolean reference;
         private String configName;
         private double exposure;
         private double zOffset;
         private double stageZPos;
         private boolean isSet;
-//        private JButton liveButton;
-//        private JButton setButton;
     
         public ChannelData (boolean ref, String name, double exp, double offset, double stagePos, boolean set) {
             reference=ref;

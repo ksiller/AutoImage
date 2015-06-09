@@ -1,6 +1,7 @@
 package autoimage.dataprocessors;
 
 import autoimage.ExtImageTags;
+import autoimage.MMCoreUtils;
 import autoimage.Utils;
 import ij.IJ;
 import ij.ImagePlus;
@@ -131,7 +132,7 @@ public class ZProjector<E> extends GroupProcessor<E> {
     //                            if (image instanceof java.io.File) {
                                     File file=(File)image;
                                     imp=IJ.openImage(file.getAbsolutePath());
-                                    meta=Utils.parseMetadata(file);
+                                    meta=MMCoreUtils.parseMetadataFromFile(file);
     //                            } 
                                     /*else if (image instanceof TaggedImage) {
                                     imp=Utils.createImagePlus((TaggedImage)image);
@@ -193,7 +194,7 @@ public class ZProjector<E> extends GroupProcessor<E> {
                             IJ.log("SINGLE FILE");
                             File file=(File)group.elements.get(0);
                             resultImp=IJ.openImage(file.getAbsolutePath());
-                            meta=Utils.parseMetadata(file);
+                            meta=MMCoreUtils.parseMetadataFromFile(file);
                         }
                         IJ.save(resultImp,"/Users/Karsten/Desktop/proj.tif");
 
@@ -205,7 +206,7 @@ public class ZProjector<E> extends GroupProcessor<E> {
                         meta.put(MMTags.Root.SUMMARY, summary);
 
                         //create TaggedImage
-                        TaggedImage ti=Utils.createTaggedImage(resultImp,meta);
+                        TaggedImage ti=MMCoreUtils.createTaggedImage(resultImp,meta);
 /*
                         if (group.elements.get(0) instanceof TaggedImage) {
                             results.add((E)ti);
@@ -249,7 +250,7 @@ public class ZProjector<E> extends GroupProcessor<E> {
     @Override
     protected boolean acceptElement(E element) {
         try {
-            JSONObject meta=Utils.parseMetadata((File)element);
+            JSONObject meta=MMCoreUtils.parseMetadataFromFile((File)element);
             long slice=meta.getLong(MMTags.Image.SLICE_INDEX);
             IJ.log(this.getClass().getName()+": current="+slice+", start="+startSlice+", end="+endSlice);
             if (allSlices || (slice >= startSlice && slice <=endSlice)) {

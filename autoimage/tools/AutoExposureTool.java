@@ -4,15 +4,14 @@
  * and open the template in the editor.
  */
 
-package autoimage;
+package autoimage.tools;
 
+import autoimage.AcqFrame;
+import autoimage.MMCoreUtils;
 import ij.IJ;
 import ij.ImagePlus;
-import ij.process.ByteProcessor;
-import ij.process.ColorProcessor;
 import ij.process.ImageProcessor;
 import ij.process.ImageStatistics;
-import ij.process.ShortProcessor;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
@@ -21,6 +20,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.BorderFactory;
@@ -31,12 +31,9 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import mmcorej.CMMCore;
-import mmcorej.TaggedImage;
 import org.micromanager.api.ScriptInterface;
-import org.micromanager.utils.ImageUtils;
 
 /**
  *
@@ -100,7 +97,7 @@ public class AutoExposureTool implements Callable<Double> {
                 double minExp=1;
                 boolean optimalExpFound=false;
                 while (!optimalExpFound && !isCancelled()) {
-                    imp = MMCoreUtils.snapImagePlus(core, channelGroup, channel, newExp,0, false);
+                    imp = MMCoreUtils.snapImagePlus(core, channelGroup, channel, newExp,0, MMCoreUtils.SCALE_NONE);
                     if (imp==null)
                         break;
                     ImageProcessor ip=imp.getProcessor();
@@ -151,9 +148,10 @@ public class AutoExposureTool implements Callable<Double> {
                 frame.dispose();
                 if (showImages && imp!=null) {
                     imp.show();
+                    IJ.run(imp,"HiLo","");
                 }
                 if (!isCancelled()) {
-                    if (optimalExp==MAX_EXPOSURE) {
+                    if (optimalExp>=MAX_EXPOSURE) {
                         JOptionPane.showMessageDialog(null, "Reached maximum exposure ("+MAX_EXPOSURE+" ms).");
                     }
                 }
@@ -185,14 +183,13 @@ public class AutoExposureTool implements Callable<Double> {
         frame.setVisible(true);
 
         worker.execute();
-        while (worker.isDone()) {
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException ex) {
-                Logger.getLogger(AutoExposureTool.class.getName()).log(Level.SEVERE, null, ex);
-            }
+        try {
+            return worker.get();
+        } catch (InterruptedException ex) {
+            return new Double(-1);
+        } catch (ExecutionException ex) {
+            return new Double(-1);
         }
-        return new Double(100);
     }
     
 /*
@@ -223,5 +220,8 @@ public class AutoExposureTool implements Callable<Double> {
         return exposure;
     }
     
-
+    public void setShowImages(boolean b) {
+        showImages=b;
+    }
+    
 }

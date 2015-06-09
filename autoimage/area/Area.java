@@ -1,5 +1,12 @@
-package autoimage;
+package autoimage.area;
 
+import autoimage.AcqLayout;
+import autoimage.ExtImageTags;
+import autoimage.FieldOfView;
+import autoimage.Tile;
+import autoimage.TileManager;
+import autoimage.TilingSetting;
+import autoimage.Vec3d;
 import ij.IJ;
 import java.awt.AlphaComposite;
 import java.awt.Color;

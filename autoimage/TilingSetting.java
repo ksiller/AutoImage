@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage;
 
 import org.json.JSONException;
@@ -10,9 +6,9 @@ import org.json.JSONObject;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
-class TilingSetting {
+public class TilingSetting {
     public enum Mode {FULL, CENTER, RANDOM, RUNTIME, FILE}
     Mode mode;
     String tileCoordFName; //abspath to file with tilingcoords
@@ -26,10 +22,6 @@ class TilingSetting {
     double overlap;
     int direction;
     
-//    public static final byte TILING_HORIZONTAL_FIRST = 1;
-//    public static final byte TILING_UP = 2;
-//    public static final byte TILING_LEFT = 4;
-//    public static final byte TILING_INSIDE_ONLY = 64;
     public static final byte DR_TILING = 0;
     public static final byte UR_TILING = 1;//TILING_UP;//2
     public static final byte DL_TILING = 2;//TILING_LEFT;//4

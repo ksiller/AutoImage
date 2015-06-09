@@ -2,6 +2,7 @@ package autoimage.dataprocessors;
 
 import autoimage.ExtImageTags;
 import autoimage.FieldOfView;
+import autoimage.MMCoreUtils;
 import autoimage.Utils;
 import ij.IJ;
 import ij.ImagePlus;
@@ -189,7 +190,7 @@ public class StitchCluster extends GroupProcessor<File> {
                         String sourceImagePath=group.elements.get(0).getParent();
                         sourceImagePath=new File (sourceImagePath).getParent();
                         try {
-                            JSONObject meta=Utils.parseMetadata(group.elements.get(0));
+                            JSONObject meta=MMCoreUtils.parseMetadataFromFile(group.elements.get(0));
                             JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
                             double cameraRot=summary.getDouble(ExtImageTags.DETECTOR_ROTATION);
                             String prefix = meta.getString(ExtImageTags.AREA_NAME);
@@ -248,7 +249,7 @@ public class StitchCluster extends GroupProcessor<File> {
                                         break;
 
                                     IJ.log("    "+Integer.toString(i)+": "+e.getAbsolutePath());
-                                    meta=Utils.parseMetadata(e);
+                                    meta=MMCoreUtils.parseMetadataFromFile(e);
                                     //need to convert from um into pixel coords if using grid stitching plugin
                                     Long sliceIndex=meta.getLong(MMTags.Image.SLICE_INDEX);
                                     double xUM=meta.getDouble(MMTags.Image.XUM)/pixSize;

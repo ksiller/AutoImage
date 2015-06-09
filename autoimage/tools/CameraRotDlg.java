@@ -4,8 +4,12 @@
  * and open the template in the editor.
  */
 
-package autoimage;
+package autoimage.tools;
 
+import autoimage.FieldOfView;
+import autoimage.ILiveListener;
+import autoimage.MMCoreUtils;
+import autoimage.Utils;
 import ij.CompositeImage;
 import ij.IJ;
 import ij.ImagePlus;
@@ -30,7 +34,6 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.swing.AbstractCellEditor;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
@@ -55,13 +58,10 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
     private static double exposure;
     private static double stageStepSize; // stage movement in um
     private static int iterations;
+    private static boolean showImages=false;
     private boolean isMeasuring;
     private CameraRotationTask rotMeasureTask;
-    private static boolean showImages=false;
-//    private LiveModeMonitor liveModeMonitor =null;
-//    private Rectangle oldRoi; //stores cameraROI so it can be rstored when closing
     private Measurement measurement;//stores camera rotation(in rad) and pixelsize
-//    private Measurement returnResult;
     
     private static int maxIterations=10;
     private static double toleratedAngleDisp=2;//degree
@@ -111,6 +111,23 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
     public class Measurement {
         double cameraAngle;
         double pixelSize;
+        
+        public Measurement() {
+            this (0,-1);
+        }
+        
+        public Measurement(double ca, double ps) {
+            cameraAngle=ca;
+            pixelSize=ps;
+        }
+        
+        public double getCameraAngle() {
+            return cameraAngle;
+        }
+        
+        public double getPixelSize() {
+            return pixelSize;
+        }
     }
 
 
@@ -182,7 +199,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     }    
                     //horizontal step along x-axis to right
                     core.setXYPosition(xyStageName, stagePos.getX(),stagePos.getY());
-                    imp1=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,false);
+                    imp1=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,MMCoreUtils.SCALE_NONE);
                     if (imp1==null) {
                         return false;
                     }
@@ -204,7 +221,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                         return null;
                     }    
                     core.setXYPosition(xyStageName, stagePos.getX()+stageStepSize,stagePos.getY());
-                    imp2=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,false);
+                    imp2=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,MMCoreUtils.SCALE_NONE);
                     if (imp2==null) {
                         return false;
                     }                    
@@ -318,7 +335,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     }    
                    //vertical step along y-axis down
                     core.setXYPosition(xyStageName, stagePos.getX(),stagePos.getY());
-                    imp1=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,false);
+                    imp1=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,MMCoreUtils.SCALE_NONE);
                     if (imp1==null) {//ipArray1==null || ipArray1.length<1) {
                         return false;
                     }                    
@@ -340,7 +357,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                         return null;
                     }    
                     core.setXYPosition(xyStageName, stagePos.getX(),stagePos.getY()+stageStepSize);
-                    imp2=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,false);
+                    imp2=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,MMCoreUtils.SCALE_NONE);
                     if (imp2==null) {
                         return false;
                     }                    
@@ -483,9 +500,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     vimp.close();
                 if (himp!=null)
                     himp.close();
-                measurement=new Measurement();
-                measurement.cameraAngle=FieldOfView.ROTATION_UNKNOWN;
-                measurement.pixelSize=-1;
+                measurement=new Measurement(FieldOfView.ROTATION_UNKNOWN,-1);
                 return false;
             }
             return true;
@@ -496,17 +511,6 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
             DefaultTableModel model=(DefaultTableModel)resultTable.getModel();
             for (Object[] row:measurements) {
                 model.addRow(row);
-/*
-                String s=Integer.toString((Integer)row[0])+";"
-                        +Double.toString((Double)row[1])+";"
-                        +Double.toString((Double)row[2])+";"
-                        +Double.toString((Double)row[3])+";"
-                        +Double.toString((Double)row[4])+";"
-                        +Double.toString((Double)row[5])+";"
-                        +Double.toString((Double)row[6])+";"
-                        +Double.toString((Double)row[7])+";"
-                        +Double.toString((Double)row[8])+";";
-                */
             }    
             int progress=progressBar.getValue()+1;
             progressBar.setValue(progress);
@@ -555,7 +559,6 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
             measurement = new Measurement();
             double difference = Math.abs((medianAngleH - medianAngleV + 180) % 360) - 180;
             if (Math.abs(difference) > toleratedAngleDisp || Utils.isNaN(medianAngleH) || Utils.isNaN(medianAngleV)) {
-         //   if (Math.abs(medianAngleH - medianAngleV) > toleratedAngleDisp || Utils.isNaN(medianAngleH) || Utils.isNaN(medianAngleV)) {
                 result="<html><p>Warning: Angles not defined or measured angles using horizontal and vertical stage displacement show more than "+toleratedAngleDisp+" degree disparity.</p></html>";
                 measurement.cameraAngle=FieldOfView.ROTATION_UNKNOWN;
             } else {
@@ -583,7 +586,6 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         resultTable.getTableHeader().setReorderingAllowed(false);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         measurement=null;
-//        returnResult=null;
         rotMeasureTask=null;
         this.gui=gui;
         core=gui.getMMCore();
@@ -611,7 +613,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
             public void windowClosing(WindowEvent e) {
                 IJ.log("CameraRotDlg.windowClosing");
                 if (resultTable.getRowCount() > 0) {
-                    int result=JOptionPane.showConfirmDialog(null, "Do you want to discard measurments?", "Camera Rotation Measurements", JOptionPane.YES_NO_OPTION);
+                    int result=JOptionPane.showConfirmDialog(null, "Do you want to discard measurements?", "Camera Rotation Measurements", JOptionPane.YES_NO_OPTION);
                     if (result==JOptionPane.NO_OPTION) {
     //                    setVisible(false);
                         return;                
@@ -631,10 +633,6 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         this(parent,gui,channelGroupStr,0, modal);
     }
 
-    @Override
-    public void dispose() {
-        super.dispose();
-    }
     
     public void setTolerance(double angle) {
         toleratedAngleDisp=angle;
@@ -1017,10 +1015,6 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     JOptionPane.showMessageDialog(this, "Select step size larger than 0.");
                     return;                    
                 }
-/*                oldRoi=core.getROI();
-                if (oldRoi !=null) {
-                    core.clearROI();
-                }*/
                 if (stageStepSize==0) {
                     JOptionPane.showMessageDialog(this, "Stage step size not set.");
                 }
@@ -1070,8 +1064,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
     private void configComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_configComboBoxActionPerformed
         if (configComboBox.getSelectedItem() != null) {
             channelGroupStr=(String)configComboBox.getSelectedItem();
-            String newChGroupStr=MMCoreUtils.loadAvailableChannelConfigs(null, channelGroupStr,core);
-//            IJ.showMessage(newChGroupStr+"-"+channelGroupStr);
+            String newChGroupStr=MMCoreUtils.loadAvailableChannelConfigs(null, core, channelGroupStr);
             if (!channelGroupStr.equals(newChGroupStr)) {
                 configComboBox.removeAllItems();
                 StrVector configs = core.getAvailableConfigGroups();
@@ -1121,6 +1114,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     } catch (Exception e) {
                     }
                     gui.enableLiveMode(true);
+                    //try to place snap window in front; OS-dependent: may or may not work 
                     SwingUtilities.invokeLater(new Runnable() {
                         @Override
                         public void run() {

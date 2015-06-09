@@ -1,5 +1,6 @@
 package autoimage.dataprocessors;
 
+import autoimage.MMCoreUtils;
 import autoimage.Utils;
 import ij.IJ;
 import java.io.File;
@@ -85,7 +86,7 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
         protected boolean addToGroup(E img) throws JSONException {
             JSONObject meta=null;
             if (img instanceof File) {
-                meta=Utils.parseMetadata((File)img);
+                meta=MMCoreUtils.parseMetadataFromFile((File)img);
             }
             if (img instanceof TaggedImage) {
                 meta=((TaggedImage)img).tags;
@@ -185,7 +186,7 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
             }    
             if (currentGroup==null) {//need to create new group
                 currentGroup=new Group<E>(null);
-                JSONObject meta=Utils.readMetadata(element,false);
+                JSONObject meta=MMCoreUtils.readMetadata(element,false);
                 try {
                     long max=determineMaxGroupSize(meta);
                     currentGroup.setMaxGroupSize(max);

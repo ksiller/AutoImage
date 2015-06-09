@@ -24,7 +24,7 @@ import org.micromanager.utils.ReportingUtils;
  *                 passes on modified image to children
  * ImageAnalyzer : leaf (no children)
  *                 passes unmodified image to sibling, runs analysis
- * SeqAnalyer    : node or leaf with children and possible downstream siblings
+ * BranchedProcessor    : node or leaf with children and possible downstream siblings
  *                 passes unmodified image to sibling
  *                 creates copy of image that can be modified and passed on to
  *                 children

@@ -1,5 +1,7 @@
 package autoimage;
 
+import autoimage.area.Area;
+
 /**
  *
  * @author Karsten

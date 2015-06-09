@@ -137,15 +137,8 @@ public class AcqSetting {
             obj.put(TAG_START_TIME, startTimeMS);
             return obj;
         }
-/*        
-        public int getType() {
-            return type;
-        }
-        
-        public long getStartTimeMS() {
-            return startTimeMS;
-        }
-*/        
+
+        @Override
         public String toString() {
             String s="";
             switch (type) {
@@ -180,11 +173,6 @@ public class AcqSetting {
         this(n, null,"", -1d);
     }
 
-/*    
-    public AcqSetting(String n, int camPixX, int camPixY, String objective, double oPixSize) {
-        this(n, camPixX, camPixY, objective, oPixSize, 1, false);
-    }
-*/
     public AcqSetting(String n, FieldOfView fov, String objective, double oPixSize) {
         this(n, fov, objective, oPixSize, 1, false);
     }
@@ -192,7 +180,6 @@ public class AcqSetting {
 //    public AcqSetting(String n, FieldOfView fov, String objective, double oPixSize, double bin, boolean autof) {
     public AcqSetting(String n, FieldOfView fov, String objective, double oPixSize, int bin, boolean autof) {
         name=n;                     
- //       path="";
         binning=bin;
         objectiveDevStr="";
         
@@ -200,7 +187,6 @@ public class AcqSetting {
             fieldOfView = new FieldOfView(1,1,FieldOfView.ROTATION_UNKNOWN);
         else
             fieldOfView=fov;
-//        setCameraChipSize(detector.getFullDetectorPixelX(), detector.getFullDetectorPixelY());
         setObjective(objective,oPixSize);        
         autofocus=autof;
         autofocusSettings=new JSONObject();
@@ -275,22 +261,6 @@ public class AcqSetting {
         }
     }
     
-    public static String[] getPropertyNames(String devName_, CMMCore core_){
-        Vector<String> propNames = new Vector<String>();
-        try {
-            core_.setAutoFocusDevice(devName_);
-            StrVector propNamesVect = core_.getDevicePropertyNames(devName_);
-            for (int i = 0; i < propNamesVect.size(); i++)
-                if (!core_.isPropertyReadOnly(devName_, propNamesVect.get(i))
-	                  && !core_.isPropertyPreInit(devName_,
-	                        propNamesVect.get(i)))
-	               propNames.add(propNamesVect.get(i));
-        } catch (Exception e) {
-           ReportingUtils.logError(e);
-        }
-        return propNames.toArray(new String[propNames.size()]);
-//        return (String[]) propNames.toArray();
-    }
 
     public static JSONObject convertAutofocusSettings(Autofocus af, CMMCore core_) throws JSONException, MMException {
         JSONObject obj=new JSONObject();
@@ -302,7 +272,7 @@ public class AcqSetting {
             }
         } catch (ClassCastException ex) {
             //caused by bug in CoreAutofocus.getPropertyNames(), fixed in 1.4.20
-            for (String propertyName : getPropertyNames(af.getDeviceName(),core_)) {
+            for (String propertyName : MMCoreUtils.getPropertyNamesForAFDevice(af.getDeviceName(),core_)) {
                 properties.put(propertyName, af.getPropertyValue(propertyName));
             }
 //            throw new MMException("Cannot read properties for "+af.getDeviceName());
@@ -492,15 +462,6 @@ public class AcqSetting {
         return channelGroupStr;
     }
     
-    /*
-    public void setPath(String path) {
-        this.path=path;
-    }
-    
-    public String getPath() {
-        return path;
-    }
-   */
     public void setStartTime(ScheduledTime start) {
         startTime=start;
     }
@@ -525,65 +486,19 @@ public class AcqSetting {
         return name;
     }
 
-/*    
-    public void setCameraChipSize(int pixX, int pixY) {
-//        cameraPixX=pixX;
-//        cameraPixY=pixY;
-        detector.setFullDetectorPixelX(pixX);
-        detector.setFullDetectorPixelY(pixY);
-//        calcTileSize();
-    }
-*/
-    
-/*    
-    public long getCameraChipWidth() {
-//        return cameraPixX;
-        return detector.getImagePixel_X();
-    }
-    
-    public long getCameraChipHeight() {
-//        return cameraPixY;
-        return detector.getImagePixel_Y();
-    }
-*/
-    
-/*
-    //obsolete?
-    public void setTileWidth(double tw) {
-        tileWidth=tw;
-    }
-*/    
     public double getTileWidth_UM() {
 //        return tileWidth;
         return fieldOfView.getRoiWidth_UM(objPixSize);
     }
-/*    
-    //obsolete?
-    public void setTileHeight(double th) {
-        tileHeight=th;
-    }
-*/    
     
     public double getTileHeight_UM() {
 //        return tileHeight;
         return fieldOfView.getRoiHeight_UM(objPixSize);    
     }
-    
-    
-/*
-    //obsolete ?
-    private void calcTileSize() {
-//        tileWidth=cameraPixX*objPixSize;
-//        tileHeight=cameraPixY*objPixSize;
-        tileWidth=detector.getDetectorROIPixel_X() * objPixSize;
-        tileHeight=detector.getDetectorROIPixel_Y() * objPixSize;
-    }
-*/
-    
+       
     public void setObjective(String label, double oPixSize) {
         objLabel=label;
         objPixSize=oPixSize;
-//        calcTileSize();
     }
     
     public String getObjective() {
@@ -595,7 +510,6 @@ public class AcqSetting {
     }
     
     public double getImagePixelSize() {
-//        return fieldOfView.getPixelSize();
         return objPixSize*binning;
     }
     

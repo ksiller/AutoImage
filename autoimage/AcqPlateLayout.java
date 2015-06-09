@@ -6,6 +6,9 @@
 
 package autoimage;
 
+import autoimage.area.RectWellArea;
+import autoimage.area.EllipseWellArea;
+import autoimage.area.Area;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Comparator;

@@ -52,155 +52,8 @@ import org.micromanager.utils.ReportingUtils;
 public class Utils {
     
 
-    //shallow pixel array copy
-    public static TaggedImage createTaggedImage(ImagePlus imp, JSONObject meta) {
-        Object pix=null;
-        TaggedImage ti=null;
-        try {
-            String pixType = meta.getString(MMTags.Image.PIX_TYPE);
-            if (pixType.equals("GRAY8") || pixType.equals("GRAY16")) {
-                pix=imp.getProcessor().getPixels();
-            } else if (pixType.equals("RGB32")) {
-                pix=imp.getProcessor().getPixels();
-                if (pix instanceof int[]) {
-                    //convert int[] to byte[]
-                    int[] intArray = (int[]) pix;
-                    byte[] byteArray = new byte[intArray.length * 4];
-                    for (int i=0; i<intArray.length; i++) {
-                        byteArray[i*4] = (byte)(intArray[i]);
-                        byteArray[i*4 + 1] = (byte)(intArray[i] >> 8);
-                        byteArray[i*4 + 2] = (byte)(intArray[i] >> 16);
-                    }
-                    pix=byteArray;
-                } else {
-                }                
-            } else if (pixType.equals("RGB64")) {
-                ImageProcessor[] ipArray=new ImageProcessor[imp.getStackSize()];
-                for (int i=0; i<imp.getStackSize(); i++) {
-                    ipArray[i]=imp.getImageStack().getProcessor(i+1);
-                }
-                if (ipArray[0].getPixels() instanceof short[]) {
-                    short[] shortArray=new short[((short[])ipArray[0].getPixels()).length * 4];
-                    for (int i=0; i<3; i++) {//iterate over R, G, B channels
-                        short[] channelPix=(short[])ipArray[i].getPixels();
-                        for (int pixelPos=0; pixelPos<channelPix.length; pixelPos++) {
-                            //channel order in shortArray is B, G, R
-                            shortArray[4 * pixelPos + (2-i)] =  channelPix[pixelPos];
-                        }
-                    }
-                    pix=shortArray;
-                }
-            }
-            ti= new TaggedImage(pix,meta);
-        } catch (JSONException ex) {
-            Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        return ti;
-    }
     
-    public static ImageProcessor[] createImageProcessor(TaggedImage ti, boolean scale) {
-        try {
-            int width = ti.tags.getInt(MMTags.Image.WIDTH);
-            int height = ti.tags.getInt(MMTags.Image.HEIGHT);
-            String pixType = ti.tags.getString(MMTags.Image.PIX_TYPE);
-            int cameraBitDepth=ti.tags.getInt((MMTags.Summary.BIT_DEPTH));
-            ImageProcessor[] ipArray=null;
-            if (pixType.equals("GRAY8")) {
-                ipArray=new ImageProcessor[1];
-                ipArray[0] = new ByteProcessor(width, height, (byte[]) ti.pix);
-                if (!scale) {
-//                    ipArray[0].setMinAndMax(0, 255);
-                    ipArray[0].setMinAndMax(0,Math.pow(2,cameraBitDepth));
-                }    
-            } else if (pixType.equals("GRAY16")) {
-                ipArray=new ImageProcessor[1];
-                ipArray[0] = new ShortProcessor(width, height, (short[]) ti.pix, null);
-                if (!scale) {
-//                    ipArray[0].setMinAndMax(0, 65535);
-                    ipArray[0].setMinAndMax(0,Math.pow(2,cameraBitDepth));
-                }    
-            } else if (pixType.equals("RGB32")) {
-                ipArray=new ImageProcessor[1];
-                if (ti.pix instanceof byte[]) {
-                    //convert byte[] to int[] 
-                    byte[] byteArray=(byte[])ti.pix;
-                    int[] intArray = new int[byteArray.length/4];
-                    for (int i=0; i<intArray.length; ++i) {
-                        intArray[i] =  byteArray[4*i]
-                                     + (byteArray[4*i + 1] << 8)
-                                     + (byteArray[4*i + 2] << 16);
-                    }
-                    ipArray[0]=new ColorProcessor(width, height, intArray);
-                } else {
-                    ipArray[0]=new ColorProcessor(width, height, (int[]) ti.pix);
-                }
-                if (!scale) {
-//                    ipArray[0].setMinAndMax(0, 255);
-                    ipArray[0].setMinAndMax(0,Math.pow(2,cameraBitDepth));
-                }
-            } else if (pixType.equals("RGB64")) {
-                    if (ti.pix instanceof short[]) {
-                        short[] shortArray=(short[])ti.pix;
-                        ipArray=new ImageProcessor[3];
-                        for (int i=0; i<3; ++i) {//iterate over B, G, R channels
-                            short[] channelArray=new short[shortArray.length/4];
-                            for (int pixelPos=0; pixelPos<channelArray.length; pixelPos++) {
-                                channelArray[pixelPos] =  shortArray[4*pixelPos+i];
-                            }
-                            //create new ShortProcessor for this channel and add to array
-                            //return in R, G, B order
-                            ipArray[2-i]=new ShortProcessor(width, height, channelArray, null);
-                            if (!scale) {
-//                                ipArray[2-i].setMinAndMax(0, 65535);
-                                ipArray[2-i].setMinAndMax(0, Math.pow(2,cameraBitDepth));
-                            }    
-                  	}
-                    }
-                //cannot handle this
-            } else {
-                ipArray=null;
-            }    
-            return ipArray;
-        } catch (JSONException ex) {
-            Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
-            return null;
-        }
-    }
     
-    public static ImagePlus createImagePlus(TaggedImage ti, boolean scale) {
-        try {
-            ImageProcessor[] ipArray=createImageProcessor(ti, scale);
-            if (ipArray!=null && ipArray.length==1) {
-                return new ImagePlus(ti.tags.getString(MMTags.Image.POS_NAME),ipArray[0]);
-            } else {
-                ImagePlus[] impArray=new ImagePlus[ipArray.length]; 
-                for (int i=0; i<ipArray.length; i++) {
-                    impArray[i]=new ImagePlus(Integer.toString(i),ipArray[i]);
-                }
-                RGBStackMerge merger=new RGBStackMerge();
-                return merger.mergeHyperstacks(impArray, false);
-            }
-        } catch (JSONException ex) {
-            Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
-            return null;
-        }
-    }    
-    
-    public static TaggedImage duplicateTaggedImage(TaggedImage ti) throws JSONException, MMScriptException {
-       TaggedImage copyTI = new TaggedImage(ti.pix,ti.tags);
-        JSONObject newMeta=new JSONObject(ti.tags.toString());
-        int width = MDUtils.getWidth(ti.tags);
-        int height = MDUtils.getHeight(ti.tags);
-        String type = MDUtils.getPixelType(ti.tags);
-        int ijType = ImagePlus.GRAY8;
-        if (type.equals("GRAY16")) {
-            ijType = ImagePlus.GRAY16;
-        }
-        ImageProcessor proc = ImageUtils.makeProcessor(ijType, width, height, ti.pix);
-        copyTI=new TaggedImage(proc.getPixelsCopy(),newMeta);
-       
-       return copyTI;
-    }       
     
     public static DefaultMutableTreeNode createDefaultImageProcTree() {
 //        DefaultMutableTreeNode root=new DefaultMutableTreeNode(new ExtDataProcessor(ProcessorTree.PROC_NAME_ACQ_ENG));
@@ -248,59 +101,6 @@ public class Utils {
    }
     
     
-    public static JSONObject parseMetadata(final File dataFile) throws JSONException {
-        JSONObject md = null;
-//        ImagePlus imp = new Opener().openImage(dataFile.getAbsolutePath());
-        ImagePlus imp = IJ.openImage(dataFile.getAbsolutePath());
-        if (imp != null) {
-            if (imp.getProperty("Info") != null) {
-                md = new JSONObject((String) imp.getProperty("Info"));
-            } else {
-                IJ.log("Utils.parseMetadata: imp.getProperty failed");
-            }
-        } else {    
-            IJ.log("Utils.parseMetadata: cannot open ImagePlus");
-        }    
-        return md;
-    }
-
-    
-    public static JSONObject readMetadata(Object element, boolean createCopy) throws JSONException {
-        JSONObject meta=null;
-        if (element instanceof TaggedImage) {
-            if (createCopy) {
-                meta=new JSONObject(((TaggedImage)element).tags.toString());
-            } else{
-                meta=((TaggedImage)element).tags;
-            }    
-        } else if (element instanceof java.io.File) {
-            meta=Utils.parseMetadata((java.io.File)element);
-        }
-        return meta;
-    }
-    
-    public static JSONObject readMetadataSummary(Object element, boolean createCopy) throws JSONException {
-        return readMetadata(element, false).getJSONObject(MMTags.Root.SUMMARY);
-    }
-            
-
-    public static void writeMetadata(final File dataFile, JSONObject meta) throws JSONException {
-        ImagePlus imp = new Opener().openImage(dataFile.getAbsolutePath());
-        if (imp != null) {
-            imp.setProperty("Info",meta);
-            IJ.saveAsTiff(imp,dataFile.getAbsolutePath());
-        }    
-    }
-
-    public static File getImageAsFileObject(TaggedImage ti) throws JSONException {
-        JSONObject summary=ti.tags.getJSONObject(MMTags.Root.SUMMARY);
-        String directory = summary.getString(MMTags.Summary.DIRECTORY); //"Directory"
-        String prefix = summary.getString(MMTags.Summary.PREFIX);
-        String positionName=ti.tags.getString(MMTags.Image.POS_NAME); //"PositionName"
-        String fileName = ti.tags.getString("FileName");
-        File f=new File(new File(new File(directory,prefix),positionName),fileName);
-        return f;
-    }        
     
     
     public static boolean isDescendantOfImageStorageNode(DefaultMutableTreeNode root, DefaultMutableTreeNode node) {
@@ -314,32 +114,6 @@ public class Utils {
         return false;
     }
     
-    public static String[] getAvailableImageTags() {   
-        Class c=org.micromanager.api.MMTags.Image.class;
-        Field[] fieldArray=c.getFields();
-        String[] tags = new String[fieldArray.length+4];
-        for (int i=0; i<fieldArray.length; i++) {
-            try {
-                tags[i]=(String)fieldArray[i].get(null);
-            } catch (IllegalArgumentException ex) {
-                Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (IllegalAccessException ex) {
-                Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
-        tags[fieldArray.length]=ExtImageTags.AREA_NAME;
-//        tags[fieldArray.length+8]="AreaIndex";
-        tags[fieldArray.length+1]=ExtImageTags.CLUSTER_INDEX;
-        tags[fieldArray.length+2]=ExtImageTags.AREA_COMMENT;
-        tags[fieldArray.length+3]=ExtImageTags.SITE_INDEX;
-/*        
-        tags[fieldArray.length+4]=ExtImageTags.CHANNEL_INDEX_ORIG;
-        tags[fieldArray.length+5]=ExtImageTags.SLICE_INDEX_ORIG;
-        tags[fieldArray.length+6]=ExtImageTags.POS_INDEX_ORIG;
-        tags[fieldArray.length+7]=ExtImageTags.FRAME_INDEX_ORIG;*/
-        Arrays.sort(tags);
-        return tags;
-    }
         
 /*    public static void copyFile(File from, File to) throws IOException {
         if (!to.exists()) {
@@ -368,7 +142,7 @@ public class Utils {
     }
 
     public static String createPathForSite(File f, String workDir, boolean create) throws JSONException {
-        JSONObject meta=parseMetadata(f);
+        JSONObject meta=MMCoreUtils.parseMetadataFromFile(f);
         if (meta==null)
             return null;
         String area = meta.getString(ExtImageTags.AREA_NAME);
@@ -386,18 +160,12 @@ public class Utils {
     }
  
     public static String getChannelName(File f) throws JSONException {
-        JSONObject meta=parseMetadata(f);
+        JSONObject meta=MMCoreUtils.parseMetadataFromFile(f);
         if (meta==null)
             return null;
         return meta.getString(MMTags.Image.CHANNEL_NAME);
     }
  
-    public static Long getSliceIndex(File f) throws JSONException {
-        JSONObject meta=parseMetadata(f);
-        if (meta==null)
-            return null;
-        return meta.getLong(MMTags.Image.SLICE_INDEX);
-    }
  
     public static Map<String,List<File>> getChannelMap(List<File> list) throws JSONException {
         Map<String,List<File>> map=new HashMap<String,List<File>>();
@@ -415,21 +183,6 @@ public class Utils {
         return map;
     }
     
-    public static Map<Long,List<File>> getSliceIndexMap(List<File> list) throws JSONException {
-        Map<Long,List<File>> map=new HashMap<Long,List<File>>();
-        for (File f:list) {
-            Long slice=Utils.getSliceIndex(f);
-            List<File> chList;
-            if (!map.containsKey(slice)) {
-                chList=new ArrayList<File>();
-                map.put(slice,chList);
-            } else {
-                chList=(List<File>)map.get(slice);
-            }
-            chList.add(f);
-        }
-        return map;
-    }
     
     public static boolean calibrateImage(ImagePlus imp, JSONObject imageMeta) {
         try {
@@ -649,12 +402,6 @@ public class Utils {
         return dist;
     }
     
-    public static TaggedImage openAsTaggedImage(String filename) throws JSONException {
-        ImagePlus imp=IJ.openImage(filename);
-        TaggedImage ti=ImageUtils.makeTaggedImage(imp.getProcessor());
-        ti.tags=readMetadata(new File(filename),true);
-        return ti;
-    }    
     
     public static String getExtension(File f) {
         return f.getName().substring(f.getName().lastIndexOf("."));

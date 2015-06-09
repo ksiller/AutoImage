@@ -3,7 +3,6 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-
 package autoimage;
 
 /**
@@ -11,22 +10,22 @@ package autoimage;
  * @author Karsten
  */
 public class PlateConfiguration {
-    String name;
-    String fileLocation;
-    double width;
-    double length;
-    double height;
-    int columns;
-    int rows;
-    double distLeftEdgeToA1;
-    double distTopEdgeToA1;
-    double wellDiameter;
-    double wellDistance;
-    double wellDepth;
-    double bottomThickness;
-    String bottomMaterial;
-    String wellShape;
-    
+    public String name;
+    public String fileLocation;
+    public double width;
+    public double length;
+    public double height;
+    public int columns;
+    public int rows;
+    public double distLeftEdgeToA1;
+    public double distTopEdgeToA1;
+    public double wellDiameter;
+    public double wellDistance;
+    public double wellDepth;
+    public double bottomThickness;
+    public String bottomMaterial;
+    public String wellShape;
+
     public PlateConfiguration() {
         name="NewPlate";
         fileLocation="";
@@ -44,7 +43,7 @@ public class PlateConfiguration {
         bottomMaterial="Glass";
         wellShape="Circle";
     }
-    
+
     @Override
     public boolean equals(Object obj) {
         if (!(obj instanceof PlateConfiguration)) {
@@ -120,3 +119,4 @@ public class PlateConfiguration {
         return hash;
     }
 }
+

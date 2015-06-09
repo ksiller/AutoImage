@@ -1,5 +1,10 @@
-package autoimage;
+package autoimage.tools;
 
+import autoimage.AcqLayout;
+import autoimage.AcqPlateLayout;
+import autoimage.PlateConfiguration;
+//import autoimage.PlateConfiguration;
+import autoimage.Utils;
 import ij.Prefs;
 import java.io.File;
 import java.io.FileWriter;
@@ -20,6 +25,7 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
     private PlateConfiguration startUpConfig;
     private static String lastFileLocation="";
 
+    
     public LayoutPlateManagerDlg(java.awt.Frame parent, boolean modal) {
         super(parent, modal);
         initComponents();

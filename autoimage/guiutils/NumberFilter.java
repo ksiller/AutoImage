@@ -1,19 +1,11 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-package autoimage;
+package autoimage.guiutils;
 
-import ij.IJ;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DocumentFilter;
 
-/**
- *
- * @author Karsten Siller
- */
-class NumberFilter extends DocumentFilter {
+
+public class NumberFilter extends DocumentFilter {
 
     private final char[] LEGAL_CHAR;
     private int digits;

@@ -5,6 +5,7 @@
 package autoimage.olddp;
 
 import autoimage.ExtImageTags;
+import autoimage.MMCoreUtils;
 import autoimage.Utils;
 import autoimage.dataprocessors.BranchedProcessor;
 import ij.IJ;
@@ -60,7 +61,7 @@ public class ClusterProcessor extends BranchedProcessor<File> {
     protected void readMetadata(File element) {
         IJ.log("AreaAnalyzer: readMetadata: "+element.getAbsolutePath());
         try {
-            meta=Utils.parseMetadata((File)element);
+            meta=Utils.parseMetadataFromFile((File)element);
         } catch (JSONException ex) {
             meta=null;
             Logger.getLogger(ClusterProcessor.class.getName()).log(Level.SEVERE, null, ex);
@@ -90,7 +91,7 @@ public class ClusterProcessor extends BranchedProcessor<File> {
     @Override
     protected boolean acceptElement(File element) {
         try {
-            Utils.readMetadata(element,false);
+            MMCoreUtils.readMetadata(element,false);
         } catch (JSONException ex) {
             Logger.getLogger(ClusterProcessor.class.getName()).log(Level.SEVERE, null, ex);
             return false;

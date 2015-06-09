@@ -4,6 +4,7 @@
  */
 package autoimage.olddp;
 
+import autoimage.MMCoreUtils;
 import autoimage.Utils;
 import ij.IJ;
 import ij.ImagePlus;
@@ -34,7 +35,7 @@ public class RGBMerge extends MultiChMultiZAnalyzer<File> {
         IJ.log("    Analyze group...");
         if (elements!=null && elements.size()>0) {
             try {
-                Map <Long,List<File>> sliceMap = Utils.getSliceIndexMap(elements);
+                Map <Long,List<File>> sliceMap = MMCoreUtils.getSliceIndexMap(elements);
                 Iterator it = sliceMap.entrySet().iterator();
                 String path=Utils.createPathForSite(elements.get(0),workDir, false);
                 List<File> destFile = new ArrayList<File>();
@@ -48,7 +49,7 @@ public class RGBMerge extends MultiChMultiZAnalyzer<File> {
                     int i=0;
                     JSONObject meta=null;
                     for (File f:chList) {
-                        meta=Utils.parseMetadata(f);
+                        meta=MMCoreUtils.parseMetadataFromFile(f);
                         impArray[i]=IJ.openImage(f.getAbsolutePath());
                         IJ.log("       "+f.getName());
                         i++;

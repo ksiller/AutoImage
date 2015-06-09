@@ -5,6 +5,7 @@
 package autoimage.olddp;
 
 import autoimage.ExtImageTags;
+import autoimage.MMCoreUtils;
 import autoimage.Utils;
 import autoimage.Vec3d;
 import ij.IJ;
@@ -240,7 +241,7 @@ public class StitchCluster_NoCamRot extends ClusterProcessor {
             String sourceImagePath=elements.get(0).getParent();
             sourceImagePath=new File (sourceImagePath).getParent();
             try {
-                meta=Utils.parseMetadata(elements.get(0));
+                meta=MMCoreUtils.parseMetadataFromFile(elements.get(0));
                 JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
                 String prefix = meta.getString(ExtImageTags.AREA_NAME);
                 long clusterIdx=meta.getLong(ExtImageTags.CLUSTER_INDEX);
@@ -283,7 +284,7 @@ public class StitchCluster_NoCamRot extends ClusterProcessor {
                     int i=1;
                     for (File e:elements) {
                         IJ.log(Integer.toString(i)+": "+e.getAbsolutePath());
-                        meta=Utils.parseMetadata(e);
+                        meta=MMCoreUtils.parseMetadataFromFile(e);
                         //need to convert from um into pixel coords if using grid stitching plugin
 
                         double xUM=meta.getDouble(MMTags.Image.XUM);

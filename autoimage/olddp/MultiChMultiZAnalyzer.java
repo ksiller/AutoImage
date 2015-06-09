@@ -4,6 +4,7 @@
  */
 package autoimage.olddp;
 
+import autoimage.MMCoreUtils;
 import autoimage.Utils;
 import autoimage.dataprocessors.BranchedProcessor;
 import ij.IJ;
@@ -82,7 +83,7 @@ public abstract class MultiChMultiZAnalyzer<E> extends BranchedProcessor<E> {
             return ((TaggedImage)element).tags;
         else if (element instanceof File) {
             try {
-                return Utils.parseMetadata((File)element);
+                return MMCoreUtils.parseMetadataFromFile((File)element);
             } catch (JSONException ex) {
                 Logger.getLogger(MultiChMultiZAnalyzer.class.getName()).log(Level.SEVERE, null, ex);
                  return null;

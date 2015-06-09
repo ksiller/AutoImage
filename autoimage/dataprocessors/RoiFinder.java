@@ -1,6 +1,7 @@
 package autoimage.dataprocessors;
 
 import autoimage.ExtImageTags;
+import autoimage.MMCoreUtils;
 import autoimage.RoiSeed;
 import autoimage.TileManager;
 import autoimage.Utils;
@@ -118,7 +119,7 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
     protected void processResults(List<File> files) {
         IJ.log(    "    Processed Results:"+script_+".");
         try {
-            JSONObject meta=Utils.parseMetadata(files.get(0));
+            JSONObject meta=MMCoreUtils.parseMetadataFromFile(files.get(0));
             String name=meta.getString(MMTags.Image.POS_NAME);
             int imgWidth=meta.getInt(MMTags.Image.WIDTH);
             int imgHeight=meta.getInt(MMTags.Image.HEIGHT);

@@ -1,5 +1,6 @@
 package autoimage;
 
+import autoimage.area.Area;
 import java.util.List;
 
 /**

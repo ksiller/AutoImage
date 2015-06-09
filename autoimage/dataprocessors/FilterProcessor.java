@@ -1,6 +1,7 @@
 package autoimage.dataprocessors;
 
 import autoimage.ExtImageTags;
+import autoimage.MMCoreUtils;
 import autoimage.Utils;
 import ij.IJ;
 import java.awt.Component;
@@ -142,7 +143,7 @@ public abstract class FilterProcessor<E,T> extends BranchedProcessor<E> implemen
         } else if (element instanceof File) {
             IJ.log(this.getClass().getName()+".acceptElement - FILE: "+((File)element).getAbsolutePath());
             try {
-                tags=Utils.parseMetadata((File)element);
+                tags=MMCoreUtils.parseMetadataFromFile((File)element);
             } catch (JSONException ex) {
                 IJ.log("    "+this.getClass().getName()+".acceptElement: problem parsing metadata");
                 Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
@@ -701,7 +702,7 @@ public abstract class FilterProcessor<E,T> extends BranchedProcessor<E> implemen
         JLabel l=new JLabel("Tag:");
         l.setAlignmentX(Component.LEFT_ALIGNMENT);
         optionPanel.add(l);   
-        JComboBox tagComboBox= new JComboBox(Utils.getAvailableImageTags());
+        JComboBox tagComboBox= new JComboBox(MMCoreUtils.getAvailableImageTags());
         tagComboBox.setSelectedItem(key_);
         tagComboBox.setAlignmentX(Component.LEFT_ALIGNMENT);
         optionPanel.add(tagComboBox);

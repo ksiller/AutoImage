@@ -2,6 +2,7 @@ package autoimage.dataprocessors;
 
 import autoimage.ExtImageTags;
 import autoimage.ImageFileQueue;
+import autoimage.MMCoreUtils;
 import autoimage.Utils;
 import bsh.EvalError;
 import bsh.Interpreter;
@@ -213,7 +214,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
         }
         File rtFile=null;
         try {
-            JSONObject meta=Utils.parseMetadata(modFiles.get(0));
+            JSONObject meta=MMCoreUtils.parseMetadataFromFile(modFiles.get(0));
             String area = meta.getString(ExtImageTags.AREA_NAME);
             String cluster=Long.toString(meta.getLong(ExtImageTags.CLUSTER_INDEX));
             String site=Long.toString(meta.getLong(ExtImageTags.SITE_INDEX));
