@@ -2,11 +2,6 @@ package autoimage.area;
 
 import autoimage.Tile;
 import autoimage.TilingSetting;
-import autoimage.area.Area;
-import static autoimage.area.Area.COLOR_ACQUIRING_AREA;
-import static autoimage.area.Area.COLOR_AREA_BORDER;
-import static autoimage.area.Area.COLOR_MERGE_AREA_BORDER;
-import static autoimage.area.Area.COLOR_SELECTED_AREA_BORDER;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.geom.Ellipse2D;
@@ -194,7 +189,7 @@ public class DonutArea extends Area {
     }
 
     @Override
-    public Area showConfigDialog(Rectangle2D bounds) {
+    public Area showConfigDialog(Rectangle2D layoutBounds) {
         JPanel optionPanel = new JPanel();
         GridLayout layout = new GridLayout(0,4);
         optionPanel.setLayout(layout);
@@ -207,7 +202,7 @@ public class DonutArea extends Area {
         nameField.setValue(new String(name));
         optionPanel.add(nameField);
 
-        l=new JLabel("Relative Z (mm):",JLabel.RIGHT);
+        l=new JLabel("Z Offset (mm):",JLabel.RIGHT);
         l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
         optionPanel.add(l);
         JFormattedTextField zField = new JFormattedTextField();
@@ -359,10 +354,10 @@ public class DonutArea extends Area {
         do {
             result = JOptionPane.showConfirmDialog(null, optionPanel, 
                 getShape()+": Configuration", JOptionPane.OK_CANCEL_OPTION);
-            if (result == JOptionPane.OK_OPTION && !isInsideRect(bounds)) {
+            if (result == JOptionPane.OK_OPTION && !isInsideRect(layoutBounds)) {
                 JOptionPane.showMessageDialog(null,"The area does not fit into the layout.");
             }
-        } while (result == JOptionPane.OK_OPTION && !isInsideRect(bounds));
+        } while (result == JOptionPane.OK_OPTION && !isInsideRect(layoutBounds));
         
         if (result == JOptionPane.CANCEL_OPTION) {
             return null;

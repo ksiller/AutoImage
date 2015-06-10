@@ -2,11 +2,9 @@ package autoimage.area;
 
 import autoimage.Tile;
 import autoimage.TilingSetting;
-import autoimage.area.Area;
 import autoimage.guiutils.NumberTableCellRenderer;
 import ij.IJ;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.Shape;
@@ -40,9 +38,6 @@ import javax.swing.SpringLayout;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.AbstractTableModel;
-import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableModel;
-import org.jdesktop.swingx.calendar.DateSelectionModel;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -513,7 +508,7 @@ public class PolygonArea extends Area {
     }
     
     @Override
-    public Area showConfigDialog(Rectangle2D bounds) {
+    public Area showConfigDialog(Rectangle2D layoutBounds) {
         JPanel optionPanel = new JPanel();
         GridLayout layout = new GridLayout(0,4);
         optionPanel.setLayout(layout);
@@ -526,7 +521,7 @@ public class PolygonArea extends Area {
         nameField.setValue(new String(name));
         optionPanel.add(nameField);
 
-        l=new JLabel("Relative Z (mm):",JLabel.RIGHT);
+        l=new JLabel("Z Offset (mm):",JLabel.RIGHT);
         l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
         optionPanel.add(l);
         JFormattedTextField zField = new JFormattedTextField();
@@ -821,7 +816,7 @@ public class PolygonArea extends Area {
             if (result == JOptionPane.OK_OPTION && points.size() < 3) {
                 JOptionPane.showMessageDialog(null,"At least three vertex points need to be defined.");
                 invalidParams=true;
-            } else if (result == JOptionPane.OK_OPTION && !isInsideRect(bounds)) {
+            } else if (result == JOptionPane.OK_OPTION && !isInsideRect(layoutBounds)) {
                 JOptionPane.showMessageDialog(null,"The area does not fit into the layout.");
                 invalidParams=true;
             }

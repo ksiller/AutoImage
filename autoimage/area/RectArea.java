@@ -2,7 +2,6 @@ package autoimage.area;
 
 import autoimage.Tile;
 import autoimage.TilingSetting;
-import autoimage.area.Area;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.geom.Point2D;
@@ -38,73 +37,12 @@ public class RectArea extends Area{
     public RectArea(String n, int id, double ox, double oy, double oz, double w, double h, boolean s, String anot) {
         super(n,id,ox,oy,oz,w,h,s,anot);
     }
-       
-    
+           
     @Override
     public String getShape() {
         return "Rectangle";
     }
-    
-    /*
-    @Override
-    public String[] getXMLTags() {
-        String[] s = new String[8];
-        s[0]="CLASS";
-        s[1]="SHAPE";
-        s[2]="NAME";
-        s[3]="WIDTH";
-        s[4]="HEIGHT";
-        s[5]="TOP_LEFT_X";
-        s[6]="TOP_LEFT_Y";
-        s[7]="REL_POS_Z";
-        return s;
-    }
-    */        
-/*
-    @Override
-    public boolean setAreaParams (List<String> params) {
-//        if (super.setAreaParams(params)) {
-        if (params.size()>=8) {
-//            shape=params.get(1);
-            name=params.get(2);
-            width=Double.parseDouble(params.get(3));
-            height=Double.parseDouble(params.get(4));
-            topLeftX=Double.parseDouble(params.get(5));
-            topLeftY=Double.parseDouble(params.get(6));
-            relPosZ=Double.parseDouble(params.get(7));
-            selectedForAcq=Boolean.parseBoolean(params.get(8));
-            return true;
-        } else {
-//            shape=getShape();
-            name="undefined";
-            width=1;
-            height=1;
-            topLeftX=0;
-            topLeftY=0;
-            relPosZ=0;
-            selectedForAcq=false;
-            return false;
-        }
-    }
-
-    @Override
-    protected Map<String,String> createParamHashMap() {
-        Map<String,String> map = super.createParamHashMap();
-        map.put(TAG_CLASS,this.getClass().getName());
-        return map;
-    }
-*/    
-/*    
-    @Override
-    public double getCenterX () {
-        return topLeftX+width/2;
-    }
-    
-    @Override
-    public double getCenterY () {
-        return topLeftY+height/2;
-    }
-*/    
+       
     @Override
     public void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio, boolean showZProfile) {
         g2d.setColor(getFillColor(showZProfile));
@@ -130,14 +68,12 @@ public class RectArea extends Area{
     @Override
     public boolean isFovInsideArea(double x, double y, double fovX, double fovY) {//checks of coordinate is inside area
         Rectangle2D.Double area = new Rectangle2D.Double(topLeftX,topLeftY,width,height);
-//        Rectangle2D.Double fov = new Rectangle2D.Double(x-fovX/2,y-fovY/2,fovX,fovY);
         return area.contains(x-fovX/2,y-fovY/2,fovX,fovY);
     }
 
     @Override
     public boolean doesFovTouchArea(double x, double y, double fovX, double fovY) {//checks of coordinate is inside area
         Rectangle2D.Double area = new Rectangle2D.Double(topLeftX,topLeftY,width,height);
-//        Rectangle2D.Double fov = new Rectangle2D.Double(x-fovX/2,y-fovY/2,fovX,fovY);
         return area.intersects(x-fovX/2,y-fovY/2,fovX,fovY);
     }
 
@@ -145,7 +81,6 @@ public class RectArea extends Area{
     public boolean isInsideRect(Rectangle2D r) { //checks if entire area is inside rectangle
         return ((topLeftX>=r.getX()) && (topLeftX+width<=r.getX()+r.getWidth()) && (topLeftY>=r.getY()) && (topLeftY+height<=r.getY()+r.getHeight()));
     } 
-
 
     @Override
     public Area duplicate() {
@@ -175,17 +110,6 @@ public class RectArea extends Area{
     protected void addFieldsToJSONObject(JSONObject obj) throws JSONException {
     }
 
-/*    
-    @Override
-    public void calculateCenterPos() {
-        centerPos=new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
-    }
-
-    @Override
-    public void calculateDefaultPos() {
-        defaultPos=new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
-    }
-*/
     @Override
     public void calcCenterAndDefaultPos() {
         centerPos=new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
@@ -203,7 +127,7 @@ public class RectArea extends Area{
     }
 
     @Override
-    public Area showConfigDialog(Rectangle2D bounds) {
+    public Area showConfigDialog(Rectangle2D layoutBounds) {
         JPanel optionPanel = new JPanel();
         GridLayout layout = new GridLayout(0,4);
         optionPanel.setLayout(layout);
@@ -216,7 +140,7 @@ public class RectArea extends Area{
         nameField.setValue(new String(name));
         optionPanel.add(nameField);
 
-        l=new JLabel("Relative Z (mm):",JLabel.RIGHT);
+        l=new JLabel("Z Offset (mm):",JLabel.RIGHT);
         l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
         optionPanel.add(l);
         JFormattedTextField zField = new JFormattedTextField();
@@ -361,10 +285,10 @@ public class RectArea extends Area{
         do {
             result = JOptionPane.showConfirmDialog(null, optionPanel, 
                 getShape()+": Configuration", JOptionPane.OK_CANCEL_OPTION);
-            if (result == JOptionPane.OK_OPTION && !isInsideRect(bounds)) {
+            if (result == JOptionPane.OK_OPTION && !isInsideRect(layoutBounds)) {
                 JOptionPane.showMessageDialog(null,"The area does not fit into the layout.");
             }
-        } while (result == JOptionPane.OK_OPTION && !isInsideRect(bounds));
+        } while (result == JOptionPane.OK_OPTION && !isInsideRect(layoutBounds));
 
         if (result == JOptionPane.CANCEL_OPTION) {
             return null;

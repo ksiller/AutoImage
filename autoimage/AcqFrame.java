@@ -289,7 +289,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private static final String CMD_REVIEW_DATA = "Review Data";
     private static final String CMD_CAMERA_ROTATION = "Check Camera Rotation";
     private static final String CMD_Z_OFFSET = "Set Z-Offset";
-    private static final String CMD_MANAGE_PLATE_LAYOUT = "Manage Plate Layout";
+    private static final String CMD_MANAGE_PLATE_LAYOUT = "Manage Well Plate Layout";
     private static final String CMD_MANAGE_CUSTOM_LAYOUT = "Manage Custom Layout";
 
     @Override
@@ -6799,13 +6799,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }//GEN-LAST:event_moveToScreenCoordButtonActionPerformed
 
-    /*    public static ArrayList<RefArea> cloneRefPointList(ArrayList<RefArea> rpList) {
-     ArrayList<RefArea> clonedList = new ArrayList<RefArea>(rpList.size());
-     for (RefArea rp : rpList) {
-     clonedList.add(new RefArea(rp));
-     }
-     return clonedList;
-     }*/
     private void setLandmarkButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_setLandmarkButtonActionPerformed
         if (acqLayout.isEmpty()) {
             JOptionPane.showMessageDialog(this, "A layout has to be loaded first.");
@@ -6821,6 +6814,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             //            ArrayList<RefArea> oldRPList=cloneRefPointList(acqLayout.getLandmarks());
             if (refPointListDialog == null) {
                 refPointListDialog = new RefPointListDialog(this, app, acqLayout);
+                IJ.log("setLandmarkButtonaA: "+stageMonitor==null ? "stageMonitor=null" : "stageMonitorOK");
                 if (stageMonitor!=null) {
                     stageMonitor.addListener(refPointListDialog);
                 }
@@ -8656,7 +8650,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             Area.setStageToLayoutRot(acqLayout.getStageToLayoutRot());
             RefArea.setStageToLayoutRot(acqLayout.getStageToLayoutRot());
             
-            if (refPointListDialog!=null) {
+/*            if (refPointListDialog!=null) {
                 if (stageMonitor!=null) {
                     stageMonitor.removeListener(refPointListDialog);
                 }
@@ -8665,10 +8659,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             refPointListDialog = new RefPointListDialog(this, app, acqLayout);
             refPointListDialog.addWindowListener(this);
             refPointListDialog.addListener(this);
+            IJ.log("loadExpSettings: "+stageMonitor==null ? "stageMonitor=null" : "stageMonitorOK");
             if (stageMonitor!=null) {
                 stageMonitor.addListener(refPointListDialog);
             }
-            
+*/            
             acqLayoutPanel.setCursor(normCursor);
             recalculateTiles = false;
             for (AcqSetting as : acqSettings) {
@@ -8910,41 +8905,42 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }
 
     
-
+    /**
+     * parses MM pixel configuration for entry for objective with label objectiveLabel
+     * returns pixel size for objective, this is not necessarily the image pixel 
+     * size since camera binning is not considered
+     * 
+     * returns -1 if no entry for objective is found
+     */
     private double getObjPixelSize(String objectiveLabel) {
         double pSize = -1;
         StrVector resolutionName = core.getAvailablePixelSizeConfigs();
         Configuration pConfig;
         int startIndex, endIndex;
         if (resolutionName != null) {
-//          for (int i=0; i<resolutionName.size(); i++) {
             for (String resolutionStr : resolutionName) {
                 try {
                     pConfig = core.getPixelSizeConfigData(resolutionStr);
                     String s = pConfig.getVerbose();
-                    //IJ.log("Pixel Config: "+s);
                     startIndex = s.indexOf("=");
                     s = s.substring(startIndex);
                     endIndex = s.indexOf("<br>");
                     s = s.substring(1, endIndex);
-                    //IJ.log(s);
                     if (s.equals(objectiveLabel)) {
                         pSize = core.getPixelSizeUmByID(resolutionStr);
+                        break;
                     }
                 } catch (Exception ex) {
-                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                    //not found, do nothing
                 }
             }
         }
-        return pSize; //pSize * currentBinning
+        return pSize;
     }
 
     private void initializeAcqSettingTable() {
         acqSettingTable.setModel(new AcqSettingTableModel(acqSettings));
-//        ((AcqSettingTableModel)acqSettingTable.getModel()).setData(acqSettings);
-//        TableColumn colorColumn = acqSettingTable.getColumnModel().getColumn(1);
-//        colorColumn.setCellEditor(new StartTimeEditor());
-//        cAcqSettingIdx = 0;
+        //select first acquisition sequence
         currentAcqSetting = acqSettings.get(0);
         acqSettingTable.getModel().addTableModelListener(this);
         ListSelectionModel selectionModel = acqSettingTable.getSelectionModel();

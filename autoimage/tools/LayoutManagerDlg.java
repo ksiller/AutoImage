@@ -7,7 +7,6 @@ import autoimage.AcqPlateLayout;
 import autoimage.area.Area;
 import autoimage.Utils;
 import autoimage.guiutils.NumberTableCellRenderer;
-import ij.IJ;
 import ij.Prefs;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
@@ -36,12 +35,12 @@ import org.json.JSONObject;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 public class LayoutManagerDlg extends javax.swing.JDialog {
 
     private AcqLayout startUpLayout;
-    private AcqLayout currentLayout;
+    //private AcqLayout currentLayout;
     private static String lastFileLocation="";
     private static Map<String, String> availableAreaClasses=null;
     private String lastAreaType=null;
@@ -71,7 +70,6 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         public List<Area> getAreaList() {
             return areas;
         }
-
         
         @Override
         public int getRowCount() {
@@ -230,10 +228,10 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         //replace forward slash with OS specific path separator
         jarFileStr.replace("/",File.pathSeparator);
         
-        IJ.log("location.getFile: "+location.getFile());
-        IJ.log("location.getPath: "+location.getPath());
-        IJ.log("locationStr: "+locationStr);
-        IJ.log("jarFileStr: "+jarFileStr);
+//        IJ.log("location.getFile: "+location.getFile());
+//        IJ.log("location.getPath: "+location.getPath());
+//        IJ.log("locationStr: "+locationStr);
+//        IJ.log("jarFileStr: "+jarFileStr);
 
         URLClassLoader classLoader;
         JarFile jarFile;
@@ -857,13 +855,10 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
                     startUpLayout.setModified(true);
                 }
             } catch (ClassNotFoundException ex) {
-                IJ.log(ex.getMessage());
                 Logger.getLogger(LayoutManagerDlg.class.getName()).log(Level.SEVERE, null, ex);
             } catch (InstantiationException ex) {
-                IJ.log(ex.getMessage());
                 Logger.getLogger(LayoutManagerDlg.class.getName()).log(Level.SEVERE, null, ex);
             } catch (IllegalAccessException ex) {
-                IJ.log(ex.getMessage());
                 Logger.getLogger(LayoutManagerDlg.class.getName()).log(Level.SEVERE, null, ex);
             }
         }

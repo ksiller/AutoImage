@@ -1,12 +1,7 @@
 package autoimage.area;
 
-//import static autoimage.Area.COLOR_ACQUIRING_AREA;
-//import static autoimage.Area.COLOR_AREA_BORDER;
-//import static autoimage.Area.COLOR_MERGE_AREA_BORDER;
-//import static autoimage.Area.COLOR_SELECTED_AREA_BORDER;
 import autoimage.Tile;
 import autoimage.TilingSetting;
-import autoimage.area.Area;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.geom.Ellipse2D;
@@ -26,9 +21,9 @@ import org.json.JSONObject;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
-class EllipseArea extends Area {
+public class EllipseArea extends Area {
 
     public EllipseArea() {
         super();
@@ -42,95 +37,13 @@ class EllipseArea extends Area {
         super(n,id,ox,oy,oz,w,h,s,anot);
     }
 
-    /*
-    public EllipseArea duplicate(EllipseArea a) {
-        EllipseArea newArea = new EllipseArea(a.getName());
-        newArea.shape=a.getShape();
-        newArea.id=a.getId();
-        newArea.topLeftX=a.getTopLeftX();
-        newArea.topLeftY=a.getTopLeftY();
-        newArea.relPosZ=a.getRelPosZ();
-        newArea.width=a.getWidth();
-        newArea.height=a.getHeight();
-        newArea.selectedForAcq=a.isSelectedForAcq();
-        newArea.comment=a.getComment();
-        newArea.acquiring=a.isAcquiring();
-        newArea.tilingMode=a.getTilingMode();
-        newArea.tileOverlap=a.tileOverlap;
-        newArea.tilePosList=new ArrayList<Tile>(a.getTilePositions());
-        return newArea;
-    }*/
-
-    
     @Override
     public String getShape() {
         return "Ellipse";
     }
-
-/*@Override
-    public String[] getXMLTags() {
-        String[] s = new String[7];
-        s[0]="SHAPE";
-        s[1]="NAME";
-        s[2]="WIDTH";
-        s[3]="HEIGHT";
-        s[4]="TOP_LEFT_X";
-        s[5]="TOP_LEFT_Y";
-        s[6]="REL_POS_Z";
-        return s;
-    }
-*/  
-    /*
-    @Override
-    public boolean setAreaParams (List<String> params) {
-         //if (super.setAreaParams(params)) {
-         if (params.size()>=8) {
-//            shape=params.get(1);
-            name=params.get(2);
-            width=Double.parseDouble(params.get(3));
-            height=Double.parseDouble(params.get(4));
-            topLeftX=Double.parseDouble(params.get(5));
-            topLeftY=Double.parseDouble(params.get(6));
-            relPosZ=Double.parseDouble(params.get(7));
-            selectedForAcq=Boolean.parseBoolean(params.get(8));
-            return true;
-        } else {
-            name="undefined";
-            width=1;
-            height=1;
-            topLeftX=0;
-            topLeftY=0;
-            relPosZ=0;
-            selectedForAcq=false;
-            return false;
-        }
-    }
     
-    @Override
-    protected Map<String,String> createParamHashMap() {
-        Map<String,String> map = super.createParamHashMap();
-        map.put(TAG_CLASS,this.getClass().getName());
-        return map;
-    }
-*/
-
-/*   @Override
-    public double getCenterX () {
-        return topLeftX+width/2;
-    }
-    
-    @Override
-    public double getCenterY () {
-        return topLeftY+height/2;
-    }
-*/    
     @Override
     public void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio, boolean showZProfile) {
-/*        if (acquiring) {
-            g2d.setColor(COLOR_ACQUIRING_AREA);
-        } else
-            g2d.setColor(COLOR_UNSELECTED_AREA);
-*/        
         g2d.setColor(getFillColor(showZProfile));
         int x = bdPix + (int) Math.round(topLeftX*physToPixelRatio);
         int y = bdPix + (int) Math.round(topLeftY*physToPixelRatio);
@@ -138,15 +51,6 @@ class EllipseArea extends Area {
         int h = (int) Math.round(height*physToPixelRatio);    
         g2d.fillOval(x,y,w,h); 
         g2d.setColor(getBorderColor());
-/*        
-        if (selectedForMerge)
-            g2d.setColor(COLOR_MERGE_AREA_BORDER);
-        else {
-            if (selectedForAcq)
-                g2d.setColor(COLOR_SELECTED_AREA_BORDER);
-            else    
-                g2d.setColor(COLOR_AREA_BORDER);
-        }*/
         g2d.draw(new Ellipse2D.Double(x, y, w,h)); 
     }
     
@@ -208,19 +112,6 @@ class EllipseArea extends Area {
     protected void addFieldsToJSONObject(JSONObject obj) throws JSONException {
     }
 
-/*    
-    @Override
-    public void calculateCenterPos() {
-        centerPos= new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
-    }
-
-    @Override
-    public void calculateDefaultPos() {
-        if (centerPos==null)
-            calculateCenterPos();
-        defaultPos=centerPos;
-    }
-*/
     
     @Override
     public void calcCenterAndDefaultPos() {
@@ -240,7 +131,7 @@ class EllipseArea extends Area {
     }
 
     @Override
-    public Area showConfigDialog(Rectangle2D bounds) {
+    public Area showConfigDialog(Rectangle2D layoutBounds) {
         JPanel optionPanel = new JPanel();
         GridLayout layout = new GridLayout(0,4);
         optionPanel.setLayout(layout);
@@ -253,7 +144,7 @@ class EllipseArea extends Area {
         nameField.setValue(new String(name));
         optionPanel.add(nameField);
 
-        l=new JLabel("Relative Z (mm):",JLabel.RIGHT);
+        l=new JLabel("Z Offset (mm):",JLabel.RIGHT);
         l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
         optionPanel.add(l);
         JFormattedTextField zField = new JFormattedTextField();
@@ -397,10 +288,10 @@ class EllipseArea extends Area {
         do {
             result = JOptionPane.showConfirmDialog(null, optionPanel, 
                 getShape()+": Configuration", JOptionPane.OK_CANCEL_OPTION);
-            if (result == JOptionPane.OK_OPTION && !isInsideRect(bounds)) {
+            if (result == JOptionPane.OK_OPTION && !isInsideRect(layoutBounds)) {
                 JOptionPane.showMessageDialog(null,"The area does not fit into the layout.");
             }
-        } while (result == JOptionPane.OK_OPTION && !isInsideRect(bounds));
+        } while (result == JOptionPane.OK_OPTION && !isInsideRect(layoutBounds));
 
         if (result == JOptionPane.CANCEL_OPTION) {
             return null;

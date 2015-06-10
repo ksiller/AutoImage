@@ -1,7 +1,5 @@
 package autoimage.area;
 
-import autoimage.area.Area;
-import autoimage.TilingSetting;
 import autoimage.TilingSetting;
 import java.awt.Graphics2D;
 import java.awt.Shape;
@@ -138,17 +136,7 @@ public class CompoundArea extends Area {
     public Area duplicate() {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
-/*
-    @Override
-    public void calculateCenterPos() {
-        centerPos=new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
-    }
 
-    @Override
-    public void calculateDefaultPos() {
-        defaultPos=new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
-    }
-*/    
     @Override
     public void calcCenterAndDefaultPos() {
         centerPos=new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
@@ -166,7 +154,7 @@ public class CompoundArea extends Area {
     }
 
     @Override
-    public Area showConfigDialog(Rectangle2D bounds) {
+    public Area showConfigDialog(Rectangle2D layoutBounds) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 

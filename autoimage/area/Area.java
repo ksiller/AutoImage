@@ -35,7 +35,6 @@ public abstract class Area {
     public static final String TAG_CLASS = "CLASS";
     public static final String TAG_NAME = "NAME";
     public static final String TAG_ID="ID";
- //   public static final String TAG_SHAPE = "SHAPE";
     public static final String TAG_COMMENT = "COMMENT";
     public static final String TAG_TOP_LEFT_X = "TOP_LEFT_X";
     public static final String TAG_TOP_LEFT_Y = "TOP_LEFT_Y";
@@ -50,16 +49,14 @@ public abstract class Area {
     public static final String TAG_TILE = "TILE";
     public static final String TAG_CLUSTER = "CLUSTER";
     
-    public static final int SUPPORT_CUSTOM_LAYOUT = 2;
     public static final int SUPPORT_WELLPLATE_LAYOUT = 1;
+    public static final int SUPPORT_CUSTOM_LAYOUT = 2;
     public static final int SUPPORT_ALL_LAYOUTS = 128;
     
     protected String name;
     protected static double cameraRot = FieldOfView.ROTATION_UNKNOWN;//in radians relative to x-y stage axis, NOT layout
     protected static double stageToLayoutRot = 0; //in radians
     protected static boolean optimizedForCameraRotation = true;
-//    protected static String shape;
-//    protected TilingSetting tiling;
     protected List<Tile> tilePosList;//has absolute layout positions in um
     protected int tileNumber;
     protected int id; //unique identifier, reflects order of addition 
@@ -75,7 +72,6 @@ public abstract class Area {
     protected boolean selectedForMerge;
     protected String comment;
     protected boolean acquiring;
-//    private boolean abortTileCalc;
     private boolean unknownTileNum; //is set when tilingmode is "runtime" or "file", or pixel size is not calibrated
     private int noOfClusters;
     
@@ -113,16 +109,12 @@ public abstract class Area {
         width=w;
         height=h;
         selectedForAcq=s;
-//        abortTileCalc=false;
         comment=anot;
         acquiring=false;
-//        tiling=new TilingSetting();
         tilePosList=null;
         unknownTileNum=true;
         noOfClusters=0;
         calcCenterAndDefaultPos();
-//        centerPos=calculateCenterPos();
-//        defaultPos=calculateDefaultPos();
     }
 
     public void enableOptimizedForCameraRotation(boolean b) {
@@ -136,7 +128,6 @@ public abstract class Area {
     public int getNoOfClusters() {
         return noOfClusters;
     }
-    
     
     public void setIndex(int index) {
         this.index=index;
@@ -169,7 +160,6 @@ public abstract class Area {
     }
     
     public void setAcquiring(boolean b) {
-//        IJ.log("Area.setAcquiring");
         acquiring=b;
     }
     
@@ -184,23 +174,7 @@ public abstract class Area {
     public boolean isAcquiring() {
         return acquiring;
     }
-/*    
-    public void abortTileCalc() {
-        abortTileCalc=true;
-    }
-    
-    public void enableTileCalc() {
-        abortTileCalc=false;
-    }
-*/    
-/*    public void setTilePosList(List<Tile> tl) {
-        tilePosList=tl;
-    }
-    
-    public List<Tile> getTilePositionList() {
-        return tilePosList;
-    }
-*/    
+
     private List<Tile> copyCluster(int clusterNr, double offsetX, double offsetY, List<Tile> source) {
         List<Tile> newCluster=null;
         if (source!=null) {
@@ -214,7 +188,7 @@ public abstract class Area {
         return newCluster;
     }
     
-    static String createTileName(int clusterNr, int siteNr) {
+    private static String createTileName(int clusterNr, int siteNr) {
         final String s="Cluster"+Integer.toString(clusterNr)+"-Site"+paddedTileIndex(siteNr);
         return s;
     }
@@ -914,79 +888,11 @@ public abstract class Area {
     public List<Tile> getTilePositions() {
         return tilePosList;
     }
-/*        
-    public boolean setAreaParams (List<String> params) {
-        if (params!=null && params.size()>=1 && params.get(0).equals(this.getName())) 
-            return true;
-        else 
-            return false;
-    }
-
-    public void setAreaParams (Map<String,String> params) {
-        if (params!=null) {
-//            String s=params.get(TAG_SHAPE);
-//            if (s!=null)
-//                shape=s;
-            String s=params.get(TAG_NAME);
-            if (s!=null)
-                name=s;
-            s=params.get(TAG_WIDTH);
-            if (s!=null)
-                width=Double.parseDouble(s);
-            s=params.get(TAG_HEIGHT);
-            if (s!=null)
-                height=Double.parseDouble(s);
-            s=params.get(TAG_TOP_LEFT_X);
-            if (s!=null)
-                topLeftX=Double.parseDouble(s);
-            s=params.get(TAG_TOP_LEFT_Y);
-            if (s!=null)
-                topLeftY=Double.parseDouble(s);
-            s=params.get(TAG_REL_POS_Z);
-            if (s!=null)
-                relPosZ=Double.parseDouble(s);
-            s=params.get(TAG_SELECTED);
-            if (s!=null)
-                selectedForAcq=Boolean.parseBoolean(s);
-            s=params.get(TAG_COMMENT);
-            if (s!=null)
-                comment=s;    
-        }       
-    }
-    
-    protected Map<String,String> createParamHashMap() {
-        Map<String,String> map = new HashMap<String,String>();
-        map.put(TAG_CLASS,"AREA-ABSTRACT CLASS");
-//        map.put(TAG_SHAPE,shape);
-        map.put(TAG_NAME,name);
-        map.put(TAG_WIDTH,Double.toString(width));
-        map.put(TAG_HEIGHT,Double.toString(height));
-        map.put(TAG_TOP_LEFT_X,Double.toString(topLeftX));
-        map.put(TAG_TOP_LEFT_Y,Double.toString(topLeftY));
-        map.put(TAG_REL_POS_Z,Double.toString(relPosZ));
-        map.put(TAG_SELECTED,Boolean.toString(selectedForAcq));
-        map.put(TAG_COMMENT,comment);
-        return map;
-    }
-*/    
 
     private static String paddedTileIndex(int index) {
         return String.format(TILE_NAME_PADDING, index);
     }
     
-/*   
-    //update uses area' relPos as base position and adds offset based on xy distance to RefArea and layouts normalVec
-    public void calculateTilePositionAbsZ(ArrayList<RefArea> rpList, Vec3d normalVec) {
-        if (rpList!=null & rpList.size()>0) {
-            double baseZ=rpList.get(0).getStageCoordZ()-rpList.get(0).getLayoutCoordZ();
-            double z;
-            for (int i=0; i<tilePosList.size(); i++) {
-                z=relPosZ+baseZ;
-//                tilePosList.get(i).setRelZPos=z;
-            }
-        }
-    }
-*/                 
     public boolean acceptTilePos(double x, double y, double fovX, double fovY, boolean insideOnly) {
         if (insideOnly)
             return isFovInsideArea(x,y,fovX,fovY);
@@ -1030,6 +936,7 @@ public abstract class Area {
         return obj;
     }
     
+    //used to sort areas by name
     public static Comparator<String> NameComparator = new Comparator<String>() {
 
         @Override
@@ -1040,16 +947,17 @@ public abstract class Area {
         }
     };
         
+    //used to sort areas by # of tiles
     public static Comparator<String> TileNumComparator = new Comparator<String>() {
 
         @Override
 	public int compare(String a1, String a2) {
+            if (a1.contains("?") && a2.contains("?"))
+                return 0;
             if (a1.contains("?"))
                 return -1;
             if (a2.contains("?"))
                 return 1;
-            if (a1.contains("?") && a2.contains("?"))
-                return 0;
             Integer a1tiles = Integer.parseInt(a1);
             Integer a2tiles = Integer.parseInt(a2);;
             return a1tiles.compareTo(a2tiles);
@@ -1084,26 +992,27 @@ public abstract class Area {
                 return COLOR_AREA_BORDER;
         }   
     }
-    /* 
-    Used to convert JSONObject to Area
-    derived classes should overwrite this to save fields that are not part of Area class
-    */
-    abstract protected void initializeFromJSONObject(JSONObject obj) throws JSONException;
+    
+    /**
+     * Used to convert JSONObject to Area 
+     * derived classes should overwrite this to save fields that are not part of Area class
+     * @param obj JSONObject with values for all area's fields
+     * @throws org.json.JSONException when obj cannot be parsed
+     */
+    protected abstract void initializeFromJSONObject(JSONObject obj) throws JSONException;
 
-    /* 
-    Used to create a JSONObject representation of Area
-    derived classes should overwrite this to save fields that are not part of Area class
-    */
-    abstract protected void addFieldsToJSONObject(JSONObject obj) throws JSONException;
+    /** 
+     * Used to create a JSONObject representation of Area
+     * derived classes should overwrite this to save fields that are not part of Area class
+     * @param obj JSONObject to which additional field values should be added
+     * @throws org.json.JSONException when operation on obj generates error
+     */
+    protected abstract void addFieldsToJSONObject(JSONObject obj) throws JSONException;
 
     public abstract String getShape();
     
     public abstract List<Point2D> getOutlinePoints();
-        
-//    public abstract void calculateCenterPos();
-    
-//    public abstract void calculateDefaultPos();
-    
+            
     public abstract void calcCenterAndDefaultPos();
     
     public abstract void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio, boolean showZProfile);
@@ -1118,10 +1027,23 @@ public abstract class Area {
 
     public abstract boolean isInsideRect(Rectangle2D r);
     
+    /**
+     * creates new instance and deep copy of this object
+     * @return Area
+     */
     public abstract Area duplicate();
     
-    public abstract Area showConfigDialog(Rectangle2D bounds);
+    /**
+     * @param layoutBounds width and height of layout (in mm)
+     * @return 
+     */
+    public abstract Area showConfigDialog(Rectangle2D layoutBounds);
     
+    /** 
+     * @return int value describing layout that handle this Area object
+     * 1: AcqPlateLayout (Well Plate Layout)
+     * 2: AcqLayout (Custom Layout)
+     */
     public abstract int supportedLayouts();
         
       

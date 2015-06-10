@@ -1,12 +1,7 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage;
 
 import autoimage.area.Area;
 import ij.IJ;
-import java.awt.Toolkit;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.NoninvertibleTransformException;
 import java.awt.geom.Point2D;
@@ -49,15 +44,15 @@ public class AcqLayout  implements PropertyChangeListener {
     protected String name;
     protected boolean isEmpty;
     protected boolean isModified;
-    protected double width;
-    protected double height;
-    protected double length;
+    protected double width;//in um
+    protected double height;//in um
+    protected double length;//in um
     protected String bottomMaterial;
-    protected double bottomThickness;
+    protected double bottomThickness;//in um
     protected String version;
     private AffineTransform stageToLayoutTransform;
     private AffineTransform layoutToStageTransform;
-    private Vec3d normalVec;
+    private Vec3d normalVec;//normal to layout reference plane
     protected File file;
     
     private double escapeZPos; //z-stage is moved to this position when moving xystage to avoid collision with plate
@@ -137,45 +132,10 @@ public class AcqLayout  implements PropertyChangeListener {
     
     public AcqLayout() {
         createEmptyLayout();
-        
-
     }
 
-/*    public AcqLayout(JSONObject obj, File f) {
-        isEmpty=true;
-        IJ.log("AcqLayout.loading from JSONObject");
-        if (obj!=null) {
-            try {
-                initializeFromJSONObject(obj);
-                isEmpty=false;
-            } catch (ClassNotFoundException ex) {
-                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (InstantiationException ex) {
-                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (IllegalAccessException ex) {
-                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (JSONException ex) {
-                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }    
-        if (isEmpty) {
-            version="1.0";
-            createEmptyLayout();
-        } else {
-            isModified=false;
-            file=f;
-        }
-        try {
-            calcStageToLayoutTransform();
-//        tileManager=new TileManager(this);
-        } catch (Exception ex) {
-            Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }
-*/  
     
     public static AcqLayout loadLayout(File file) {//returns true if layout has been changed
-//        IJ.log("AcqFrame.loadLayout: "+absPath);
         BufferedReader br;
         StringBuilder sb=new StringBuilder();
         JSONObject layoutObj=null;
@@ -194,14 +154,11 @@ public class AcqLayout  implements PropertyChangeListener {
         } catch (JSONException ex) {
             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
-//        acqLayout=new AcqLayout(layoutObj, file);
         AcqLayout layout=AcqLayout.createFromJSONObject(layoutObj, file);
         return layout;
     }
     
     public static AcqLayout createFromJSONObject(JSONObject obj, File f) {
-        IJ.log("AcqLayout.loading from JSONObject");
-        //create empty layout;
         AcqLayout layout=null;
         if (obj!=null) {
             String className;
@@ -515,6 +472,7 @@ public class AcqLayout  implements PropertyChangeListener {
             if (mappedLandmarks.size() == 2) {//2 mapped stage positions
                 v1=new Vec3d(mappedLandmarks.get(0).getStageCoordX(),mappedLandmarks.get(0).getStageCoordY(),mappedLandmarks.get(0).getStageCoordZ()-mappedLandmarks.get(0).getLayoutCoordZ());
                 v2=new Vec3d(mappedLandmarks.get(1).getStageCoordX(),mappedLandmarks.get(1).getStageCoordY(),mappedLandmarks.get(1).getStageCoordZ()-mappedLandmarks.get(1).getLayoutCoordZ());
+                //create 3rd vector orthogonal to v2-v1
                 v3=new Vec3d(v1.x+v2.y-v1.y,v1.y-(v2.x-v1.x),v1.z);
             
             } else {// at least 3 mapped stage positions
@@ -555,45 +513,23 @@ public class AcqLayout  implements PropertyChangeListener {
             
 //        normalVec.normalize();
         } else {
+            //single landmark --> create vector that is pefectly vertical
             normalVec=new Vec3d(0,0,1);
         }    
-        //determine lowest corner to set z-pos when moving xy-stage
-
-//        RefArea rp = getLandmark(0);
-//        if (rp!=null) {
-            try {
-                Vec3d p1=convertLayoutToStagePos(0,0,0);
-/*            double x=rp.convertLayoutCoordToStageCoord_X(0);
-            double y=rp.convertLayoutCoordToStageCoord_Y(0);
-            double z1=((-normalVec.x*(x-rp.getStageCoordX())-normalVec.y*(y-rp.getStageCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
-*/            
-                Vec3d p2=convertLayoutToStagePos(width,0,0);
-/*            x=rp.convertLayoutCoordToStageCoord_X(width);
-            y=rp.convertLayoutCoordToStageCoord_Y(0);
-            double z2=((-normalVec.x*(x-rp.getStageCoordX())-normalVec.y*(y-rp.getStageCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
-*/            
-                Vec3d p3=convertLayoutToStagePos(width,length,0);
-/*            x=rp.convertLayoutCoordToStageCoord_X(width);
-            y=rp.convertLayoutCoordToStageCoord_Y(length);
-            double z3=((-normalVec.x*(x-rp.getStageCoordX())-normalVec.y*(y-rp.getStageCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
-*/            
-                Vec3d p4=convertLayoutToStagePos(0,length,0);
-/*            x=rp.convertLayoutCoordToStageCoord_X(0);
-            y=rp.convertLayoutCoordToStageCoord_Y(length);
-            double z4=((-normalVec.x*(x-rp.getStageCoordX())-normalVec.y*(y-rp.getStageCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
-*/            
-                escapeZPos=Math.min(Math.min(Math.min(p1.z,p2.z),p3.z),p4.z)-ESCAPE_ZPOS_SAFETY;
-            } catch (Exception ex) {
-                escapeZPos=0;
-//                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
-            }
-//        } else
-//          escapeZPos=0;
+        //determine lowest corner to set escape z-pos when moving xy-stage
+        try {
+            Vec3d p1=convertLayoutToStagePos(0,0,0);
+            Vec3d p2=convertLayoutToStagePos(width,0,0);
+            Vec3d p3=convertLayoutToStagePos(width,length,0);
+            Vec3d p4=convertLayoutToStagePos(0,length,0);
+            escapeZPos=Math.min(Math.min(Math.min(p1.z,p2.z),p3.z),p4.z)-ESCAPE_ZPOS_SAFETY;
+        } catch (Exception ex) {
+            escapeZPos=0;
+        }
     }
     
     public Vec3d convertStageToLayoutPos(double stageX, double stageY, double stageZ) throws Exception {
         Point2D layoutXY=convertStageToLayoutPos_XY(new Point2D.Double(stageX,stageY));
-        //double layoutZ=0;
         double layoutZ=stageZ-getStageZPosForStageXYPos(stageX,stageY);
         Vec3d lCoord=new Vec3d(layoutXY.getX(),layoutXY.getY(),layoutZ);
         return lCoord;
@@ -601,7 +537,6 @@ public class AcqLayout  implements PropertyChangeListener {
     
     public Vec3d convertLayoutToStagePos(double layoutX, double layoutY, double layoutZ) throws Exception {
         Point2D xy=convertLayoutToStagePos_XY(new Point2D.Double(layoutX,layoutY));
-//        double z=getStageZPosForLayoutPos(layoutX,layoutY);
         //get z stage position in layout reference plane (layoutZ=0);
         double z=getStageZPosForStageXYPos(xy.getX(),xy.getY());
         //add layoutZ
@@ -798,25 +733,22 @@ public class AcqLayout  implements PropertyChangeListener {
     public Area getAreaById(int id) {
         if ((id < 1 || id > areas.size()) || id!=areas.get(id-1).getId()) {
             int index=-1;
-            for (int i=0; i<areas.size(); i++) {
-                if (id==areas.get(i).getId()) {
-//                    index=i;
-//                    break;
-                    return areas.get(i);
+            for (Area area : areas) {
+                if (id == area.getId()) {
+                    return area;
                 } 
             }
             if (index!=-1)
                 return areas.get(index);
             else
                 return null;
+        } else {
+            return areas.get(id-1);
         }
-        else return areas.get(id-1);
     }
     
     public void addArea(Area a) {
         if (a.getName().equals("")) {
-//            IJ.log("name not defined");   
-  
             a.setName("Area "+Integer.toString(areas.size()+1));
         }
         areas.add(a);
@@ -981,12 +913,7 @@ public class AcqLayout  implements PropertyChangeListener {
         escapeZPos = 50; //in um; z-stage is moved to this position when moving xystage to avoid collision with plate
         isEmpty=true;
         isModified=false;;
-        calcStageToLayoutTransform();
-    
-/*
-    ProgressMonitor tileCalcMonitor;
-    TileCalcTask tileTask;        
-*/                
+        calcStageToLayoutTransform();    
     }
     
 
