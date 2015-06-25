@@ -25,6 +25,7 @@ import autoimage.dataprocessors.ImageTagFilterString;
 import autoimage.dataprocessors.RoiFinder;
 import autoimage.dataprocessors.ScriptAnalyzer;
 import autoimage.dataprocessors.SiteInfoUpdater;
+import autoimage.guiutils.TilingIntVerifier;
 import autoimage.olddp.NoFilterSeqAnalyzer;
 import autoimage.tools.CameraRotDlg;
 import ij.CompositeImage;
@@ -234,6 +235,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     //Settings
     private File expSettingsFile;
     private String imageDestPath;
+    private String layoutPath;
     private String dataProcessorPath;
     private AcqLayout acqLayout;
     private List<AcqSetting> acqSettings;
@@ -1417,21 +1419,17 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     
     
     class TableHeaderSelector extends MouseAdapter  {  
-//        TableHeaderEditor editor;  
 
         public TableHeaderSelector(JTable t)  {  
-//            editor = new TableHeaderEditor(this);  
         }  
 
         @Override
         public void mousePressed(MouseEvent e)  {  
             JTableHeader th = (JTableHeader)e.getSource();  
             int col= th.columnAtPoint(e.getPoint());
-            if(col==0) {//th.getHeaderRect(col).contains(e.getPoint())) {  
+            if(col==0) {
                 TableColumn column = th.getColumnModel().getColumn(col);  
                 String oldValue = (String)column.getHeaderValue();  
-                //String value = (String)editor.showEditor(th, oldValue);
-                
                 StrVector groups=core.getAvailableConfigGroups();
                 String message = "Select configuration group that contains channel definitions";  
                 String value = (String)JOptionPane.showInputDialog(
@@ -1453,42 +1451,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
      
     
     
-    class TilingIntVerifier extends InputVerifier {
-
-        int minVal;
-        int maxVal;
-
-        public TilingIntVerifier(int min, int max) {
-            super();
-            minVal = min;
-            maxVal = max;
-        }
-
-        @Override
-        public boolean verify(JComponent jc) {
-            /*            calcTilePositions(null, currentAcgetTileWidth_UMTileWidth(), currentAcgetTileHeight_UMileHeight(),currentAcqSetting.getTilingSetting(), "Verifying...");
-             while (calculating) {};*/
-//            IJ.showMessage(jc.getName(),"verifying");
-            JTextField field = (JTextField) jc;
-            boolean passed = false;
-            try {
-                int n = Integer.parseInt(field.getText());
-                passed = (n >= minVal && n <= maxVal);
-            } catch (NumberFormatException nfe) {
-            }
-            return passed;
-        }
-
-        @Override
-        public boolean shouldYieldFocus(JComponent input) {
-            boolean inputOk = verify(input);
-            if (!inputOk) {
-                JOptionPane.showMessageDialog(null, "Number is out of range (" + Integer.toString(minVal) + "-" + Integer.toString(maxVal) + ")");
-                ((JTextField) input).selectAll();
-            }
-            return inputOk;
-        }
-    }
+    
 
     private class DirectionIconListRenderer extends DefaultListCellRenderer {
 
@@ -1572,9 +1535,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         JMenuItem newData=new JMenuItem(CMD_NEW_DATA);
         newData.addActionListener(this);
         expMenu.add(newData);
-//        JMenuItem reviewData=new JMenuItem(CMD_REVIEW_DATA);
-//        reviewData.addActionListener(this);
-//        expMenu.add(reviewData);
         
         JMenu utilMenu = new JMenu("Utilities");
         JMenuItem managePlateLayout=new JMenuItem(CMD_MANAGE_PLATE_LAYOUT);
@@ -1739,7 +1699,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         ((AbstractDocument) maxSitesField.getDocument()).setDocumentFilter(new NumberFilter(6, false));
         maxSitesField.setInputVerifier(new TilingIntVerifier(0, 1000));
 
-
         //format channelTable 
         channelTable.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
         channelTable.getTableHeader().setReorderingAllowed(false);
@@ -1752,9 +1711,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         
         //initialize acquisition JProgressBar
         progressBar.setStringPainted(false);
-
-//        acqSettingListBox.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-//        tileManager = new TileManager(null);
         
         loadPreferences();
         loadAvailableObjectiveLabels();
@@ -1767,14 +1723,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         acqSettingTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         acqSettingTable.getSelectionModel().setSelectionInterval(0, 0);
         acqSettingTable.setDefaultEditor(AcqSetting.ScheduledTime.class, new StartTimeEditor());
-                
+
+        //update border title in panel displaying acqusition settings
         sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
                         "Sequence: "+currentAcqSetting.getName()));
-/*        try {
-            core.setChannelGroup(currentAcqSetting.getChannelGroupStr());
-        } catch (Exception ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-        }*/
 
         //initialize processorTreeView
         processorTreeView.setEditable(true);
@@ -1791,7 +1743,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
         //initialize and start stage and live-mode monitors
         //refresh every 100ms
-        stageMonitor = new StagePosMonitor(gui,100);
+        stageMonitor = new StagePosMonitor(core,100,false);
         stageMonitor.addListener(this);
         stageMonitor.addListener((LayoutPanel)acqLayoutPanel);
         stageMonitor.execute();        
@@ -1848,12 +1800,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }
 
     public void calcTotalTileNumber() {
-        long totalTiles=0;
-        for (Area a:acqLayout.getAreaArray()) {
-            if (a.isSelectedForAcq())
-                totalTiles=totalTiles+a.getTileNumber();
-        }    
-        currentAcqSetting.setTotalTiles(totalTiles);
+        currentAcqSetting.setTotalTiles(acqLayout.getTotalTileNumber());
         ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.getSelectedRow());
     }
 
@@ -1985,7 +1932,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         zStackEndField = new javax.swing.JFormattedTextField();
         zShutterCheckBox = new javax.swing.JCheckBox();
         timelapsePanel = new javax.swing.JPanel();
-        durationText = new javax.swing.JLabel();
         jPanel1 = new javax.swing.JPanel();
         timepointSpinner = new javax.swing.JSpinner();
         jPanel3 = new javax.swing.JPanel();
@@ -1997,6 +1943,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         jLabel15 = new javax.swing.JLabel();
         jLabel14 = new javax.swing.JLabel();
         jLabel35 = new javax.swing.JLabel();
+        jPanel4 = new javax.swing.JPanel();
+        durationText = new javax.swing.JLabel();
         jPanel9 = new javax.swing.JPanel();
         jLabel28 = new javax.swing.JLabel();
         jScrollPane4 = new javax.swing.JScrollPane();
@@ -2067,7 +2015,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("AutoImage");
         setBounds(new java.awt.Rectangle(0, 22, 1024, 710));
-        setMinimumSize(new java.awt.Dimension(1024, 710));
+        setMinimumSize(new java.awt.Dimension(1024, 725));
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowOpened(java.awt.event.WindowEvent evt) {
                 formWindowOpened(evt);
@@ -2209,7 +2157,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         .add(2, 2, 2)
                         .add(mergeAreasButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .add(0, 0, Short.MAX_VALUE))
-                    .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 312, Short.MAX_VALUE))
+                    .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 321, Short.MAX_VALUE))
                 .add(3, 3, 3))
         );
 
@@ -2506,7 +2454,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         );
 
         acqModePane.setFont(new java.awt.Font("Arial", 0, 11)); // NOI18N
-        acqModePane.setMinimumSize(new java.awt.Dimension(72, 300));
+        acqModePane.setMinimumSize(new java.awt.Dimension(72, 150));
 
         channelTable.setModel(new ChannelTableModel(null));
         channelTable.setColumnSelectionAllowed(true);
@@ -2760,7 +2708,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(3, 3, 3)
                 .add(afPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
                     .add(jLabel11)
-                    .add(afSkipFrameSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(afSkipFrameSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(jLabel27)
                     .add(afModeLabel))
                 .add(3, 3, 3)
@@ -2822,7 +2770,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         jLabel26.setMaximumSize(new java.awt.Dimension(18, 15));
         jLabel26.setMinimumSize(new java.awt.Dimension(18, 15));
 
-        reverseButton.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        reverseButton.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
         reverseButton.setText("Reverse");
         reverseButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2865,7 +2813,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
-        zShutterCheckBox.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
+        zShutterCheckBox.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         zShutterCheckBox.setText("Shutter open");
         zShutterCheckBox.setToolTipText("Keep shutter open between slices");
         zShutterCheckBox.addItemListener(new java.awt.event.ItemListener() {
@@ -2879,34 +2827,30 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         zStackPanelLayout.setHorizontalGroup(
             zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
-                .add(6, 6, 6)
+                .add(3, 3, 3)
                 .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(zStackPanelLayout.createSequentialGroup()
                         .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(zStackPanelLayout.createSequentialGroup()
-                                .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                                    .add(zStackPanelLayout.createSequentialGroup()
-                                        .add(9, 9, 9)
-                                        .add(jLabel20))
-                                    .add(jLabel19))
-                                .add(6, 6, 6)
-                                .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
-                                    .add(zStackEndField, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 61, Short.MAX_VALUE)
-                                    .add(zStackBeginField)))
-                            .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
-                                .add(1, 1, 1)
-                                .add(reverseButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 101, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
-                        .add(6, 6, 6)
+                                .add(9, 9, 9)
+                                .add(jLabel20))
+                            .add(jLabel19))
+                        .add(3, 3, 3)
+                        .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                            .add(zStackEndField, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 61, Short.MAX_VALUE)
+                            .add(zStackBeginField)
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, reverseButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE))
+                        .add(3, 3, 3)
                         .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, 60, Short.MAX_VALUE)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                 .add(jLabel23))
                             .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
                                 .add(jLabel26, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                 .add(jLabel22))
                             .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
-                                .add(jLabel25, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 82, Short.MAX_VALUE)
+                                .add(jLabel25, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                                 .add(jLabel21)))
                         .add(6, 6, 6)
@@ -2917,13 +2861,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                             .add(zStackPanelLayout.createSequentialGroup()
                                 .add(6, 6, 6)
                                 .add(zStackTotalDistLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 63, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
-                        .add(6, 6, 6)
+                        .add(0, 0, 0)
                         .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(jLabel24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(jLabel9)))
                     .add(zStackPanelLayout.createSequentialGroup()
                         .add(zStackCenteredCheckBox)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .add(3, 3, 3)
                         .add(zShutterCheckBox)))
                 .add(6, 6, 6))
         );
@@ -2937,9 +2881,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel25, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(jLabel19)
-                    .add(jLabel21, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 16, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(zSlicesSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(zStackBeginField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(jLabel21)
+                    .add(zSlicesSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(zStackBeginField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .add(2, 2, 2)
                 .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(zStackPanelLayout.createSequentialGroup()
@@ -2947,24 +2891,19 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                             .add(jLabel20)
                             .add(jLabel22)
                             .add(jLabel24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(zStackEndField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(jLabel26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 14, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                        .add(2, 2, 2)
+                            .add(zStackEndField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(jLabel26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                        .add(4, 4, 4)
                         .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                             .add(jLabel23)
                             .add(zStackTotalDistLabel)
-                            .add(reverseButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(reverseButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 18, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(jLabel9)))
-                    .add(zStepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(143, 143, 143))
+                    .add(zStepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .add(3, 3, 3))
         );
 
         acqModePane.addTab("Z-Stack", zStackPanel);
-
-        durationText.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
-        durationText.setText("jLabel19");
-        durationText.setVerticalAlignment(javax.swing.SwingConstants.TOP);
-        durationText.setBorder(javax.swing.BorderFactory.createTitledBorder(null, "Duration", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Arial", 0, 12))); // NOI18N
 
         jPanel1.setBorder(javax.swing.BorderFactory.createTitledBorder(null, "Timepoints", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Arial", 0, 12))); // NOI18N
 
@@ -3080,17 +3019,40 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(2, 2, 2))
         );
 
+        jPanel4.setBorder(javax.swing.BorderFactory.createTitledBorder(null, "Duration", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Arial", 0, 12))); // NOI18N
+
+        durationText.setFont(new java.awt.Font("Arial", 0, 11)); // NOI18N
+        durationText.setText("jLabel19");
+        durationText.setVerticalAlignment(javax.swing.SwingConstants.TOP);
+
+        org.jdesktop.layout.GroupLayout jPanel4Layout = new org.jdesktop.layout.GroupLayout(jPanel4);
+        jPanel4.setLayout(jPanel4Layout);
+        jPanel4Layout.setHorizontalGroup(
+            jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(jPanel4Layout.createSequentialGroup()
+                .add(3, 3, 3)
+                .add(durationText, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 236, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(3, 3, 3))
+        );
+        jPanel4Layout.setVerticalGroup(
+            jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(jPanel4Layout.createSequentialGroup()
+                .add(3, 3, 3)
+                .add(durationText, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 30, Short.MAX_VALUE)
+                .add(3, 3, 3))
+        );
+
         org.jdesktop.layout.GroupLayout timelapsePanelLayout = new org.jdesktop.layout.GroupLayout(timelapsePanel);
         timelapsePanel.setLayout(timelapsePanelLayout);
         timelapsePanelLayout.setHorizontalGroup(
             timelapsePanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(timelapsePanelLayout.createSequentialGroup()
                 .add(3, 3, 3)
-                .add(timelapsePanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                .add(timelapsePanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(timelapsePanelLayout.createSequentialGroup()
                         .add(jPanel1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .add(6, 6, 6)
-                        .add(durationText, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                        .add(jPanel4, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                     .add(jPanel3, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
@@ -3100,9 +3062,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(3, 3, 3)
                 .add(jPanel3, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .add(3, 3, 3)
-                .add(timelapsePanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jPanel1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .add(durationText, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .add(timelapsePanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                    .add(jPanel4, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(jPanel1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .add(6, 6, 6))
         );
 
@@ -3116,7 +3078,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(jPanel10, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(jPanel5Layout.createSequentialGroup()
-                        .add(3, 3, 3)
+                        .add(2, 2, 2)
                         .add(acqModePane, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 372, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
                 .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
@@ -3125,9 +3087,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             .add(jPanel5Layout.createSequentialGroup()
                 .add(0, 0, 0)
                 .add(jPanel10, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .add(1, 1, 1)
-                .add(acqModePane, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 162, Short.MAX_VALUE)
-                .add(3, 3, 3))
+                .add(2, 2, 2)
+                .add(acqModePane, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 168, Short.MAX_VALUE)
+                .add(5, 5, 5))
         );
 
         sequenceTabbedPane.addTab("Acq Settings", jPanel5);
@@ -3341,7 +3303,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(jLabel28)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jScrollPane4, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 309, Short.MAX_VALUE)
+                    .add(jScrollPane4, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 318, Short.MAX_VALUE)
                     .add(jPanel9Layout.createSequentialGroup()
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(addZFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
@@ -3661,13 +3623,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(sequenceListPanel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(sequenceTabbedPane, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 408, Short.MAX_VALUE)
+                .add(sequenceTabbedPane, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 417, Short.MAX_VALUE)
                 .add(3, 3, 3)
                 .add(settingsPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
                     .add(acquireButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(processProgressBar, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(cancelThreadButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(12, 12, 12))
+                .add(3, 3, 3))
         );
 
         statusPanel.setMaximumSize(new java.awt.Dimension(32767, 130));
@@ -4944,19 +4906,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     private void acqLayoutPanelMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_acqLayoutPanelMouseReleased
         if ((marking & selectMode) || (marking & mergeAreasMode) || (marking & commentMode)) {
-//            IJ.showMessage("EventHandler", "mouseReleased");
-//            IJ.log("MouseReleased: "+Integer.toString(evt.getX())+", "+Integer.toString(evt.getY()));
-//            double coordX=((LayoutPanel)acqLayoutPanel).convertPixToPhysCoord(evt.getX());
-//            double coordY=((LayoutPanel)acqLayoutPanel).convertPixToPhysCoord(evt.getY());
             markEndScreenPos = new Point(evt.getX(), evt.getY());
-//            IJ.log("Screen Pos: "+Integer.toString(markEndScreenPos.x)+", "+Integer.toString(markEndScreenPos.y));
-//            Point2D.Double markStartPos=new Point2D.Double(((LayoutPanel)acqLayoutPanel).convertPixToPhysCoord(markStartScreenPos.x),((LayoutPanel)acqLayoutPanel).convertPixToPhysCoord(markStartScreenPos.y));
-//            Point2D.Double markEndPos=new Point2D.Double(((LayoutPanel)acqLayoutPanel).convertPixToPhysCoord(markEndScreenPos.x),((LayoutPanel)acqLayoutPanel).convertPixToPhysCoord(markEndScreenPos.y));
             Point2D.Double markStartPos = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(markStartScreenPos);
             Point2D.Double markEndPos = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(markEndScreenPos);
             List<Area> al=null;//will hold list of all affected areas
-            if (!identicalPoints(markStartScreenPos, markEndScreenPos)) { // drag and relase to mark group of areas
-//                IJ.log("acqLayoutPanelMouseReleased: dragged");
+            if (!identicalPoints(markStartScreenPos, markEndScreenPos)) { 
+                // drag and relase to mark group of areas
                 if (selectMode) {
                     if (isLeftMouseButton)
                         al = acqLayout.getUnselectedAreasInsideRect(createRectangle2D(markStartPos, markEndPos));
@@ -4977,14 +4932,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
             AreaTableModel atm = (AreaTableModel) areaTable.getModel();
             if (selectMode && al!=null) {
-//                for (int i=0; i<al.size(); i++) {
-//                    int id=al.get(i).getId();
                 recalculateTiles = false;
                 for (Area area : al) {
                     int id = area.getId();
                     for (int j = 0; j < atm.getRowCount(); j++) {
                         int idInRow = (Integer) atm.getValueAt(j, 1);
-                        // IJ.log(Integer.toString(id)+", "+Integer.toString(idInRow));
                         if (idInRow == id) {
                             if (isLeftMouseButton) {
                                 atm.setValueAt(true, j, 0);
@@ -4997,23 +4949,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 recalculateTiles = true;
                 if (isLeftMouseButton) {
                     calcTilePositions(al, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), "Selecting Area...");
-                } //updateAcqLayoutPanel is called automatically when calctile thread is completed or aborted (in TileCalcMonitor.done)
-                else {
+                    //updateAcqLayoutPanel is called automatically
+                } else {
                     calcTotalTileNumber();
                     updateAcqLayoutPanel();
                 }
-                /*ArrayList<Area> allAreas=acqLayout.getAreaArray();
-                 for (int i=0; i<a.size(); i++) {
-                 int id=a.get(i).getId();
-                 for (int j=0; j<allAreas.size(); j++) {
-                 if (allAreas.get(j).getId()==id) {
-                 allAreas.get(j).setSelected(isLeftMouseButton);
-                 }    
-                 }    
-                 }*/
             } else if (mergeAreasMode) {
-//                for (int i=0; i<al.size(); i++)
-//                    al.get(i).setSelectedForMerge(true);
                 for (Area a : al) {
                     a.setSelectedForMerge(true);
                 }
@@ -5026,8 +4967,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 gd.showDialog();
                 if (!gd.wasCanceled()) {
                     String annot = gd.getNextString();
-//                    for (int i=0; i<al.size(); i++) {
-//                        int id=al.get(i).getId();
                     for (Area a : al) {
                         int id = a.getId();
                         for (int j = 0; j < atm.getRowCount(); j++) {
@@ -5445,10 +5384,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 return "txt files";
             }
         });
-        fc.setCurrentDirectory(new File(acqLayout.getFile().getPath()));
+//        fc.setCurrentDirectory(new File(acqLayout.getFile().getPath()));
+        fc.setCurrentDirectory(new File(layoutPath));
         int returnVal = fc.showOpenDialog(null);
         if (returnVal == JFileChooser.APPROVE_OPTION) {
             File f = fc.getSelectedFile();
+            layoutPath=fc.getCurrentDirectory().getAbsolutePath();
             if (!Utils.getExtension(f).toLowerCase().equals(".txt")) {
                 JOptionPane.showMessageDialog(null, "Layout files have to be in txt format.\nLayout has not been loaded.", "", JOptionPane.ERROR_MESSAGE);
                 return;
@@ -8220,6 +8161,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JPanel jPanel11;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
+    private javax.swing.JPanel jPanel4;
     private javax.swing.JPanel jPanel5;
     private javax.swing.JPanel jPanel6;
     private javax.swing.JPanel jPanel9;
@@ -8299,6 +8241,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         
     private void loadPreferences() {
         expSettingsFile  = new File(Prefs.get("edu.virginia.autoimage.expSettingsFile", Prefs.getHomeDir()));
+        layoutPath = Prefs.get("edu.virginia.autoimage.layoutPath", Prefs.getHomeDir());
         dataProcessorPath=Prefs.get("edu.virginia.autoimage.dataProcessorPath", Prefs.getHomeDir());
         imageDestPath = Prefs.get("edu.virginia.autoimage.rootDir", Prefs.getHomeDir());
         experimentTextField.setText(Prefs.get("edu.virginia.autoimage.experimentBaseName", "Exp"));
@@ -8310,6 +8253,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     private void savePreferences() {        
         Prefs.set("edu.virginia.autoimage.expSettingsFile", expSettingsFile.getAbsolutePath());
+        Prefs.set("edu.virginia.autoimage.layoutPath", layoutPath);
         Prefs.set("edu.virginia.autoimage.dataProcessorPath", dataProcessorPath);
         Prefs.set("edu.virginia.autoimage.rootDir", rootDirLabel.getText());
         Prefs.set("edu.virginia.autoimage.experimentBaseName", experimentTextField.getText());

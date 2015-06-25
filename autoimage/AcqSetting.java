@@ -1,10 +1,5 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage;
 
-import ij.IJ;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
@@ -24,7 +19,7 @@ import org.micromanager.utils.ReportingUtils;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 public class AcqSetting {
     public static final String[] ACQ_ORDER_LIST = {"Time, Position, Z, Channel",
@@ -66,9 +61,6 @@ public class AcqSetting {
     public static final String TAG_Z_SHUTTER_OPEN = "Z_SHUTTER_OPEN";
     public static final String TAG_SLICES = "SLICES";
     public static final String TAG_TIMELAPSE = "TIMELAPSE";
-//    public static final String TAG_HOUR_INTERVAL = "HOUR_INTERVAL";
-//    public static final String TAG_MINUTE_INTERVAL = "MINUTE_INTERVAL";
-//    public static final String TAG_SECOND_INTERVAL = "SECOND_INTERVAL";
     public static final String TAG_MILLIS_INTERVAL = "MILLIS_INTERVAL";
     public static final String TAG_FRAMES = "FRAMES";
     public static final String TAG_ACQ_ORDER = "ACQ_ORDER";
@@ -78,19 +70,19 @@ public class AcqSetting {
     
     private String name;            //visible in GUI
     private String objectiveDevStr="";
-    private String channelGroupStr;
+    private String channelGroupStr; //visible in GUI
     private String objLabel;        //visible in GUI
     private double objPixSize;      //internal based on existing MM calibration
     private FieldOfView fieldOfView;
     private int binning;            //visible in GUI 
     private TilingSetting tiling;
-    //private String path;
     private boolean isModified;
     protected TileManager tileManager;
 
     private boolean autofocus;      //visible
     private int afSkipFrames;       //visible
     private JSONObject autofocusSettings;
+    
     private boolean zStack;         //visible
     private boolean zStackCentered; //visible
     private double zBegin;          //visible
@@ -98,12 +90,13 @@ public class AcqSetting {
     private double zStepSize;       //visible
     private int slices;             //visible
     private boolean zShutterOpen;    //visible
+    
     private boolean timelapse;      //visible
-    private int hours;
-    private int minutes;
-    private int seconds;
-    private int milliseconds;
-    private long intervalInMS; //visible
+    private int hours;              //internal for convenience
+    private int minutes;            //internal for convenience
+    private int seconds;            //internal for convenience
+    private int milliseconds;       //internal for convenience
+    private long intervalInMS;      //stored
     private int frames;             //visible
     private List<Channel> channels; //visible 
     private boolean chShutterOpen;  //visible
@@ -267,11 +260,6 @@ public class AcqSetting {
             minutes=(int)Math.floor((intervalInMS -(hours*3600000)) / 60000);
             seconds=(int)Math.floor((intervalInMS -(hours*3600000 + minutes*60000)) / 1000);
             milliseconds=(int)(intervalInMS % 1000);
-            IJ.log(Long.toString(intervalInMS));
-            IJ.log(Long.toString(hours));
-            IJ.log(Long.toString(minutes));
-            IJ.log(Long.toString(seconds));
-            IJ.log(Long.toString(milliseconds));
             frames=obj.getInt(TAG_FRAMES);
             acqOrder=obj.getInt(TAG_ACQ_ORDER);                    
             startTime=new ScheduledTime(obj.getJSONObject(TAG_START_TIME));

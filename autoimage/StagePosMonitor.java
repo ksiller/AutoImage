@@ -10,15 +10,13 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.SwingWorker;
 import mmcorej.CMMCore;
-import org.micromanager.api.ScriptInterface;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 class StagePosMonitor extends SwingWorker<Void, Double[]> {
 
-    private ScriptInterface gui;
     private CMMCore core;
     private String xyStageName;
     private String focusDeviceName;
@@ -29,23 +27,26 @@ class StagePosMonitor extends SwingWorker<Void, Double[]> {
     private final ExecutorService listenerExecutor;
     
         
-    public StagePosMonitor(ScriptInterface gui, int interval) {
-        this.gui=gui;
+    public StagePosMonitor(CMMCore core, int interval, boolean readZ) {
         listeners=new ArrayList<IStageMonitorListener>();
-        setCore(gui.getMMCore());
+        setCore(core);
         interval_ms=interval;
-        readZPos=true;
+        readZPos=readZ;
         
         listenerExecutor = Executors.newFixedThreadPool(1);
         currentPos=readStagePosition();
         publish(currentPos);
     }
 
-    public StagePosMonitor(ScriptInterface gui) {
-        this(gui,100);
+    public StagePosMonitor(CMMCore core, int interval) {
+        this (core, interval, true);
+    }
+    
+    public StagePosMonitor(CMMCore core) {
+        this(core,100, true);
     }
 
-    public void setCore(CMMCore core) {
+    public final void setCore(CMMCore core) {
         this.core=core;
         xyStageName=core.getXYStageDevice();
         focusDeviceName=core.getFocusDevice();
@@ -84,8 +85,8 @@ class StagePosMonitor extends SwingWorker<Void, Double[]> {
             } catch (Exception ex) {
                 Logger.getLogger(getClass().getName()).log(Level.SEVERE, null, ex);
             }
-        }
-        return new Double[]{x,y,z};    
+        }    
+        return new Double[]{x,y,z};
     }
     
     synchronized
@@ -118,8 +119,12 @@ class StagePosMonitor extends SwingWorker<Void, Double[]> {
             try {
                 Thread.sleep(interval_ms);
                 Double[] newPos = readStagePosition();
-                if (!newPos[0].equals(currentPos[0]) || !newPos[1].equals(currentPos[1]) || !newPos[2].equals(currentPos[2]))
-                    publish(newPos);
+                for (int i=0; i<newPos.length; i++) {
+                    if (newPos[i]!=null && !newPos[i].equals(currentPos[i])) {
+                        publish(newPos);
+                        break;
+                    }
+                }
                 currentPos=newPos;
             } catch (InterruptedException ex) {
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
@@ -129,27 +134,23 @@ class StagePosMonitor extends SwingWorker<Void, Double[]> {
     }
 
     
-    /*  sends latest stage position to listeners    
-    */
+    /**  
+     * Sends latest stage position to listeners.
+     * 
+     */
     @Override
     protected void process(final List<Double[]> newPosList) {
         if (newPosList!=null) {
             final Double[] lastPos=newPosList.get(newPosList.size()-1);
             synchronized (listeners) {
                 for (final IStageMonitorListener l : listeners) {
-/*                    listenerExecutor.submit(
-                        new Runnable() {
-                            @Override
-                            public void run() {*/
-                                try {
-                                    l.stagePositionChanged(lastPos);
-                                }
-                                catch (RuntimeException e) {
-                                    IJ.log(getClass().getName()+": Unexpected exception in listener."+ e.getMessage());
-                                    listeners.remove(l);                               
-                                }
-/*                            }
-                        });*/
+                    try {
+                        l.stagePositionChanged(lastPos);
+                    }
+                    catch (RuntimeException e) {
+                        IJ.log(getClass().getName()+": Unexpected exception in listener."+ e.getMessage());
+                        listeners.remove(l);                               
+                    }
                 }
             }    
         }

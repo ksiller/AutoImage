@@ -903,7 +903,15 @@ public abstract class Area {
     //used to initialize Area from layout file
     public final static Area createFromJSONObject(JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         String className=obj.getString(TAG_CLASS);
-        Class clazz=Class.forName(className);
+        Class clazz=null;
+        try {
+            clazz=Class.forName(className);
+        } catch (Exception ex) {
+            //open layouts saved before refactoring of Area classes into autoimage.area package, 
+            //e.g. "autoimage.RectArea" should be initialized as "autoimage.area.RectArea"
+            className=className.substring(0,className.lastIndexOf("."))+".area"+className.substring(className.lastIndexOf("."));
+            clazz=Class.forName(className);
+        }
         Area area=(Area) clazz.newInstance();
         area.name=obj.getString(TAG_NAME);
         area.id=obj.getInt(TAG_ID);

@@ -1168,5 +1168,14 @@ public class AcqLayout {
     public Comparator getTileNumberComparator() {
         return Area.TileNumComparator;
     }
+    
+    public long getTotalTileNumber() {
+        long totalTiles=0;
+        for (Area a:areas) {
+            if (a.isSelectedForAcq())
+                totalTiles=totalTiles+a.getTileNumber();
+        }    
+        return totalTiles;
+    }
 }
 

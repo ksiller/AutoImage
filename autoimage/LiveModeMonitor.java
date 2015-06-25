@@ -1,9 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package autoimage;
 
 import ij.IJ;
@@ -18,7 +12,7 @@ import org.micromanager.api.ScriptInterface;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 class LiveModeMonitor extends SwingWorker<Void, Boolean> {
 
@@ -92,24 +86,19 @@ class LiveModeMonitor extends SwingWorker<Void, Boolean> {
                 currentMode=b;
                 synchronized (listeners) {
 	            for (final ILiveListener l : listeners) {
-/*                      listenerExecutor.submit(new Runnable() {
-	                    @Override
-	                    public void run() {*/
-                                try {
-	                            l.liveModeChanged(currentMode);
-                                } catch (RuntimeException e) {
-                                    IJ.log(getClass().getName()+": Error in listener. "+e.getMessage());
-                                    listeners.remove(l);
-                                }    
-/*	                    }
-	                });*/
+                        try {
+                            l.liveModeChanged(currentMode);
+                        } catch (RuntimeException e) {
+                            IJ.log(getClass().getName()+": Error in listener. "+e.getMessage());
+                            listeners.remove(l);
+                        }    
 	            }
 	         }
             }    
         }
 
-
         @Override
         public void done() {
+            IJ.log("LiveModeMonitor.done.");
         }
     }
