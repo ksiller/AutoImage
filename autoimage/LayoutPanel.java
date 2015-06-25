@@ -28,7 +28,7 @@ import javax.swing.SwingConstants;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 
 
@@ -69,7 +69,6 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     private Rectangle2D.Double mergeAreasBounds; 
     private AffineTransform layoutTransform;
 
-    
     private double borderDim; //in physDim;
     private double physToPixelRatio;
 

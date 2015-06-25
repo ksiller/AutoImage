@@ -303,7 +303,7 @@ public class ScriptAnalyzerOld extends BranchedProcessor<File>  {
                 modFile=f;
                 IJ.log("Problem: copying file for "+script_);
             }*/
-            File modFile=createCopy(f);
+            File modFile=createModifiedOutput(f);
             if (execute(modFile)) {
                 if (saveRT_ && rTable_!=null) {
                     saveResultsTable(modFile);

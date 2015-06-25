@@ -148,7 +148,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
     //creates copy of element
     //if meta!=null, metadata in copied element will be replaced by meta, otherwise keep original metadata
     @Override
-    protected File createCopy(File element) {
+    protected File createModifiedOutput(File element) {
         JSONObject meta=null;
         File copy=null;
         TaggedImage ti=null;
@@ -196,14 +196,14 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
             } catch (JSONException ex) {
                 IJ.log(this.getClass().getName()+ ": Cannot retrieve 'Info' metadata from file. "+ex);
                 Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
-//                    copy=super.createCopy(element);
+//                    copy=super.createModifiedOutput(element);
             } catch (Exception ex) {
                 IJ.log(this.getClass().getName()+ ": Error writing file to storage. "+ex);
                 Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
             }
         } else {
             IJ.log(this.getClass().getName()+": Cannot open image");
-//                copy=super.createCopy(element);
+//                copy=super.createModifiedOutput(element);
         }
        return copy;
     }    
@@ -406,7 +406,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
             List<File> modFiles=new ArrayList<File>(group.elements.size());
             for (File f:group.elements) {
                 IJ.log("    "+f.getAbsolutePath());
-                modFiles.add(createCopy(f));
+                modFiles.add(createModifiedOutput(f));
                 
             }
             if (execute(modFiles)) {

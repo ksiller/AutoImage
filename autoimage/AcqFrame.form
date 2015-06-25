@@ -123,7 +123,7 @@
                   <EmptySpace min="-2" max="-2" attributes="0"/>
                   <Component id="sequenceListPanel" min="-2" max="-2" attributes="0"/>
                   <EmptySpace min="-2" max="-2" attributes="0"/>
-                  <Component id="sequenceTabbedPane" pref="418" max="32767" attributes="0"/>
+                  <Component id="sequenceTabbedPane" pref="408" max="32767" attributes="0"/>
                   <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
                   <Group type="103" groupAlignment="2" attributes="0">
                       <Component id="acquireButton" alignment="2" min="-2" pref="20" max="-2" attributes="0"/>
@@ -144,6 +144,9 @@
                   <Font PropertyName="font" name="Lucida Grande" size="12" style="0"/>
                 </TitledBorder>
               </Border>
+            </Property>
+            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+              <Font name="Arial" size="12" style="0"/>
             </Property>
             <Property name="preferredSize" type="java.awt.Dimension" editor="org.netbeans.beaninfo.editors.DimensionEditor">
               <Dimension value="[410, 540]"/>
@@ -216,7 +219,7 @@
                                   <Component id="mergeAreasButton" min="-2" pref="22" max="-2" attributes="0"/>
                                   <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
                               </Group>
-                              <Component id="jScrollPane2" pref="319" max="32767" attributes="0"/>
+                              <Component id="jScrollPane2" pref="312" max="32767" attributes="0"/>
                           </Group>
                           <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
                       </Group>
@@ -405,8 +408,8 @@
                           <Group type="103" groupAlignment="0" attributes="0">
                               <Component id="jPanel10" min="-2" max="-2" attributes="0"/>
                               <Group type="102" alignment="0" attributes="0">
-                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
-                                  <Component id="acqModePane" min="-2" pref="363" max="-2" attributes="0"/>
+                                  <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
+                                  <Component id="acqModePane" min="-2" pref="372" max="-2" attributes="0"/>
                               </Group>
                           </Group>
                           <EmptySpace max="32767" attributes="0"/>
@@ -418,9 +421,9 @@
                       <Group type="102" alignment="0" attributes="0">
                           <EmptySpace min="-2" pref="0" max="-2" attributes="0"/>
                           <Component id="jPanel10" min="-2" max="-2" attributes="0"/>
-                          <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
-                          <Component id="acqModePane" pref="140" max="32767" attributes="0"/>
-                          <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
+                          <EmptySpace min="-2" pref="1" max="-2" attributes="0"/>
+                          <Component id="acqModePane" pref="162" max="32767" attributes="0"/>
+                          <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
                       </Group>
                   </Group>
                 </DimensionLayout>
@@ -434,17 +437,6 @@
                           <Group type="102" attributes="0">
                               <EmptySpace min="3" pref="3" max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="0" attributes="0">
-                                  <Group type="102" attributes="0">
-                                      <Component id="autofocusCheckBox" min="-2" max="-2" attributes="0"/>
-                                      <EmptySpace max="-2" attributes="0"/>
-                                      <Component id="autofocusButton" min="-2" pref="24" max="-2" attributes="0"/>
-                                      <EmptySpace max="-2" attributes="0"/>
-                                      <Component id="autofocusImportButton" min="-2" pref="22" max="-2" attributes="0"/>
-                                      <EmptySpace max="-2" attributes="0"/>
-                                      <Component id="zStackCheckBox" min="-2" max="-2" attributes="0"/>
-                                      <EmptySpace min="-2" pref="26" max="-2" attributes="0"/>
-                                      <Component id="timelapseCheckBox" min="-2" max="-2" attributes="0"/>
-                                  </Group>
                                   <Group type="102" alignment="0" attributes="0">
                                       <Component id="jLabel6" min="-2" max="-2" attributes="0"/>
                                       <EmptySpace max="-2" attributes="0"/>
@@ -525,11 +517,11 @@
                       <Group type="103" groupAlignment="0" attributes="0">
                           <Group type="102" attributes="0">
                               <EmptySpace min="0" pref="0" max="-2" attributes="0"/>
-                              <Group type="103" groupAlignment="3" attributes="0">
-                                  <Component id="jLabel1" alignment="3" min="-2" max="-2" attributes="0"/>
-                                  <Component id="objectiveComboBox" alignment="3" min="-2" max="-2" attributes="0"/>
-                                  <Component id="binningComboBox" alignment="3" min="-2" max="-2" attributes="0"/>
-                                  <Component id="jLabel10" alignment="3" min="-2" pref="15" max="-2" attributes="0"/>
+                              <Group type="103" groupAlignment="2" attributes="0">
+                                  <Component id="jLabel1" alignment="2" min="-2" max="-2" attributes="0"/>
+                                  <Component id="objectiveComboBox" alignment="2" min="-2" max="-2" attributes="0"/>
+                                  <Component id="jLabel10" alignment="2" min="-2" pref="15" max="-2" attributes="0"/>
+                                  <Component id="binningComboBox" alignment="2" min="-2" max="-2" attributes="0"/>
                               </Group>
                               <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="0" attributes="0">
@@ -572,36 +564,17 @@
                                   <Component id="closeGapsButton" alignment="3" min="-2" max="-2" attributes="0"/>
                                   <Component id="siteOverlapCheckBox" alignment="3" min="-2" max="-2" attributes="0"/>
                               </Group>
-                              <EmptySpace min="-2" pref="4" max="-2" attributes="0"/>
+                              <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="3" attributes="0">
                                   <Component id="jLabel6" alignment="3" min="-2" max="-2" attributes="0"/>
                                   <Component id="acqOrderList" alignment="3" min="-2" max="-2" attributes="0"/>
                               </Group>
-                              <EmptySpace min="0" pref="0" max="-2" attributes="0"/>
-                              <Group type="103" groupAlignment="2" attributes="0">
-                                  <Component id="autofocusCheckBox" alignment="2" min="-2" max="-2" attributes="0"/>
-                                  <Component id="autofocusButton" alignment="2" min="-2" pref="20" max="-2" attributes="0"/>
-                                  <Component id="zStackCheckBox" alignment="2" min="-2" max="-2" attributes="0"/>
-                                  <Component id="timelapseCheckBox" alignment="2" min="-2" max="-2" attributes="0"/>
-                                  <Component id="autofocusImportButton" alignment="2" min="-2" pref="22" max="-2" attributes="0"/>
-                              </Group>
-                              <EmptySpace min="0" pref="0" max="-2" attributes="0"/>
+                              <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
                           </Group>
                       </Group>
                     </DimensionLayout>
                   </Layout>
                   <SubComponents>
-                    <Component class="javax.swing.JCheckBox" name="timelapseCheckBox">
-                      <Properties>
-                        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                          <Font name="Lucida Grande" size="12" style="0"/>
-                        </Property>
-                        <Property name="text" type="java.lang.String" value="Time-lapse"/>
-                      </Properties>
-                      <Events>
-                        <EventHandler event="itemStateChanged" listener="java.awt.event.ItemListener" parameters="java.awt.event.ItemEvent" handler="timelapseCheckBoxItemStateChanged"/>
-                      </Events>
-                    </Component>
                     <Component class="javax.swing.JTextField" name="clusterYField">
                       <Properties>
                         <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
@@ -643,7 +616,7 @@
                     <Component class="javax.swing.JComboBox" name="objectiveComboBox">
                       <Properties>
                         <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                          <Font name="Lucida Grande" size="12" style="0"/>
+                          <Font name="Arial" size="12" style="0"/>
                         </Property>
                         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
                           <StringArray count="4">
@@ -681,18 +654,6 @@
                         </Property>
                         <Property name="text" type="java.lang.String" value="jLabel6"/>
                       </Properties>
-                    </Component>
-                    <Component class="javax.swing.JCheckBox" name="zStackCheckBox">
-                      <Properties>
-                        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                          <Font name="Lucida Grande" size="12" style="0"/>
-                        </Property>
-                        <Property name="text" type="java.lang.String" value="Z-Stack"/>
-                      </Properties>
-                      <Events>
-                        <EventHandler event="itemStateChanged" listener="java.awt.event.ItemListener" parameters="java.awt.event.ItemEvent" handler="zStackCheckBoxItemStateChanged"/>
-                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="zStackCheckBoxActionPerformed"/>
-                      </Events>
                     </Component>
                     <Component class="javax.swing.JLabel" name="jLabel6">
                       <Properties>
@@ -766,17 +727,6 @@
                         <Property name="text" type="java.lang.String" value="Tiling:"/>
                       </Properties>
                     </Component>
-                    <Component class="javax.swing.JCheckBox" name="autofocusCheckBox">
-                      <Properties>
-                        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                          <Font name="Lucida Grande" size="12" style="0"/>
-                        </Property>
-                        <Property name="text" type="java.lang.String" value="Autofocus"/>
-                      </Properties>
-                      <Events>
-                        <EventHandler event="itemStateChanged" listener="java.awt.event.ItemListener" parameters="java.awt.event.ItemEvent" handler="autofocusCheckBoxItemStateChanged"/>
-                      </Events>
-                    </Component>
                     <Component class="javax.swing.JLabel" name="jLabel12">
                       <Properties>
                         <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
@@ -787,6 +737,9 @@
                     </Component>
                     <Component class="javax.swing.JComboBox" name="binningComboBox">
                       <Properties>
+                        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                          <Font name="Arial" size="12" style="0"/>
+                        </Property>
                         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
                           <StringArray count="4">
                             <StringItem index="0" value="Item 1"/>
@@ -833,7 +786,7 @@
                     <Component class="javax.swing.JComboBox" name="acqOrderList">
                       <Properties>
                         <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                          <Font name="Lucida Grande" size="12" style="0"/>
+                          <Font name="Arial" size="12" style="0"/>
                         </Property>
                         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
                           <StringArray count="0"/>
@@ -843,21 +796,10 @@
                         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="acqOrderListActionPerformed"/>
                       </Events>
                     </Component>
-                    <Component class="javax.swing.JButton" name="autofocusButton">
-                      <Properties>
-                        <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                          <Image iconType="3" name="/autoimage/resources/wrench_orange.png"/>
-                        </Property>
-                        <Property name="toolTipText" type="java.lang.String" value="Autofocus Configuration"/>
-                      </Properties>
-                      <Events>
-                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="autofocusButtonActionPerformed"/>
-                      </Events>
-                    </Component>
                     <Component class="javax.swing.JComboBox" name="tilingModeComboBox">
                       <Properties>
                         <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                          <Font name="Lucida Grande" size="12" style="0"/>
+                          <Font name="Arial" size="12" style="0"/>
                         </Property>
                         <Property name="model" type="javax.swing.ComboBoxModel" editor="org.netbeans.modules.form.editors2.ComboBoxModelEditor">
                           <StringArray count="4">
@@ -927,26 +869,12 @@
                         <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="closeGapsButtonActionPerformed"/>
                       </Events>
                     </Component>
-                    <Component class="javax.swing.JButton" name="autofocusImportButton">
-                      <Properties>
-                        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                          <Font name="Arial" size="10" style="0"/>
-                        </Property>
-                        <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
-                          <Image iconType="3" name="/org/micromanager/icons/arrow_refresh.png"/>
-                        </Property>
-                        <Property name="toolTipText" type="java.lang.String" value="Apply autofocus settings"/>
-                      </Properties>
-                      <Events>
-                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="autofocusImportButtonActionPerformed"/>
-                      </Events>
-                    </Component>
                   </SubComponents>
                 </Container>
                 <Container class="javax.swing.JTabbedPane" name="acqModePane">
                   <Properties>
                     <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                      <Font name="Lucida Grande" size="12" style="0"/>
+                      <Font name="Arial" size="11" style="0"/>
                     </Property>
                     <Property name="minimumSize" type="java.awt.Dimension" editor="org.netbeans.beaninfo.editors.DimensionEditor">
                       <Dimension value="[72, 300]"/>
@@ -955,7 +883,7 @@
 
                   <Layout class="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout"/>
                   <SubComponents>
-                    <Container class="javax.swing.JPanel" name="jPanel4">
+                    <Container class="javax.swing.JPanel" name="chPanel">
                       <Constraints>
                         <Constraint layoutClass="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout" value="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout$JTabbedPaneConstraintsDescription">
                           <JTabbedPaneConstraints tabName="Channels">
@@ -967,11 +895,14 @@
                       <Layout>
                         <DimensionLayout dim="0">
                           <Group type="103" groupAlignment="0" attributes="0">
-                              <Group type="102" alignment="0" attributes="0">
+                              <Group type="102" alignment="1" attributes="0">
                                   <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
-                                  <Component id="jScrollPane3" pref="227" max="32767" attributes="0"/>
-                                  <EmptySpace max="-2" attributes="0"/>
-                                  <Component id="jPanel6" min="-2" pref="97" max="-2" attributes="0"/>
+                                  <Component id="jScrollPane3" pref="236" max="32767" attributes="0"/>
+                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
+                                  <Group type="103" groupAlignment="0" attributes="0">
+                                      <Component id="chShutterCheckBox" min="-2" max="-2" attributes="0"/>
+                                      <Component id="jPanel6" min="-2" pref="97" max="-2" attributes="0"/>
+                                  </Group>
                                   <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                               </Group>
                           </Group>
@@ -981,10 +912,16 @@
                               <Group type="102" alignment="0" attributes="0">
                                   <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
                                   <Group type="103" groupAlignment="0" attributes="0">
-                                      <Component id="jScrollPane3" pref="0" max="32767" attributes="0"/>
-                                      <Component id="jPanel6" min="-2" pref="92" max="-2" attributes="0"/>
+                                      <Group type="102" attributes="0">
+                                          <Component id="jPanel6" min="-2" pref="92" max="-2" attributes="0"/>
+                                          <EmptySpace min="-2" pref="1" max="-2" attributes="0"/>
+                                          <Component id="chShutterCheckBox" min="-2" max="-2" attributes="0"/>
+                                      </Group>
+                                      <Group type="102" attributes="0">
+                                          <Component id="jScrollPane3" pref="0" max="32767" attributes="0"/>
+                                          <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
+                                      </Group>
                                   </Group>
-                                  <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -1152,7 +1089,7 @@
                             <Component class="javax.swing.JButton" name="zOffsetButton">
                               <Properties>
                                 <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                                  <Font name="SansSerif" size="12" style="0"/>
+                                  <Font name="Arial" size="11" style="0"/>
                                 </Property>
                                 <Property name="text" type="java.lang.String" value="z-Offset"/>
                                 <Property name="toolTipText" type="java.lang.String" value="Set channel z-offsets"/>
@@ -1164,7 +1101,7 @@
                             <Component class="javax.swing.JButton" name="autoExposureButton">
                               <Properties>
                                 <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                                  <Font name="SansSerif" size="12" style="0"/>
+                                  <Font name="Arial" size="11" style="0"/>
                                 </Property>
                                 <Property name="text" type="java.lang.String" value="Auto-Exp"/>
                                 <Property name="toolTipText" type="java.lang.String" value="Determine optimal exposure time for channel"/>
@@ -1175,6 +1112,160 @@
                             </Component>
                           </SubComponents>
                         </Container>
+                        <Component class="javax.swing.JCheckBox" name="chShutterCheckBox">
+                          <Properties>
+                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                              <Font name="Arial" size="10" style="0"/>
+                            </Property>
+                            <Property name="text" type="java.lang.String" value="Shutter open"/>
+                            <Property name="toolTipText" type="java.lang.String" value="Keep shutter open when changing channels"/>
+                          </Properties>
+                          <Events>
+                            <EventHandler event="itemStateChanged" listener="java.awt.event.ItemListener" parameters="java.awt.event.ItemEvent" handler="chShutterCheckBoxItemStateChanged"/>
+                          </Events>
+                        </Component>
+                      </SubComponents>
+                    </Container>
+                    <Container class="javax.swing.JPanel" name="afPanel">
+                      <Constraints>
+                        <Constraint layoutClass="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout" value="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout$JTabbedPaneConstraintsDescription">
+                          <JTabbedPaneConstraints tabName="Autofocus">
+                            <Property name="tabTitle" type="java.lang.String" value="Autofocus"/>
+                          </JTabbedPaneConstraints>
+                        </Constraint>
+                      </Constraints>
+
+                      <Layout>
+                        <DimensionLayout dim="0">
+                          <Group type="103" groupAlignment="0" attributes="0">
+                              <Group type="102" attributes="0">
+                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
+                                  <Group type="103" groupAlignment="0" attributes="0">
+                                      <Group type="102" alignment="0" attributes="0">
+                                          <Component id="jScrollPane1" pref="0" max="32767" attributes="0"/>
+                                          <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
+                                          <Group type="103" groupAlignment="0" attributes="0">
+                                              <Component id="autofocusButton" min="-2" pref="22" max="-2" attributes="0"/>
+                                              <Component id="autofocusImportButton" min="-2" pref="22" max="-2" attributes="0"/>
+                                          </Group>
+                                      </Group>
+                                      <Group type="102" alignment="0" attributes="0">
+                                          <Component id="jLabel11" min="-2" max="-2" attributes="0"/>
+                                          <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
+                                          <Component id="afSkipFrameSpinner" min="-2" pref="52" max="-2" attributes="0"/>
+                                          <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
+                                          <Component id="jLabel27" min="-2" max="-2" attributes="0"/>
+                                          <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
+                                          <Component id="afModeLabel" pref="167" max="32767" attributes="0"/>
+                                      </Group>
+                                  </Group>
+                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
+                              </Group>
+                          </Group>
+                        </DimensionLayout>
+                        <DimensionLayout dim="1">
+                          <Group type="103" groupAlignment="0" attributes="0">
+                              <Group type="102" attributes="0">
+                                  <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
+                                  <Group type="103" groupAlignment="2" attributes="0">
+                                      <Component id="jLabel11" alignment="2" min="-2" max="-2" attributes="0"/>
+                                      <Component id="afSkipFrameSpinner" alignment="2" min="-2" pref="20" max="-2" attributes="0"/>
+                                      <Component id="jLabel27" alignment="2" min="-2" max="-2" attributes="0"/>
+                                      <Component id="afModeLabel" alignment="2" min="-2" max="-2" attributes="0"/>
+                                  </Group>
+                                  <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
+                                  <Group type="103" groupAlignment="0" attributes="0">
+                                      <Component id="jScrollPane1" pref="90" max="32767" attributes="0"/>
+                                      <Group type="102" alignment="0" attributes="0">
+                                          <Component id="autofocusButton" min="-2" pref="22" max="-2" attributes="0"/>
+                                          <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
+                                          <Component id="autofocusImportButton" min="-2" pref="22" max="-2" attributes="0"/>
+                                      </Group>
+                                  </Group>
+                                  <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
+                              </Group>
+                          </Group>
+                        </DimensionLayout>
+                      </Layout>
+                      <SubComponents>
+                        <Component class="javax.swing.JButton" name="autofocusImportButton">
+                          <Properties>
+                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                              <Font name="Arial" size="10" style="0"/>
+                            </Property>
+                            <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                              <Image iconType="3" name="/org/micromanager/icons/arrow_refresh.png"/>
+                            </Property>
+                            <Property name="toolTipText" type="java.lang.String" value="Apply autofocus settings"/>
+                          </Properties>
+                          <Events>
+                            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="autofocusImportButtonActionPerformed"/>
+                          </Events>
+                        </Component>
+                        <Component class="javax.swing.JLabel" name="afModeLabel">
+                          <Properties>
+                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                              <Font name="Arial" size="12" style="0"/>
+                            </Property>
+                            <Property name="text" type="java.lang.String" value="jLabel35"/>
+                          </Properties>
+                        </Component>
+                        <Component class="javax.swing.JButton" name="autofocusButton">
+                          <Properties>
+                            <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                              <Image iconType="3" name="/autoimage/resources/wrench_orange.png"/>
+                            </Property>
+                            <Property name="toolTipText" type="java.lang.String" value="Autofocus Configuration"/>
+                          </Properties>
+                          <Events>
+                            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="autofocusButtonActionPerformed"/>
+                          </Events>
+                        </Component>
+                        <Component class="javax.swing.JSpinner" name="afSkipFrameSpinner">
+                          <Properties>
+                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                              <Font name="Arial" size="10" style="0"/>
+                            </Property>
+                            <Property name="model" type="javax.swing.SpinnerModel" editor="org.netbeans.modules.form.editors2.SpinnerModelEditor">
+                              <SpinnerModel initial="0" minimum="0" numberType="java.lang.Integer" stepSize="1" type="number"/>
+                            </Property>
+                          </Properties>
+                          <Events>
+                            <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="afSkipFrameSpinnerStateChanged"/>
+                          </Events>
+                        </Component>
+                        <Container class="javax.swing.JScrollPane" name="jScrollPane1">
+
+                          <Layout class="org.netbeans.modules.form.compat2.layouts.support.JScrollPaneSupportLayout"/>
+                          <SubComponents>
+                            <Component class="javax.swing.JTable" name="afPropertyTable">
+                              <Properties>
+                                <Property name="model" type="javax.swing.table.TableModel" editor="org.netbeans.modules.form.editors2.TableModelEditor">
+                                  <Table columnCount="2" rowCount="4">
+                                    <Column editable="false" title="Property" type="java.lang.String"/>
+                                    <Column editable="false" title="Value" type="java.lang.String"/>
+                                  </Table>
+                                </Property>
+                              </Properties>
+                            </Component>
+                          </SubComponents>
+                        </Container>
+                        <Component class="javax.swing.JLabel" name="jLabel27">
+                          <Properties>
+                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                              <Font name="Arial" size="12" style="0"/>
+                            </Property>
+                            <Property name="text" type="java.lang.String" value="Mode:"/>
+                          </Properties>
+                        </Component>
+                        <Component class="javax.swing.JLabel" name="jLabel11">
+                          <Properties>
+                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                              <Font name="Arial" size="12" style="0"/>
+                            </Property>
+                            <Property name="text" type="java.lang.String" value="Skip Frames: "/>
+                          </Properties>
+                        </Component>
                       </SubComponents>
                     </Container>
                     <Container class="javax.swing.JPanel" name="zStackPanel">
@@ -1189,12 +1280,12 @@
                       <Layout>
                         <DimensionLayout dim="0">
                           <Group type="103" groupAlignment="0" attributes="0">
-                              <Group type="102" attributes="0">
+                              <Group type="102" alignment="1" attributes="0">
                                   <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                   <Group type="103" groupAlignment="0" attributes="0">
                                       <Group type="102" attributes="0">
-                                          <Group type="103" groupAlignment="0" max="-2" attributes="0">
-                                              <Group type="102" alignment="0" attributes="0">
+                                          <Group type="103" groupAlignment="0" attributes="0">
+                                              <Group type="102" attributes="0">
                                                   <Group type="103" groupAlignment="0" attributes="0">
                                                       <Group type="102" attributes="0">
                                                           <EmptySpace min="-2" pref="9" max="-2" attributes="0"/>
@@ -1203,12 +1294,12 @@
                                                       <Component id="jLabel19" alignment="0" min="-2" max="-2" attributes="0"/>
                                                   </Group>
                                                   <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
-                                                  <Group type="103" groupAlignment="0" attributes="0">
-                                                      <Component id="zStackEndField" max="32767" attributes="0"/>
+                                                  <Group type="103" groupAlignment="0" max="-2" attributes="0">
+                                                      <Component id="zStackEndField" pref="61" max="32767" attributes="0"/>
                                                       <Component id="zStackBeginField" max="32767" attributes="0"/>
                                                   </Group>
                                               </Group>
-                                              <Group type="102" attributes="0">
+                                              <Group type="102" alignment="1" attributes="0">
                                                   <EmptySpace min="-2" pref="1" max="-2" attributes="0"/>
                                                   <Component id="reverseButton" min="-2" pref="101" max="-2" attributes="0"/>
                                               </Group>
@@ -1216,28 +1307,30 @@
                                           <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                           <Group type="103" groupAlignment="0" attributes="0">
                                               <Group type="102" alignment="1" attributes="0">
-                                                  <Group type="103" groupAlignment="1" max="-2" attributes="0">
-                                                      <Component id="jLabel25" pref="24" max="32767" attributes="0"/>
-                                                      <Component id="jLabel26" max="32767" attributes="0"/>
-                                                  </Group>
-                                                  <EmptySpace min="-2" pref="12" max="-2" attributes="0"/>
-                                                  <Group type="103" groupAlignment="1" attributes="0">
-                                                      <Component id="jLabel21" min="-2" max="-2" attributes="0"/>
-                                                      <Component id="jLabel22" min="-2" max="-2" attributes="0"/>
-                                                  </Group>
-                                                  <EmptySpace min="6" pref="6" max="-2" attributes="0"/>
+                                                  <EmptySpace pref="60" max="32767" attributes="0"/>
+                                                  <Component id="jLabel23" min="-2" max="-2" attributes="0"/>
                                               </Group>
                                               <Group type="102" alignment="1" attributes="0">
-                                                  <Component id="jLabel23" min="-2" max="-2" attributes="0"/>
-                                                  <EmptySpace min="-2" pref="8" max="-2" attributes="0"/>
+                                                  <Component id="jLabel26" max="32767" attributes="0"/>
+                                                  <EmptySpace max="-2" attributes="0"/>
+                                                  <Component id="jLabel22" min="-2" max="-2" attributes="0"/>
+                                              </Group>
+                                              <Group type="102" alignment="1" attributes="0">
+                                                  <Component id="jLabel25" pref="82" max="32767" attributes="0"/>
+                                                  <EmptySpace max="-2" attributes="0"/>
+                                                  <Component id="jLabel21" min="-2" max="-2" attributes="0"/>
                                               </Group>
                                           </Group>
+                                          <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                           <Group type="103" groupAlignment="0" attributes="0">
                                               <Group type="103" groupAlignment="0" max="-2" attributes="0">
                                                   <Component id="zSlicesSpinner" max="32767" attributes="0"/>
                                                   <Component id="zStepSizeField" pref="0" max="32767" attributes="0"/>
                                               </Group>
-                                              <Component id="zStackTotalDistLabel" alignment="0" min="-2" pref="69" max="-2" attributes="0"/>
+                                              <Group type="102" attributes="0">
+                                                  <EmptySpace min="6" pref="6" max="-2" attributes="0"/>
+                                                  <Component id="zStackTotalDistLabel" min="-2" pref="63" max="-2" attributes="0"/>
+                                              </Group>
                                           </Group>
                                           <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                           <Group type="103" groupAlignment="0" attributes="0">
@@ -1245,9 +1338,13 @@
                                               <Component id="jLabel9" min="-2" max="-2" attributes="0"/>
                                           </Group>
                                       </Group>
-                                      <Component id="zStackCenteredCheckBox" alignment="0" min="-2" max="-2" attributes="0"/>
+                                      <Group type="102" alignment="0" attributes="0">
+                                          <Component id="zStackCenteredCheckBox" min="-2" max="-2" attributes="0"/>
+                                          <EmptySpace max="32767" attributes="0"/>
+                                          <Component id="zShutterCheckBox" min="-2" max="-2" attributes="0"/>
+                                      </Group>
                                   </Group>
-                                  <EmptySpace max="32767" attributes="0"/>
+                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
@@ -1255,13 +1352,16 @@
                           <Group type="103" groupAlignment="0" attributes="0">
                               <Group type="102" alignment="1" attributes="0">
                                   <EmptySpace min="0" pref="0" max="-2" attributes="0"/>
-                                  <Component id="zStackCenteredCheckBox" min="-2" max="-2" attributes="0"/>
+                                  <Group type="103" groupAlignment="3" attributes="0">
+                                      <Component id="zStackCenteredCheckBox" alignment="3" min="-2" max="-2" attributes="0"/>
+                                      <Component id="zShutterCheckBox" alignment="3" min="-2" max="-2" attributes="0"/>
+                                  </Group>
                                   <Group type="103" groupAlignment="3" attributes="0">
                                       <Component id="jLabel25" alignment="3" min="-2" max="-2" attributes="0"/>
                                       <Component id="jLabel19" alignment="3" min="-2" max="-2" attributes="0"/>
                                       <Component id="jLabel21" alignment="3" min="-2" pref="16" max="-2" attributes="0"/>
-                                      <Component id="zSlicesSpinner" alignment="3" min="-2" max="-2" attributes="0"/>
-                                      <Component id="zStackBeginField" alignment="3" min="-2" max="-2" attributes="0"/>
+                                      <Component id="zSlicesSpinner" alignment="3" min="-2" pref="20" max="-2" attributes="0"/>
+                                      <Component id="zStackBeginField" alignment="3" min="-2" pref="20" max="-2" attributes="0"/>
                                   </Group>
                                   <EmptySpace min="2" pref="2" max="-2" attributes="0"/>
                                   <Group type="103" groupAlignment="0" attributes="0">
@@ -1270,18 +1370,18 @@
                                               <Component id="jLabel20" alignment="3" min="-2" max="-2" attributes="0"/>
                                               <Component id="jLabel22" alignment="3" min="-2" max="-2" attributes="0"/>
                                               <Component id="jLabel24" alignment="3" min="-2" max="-2" attributes="0"/>
-                                              <Component id="zStackEndField" alignment="3" min="-2" max="-2" attributes="0"/>
+                                              <Component id="zStackEndField" alignment="3" min="-2" pref="20" max="-2" attributes="0"/>
                                               <Component id="jLabel26" alignment="3" min="-2" pref="14" max="-2" attributes="0"/>
                                           </Group>
                                           <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
                                           <Group type="103" groupAlignment="3" attributes="0">
                                               <Component id="jLabel23" alignment="3" min="-2" max="-2" attributes="0"/>
                                               <Component id="zStackTotalDistLabel" alignment="3" min="-2" max="-2" attributes="0"/>
-                                              <Component id="reverseButton" alignment="3" min="-2" pref="14" max="-2" attributes="0"/>
+                                              <Component id="reverseButton" alignment="3" min="-2" pref="22" max="-2" attributes="0"/>
                                               <Component id="jLabel9" alignment="3" min="-2" max="-2" attributes="0"/>
                                           </Group>
                                       </Group>
-                                      <Component id="zStepSizeField" alignment="0" min="-2" max="-2" attributes="0"/>
+                                      <Component id="zStepSizeField" alignment="0" min="-2" pref="20" max="-2" attributes="0"/>
                                   </Group>
                                   <EmptySpace min="-2" pref="143" max="-2" attributes="0"/>
                               </Group>
@@ -1465,9 +1565,21 @@
                             <EventHandler event="propertyChange" listener="java.beans.PropertyChangeListener" parameters="java.beans.PropertyChangeEvent" handler="zStackEndFieldPropertyChange"/>
                           </Events>
                         </Component>
+                        <Component class="javax.swing.JCheckBox" name="zShutterCheckBox">
+                          <Properties>
+                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                              <Font name="Arial" size="10" style="0"/>
+                            </Property>
+                            <Property name="text" type="java.lang.String" value="Shutter open"/>
+                            <Property name="toolTipText" type="java.lang.String" value="Keep shutter open between slices"/>
+                          </Properties>
+                          <Events>
+                            <EventHandler event="itemStateChanged" listener="java.awt.event.ItemListener" parameters="java.awt.event.ItemEvent" handler="zShutterCheckBoxItemStateChanged"/>
+                          </Events>
+                        </Component>
                       </SubComponents>
                     </Container>
-                    <Container class="javax.swing.JPanel" name="jPanel3">
+                    <Container class="javax.swing.JPanel" name="timelapsePanel">
                       <Constraints>
                         <Constraint layoutClass="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout" value="org.netbeans.modules.form.compat2.layouts.support.JTabbedPaneSupportLayout$JTabbedPaneConstraintsDescription">
                           <JTabbedPaneConstraints tabName="Time-lapse">
@@ -1480,168 +1592,35 @@
                         <DimensionLayout dim="0">
                           <Group type="103" groupAlignment="0" attributes="0">
                               <Group type="102" attributes="0">
-                                  <EmptySpace min="-2" pref="8" max="-2" attributes="0"/>
-                                  <Group type="103" groupAlignment="1" attributes="0">
-                                      <Component id="jLabel17" alignment="1" min="-2" max="-2" attributes="0"/>
-                                      <Component id="jLabel13" alignment="1" min="-2" pref="59" max="-2" attributes="0"/>
-                                      <Component id="jLabel18" min="-2" max="-2" attributes="0"/>
-                                  </Group>
-                                  <EmptySpace max="-2" attributes="0"/>
-                                  <Group type="103" groupAlignment="0" attributes="0">
+                                  <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
+                                  <Group type="103" groupAlignment="0" max="-2" attributes="0">
                                       <Group type="102" attributes="0">
-                                          <Group type="103" groupAlignment="0" attributes="0">
-                                              <Component id="framesField" alignment="0" min="-2" pref="56" max="-2" attributes="0"/>
-                                              <Group type="102" alignment="0" attributes="0">
-                                                  <Component id="intHourField" min="-2" pref="40" max="-2" attributes="0"/>
-                                                  <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
-                                                  <Component id="jLabel14" min="-2" pref="26" max="-2" attributes="0"/>
-                                                  <EmptySpace max="-2" attributes="0"/>
-                                                  <Component id="intMinField" min="-2" pref="40" max="-2" attributes="0"/>
-                                                  <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
-                                                  <Component id="jLabel15" min="-2" pref="26" max="-2" attributes="0"/>
-                                                  <EmptySpace max="-2" attributes="0"/>
-                                                  <Component id="intSecField" min="-2" pref="40" max="-2" attributes="0"/>
-                                                  <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
-                                                  <Component id="jLabel16" min="-2" max="-2" attributes="0"/>
-                                              </Group>
-                                          </Group>
-                                          <EmptySpace max="-2" attributes="0"/>
+                                          <Component id="jPanel1" min="-2" max="-2" attributes="0"/>
+                                          <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
+                                          <Component id="durationText" max="32767" attributes="0"/>
                                       </Group>
-                                      <Component id="durationText" alignment="1" max="32767" attributes="0"/>
+                                      <Component id="jPanel3" min="-2" max="-2" attributes="0"/>
                                   </Group>
+                                  <EmptySpace max="32767" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
                         <DimensionLayout dim="1">
                           <Group type="103" groupAlignment="0" attributes="0">
-                              <Group type="102" alignment="0" attributes="0">
-                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
-                                  <Group type="103" groupAlignment="3" attributes="0">
-                                      <Component id="jLabel13" alignment="3" min="-2" max="-2" attributes="0"/>
-                                      <Component id="intHourField" alignment="3" min="-2" max="-2" attributes="0"/>
-                                      <Component id="intSecField" alignment="3" min="-2" max="-2" attributes="0"/>
-                                      <Component id="intMinField" alignment="3" min="-2" max="-2" attributes="0"/>
-                                      <Component id="jLabel14" alignment="3" min="-2" max="-2" attributes="0"/>
-                                      <Component id="jLabel15" alignment="3" min="-2" max="-2" attributes="0"/>
-                                      <Component id="jLabel16" alignment="3" min="-2" max="-2" attributes="0"/>
-                                  </Group>
-                                  <Group type="103" groupAlignment="3" attributes="0">
-                                      <Component id="jLabel17" alignment="3" min="-2" max="-2" attributes="0"/>
-                                      <Component id="framesField" alignment="3" min="-2" max="-2" attributes="0"/>
-                                  </Group>
-                                  <EmptySpace max="-2" attributes="0"/>
+                              <Group type="102" alignment="1" attributes="0">
+                                  <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
+                                  <Component id="jPanel3" min="-2" max="-2" attributes="0"/>
+                                  <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
                                   <Group type="103" groupAlignment="0" attributes="0">
-                                      <Group type="102" attributes="0">
-                                          <Component id="jLabel18" min="-2" max="-2" attributes="0"/>
-                                          <EmptySpace min="0" pref="0" max="32767" attributes="0"/>
-                                      </Group>
+                                      <Component id="jPanel1" max="32767" attributes="0"/>
                                       <Component id="durationText" max="32767" attributes="0"/>
                                   </Group>
-                                  <EmptySpace max="-2" attributes="0"/>
+                                  <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                               </Group>
                           </Group>
                         </DimensionLayout>
                       </Layout>
                       <SubComponents>
-                        <Component class="javax.swing.JLabel" name="jLabel13">
-                          <Properties>
-                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                              <Font name="Arial" size="12" style="0"/>
-                            </Property>
-                            <Property name="horizontalAlignment" type="int" value="4"/>
-                            <Property name="text" type="java.lang.String" value="Interval:"/>
-                          </Properties>
-                        </Component>
-                        <Component class="javax.swing.JTextField" name="intHourField">
-                          <Properties>
-                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                              <Font name="Arial" size="12" style="0"/>
-                            </Property>
-                            <Property name="text" type="java.lang.String" value="0"/>
-                          </Properties>
-                          <Events>
-                            <EventHandler event="focusLost" listener="java.awt.event.FocusListener" parameters="java.awt.event.FocusEvent" handler="intHourFieldFocusLost"/>
-                            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="intHourFieldActionPerformed"/>
-                          </Events>
-                        </Component>
-                        <Component class="javax.swing.JTextField" name="intMinField">
-                          <Properties>
-                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                              <Font name="Arial" size="12" style="0"/>
-                            </Property>
-                            <Property name="text" type="java.lang.String" value="0"/>
-                          </Properties>
-                          <Events>
-                            <EventHandler event="focusLost" listener="java.awt.event.FocusListener" parameters="java.awt.event.FocusEvent" handler="intMinFieldFocusLost"/>
-                            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="intMinFieldActionPerformed"/>
-                          </Events>
-                        </Component>
-                        <Component class="javax.swing.JTextField" name="intSecField">
-                          <Properties>
-                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                              <Font name="Arial" size="12" style="0"/>
-                            </Property>
-                            <Property name="text" type="java.lang.String" value="0"/>
-                          </Properties>
-                          <Events>
-                            <EventHandler event="focusLost" listener="java.awt.event.FocusListener" parameters="java.awt.event.FocusEvent" handler="intSecFieldFocusLost"/>
-                            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="intSecFieldActionPerformed"/>
-                          </Events>
-                        </Component>
-                        <Component class="javax.swing.JLabel" name="jLabel14">
-                          <Properties>
-                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                              <Font name="Arial" size="12" style="0"/>
-                            </Property>
-                            <Property name="text" type="java.lang.String" value="h"/>
-                          </Properties>
-                        </Component>
-                        <Component class="javax.swing.JLabel" name="jLabel15">
-                          <Properties>
-                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                              <Font name="Arial" size="12" style="0"/>
-                            </Property>
-                            <Property name="text" type="java.lang.String" value="min"/>
-                          </Properties>
-                        </Component>
-                        <Component class="javax.swing.JLabel" name="jLabel16">
-                          <Properties>
-                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                              <Font name="Arial" size="12" style="0"/>
-                            </Property>
-                            <Property name="text" type="java.lang.String" value="s"/>
-                          </Properties>
-                        </Component>
-                        <Component class="javax.swing.JLabel" name="jLabel17">
-                          <Properties>
-                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                              <Font name="Arial" size="12" style="0"/>
-                            </Property>
-                            <Property name="horizontalAlignment" type="int" value="4"/>
-                            <Property name="text" type="java.lang.String" value="Timepoints:"/>
-                          </Properties>
-                        </Component>
-                        <Component class="javax.swing.JTextField" name="framesField">
-                          <Properties>
-                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                              <Font name="Arial" size="12" style="0"/>
-                            </Property>
-                            <Property name="text" type="java.lang.String" value="1"/>
-                          </Properties>
-                          <Events>
-                            <EventHandler event="focusLost" listener="java.awt.event.FocusListener" parameters="java.awt.event.FocusEvent" handler="framesFieldFocusLost"/>
-                            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="framesFieldActionPerformed"/>
-                          </Events>
-                        </Component>
-                        <Component class="javax.swing.JLabel" name="jLabel18">
-                          <Properties>
-                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
-                              <Font name="Arial" size="12" style="0"/>
-                            </Property>
-                            <Property name="horizontalAlignment" type="int" value="4"/>
-                            <Property name="text" type="java.lang.String" value="Duration:"/>
-                          </Properties>
-                        </Component>
                         <Component class="javax.swing.JLabel" name="durationText">
                           <Properties>
                             <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
@@ -1649,8 +1628,200 @@
                             </Property>
                             <Property name="text" type="java.lang.String" value="jLabel19"/>
                             <Property name="verticalAlignment" type="int" value="1"/>
+                            <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                              <Border info="org.netbeans.modules.form.compat2.border.TitledBorderInfo">
+                                <TitledBorder title="Duration">
+                                  <Font PropertyName="font" name="Arial" size="12" style="0"/>
+                                </TitledBorder>
+                              </Border>
+                            </Property>
                           </Properties>
                         </Component>
+                        <Container class="javax.swing.JPanel" name="jPanel1">
+                          <Properties>
+                            <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                              <Border info="org.netbeans.modules.form.compat2.border.TitledBorderInfo">
+                                <TitledBorder title="Timepoints">
+                                  <Font PropertyName="font" name="Arial" size="12" style="0"/>
+                                </TitledBorder>
+                              </Border>
+                            </Property>
+                          </Properties>
+
+                          <Layout>
+                            <DimensionLayout dim="0">
+                              <Group type="103" groupAlignment="0" attributes="0">
+                                  <Group type="102" attributes="0">
+                                      <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
+                                      <Component id="timepointSpinner" alignment="0" min="-2" pref="60" max="-2" attributes="0"/>
+                                      <EmptySpace pref="9" max="32767" attributes="0"/>
+                                  </Group>
+                              </Group>
+                            </DimensionLayout>
+                            <DimensionLayout dim="1">
+                              <Group type="103" groupAlignment="0" attributes="0">
+                                  <Group type="102" attributes="0">
+                                      <EmptySpace min="0" pref="0" max="-2" attributes="0"/>
+                                      <Component id="timepointSpinner" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace min="0" pref="0" max="-2" attributes="0"/>
+                                  </Group>
+                              </Group>
+                            </DimensionLayout>
+                          </Layout>
+                          <SubComponents>
+                            <Component class="javax.swing.JSpinner" name="timepointSpinner">
+                              <Properties>
+                                <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                                  <Font name="Arial" size="12" style="0"/>
+                                </Property>
+                                <Property name="model" type="javax.swing.SpinnerModel" editor="org.netbeans.modules.form.editors2.SpinnerModelEditor">
+                                  <SpinnerModel initial="1" minimum="1" numberType="java.lang.Integer" stepSize="1" type="number"/>
+                                </Property>
+                              </Properties>
+                              <Events>
+                                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="timepointSpinnerStateChanged"/>
+                              </Events>
+                            </Component>
+                          </SubComponents>
+                        </Container>
+                        <Container class="javax.swing.JPanel" name="jPanel3">
+                          <Properties>
+                            <Property name="border" type="javax.swing.border.Border" editor="org.netbeans.modules.form.editors2.BorderEditor">
+                              <Border info="org.netbeans.modules.form.compat2.border.TitledBorderInfo">
+                                <TitledBorder title="Interval">
+                                  <Font PropertyName="font" name="Arial" size="12" style="0"/>
+                                </TitledBorder>
+                              </Border>
+                            </Property>
+                          </Properties>
+
+                          <Layout>
+                            <DimensionLayout dim="0">
+                              <Group type="103" groupAlignment="0" attributes="0">
+                                  <Group type="102" attributes="0">
+                                      <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
+                                      <Component id="intHourSpinner" linkSize="15" min="-2" pref="60" max="-2" attributes="0"/>
+                                      <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
+                                      <Component id="jLabel14" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace min="-2" pref="10" max="-2" attributes="0"/>
+                                      <Component id="intMinSpinner" linkSize="15" min="-2" pref="60" max="-2" attributes="0"/>
+                                      <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
+                                      <Component id="jLabel15" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace min="-2" pref="10" max="-2" attributes="0"/>
+                                      <Component id="intSecSpinner" linkSize="15" min="-2" pref="60" max="-2" attributes="0"/>
+                                      <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
+                                      <Component id="jLabel16" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace min="-2" pref="10" max="-2" attributes="0"/>
+                                      <Component id="intMillisSpinner" linkSize="15" min="-2" pref="60" max="-2" attributes="0"/>
+                                      <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
+                                      <Component id="jLabel35" min="-2" max="-2" attributes="0"/>
+                                      <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
+                                  </Group>
+                              </Group>
+                            </DimensionLayout>
+                            <DimensionLayout dim="1">
+                              <Group type="103" groupAlignment="0" attributes="0">
+                                  <Group type="102" attributes="0">
+                                      <EmptySpace min="0" pref="0" max="-2" attributes="0"/>
+                                      <Group type="103" groupAlignment="2" attributes="0">
+                                          <Component id="jLabel14" alignment="2" min="-2" max="-2" attributes="0"/>
+                                          <Component id="intHourSpinner" alignment="2" min="-2" max="-2" attributes="0"/>
+                                          <Component id="intMinSpinner" alignment="2" min="-2" max="-2" attributes="0"/>
+                                          <Component id="jLabel15" alignment="2" min="-2" max="-2" attributes="0"/>
+                                          <Component id="jLabel16" alignment="2" min="-2" max="-2" attributes="0"/>
+                                          <Component id="intSecSpinner" alignment="2" min="-2" max="-2" attributes="0"/>
+                                          <Component id="intMillisSpinner" alignment="2" min="-2" max="-2" attributes="0"/>
+                                          <Component id="jLabel35" alignment="2" min="-2" max="-2" attributes="0"/>
+                                      </Group>
+                                      <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
+                                  </Group>
+                              </Group>
+                            </DimensionLayout>
+                          </Layout>
+                          <SubComponents>
+                            <Component class="javax.swing.JSpinner" name="intMillisSpinner">
+                              <Properties>
+                                <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                                  <Font name="Arial" size="12" style="0"/>
+                                </Property>
+                                <Property name="model" type="javax.swing.SpinnerModel" editor="org.netbeans.modules.form.editors2.SpinnerModelEditor">
+                                  <SpinnerModel initial="0" maximum="999" minimum="0" numberType="java.lang.Integer" stepSize="1" type="number"/>
+                                </Property>
+                              </Properties>
+                              <Events>
+                                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="intMillisSpinnerStateChanged"/>
+                              </Events>
+                            </Component>
+                            <Component class="javax.swing.JSpinner" name="intHourSpinner">
+                              <Properties>
+                                <Property name="model" type="javax.swing.SpinnerModel" editor="org.netbeans.modules.form.editors2.SpinnerModelEditor">
+                                  <SpinnerModel initial="0" maximum="168" minimum="0" numberType="java.lang.Integer" stepSize="1" type="number"/>
+                                </Property>
+                              </Properties>
+                              <Events>
+                                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="intHourSpinnerStateChanged"/>
+                              </Events>
+                            </Component>
+                            <Component class="javax.swing.JLabel" name="jLabel16">
+                              <Properties>
+                                <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                                  <Font name="Arial" size="12" style="0"/>
+                                </Property>
+                                <Property name="text" type="java.lang.String" value="s"/>
+                              </Properties>
+                            </Component>
+                            <Component class="javax.swing.JSpinner" name="intMinSpinner">
+                              <Properties>
+                                <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                                  <Font name="Arial" size="12" style="0"/>
+                                </Property>
+                                <Property name="model" type="javax.swing.SpinnerModel" editor="org.netbeans.modules.form.editors2.SpinnerModelEditor">
+                                  <SpinnerModel initial="0" maximum="59" minimum="0" numberType="java.lang.Integer" stepSize="1" type="number"/>
+                                </Property>
+                              </Properties>
+                              <Events>
+                                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="intMinSpinnerStateChanged"/>
+                              </Events>
+                            </Component>
+                            <Component class="javax.swing.JSpinner" name="intSecSpinner">
+                              <Properties>
+                                <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                                  <Font name="Arial" size="12" style="0"/>
+                                </Property>
+                                <Property name="model" type="javax.swing.SpinnerModel" editor="org.netbeans.modules.form.editors2.SpinnerModelEditor">
+                                  <SpinnerModel initial="0" maximum="59" minimum="0" numberType="java.lang.Integer" stepSize="1" type="number"/>
+                                </Property>
+                              </Properties>
+                              <Events>
+                                <EventHandler event="stateChanged" listener="javax.swing.event.ChangeListener" parameters="javax.swing.event.ChangeEvent" handler="intSecSpinnerStateChanged"/>
+                              </Events>
+                            </Component>
+                            <Component class="javax.swing.JLabel" name="jLabel15">
+                              <Properties>
+                                <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                                  <Font name="Arial" size="12" style="0"/>
+                                </Property>
+                                <Property name="text" type="java.lang.String" value="min"/>
+                              </Properties>
+                            </Component>
+                            <Component class="javax.swing.JLabel" name="jLabel14">
+                              <Properties>
+                                <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                                  <Font name="Arial" size="12" style="0"/>
+                                </Property>
+                                <Property name="text" type="java.lang.String" value="h"/>
+                              </Properties>
+                            </Component>
+                            <Component class="javax.swing.JLabel" name="jLabel35">
+                              <Properties>
+                                <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                                  <Font name="Arial" size="12" style="0"/>
+                                </Property>
+                                <Property name="text" type="java.lang.String" value="ms"/>
+                              </Properties>
+                            </Component>
+                          </SubComponents>
+                        </Container>
                       </SubComponents>
                     </Container>
                   </SubComponents>
@@ -1728,7 +1899,7 @@
                           <Component id="jLabel28" min="-2" max="-2" attributes="0"/>
                           <EmptySpace max="-2" attributes="0"/>
                           <Group type="103" groupAlignment="0" attributes="0">
-                              <Component id="jScrollPane4" pref="316" max="32767" attributes="0"/>
+                              <Component id="jScrollPane4" pref="309" max="32767" attributes="0"/>
                               <Group type="102" attributes="0">
                                   <Group type="103" groupAlignment="0" attributes="0">
                                       <Component id="addZFilterButton" min="-2" pref="22" max="-2" attributes="0"/>
@@ -1788,6 +1959,11 @@
                   <Layout class="org.netbeans.modules.form.compat2.layouts.support.JScrollPaneSupportLayout"/>
                   <SubComponents>
                     <Component class="javax.swing.JTree" name="processorTreeView">
+                      <Properties>
+                        <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                          <Font name="Arial" size="12" style="0"/>
+                        </Property>
+                      </Properties>
                     </Component>
                   </SubComponents>
                 </Container>
@@ -2484,6 +2660,9 @@
         </Component>
         <Component class="javax.swing.JButton" name="acquireButton">
           <Properties>
+            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+              <Font name="Lucida Grande" size="13" style="1"/>
+            </Property>
             <Property name="text" type="java.lang.String" value="Acquire"/>
           </Properties>
           <Events>

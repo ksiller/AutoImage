@@ -2,13 +2,8 @@ package autoimage.dataprocessors;
 
 import autoimage.ImageFileQueue;
 import autoimage.MMCoreUtils;
-import autoimage.Utils;
-import ij.CompositeImage;
 import ij.IJ;
-import ij.ImagePlus;
-import ij.process.ImageProcessor;
 import java.io.File;
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Level;
@@ -19,7 +14,6 @@ import org.json.JSONObject;
 import org.micromanager.acquisition.TaggedImageQueue;
 import org.micromanager.acquisition.TaggedImageStorageDiskDefault;
 import org.micromanager.api.MMTags;
-import org.micromanager.utils.ImageUtils;
 import org.micromanager.utils.MMScriptException;
 import org.micromanager.utils.ReportingUtils;
 
@@ -37,7 +31,7 @@ import org.micromanager.utils.ReportingUtils;
  * via the output_ queue (functionality inherited from DataProcessor).
  * 
  * The Element flow can be branched to create complex analysis trees.
- * A copy of the element will be pushed through to the modifiedOutput_ queue. 
+ * A modified element (copy of input_ element) is pushed through to the modifiedOutput_ queue. 
  * This copied element can be modified, for example a GroupProcessor could collect
  * all slices of a z-stack and create a single image z-projection that gets pushed
  * to the queue of the next DataProcessor.
@@ -46,75 +40,74 @@ import org.micromanager.utils.ReportingUtils;
  * terminal processor in branch: analysisOutput==null)
  * 
  * @author Karsten Siller
- * @param <E> element type in BlockingQueue (e.g. TaggedImage or File)
+ * @param <E> element type in BlockingQueue (e.g. TaggedImage or java.io.File)
  */
 public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
 
-   private BlockingQueue<E> modifiedOutput_;
-   protected TaggedImageStorageDiskDefault storage=null;
+    private BlockingQueue<E> modifiedOutput_;
+    protected TaggedImageStorageDiskDefault storage=null;
+    protected boolean savesImageCopy=true;
+    protected boolean modifiesMetaData=false;
 
-   public BranchedProcessor () {
+    public BranchedProcessor () {
         super("","");
-   }
+    }
     
-   public BranchedProcessor (String pName) {
+    
+    /**
+     * 
+     * @param pName label of processor used in GUI
+     */
+    public BranchedProcessor (String pName) {
         super(pName);
-   }     
+    }     
    
-   public BranchedProcessor(String pName, String path) {
-       super(pName, path);
-   }
-   
-   @Override
-   protected void initialize() {
-       storage=null;
-   }
-   
-   @Override
-   protected void cleanUp() {
-        if (storage!=null) {
-            storage.close(); 
-            //set to null so a new storage will be created when processor runs again
-            storage=null;
-        }
+    
+    /** 
+    * 
+    * @param pName label of processor used in GUI
+    * @param path assigned path that processor can use to store results (images or data) 
+    */
+    public BranchedProcessor(String pName, String path) {
+        super(pName, path);
     }
    
-   /*
-    * The processElement method should be overridden by classes extending
-  BranchedProcessorzer to provide a analysis and processing function.
-    *
-    * For example, an "Identity" DataProcessor (where nothing is
-    * done to the data) would override process() thus:
-    *
-    * @Override
-    * public void process() {
-    *    produce(poll());
-    * }
-    * TaggedImageQueue.POISON will be the last object
-    * received by polling -- the process method should pass this
-    * object on unchanged.
-    */
- 
+    
+    @Override
+    protected void initialize() {
+        storage=null;
+    }
+
+    
+    @Override
+    protected void cleanUp() {
+         if (storage!=null) {
+             storage.close(); 
+             //set to null so a new storage will be created when processor runs again
+             storage=null;
+         }
+     }
+
    
-   /*
-    * Sets the input queue where objects to be processed
-    * are received by the DataProcessor.
-    */
-   
-   /*
+   /**
     * Sets the output queue for objects that have been analyzed
-    * exit the DataProcessor. This is a parallel branch that allows creation of 
+    * exit the DataProcessor. This is a branch parallel to the output_ branch 
+    * defined in the DataProcessor class, allowing creation of 
     * a tree analysis architecture. Unmodified objects (same as received via 
     * input queue) are passed through via 'produce()'  
+    * 
+    * @param aOutput BlockingQueue for modified element output
     */
-   
- 
-   
    public void setAnalysisOutput(BlockingQueue<E> aOutput) {
       modifiedOutput_ = aOutput;
    }
 
    
+   /**
+    * Places element into modifiedOutput_ queue
+    * 
+    * @param element 
+    */
    protected void produceModified(E element) {
       if (modifiedOutput_!=null) {           
          try {
@@ -125,89 +118,87 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
       } 
    }
 
-   //has to reject TaggedImageQueue.Poison or ImageFileQueue.Poison
+   
+   /**
+    * Has to reject TaggedImageQueue.Poison or ImageFileQueue.Poison.
+    * 
+    * @param element incoming element
+    * @return should be true if element should be processed and placed in modifiedOutput_ queue
+    */ 
    protected abstract boolean acceptElement(E element);
    
-   /* if element is modified, a copy needs to be created and saved in workDir
-    * createCopy can handle that
-    * copy will be passed to analysisOutput_ 
+   
+   /** If element is modified, a copy needs to be created;
+    * createModifiedOutput should handle that.
+    * Copy should be passed to modifiedOutput_ queue via call of produceModified(modifiedElement); 
+    * @param element incoming element from input_ queue
+    * @return list of elements created during processing step
+    * @throws java.lang.InterruptedException
     */
    protected abstract List<E> processElement(E element) throws InterruptedException;
+   
    
    /**
     * Does not do anything by default.
     * Overwrite if metadata update is needed, e.g. after filtering 
+     * @param meta metadata of modified element
+     * @param newDir path to be set for "Directory" entry in summary metadata
+     * @param newPrefix name to be set for "Prefix" entry in summary metadata
+     * @param isTaggedImage if true, newDir and newPrefix values should be ignored since they will be defined by ImageCache
+     * @return modified metadata
+     * @throws org.json.JSONException if meta JSONObject cannot be parsed or modified
     */
    public JSONObject updateTagValue(JSONObject meta,String newDir, String newPrefix, boolean isTaggedImage) throws JSONException {
        return meta;
    }
 
    /**
-    * creates copy of element
-    * calls updateTagValue with metadata tags of copied element
+    * Creates the output of the incoming element.
+    * Calls updateTagValue with metadata tags of copied element
+    * Should create/save a modified element as a copy of incoming element
     * 
+    * @param element unmodified element from input_queue
+    * @return modified (copied) version of incoming element
     */
-    protected E createCopy(E element) {
-    //    JSONObject meta=null;
+    protected E createModifiedOutput(E element) {
         E copy=null;
         if (element instanceof File) {
-            TaggedImage ti=null;
-            ImagePlus imp=IJ.openImage(((File)element).getAbsolutePath());
-            if (imp!=null && imp.getProperty("Info") != null) {
-                try {
-                    JSONObject meta = new JSONObject((String)imp.getProperty("Info"));
-                    String newDir=new File(workDir).getParentFile().getAbsolutePath();
-                    ImageProcessor ip=imp.getProcessor();
-                    if (meta.getJSONObject(MMTags.Root.SUMMARY).getString(MMTags.Summary.PIX_TYPE).equals("RGB32")) {
-                        //RGB32 images hold pixel data in int[] --> convert to byte[]
-                        ti=new TaggedImage(MMCoreUtils.convertIntToByteArray((int[])ip.getPixels()),new JSONObject(meta.toString()));
-                    }
-                    else if (meta.getJSONObject(MMTags.Root.SUMMARY).getString(MMTags.Summary.PIX_TYPE).equals("RGB64")) {
-                        if (imp.isComposite()) {
-                            CompositeImage ci=(CompositeImage)imp;
-                            short[] totalArray=new short[ci.getWidth()*ci.getHeight()*4];
-                            for (int channel=0; channel< ci.getNChannels(); channel++) {
-                                ImageProcessor proc=imp.getStack().getProcessor(channel+1);
-                                short[] chPixels=(short[])proc.getPixels();
-                                for (int i=0;i<chPixels.length;i++) {
-                                    totalArray[(2-channel) + 4*i] = chPixels[i]; // B,G,R
-                                }
-                            }
-                            ti=new TaggedImage(totalArray,new JSONObject(meta.toString()));
-                        }
-                        
-                    } else {//8-bit or 16-bit grayscale
-                        ti=ImageUtils.makeTaggedImage(ip);
-                        ti.tags=new JSONObject(meta.toString());                        
-                    }
-                    String newPrefix=new File(workDir).getName();
-                    //update metadata
+            try {
+                String newPrefix=new File(workDir).getName();
+                String newDir=new File(workDir).getParentFile().getAbsolutePath();
+                TaggedImage ti=MMCoreUtils.openAsTaggedImage(((File)element).getAbsolutePath());
+//                JSONObject meta = new JSONObject(ti.tags.toString()); 
+                //update metadata
+                if (savesImageCopy) {
                     ti.tags=updateTagValue(ti.tags, newDir, newPrefix, false);
-                    if (storage==null) {
-                        storage = new TaggedImageStorageDiskDefault (workDir,true,ti.tags.getJSONObject(MMTags.Root.SUMMARY));
-                    }
-                    storage.putImage(ti);
-
-                    String posName="";
-                    File copiedFile=new File(new File(new File(newDir,newPrefix),meta.getString("PositionName")),
-                                                    ti.tags.getString("FileName"));
-                    copy=(E)copiedFile;
-                } catch (JSONException ex) {
-                    IJ.log(this.getClass().getName()+ ": Cannot retrieve 'Info' metadata from file. "+ex);
-                    Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
-//                    copy=super.createCopy(element);
-                } catch (Exception ex) {
-                    IJ.log(this.getClass().getName()+ ": Error writing file to storage. "+ex);
-                    Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
+                } else {
+                    //create TaggedImage without any pixel data
+                    //--> subsequent call of storage.putImage(ti) will save the metadata.txt without TIF files
+                    ti=new TaggedImage(null,updateTagValue(ti.tags, null, null, false));
                 }
-            } else {
-                IJ.log(this.getClass().getName()+": Cannot open image");
+                if (storage==null) {
+                    storage = new TaggedImageStorageDiskDefault (workDir,true,ti.tags.getJSONObject(MMTags.Root.SUMMARY));
+                }
+                storage.putImage(ti);
+
+                String posName="";
+                File copiedFile=new File(new File(new File(newDir,newPrefix),ti.tags.getString("PositionName")),
+                                            ti.tags.getString("FileName"));
+                copy=(E)copiedFile;
+            } catch (JSONException ex) {
+                 IJ.log(this.getClass().getName()+ ": Cannot retrieve 'Info' metadata from file. "+ex);
+                 Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (NullPointerException ex) {
+                 IJ.log(this.getClass().getName()+ ": Error opening file: "+((File)element).getAbsolutePath()+"; "+ex);
+            } catch (Exception ex) {
+                 IJ.log(this.getClass().getName()+ ": Error writing file to storage. "+ex);
+                 Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
             }
        } else if (element instanceof TaggedImage) {
             try {                
-                TaggedImage modTI=MMCoreUtils.duplicateTaggedImage((TaggedImage)element);
-                modTI.tags=updateTagValue(modTI.tags,null,null, true);
-                copy=(E)modTI;
+                TaggedImage ti=MMCoreUtils.duplicateTaggedImage((TaggedImage)element);
+                ti.tags=updateTagValue(ti.tags,null,null, true);
+                copy=(E)ti;
             } catch (JSONException ex) {
                 IJ.log(this.getClass().getName()+ ": Cannot retrieve 'Info' metadata from file. "+ex);
                 Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
@@ -219,47 +210,11 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
        return copy;
     }  
     
-    /*
-   protected E createCopy(E element) {
-        if (element instanceof File) {
-            File f =(File)element;
-            try {
-                JSONObject meta=Utils.parseMetadataFromFile(f);
-                String path=Utils.createPathForSite(f,workDir,true);
-                if (path==null)
-                    path=workDir;
-                File modFile=new File(path,f.getName());
-                Utils.copyFile(f,modFile);
-                return (E)modFile;
-            } catch (JSONException ex) {
-                Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
-                IJ.log("Problem: parsing File metadata: "+this.getClass().getName());
-                return null;
-            } catch (IOException ex) {
-                Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
-                IJ.log("Problem: copying File: "+f.getAbsolutePath());
-                return null;
-            }    
-        } else if (element instanceof TaggedImage) {
-            try {
-                TaggedImage modTI=Utils.duplicateTaggedImage((TaggedImage)element);
-                modTI.tags=updateTagValue(modTI.tags,null,null, true);
-                return (E)modTI;
-            } catch (JSONException ex) {
-                IJ.log("Problem: parsing TaggedImage metadata: "+this.getClass().getName());
-                Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
-                return null;
-            } catch (MMScriptException ex) {
-                IJ.log("Problem: copying TaggedImage: "+this.getClass().getName());
-                Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
-                return null;
-            }
-        } else {
-            return null;
-        } 
-   }
-   */
-   
+   /**
+    * Convenience method to identify last element ("Poison") of queue
+    * @param element e.g. TaggedImage or java.io.File
+    * @return true if element is TaggedImageQueue.isPoison or ImageFileQueue.isPoison
+    */
    protected boolean isPoison(E element) {
         if (element instanceof TaggedImage)
             return TaggedImageQueue.isPoison((TaggedImage)element);
@@ -270,7 +225,11 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
    }
 
 
-   // extends logic of DataProcessor.process() design
+   /** 
+    * Extends logic of DataProcessor.process() design.
+    * - places polled element from input_ queue into output_ queue
+    * - 
+    */
    @Override
    protected void process() {
       E element = poll();
@@ -282,7 +241,6 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
          if (isPoison(element)) { //needs to be passed on unmodified
              cleanUp();
              produceModified(element);
-//             IJ.log(this.getClass().getName()+" received POISON");
              done=true;
              return;
          }

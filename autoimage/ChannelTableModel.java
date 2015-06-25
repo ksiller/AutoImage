@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage;
 
 import java.awt.Color;
@@ -13,11 +8,11 @@ import javax.swing.table.AbstractTableModel;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 public class ChannelTableModel extends AbstractTableModel {
 
-    public final String[] COLUMN_NAMES = new String[]{"Configuration", "Exposure", "z-Offset", "Color"};
+    public final String[] COLUMN_NAMES = new String[]{"Configuration", "Exp [ms]", "z-Offset", "Color"};
     private List<Channel> channels;
 
     public ChannelTableModel(List<Channel> cl) {
@@ -67,8 +62,6 @@ public class ChannelTableModel extends AbstractTableModel {
                 return c.getExposure();
             } else if (colIndex == 2) {
                 return c.getZOffset();
-/*                } else if (colIndex == 3) {
-                return c.getStitch();*/
             } else if (colIndex == 3) {
                 return c.getColor();
             } else {
@@ -120,7 +113,6 @@ public class ChannelTableModel extends AbstractTableModel {
     }
 
     public int rowDown(int[] rowIdx) {
-//            IJ.log("ChannelTableModel.rowDown: "+Integer.toString(rowIdx[0])+", "+Integer.toString(rowIdx[rowIdx.length-1])+", "+Integer.toString(rowIdx.length));
         if (rowIdx.length == 1 & rowIdx[0] < getRowCount() - 1) {
             Collections.swap(channels, rowIdx[0], rowIdx[0] + 1);
             fireTableRowsUpdated(rowIdx[0], rowIdx[0] + 1);
@@ -136,7 +128,6 @@ public class ChannelTableModel extends AbstractTableModel {
     }
 
     public int rowUp(int[] rowIdx) {
-        //           IJ.log("ChannelTableModel.rowUp: "+Integer.toString(rowIdx[0])+", "+Integer.toString(rowIdx[rowIdx.length-1])+", "+Integer.toString(rowIdx.length));
         if (rowIdx.length == 1 & rowIdx[0] > 0) {
             Collections.swap(channels, rowIdx[0], rowIdx[0] - 1);
             fireTableRowsUpdated(rowIdx[0] - 1, rowIdx[0]);
@@ -195,5 +186,4 @@ public class ChannelTableModel extends AbstractTableModel {
     }
 
 }
-// end ChannelTableModel
 

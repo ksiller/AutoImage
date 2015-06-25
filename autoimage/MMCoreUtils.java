@@ -394,7 +394,7 @@ public class MMCoreUtils {
         return map;
     }
 
-    //shallow pixel array copy
+
     public static TaggedImage createTaggedImage(ImagePlus imp, JSONObject meta) {
         Object pix = null;
         TaggedImage ti = null;
@@ -534,9 +534,12 @@ public class MMCoreUtils {
     }
 
     public static TaggedImage openAsTaggedImage(String filename) throws JSONException {
-        ImagePlus imp = IJ.openImage(filename);
-        TaggedImage ti = ImageUtils.makeTaggedImage(imp.getProcessor());
-        ti.tags = readMetadata(new File(filename), true);
+        TaggedImage ti=null;   
+        ImagePlus imp=IJ.openImage(filename);
+        if (imp!=null && imp.getProperty("Info") != null) {
+            JSONObject meta = new JSONObject((String)imp.getProperty("Info"));
+            ti=createTaggedImage(imp,meta);
+        }
         return ti;
     }
 

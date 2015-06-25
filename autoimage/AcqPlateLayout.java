@@ -10,7 +10,6 @@ import autoimage.area.RectWellArea;
 import autoimage.area.EllipseWellArea;
 import autoimage.area.Area;
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Comparator;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -46,24 +45,23 @@ public class AcqPlateLayout extends AcqLayout {
     //all dimensions are stored in um
     public AcqPlateLayout (File f, PlateConfiguration configuration) {
         this();
-        file=f;
-        width=configuration.width;
-        length=configuration.length;
-        height=configuration.height;
+        setFile(f);
+        setWidth(configuration.width);
+        setLength(configuration.length);
+        setHeight(configuration.height);
         columns=configuration.columns;
         rows=configuration.rows;
         leftEdgeToA1=configuration.distLeftEdgeToA1;
         topEdgeToA1=configuration.distTopEdgeToA1;
-        bottomMaterial=configuration.bottomMaterial;
-        bottomThickness=configuration.bottomThickness;
+        setBottomMaterial(configuration.bottomMaterial);
+        setBottomThickness(configuration.bottomThickness);
         wellShape=configuration.wellShape;
         wellDepth=configuration.wellDepth;
         wellDiameter=configuration.wellDiameter;
         wellDistance=configuration.wellDistance;
         double oX=(double)configuration.distLeftEdgeToA1-configuration.wellDiameter/2;
         double oY=(double)configuration.distTopEdgeToA1-configuration.wellDiameter/2;
-        int areaNum=columns*rows;
-        areas = new ArrayList<Area>(areaNum);
+        initializeAreaList(columns*rows);
         int id=1;
         String wellName;
         for (int column=0; column<columns; column++) {
@@ -85,7 +83,8 @@ public class AcqPlateLayout extends AcqLayout {
                     a = new RectWellArea(wellName, id, oX+wellDistance*column, oY+wellDistance*row,0,wellDiameter,wellDiameter,false,"");
                 else if (wellShape.equals("Round"))
                     a = new EllipseWellArea(wellName, id, oX+wellDistance*column, oY+wellDistance*row,0,configuration.wellDiameter,configuration.wellDiameter,false,"");
-                areas.add(a);
+//                areas.add(a);
+                addArea(a);
                 id++;
             }    
         }

@@ -1,7 +1,6 @@
 package autoimage.dataprocessors;
 
 import autoimage.MMCoreUtils;
-import autoimage.Utils;
 import ij.IJ;
 import java.io.File;
 import java.util.ArrayList;
@@ -153,7 +152,6 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
         processOnTheFly=b;
     }
     
-    //processes only File image data by default 
     @Override
     public abstract boolean isSupportedDataType(Class<?> clazz);
     
@@ -184,7 +182,8 @@ public abstract class GroupProcessor<E> extends BranchedProcessor<E> implements 
                 }
                 i++;
             }    
-            if (currentGroup==null) {//need to create new group
+            if (currentGroup==null) {
+                //need to create new group
                 currentGroup=new Group<E>(null);
                 JSONObject meta=MMCoreUtils.readMetadata(element,false);
                 try {

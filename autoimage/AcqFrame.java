@@ -146,6 +146,7 @@ import javax.swing.event.RowSorterEvent;
 import javax.swing.event.RowSorterListener;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
+import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableRowSorter;
@@ -199,6 +200,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private final static String MMPLUGINSDIR="mmplugins";
     private final static String DEVICE_CONTROL_DIR = "Device_Control";
     private final static String STAGE_CONTROL_FILE = "StageControl.jar";
+    private JCheckBox autofocusCheckBox;
+    private JCheckBox zStackCheckBox;
+    private JCheckBox timelapseCheckBox;
+    
     
     //Dialogs
     private RefPointListDialog refPointListDialog;
@@ -209,7 +214,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     //Monitors and Task Executors
     private ThreadPoolExecutor retilingExecutor;
-    private DisplayUpdater displayUpdater;
+//    private DisplayUpdater displayUpdater;
     private VirtualAcquisitionDisplay virtualDisplay;
     private final LiveModeMonitor liveModeMonitor;
     private final StagePosMonitor stageMonitor;
@@ -295,6 +300,87 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     @Override
     public void slmExposureChanged(String string, double d) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    private Component createAfPaneTab() {
+        JPanel panel=new JPanel(new FlowLayout(FlowLayout.LEFT,2,0));
+        panel.setOpaque(false);
+        autofocusCheckBox = new JCheckBox();
+        autofocusCheckBox.addItemListener(new java.awt.event.ItemListener() {
+            @Override
+            public void itemStateChanged(java.awt.event.ItemEvent evt) {
+                if (currentAcqSetting != null) {
+                    currentAcqSetting.enableAutofocus(autofocusCheckBox.isSelected());
+                }
+                if (autofocusCheckBox.isSelected()) {
+                    zStackCenteredCheckBox.setText("Centered around autofocus Z-position");
+                } else {
+                    zStackCenteredCheckBox.setText("Centered around reference Z-position");
+                }
+                enableComponent(afPanel,true,autofocusCheckBox.isSelected());
+            }
+        });
+        autofocusCheckBox.setOpaque(false);
+        JLabel label = new JLabel("A-Focus");
+        label.setFont(new java.awt.Font("Arial", 0, 11));
+        label.setOpaque(false);
+        panel.add(autofocusCheckBox);
+        panel.add(label);
+        return panel;
+    }
+
+    private Component createZStackPaneTab() {
+        JPanel panel=new JPanel(new FlowLayout(FlowLayout.LEFT,2,0));
+        panel.setOpaque(false);
+        zStackCheckBox = new JCheckBox();
+        zStackCheckBox.addItemListener(new java.awt.event.ItemListener() {
+            @Override
+            public void itemStateChanged(java.awt.event.ItemEvent evt) {
+                if (currentAcqSetting != null) {
+                    currentAcqSetting.enableZStack(zStackCheckBox.isSelected());
+                }
+//                enableZStackPane(zStackCheckBox.isSelected());
+                enableComponent(zStackPanel,true,zStackCheckBox.isSelected());
+            }
+        });
+        zStackCheckBox.setOpaque(false);
+        JLabel label = new JLabel("Z-Stack");
+        label.setFont(new java.awt.Font("Arial", 0, 11));
+        label.setOpaque(false);
+        panel.add(zStackCheckBox);
+        panel.add(label);
+        return panel;
+    }
+
+    private Component createTimelapsePaneTab() {
+        JPanel panel=new JPanel(new FlowLayout(FlowLayout.LEFT,2,0));
+        panel.setOpaque(false);
+        timelapseCheckBox = new JCheckBox();
+        timelapseCheckBox.addItemListener(new java.awt.event.ItemListener() {
+            @Override
+            public void itemStateChanged(java.awt.event.ItemEvent evt) {
+                if (currentAcqSetting != null) {
+                    currentAcqSetting.enableTimelapse(timelapseCheckBox.isSelected());
+                }
+                if (timelapseCheckBox.isSelected()) {
+                    if (currentAcqSetting != null) {
+                        calculateDuration(currentAcqSetting);
+                    } else {
+                        calculateDuration(null);
+                    }
+                } else {
+                    durationText.setText("No Time-lapse acquisition");
+                }
+                enableComponent(timelapsePanel,true,timelapseCheckBox.isSelected());
+            }
+        });
+        timelapseCheckBox.setOpaque(false);
+        JLabel label = new JLabel("Time");
+        label.setFont(new java.awt.Font("Arial", 0, 11));
+        label.setOpaque(false);
+        panel.add(timelapseCheckBox);
+        panel.add(label);
+        return panel;
     }
 
 
@@ -435,8 +521,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 imageCache.addImageCacheListener(virtualDisplay);
                 virtualDisplay.show();
                 
-                displayUpdater = new DisplayUpdater(imageCache, acqSetting.getChannels(),acqSetting.getImagePixelSize());
-                displayUpdater.execute();
+//                displayUpdater = new DisplayUpdater(imageCache, acqSetting.getChannels(),acqSetting.getImagePixelSize());
+//                displayUpdater.execute();
                 
                 if (mainImageStorageNode.getChildCount()>0) {
                     //create fileoutputqueue and ProcessorTree
@@ -953,7 +1039,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     
     private void showManageCustomLayout(boolean modal) {
         LayoutManagerDlg layoutDialog=new LayoutManagerDlg(this, modal);
-        if (!acqLayout.isEmpty && !(acqLayout instanceof AcqPlateLayout)) {
+        if (!acqLayout.isEmpty() && !(acqLayout instanceof AcqPlateLayout)) {
             try {
                 layoutDialog.setCustomLayout(AcqLayout.createFromJSONObject(acqLayout.toJSONObject(),acqLayout.getFile()));
             } catch (JSONException ex) {
@@ -1459,6 +1545,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         instrumentOnline = false; //to ensure that during app initialization instrument does not respond 
         initComponents();
         
+        acqModePane.setTabComponentAt(1, createAfPaneTab());
+        acqModePane.setTabComponentAt(2, createZStackPaneTab());
+        acqModePane.setTabComponentAt(3, createTimelapsePaneTab());
+        
         InputVerifier doubleVerifier = new InputVerifier() {
 
             @Override
@@ -1655,12 +1745,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         channelTable.getTableHeader().setReorderingAllowed(false);
         channelTable.getTableHeader().addMouseListener(new TableHeaderSelector(channelTable));
 
-        //Timelapse fields
-        ((AbstractDocument) intHourField.getDocument()).setDocumentFilter(new NumberFilter(3, false));
-        ((AbstractDocument) intMinField.getDocument()).setDocumentFilter(new NumberFilter(2, false));
-        ((AbstractDocument) intSecField.getDocument()).setDocumentFilter(new NumberFilter(2, false));
-        ((AbstractDocument) framesField.getDocument()).setDocumentFilter(new NumberFilter(4, false));
-
         //set AcqOrderComboBox
         for (int i = 0; i < AcqSetting.ACQ_ORDER_LIST.length; i++) {
             acqOrderList.addItem(AcqSetting.ACQ_ORDER_LIST[i]);
@@ -1686,7 +1770,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 
         sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
                         "Sequence: "+currentAcqSetting.getName()));
-        updateAutofocusToolTip(currentAcqSetting);
 /*        try {
             core.setChannelGroup(currentAcqSetting.getChannelGroupStr());
         } catch (Exception ex) {
@@ -1833,7 +1916,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         totalTilesLabel = new javax.swing.JLabel();
         jPanel5 = new javax.swing.JPanel();
         jPanel10 = new javax.swing.JPanel();
-        timelapseCheckBox = new javax.swing.JCheckBox();
         clusterYField = new javax.swing.JTextField();
         tilingDirComboBox = new javax.swing.JComboBox();
         jLabel1 = new javax.swing.JLabel();
@@ -1841,7 +1923,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         jLabel4 = new javax.swing.JLabel();
         jLabel5 = new javax.swing.JLabel();
         tileSizeLabel = new javax.swing.JLabel();
-        zStackCheckBox = new javax.swing.JCheckBox();
         jLabel6 = new javax.swing.JLabel();
         pixelSizeLabel = new javax.swing.JLabel();
         jLabel34 = new javax.swing.JLabel();
@@ -1850,23 +1931,20 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         maxSitesLabel = new javax.swing.JLabel();
         tileOverlapField = new javax.swing.JTextField();
         jLabel33 = new javax.swing.JLabel();
-        autofocusCheckBox = new javax.swing.JCheckBox();
         jLabel12 = new javax.swing.JLabel();
         binningComboBox = new javax.swing.JComboBox();
         jLabel10 = new javax.swing.JLabel();
         clusterCheckBox = new javax.swing.JCheckBox();
         insideOnlyCheckBox = new javax.swing.JCheckBox();
         acqOrderList = new javax.swing.JComboBox();
-        autofocusButton = new javax.swing.JButton();
         tilingModeComboBox = new javax.swing.JComboBox();
         clusterXField = new javax.swing.JTextField();
         siteOverlapCheckBox = new javax.swing.JCheckBox();
         clusterLabel1 = new javax.swing.JLabel();
         clearRoiButton = new javax.swing.JButton();
         closeGapsButton = new javax.swing.JButton();
-        autofocusImportButton = new javax.swing.JButton();
         acqModePane = new javax.swing.JTabbedPane();
-        jPanel4 = new javax.swing.JPanel();
+        chPanel = new javax.swing.JPanel();
         jScrollPane3 = new javax.swing.JScrollPane();
         channelTable = new javax.swing.JTable();
         jPanel6 = new javax.swing.JPanel();
@@ -1878,6 +1956,16 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         liveButton = new javax.swing.JButton();
         zOffsetButton = new javax.swing.JButton();
         autoExposureButton = new javax.swing.JButton();
+        chShutterCheckBox = new javax.swing.JCheckBox();
+        afPanel = new javax.swing.JPanel();
+        autofocusImportButton = new javax.swing.JButton();
+        afModeLabel = new javax.swing.JLabel();
+        autofocusButton = new javax.swing.JButton();
+        afSkipFrameSpinner = new javax.swing.JSpinner();
+        jScrollPane1 = new javax.swing.JScrollPane();
+        afPropertyTable = new javax.swing.JTable();
+        jLabel27 = new javax.swing.JLabel();
+        jLabel11 = new javax.swing.JLabel();
         zStackPanel = new javax.swing.JPanel();
         jLabel19 = new javax.swing.JLabel();
         jLabel20 = new javax.swing.JLabel();
@@ -1895,18 +1983,20 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         zStepSizeField = new javax.swing.JFormattedTextField();
         zStackBeginField = new javax.swing.JFormattedTextField();
         zStackEndField = new javax.swing.JFormattedTextField();
-        jPanel3 = new javax.swing.JPanel();
-        jLabel13 = new javax.swing.JLabel();
-        intHourField = new javax.swing.JTextField();
-        intMinField = new javax.swing.JTextField();
-        intSecField = new javax.swing.JTextField();
-        jLabel14 = new javax.swing.JLabel();
-        jLabel15 = new javax.swing.JLabel();
-        jLabel16 = new javax.swing.JLabel();
-        jLabel17 = new javax.swing.JLabel();
-        framesField = new javax.swing.JTextField();
-        jLabel18 = new javax.swing.JLabel();
+        zShutterCheckBox = new javax.swing.JCheckBox();
+        timelapsePanel = new javax.swing.JPanel();
         durationText = new javax.swing.JLabel();
+        jPanel1 = new javax.swing.JPanel();
+        timepointSpinner = new javax.swing.JSpinner();
+        jPanel3 = new javax.swing.JPanel();
+        intMillisSpinner = new javax.swing.JSpinner();
+        intHourSpinner = new javax.swing.JSpinner();
+        jLabel16 = new javax.swing.JLabel();
+        intMinSpinner = new javax.swing.JSpinner();
+        intSecSpinner = new javax.swing.JSpinner();
+        jLabel15 = new javax.swing.JLabel();
+        jLabel14 = new javax.swing.JLabel();
+        jLabel35 = new javax.swing.JLabel();
         jPanel9 = new javax.swing.JPanel();
         jLabel28 = new javax.swing.JLabel();
         jScrollPane4 = new javax.swing.JScrollPane();
@@ -1994,6 +2084,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         settingsPanel.setSize(new java.awt.Dimension(0, 649));
 
         sequenceTabbedPane.setBorder(javax.swing.BorderFactory.createTitledBorder(null, "Sequence:", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Lucida Grande", 0, 12))); // NOI18N
+        sequenceTabbedPane.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         sequenceTabbedPane.setPreferredSize(new java.awt.Dimension(410, 540));
 
         areaTable.setModel(new AreaTableModel(null));
@@ -2118,19 +2209,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         .add(2, 2, 2)
                         .add(mergeAreasButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .add(0, 0, Short.MAX_VALUE))
-                    .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 319, Short.MAX_VALUE))
+                    .add(jScrollPane2, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 312, Short.MAX_VALUE))
                 .add(3, 3, 3))
         );
 
         sequenceTabbedPane.addTab("Areas", jPanel2);
-
-        timelapseCheckBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        timelapseCheckBox.setText("Time-lapse");
-        timelapseCheckBox.addItemListener(new java.awt.event.ItemListener() {
-            public void itemStateChanged(java.awt.event.ItemEvent evt) {
-                timelapseCheckBoxItemStateChanged(evt);
-            }
-        });
 
         clusterYField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         clusterYField.setText("jTextField2");
@@ -2156,7 +2239,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         jLabel1.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel1.setText("Objective:");
 
-        objectiveComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        objectiveComboBox.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         objectiveComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
         objectiveComboBox.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2172,19 +2255,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
         tileSizeLabel.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         tileSizeLabel.setText("jLabel6");
-
-        zStackCheckBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        zStackCheckBox.setText("Z-Stack");
-        zStackCheckBox.addItemListener(new java.awt.event.ItemListener() {
-            public void itemStateChanged(java.awt.event.ItemEvent evt) {
-                zStackCheckBoxItemStateChanged(evt);
-            }
-        });
-        zStackCheckBox.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                zStackCheckBoxActionPerformed(evt);
-            }
-        });
 
         jLabel6.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel6.setText("Order:");
@@ -2230,17 +2300,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         jLabel33.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel33.setText("Tiling:");
 
-        autofocusCheckBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        autofocusCheckBox.setText("Autofocus");
-        autofocusCheckBox.addItemListener(new java.awt.event.ItemListener() {
-            public void itemStateChanged(java.awt.event.ItemEvent evt) {
-                autofocusCheckBoxItemStateChanged(evt);
-            }
-        });
-
         jLabel12.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel12.setText("Pixel:");
 
+        binningComboBox.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         binningComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
         binningComboBox.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2267,22 +2330,14 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
-        acqOrderList.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        acqOrderList.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         acqOrderList.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 acqOrderListActionPerformed(evt);
             }
         });
 
-        autofocusButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/wrench_orange.png"))); // NOI18N
-        autofocusButton.setToolTipText("Autofocus Configuration");
-        autofocusButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                autofocusButtonActionPerformed(evt);
-            }
-        });
-
-        tilingModeComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        tilingModeComboBox.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         tilingModeComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
         tilingModeComboBox.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2330,15 +2385,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
-        autofocusImportButton.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
-        autofocusImportButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/micromanager/icons/arrow_refresh.png"))); // NOI18N
-        autofocusImportButton.setToolTipText("Apply autofocus settings");
-        autofocusImportButton.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                autofocusImportButtonActionPerformed(evt);
-            }
-        });
-
         org.jdesktop.layout.GroupLayout jPanel10Layout = new org.jdesktop.layout.GroupLayout(jPanel10);
         jPanel10.setLayout(jPanel10Layout);
         jPanel10Layout.setHorizontalGroup(
@@ -2346,16 +2392,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             .add(jPanel10Layout.createSequentialGroup()
                 .add(3, 3, 3)
                 .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jPanel10Layout.createSequentialGroup()
-                        .add(autofocusCheckBox)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(autofocusButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(autofocusImportButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                        .add(zStackCheckBox)
-                        .add(26, 26, 26)
-                        .add(timelapseCheckBox))
                     .add(jPanel10Layout.createSequentialGroup()
                         .add(jLabel6)
                         .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
@@ -2424,11 +2460,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel10Layout.createSequentialGroup()
                 .add(0, 0, 0)
-                .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
                     .add(jLabel1)
                     .add(objectiveComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(binningComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(jLabel10, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 15, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(jLabel10, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 15, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(binningComboBox, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .add(2, 2, 2)
                 .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(clearRoiButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
@@ -2462,21 +2498,14 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     .add(tileOverlapField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(closeGapsButton)
                     .add(siteOverlapCheckBox))
-                .add(4, 4, 4)
+                .add(3, 3, 3)
                 .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel6)
                     .add(acqOrderList, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(0, 0, 0)
-                .add(jPanel10Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
-                    .add(autofocusCheckBox)
-                    .add(autofocusButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(zStackCheckBox)
-                    .add(timelapseCheckBox)
-                    .add(autofocusImportButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .add(0, 0, 0))
+                .add(3, 3, 3))
         );
 
-        acqModePane.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        acqModePane.setFont(new java.awt.Font("Arial", 0, 11)); // NOI18N
         acqModePane.setMinimumSize(new java.awt.Dimension(72, 300));
 
         channelTable.setModel(new ChannelTableModel(null));
@@ -2536,7 +2565,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
-        zOffsetButton.setFont(new java.awt.Font("SansSerif", 0, 12)); // NOI18N
+        zOffsetButton.setFont(new java.awt.Font("Arial", 0, 11)); // NOI18N
         zOffsetButton.setText("z-Offset");
         zOffsetButton.setToolTipText("Set channel z-offsets");
         zOffsetButton.addActionListener(new java.awt.event.ActionListener() {
@@ -2545,7 +2574,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
-        autoExposureButton.setFont(new java.awt.Font("SansSerif", 0, 12)); // NOI18N
+        autoExposureButton.setFont(new java.awt.Font("Arial", 0, 11)); // NOI18N
         autoExposureButton.setText("Auto-Exp");
         autoExposureButton.setToolTipText("Determine optimal exposure time for channel");
         autoExposureButton.addActionListener(new java.awt.event.ActionListener() {
@@ -2602,28 +2631,149 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
         jPanel6Layout.linkSize(new java.awt.Component[] {liveButton, snapButton}, org.jdesktop.layout.GroupLayout.VERTICAL);
 
-        org.jdesktop.layout.GroupLayout jPanel4Layout = new org.jdesktop.layout.GroupLayout(jPanel4);
-        jPanel4.setLayout(jPanel4Layout);
-        jPanel4Layout.setHorizontalGroup(
-            jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(jPanel4Layout.createSequentialGroup()
+        chShutterCheckBox.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
+        chShutterCheckBox.setText("Shutter open");
+        chShutterCheckBox.setToolTipText("Keep shutter open when changing channels");
+        chShutterCheckBox.addItemListener(new java.awt.event.ItemListener() {
+            public void itemStateChanged(java.awt.event.ItemEvent evt) {
+                chShutterCheckBoxItemStateChanged(evt);
+            }
+        });
+
+        org.jdesktop.layout.GroupLayout chPanelLayout = new org.jdesktop.layout.GroupLayout(chPanel);
+        chPanel.setLayout(chPanelLayout);
+        chPanelLayout.setHorizontalGroup(
+            chPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(org.jdesktop.layout.GroupLayout.TRAILING, chPanelLayout.createSequentialGroup()
                 .add(6, 6, 6)
-                .add(jScrollPane3, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 227, Short.MAX_VALUE)
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jPanel6, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 97, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(jScrollPane3, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 236, Short.MAX_VALUE)
+                .add(6, 6, 6)
+                .add(chPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(chShutterCheckBox)
+                    .add(jPanel6, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 97, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .add(6, 6, 6))
         );
-        jPanel4Layout.setVerticalGroup(
-            jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(jPanel4Layout.createSequentialGroup()
+        chPanelLayout.setVerticalGroup(
+            chPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(chPanelLayout.createSequentialGroup()
                 .add(3, 3, 3)
-                .add(jPanel4Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jScrollPane3, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
-                    .add(jPanel6, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 92, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .add(chPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(chPanelLayout.createSequentialGroup()
+                        .add(jPanel6, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 92, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(1, 1, 1)
+                        .add(chShutterCheckBox))
+                    .add(chPanelLayout.createSequentialGroup()
+                        .add(jScrollPane3, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
+                        .add(6, 6, 6))))
+        );
+
+        acqModePane.addTab("Channels", chPanel);
+
+        autofocusImportButton.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
+        autofocusImportButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/micromanager/icons/arrow_refresh.png"))); // NOI18N
+        autofocusImportButton.setToolTipText("Apply autofocus settings");
+        autofocusImportButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                autofocusImportButtonActionPerformed(evt);
+            }
+        });
+
+        afModeLabel.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        afModeLabel.setText("jLabel35");
+
+        autofocusButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/wrench_orange.png"))); // NOI18N
+        autofocusButton.setToolTipText("Autofocus Configuration");
+        autofocusButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                autofocusButtonActionPerformed(evt);
+            }
+        });
+
+        afSkipFrameSpinner.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
+        afSkipFrameSpinner.setModel(new javax.swing.SpinnerNumberModel(Integer.valueOf(0), Integer.valueOf(0), null, Integer.valueOf(1)));
+        afSkipFrameSpinner.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                afSkipFrameSpinnerStateChanged(evt);
+            }
+        });
+
+        afPropertyTable.setModel(new javax.swing.table.DefaultTableModel(
+            new Object [][] {
+                {null, null},
+                {null, null},
+                {null, null},
+                {null, null}
+            },
+            new String [] {
+                "Property", "Value"
+            }
+        ) {
+            Class[] types = new Class [] {
+                java.lang.String.class, java.lang.String.class
+            };
+            boolean[] canEdit = new boolean [] {
+                false, false
+            };
+
+            public Class getColumnClass(int columnIndex) {
+                return types [columnIndex];
+            }
+
+            public boolean isCellEditable(int rowIndex, int columnIndex) {
+                return canEdit [columnIndex];
+            }
+        });
+        jScrollPane1.setViewportView(afPropertyTable);
+
+        jLabel27.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        jLabel27.setText("Mode:");
+
+        jLabel11.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        jLabel11.setText("Skip Frames: ");
+
+        org.jdesktop.layout.GroupLayout afPanelLayout = new org.jdesktop.layout.GroupLayout(afPanel);
+        afPanel.setLayout(afPanelLayout);
+        afPanelLayout.setHorizontalGroup(
+            afPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(afPanelLayout.createSequentialGroup()
+                .add(6, 6, 6)
+                .add(afPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(afPanelLayout.createSequentialGroup()
+                        .add(jScrollPane1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
+                        .add(6, 6, 6)
+                        .add(afPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                            .add(autofocusButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(autofocusImportButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                    .add(afPanelLayout.createSequentialGroup()
+                        .add(jLabel11)
+                        .add(3, 3, 3)
+                        .add(afSkipFrameSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 52, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(6, 6, 6)
+                        .add(jLabel27)
+                        .add(3, 3, 3)
+                        .add(afModeLabel, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 167, Short.MAX_VALUE)))
+                .add(6, 6, 6))
+        );
+        afPanelLayout.setVerticalGroup(
+            afPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(afPanelLayout.createSequentialGroup()
+                .add(3, 3, 3)
+                .add(afPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
+                    .add(jLabel11)
+                    .add(afSkipFrameSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(jLabel27)
+                    .add(afModeLabel))
+                .add(3, 3, 3)
+                .add(afPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 90, Short.MAX_VALUE)
+                    .add(afPanelLayout.createSequentialGroup()
+                        .add(autofocusButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(3, 3, 3)
+                        .add(autofocusImportButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
                 .add(3, 3, 3))
         );
 
-        acqModePane.addTab("Channels", jPanel4);
+        acqModePane.addTab("Autofocus", afPanel);
 
         jLabel19.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel19.setText("Begin:");
@@ -2715,15 +2865,24 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
+        zShutterCheckBox.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
+        zShutterCheckBox.setText("Shutter open");
+        zShutterCheckBox.setToolTipText("Keep shutter open between slices");
+        zShutterCheckBox.addItemListener(new java.awt.event.ItemListener() {
+            public void itemStateChanged(java.awt.event.ItemEvent evt) {
+                zShutterCheckBoxItemStateChanged(evt);
+            }
+        });
+
         org.jdesktop.layout.GroupLayout zStackPanelLayout = new org.jdesktop.layout.GroupLayout(zStackPanel);
         zStackPanel.setLayout(zStackPanelLayout);
         zStackPanelLayout.setHorizontalGroup(
             zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-            .add(zStackPanelLayout.createSequentialGroup()
+            .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
                 .add(6, 6, 6)
                 .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(zStackPanelLayout.createSequentialGroup()
-                        .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                        .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(zStackPanelLayout.createSequentialGroup()
                                 .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                                     .add(zStackPanelLayout.createSequentialGroup()
@@ -2731,49 +2890,56 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                         .add(jLabel20))
                                     .add(jLabel19))
                                 .add(6, 6, 6)
-                                .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                                    .add(zStackEndField)
+                                .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                                    .add(zStackEndField, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 61, Short.MAX_VALUE)
                                     .add(zStackBeginField)))
-                            .add(zStackPanelLayout.createSequentialGroup()
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
                                 .add(1, 1, 1)
                                 .add(reverseButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 101, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
                         .add(6, 6, 6)
                         .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
-                                .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING, false)
-                                    .add(jLabel25, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 24, Short.MAX_VALUE)
-                                    .add(jLabel26, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                                .add(12, 12, 12)
-                                .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                                    .add(jLabel21)
-                                    .add(jLabel22))
-                                .add(6, 6, 6))
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, 60, Short.MAX_VALUE)
+                                .add(jLabel23))
                             .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
-                                .add(jLabel23)
-                                .add(8, 8, 8)))
+                                .add(jLabel26, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(jLabel22))
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
+                                .add(jLabel25, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 82, Short.MAX_VALUE)
+                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
+                                .add(jLabel21)))
+                        .add(6, 6, 6)
                         .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
                                 .add(zSlicesSpinner)
                                 .add(zStepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE))
-                            .add(zStackTotalDistLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 69, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                            .add(zStackPanelLayout.createSequentialGroup()
+                                .add(6, 6, 6)
+                                .add(zStackTotalDistLabel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 63, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
                         .add(6, 6, 6)
                         .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(jLabel24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(jLabel9)))
-                    .add(zStackCenteredCheckBox))
-                .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .add(zStackPanelLayout.createSequentialGroup()
+                        .add(zStackCenteredCheckBox)
+                        .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .add(zShutterCheckBox)))
+                .add(6, 6, 6))
         );
         zStackPanelLayout.setVerticalGroup(
             zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
                 .add(0, 0, 0)
-                .add(zStackCenteredCheckBox)
+                .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
+                    .add(zStackCenteredCheckBox)
+                    .add(zShutterCheckBox))
                 .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                     .add(jLabel25, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(jLabel19)
                     .add(jLabel21, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 16, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(zSlicesSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(zStackBeginField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(zSlicesSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(zStackBeginField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .add(2, 2, 2)
                 .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(zStackPanelLayout.createSequentialGroup()
@@ -2781,152 +2947,166 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                             .add(jLabel20)
                             .add(jLabel22)
                             .add(jLabel24, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(zStackEndField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(zStackEndField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(jLabel26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 14, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                         .add(2, 2, 2)
                         .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
                             .add(jLabel23)
                             .add(zStackTotalDistLabel)
-                            .add(reverseButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 14, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(reverseButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                             .add(jLabel9)))
-                    .add(zStepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                    .add(zStepSizeField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
                 .add(143, 143, 143))
         );
 
         acqModePane.addTab("Z-Stack", zStackPanel);
 
-        jLabel13.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
-        jLabel13.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
-        jLabel13.setText("Interval:");
+        durationText.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        durationText.setText("jLabel19");
+        durationText.setVerticalAlignment(javax.swing.SwingConstants.TOP);
+        durationText.setBorder(javax.swing.BorderFactory.createTitledBorder(null, "Duration", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Arial", 0, 12))); // NOI18N
 
-        intHourField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
-        intHourField.setText("0");
-        intHourField.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusLost(java.awt.event.FocusEvent evt) {
-                intHourFieldFocusLost(evt);
-            }
-        });
-        intHourField.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                intHourFieldActionPerformed(evt);
+        jPanel1.setBorder(javax.swing.BorderFactory.createTitledBorder(null, "Timepoints", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Arial", 0, 12))); // NOI18N
+
+        timepointSpinner.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        timepointSpinner.setModel(new javax.swing.SpinnerNumberModel(Integer.valueOf(1), Integer.valueOf(1), null, Integer.valueOf(1)));
+        timepointSpinner.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                timepointSpinnerStateChanged(evt);
             }
         });
 
-        intMinField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
-        intMinField.setText("0");
-        intMinField.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusLost(java.awt.event.FocusEvent evt) {
-                intMinFieldFocusLost(evt);
-            }
-        });
-        intMinField.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                intMinFieldActionPerformed(evt);
+        org.jdesktop.layout.GroupLayout jPanel1Layout = new org.jdesktop.layout.GroupLayout(jPanel1);
+        jPanel1.setLayout(jPanel1Layout);
+        jPanel1Layout.setHorizontalGroup(
+            jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(jPanel1Layout.createSequentialGroup()
+                .add(2, 2, 2)
+                .add(timepointSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 60, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(9, Short.MAX_VALUE))
+        );
+        jPanel1Layout.setVerticalGroup(
+            jPanel1Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(jPanel1Layout.createSequentialGroup()
+                .add(0, 0, 0)
+                .add(timepointSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(0, 0, 0))
+        );
+
+        jPanel3.setBorder(javax.swing.BorderFactory.createTitledBorder(null, "Interval", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Arial", 0, 12))); // NOI18N
+
+        intMillisSpinner.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        intMillisSpinner.setModel(new javax.swing.SpinnerNumberModel(0, 0, 999, 1));
+        intMillisSpinner.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                intMillisSpinnerStateChanged(evt);
             }
         });
 
-        intSecField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
-        intSecField.setText("0");
-        intSecField.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusLost(java.awt.event.FocusEvent evt) {
-                intSecFieldFocusLost(evt);
+        intHourSpinner.setModel(new javax.swing.SpinnerNumberModel(0, 0, 168, 1));
+        intHourSpinner.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                intHourSpinnerStateChanged(evt);
             }
         });
-        intSecField.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                intSecFieldActionPerformed(evt);
-            }
-        });
-
-        jLabel14.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
-        jLabel14.setText("h");
-
-        jLabel15.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
-        jLabel15.setText("min");
 
         jLabel16.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel16.setText("s");
 
-        jLabel17.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
-        jLabel17.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
-        jLabel17.setText("Timepoints:");
-
-        framesField.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
-        framesField.setText("1");
-        framesField.addFocusListener(new java.awt.event.FocusAdapter() {
-            public void focusLost(java.awt.event.FocusEvent evt) {
-                framesFieldFocusLost(evt);
-            }
-        });
-        framesField.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                framesFieldActionPerformed(evt);
+        intMinSpinner.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        intMinSpinner.setModel(new javax.swing.SpinnerNumberModel(0, 0, 59, 1));
+        intMinSpinner.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                intMinSpinnerStateChanged(evt);
             }
         });
 
-        jLabel18.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
-        jLabel18.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
-        jLabel18.setText("Duration:");
+        intSecSpinner.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        intSecSpinner.setModel(new javax.swing.SpinnerNumberModel(0, 0, 59, 1));
+        intSecSpinner.addChangeListener(new javax.swing.event.ChangeListener() {
+            public void stateChanged(javax.swing.event.ChangeEvent evt) {
+                intSecSpinnerStateChanged(evt);
+            }
+        });
 
-        durationText.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
-        durationText.setText("jLabel19");
-        durationText.setVerticalAlignment(javax.swing.SwingConstants.TOP);
+        jLabel15.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        jLabel15.setText("min");
+
+        jLabel14.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        jLabel14.setText("h");
+
+        jLabel35.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        jLabel35.setText("ms");
 
         org.jdesktop.layout.GroupLayout jPanel3Layout = new org.jdesktop.layout.GroupLayout(jPanel3);
         jPanel3.setLayout(jPanel3Layout);
         jPanel3Layout.setHorizontalGroup(
             jPanel3Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel3Layout.createSequentialGroup()
-                .add(8, 8, 8)
-                .add(jPanel3Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.TRAILING)
-                    .add(jLabel17)
-                    .add(jLabel13, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 59, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(jLabel18))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jPanel3Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jPanel3Layout.createSequentialGroup()
-                        .add(jPanel3Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(framesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 56, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(jPanel3Layout.createSequentialGroup()
-                                .add(intHourField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 40, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(3, 3, 3)
-                                .add(jLabel14, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(intMinField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 40, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(3, 3, 3)
-                                .add(jLabel15, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 26, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                                .add(intSecField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 40, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                                .add(3, 3, 3)
-                                .add(jLabel16)))
-                        .addContainerGap())
-                    .add(org.jdesktop.layout.GroupLayout.TRAILING, durationText, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+                .add(2, 2, 2)
+                .add(intHourSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 60, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(2, 2, 2)
+                .add(jLabel14)
+                .add(10, 10, 10)
+                .add(intMinSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 60, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(2, 2, 2)
+                .add(jLabel15)
+                .add(10, 10, 10)
+                .add(intSecSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 60, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(2, 2, 2)
+                .add(jLabel16)
+                .add(10, 10, 10)
+                .add(intMillisSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 60, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(2, 2, 2)
+                .add(jLabel35)
+                .add(2, 2, 2))
         );
+
+        jPanel3Layout.linkSize(new java.awt.Component[] {intHourSpinner, intMillisSpinner, intMinSpinner, intSecSpinner}, org.jdesktop.layout.GroupLayout.HORIZONTAL);
+
         jPanel3Layout.setVerticalGroup(
             jPanel3Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
             .add(jPanel3Layout.createSequentialGroup()
-                .add(6, 6, 6)
-                .add(jPanel3Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel13)
-                    .add(intHourField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(intSecField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                    .add(intMinField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(0, 0, 0)
+                .add(jPanel3Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
                     .add(jLabel14)
+                    .add(intHourSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(intMinSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(jLabel15)
-                    .add(jLabel16))
-                .add(jPanel3Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.BASELINE)
-                    .add(jLabel17)
-                    .add(framesField, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
-                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(jPanel3Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jPanel3Layout.createSequentialGroup()
-                        .add(jLabel18)
-                        .add(0, 0, Short.MAX_VALUE))
-                    .add(durationText, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addContainerGap())
+                    .add(jLabel16)
+                    .add(intSecSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(intMillisSpinner, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                    .add(jLabel35))
+                .add(2, 2, 2))
         );
 
-        acqModePane.addTab("Time-lapse", jPanel3);
+        org.jdesktop.layout.GroupLayout timelapsePanelLayout = new org.jdesktop.layout.GroupLayout(timelapsePanel);
+        timelapsePanel.setLayout(timelapsePanelLayout);
+        timelapsePanelLayout.setHorizontalGroup(
+            timelapsePanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(timelapsePanelLayout.createSequentialGroup()
+                .add(3, 3, 3)
+                .add(timelapsePanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING, false)
+                    .add(timelapsePanelLayout.createSequentialGroup()
+                        .add(jPanel1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(6, 6, 6)
+                        .add(durationText, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .add(jPanel3, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+        );
+        timelapsePanelLayout.setVerticalGroup(
+            timelapsePanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+            .add(org.jdesktop.layout.GroupLayout.TRAILING, timelapsePanelLayout.createSequentialGroup()
+                .add(3, 3, 3)
+                .add(jPanel3, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                .add(3, 3, 3)
+                .add(timelapsePanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
+                    .add(jPanel1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .add(durationText, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .add(6, 6, 6))
+        );
+
+        acqModePane.addTab("Time-lapse", timelapsePanel);
 
         org.jdesktop.layout.GroupLayout jPanel5Layout = new org.jdesktop.layout.GroupLayout(jPanel5);
         jPanel5.setLayout(jPanel5Layout);
@@ -2936,8 +3116,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(jPanel5Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(jPanel10, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                     .add(jPanel5Layout.createSequentialGroup()
-                        .add(6, 6, 6)
-                        .add(acqModePane, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 363, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                        .add(3, 3, 3)
+                        .add(acqModePane, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 372, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
                 .addContainerGap(org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
         jPanel5Layout.setVerticalGroup(
@@ -2945,9 +3125,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             .add(jPanel5Layout.createSequentialGroup()
                 .add(0, 0, 0)
                 .add(jPanel10, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                .add(6, 6, 6)
-                .add(acqModePane, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 140, Short.MAX_VALUE)
-                .add(6, 6, 6))
+                .add(1, 1, 1)
+                .add(acqModePane, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 162, Short.MAX_VALUE)
+                .add(3, 3, 3))
         );
 
         sequenceTabbedPane.addTab("Acq Settings", jPanel5);
@@ -2955,6 +3135,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         jLabel28.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel28.setText("Image Processors/Analyzers:");
 
+        processorTreeView.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jScrollPane4.setViewportView(processorTreeView);
 
         addImageTagFilterButton.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
@@ -3160,7 +3341,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(jLabel28)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                    .add(jScrollPane4, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 316, Short.MAX_VALUE)
+                    .add(jScrollPane4, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 309, Short.MAX_VALUE)
                     .add(jPanel9Layout.createSequentialGroup()
                         .add(jPanel9Layout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                             .add(addZFilterButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
@@ -3438,6 +3619,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
         jPanel11Layout.linkSize(new java.awt.Component[] {browseImageDestPathButton, loadExpSettingFileButton, saveExpSettingFileButton, saveLayoutButton}, org.jdesktop.layout.GroupLayout.VERTICAL);
 
+        acquireButton.setFont(new java.awt.Font("Lucida Grande", 1, 13)); // NOI18N
         acquireButton.setText("Acquire");
         acquireButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -3479,7 +3661,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
                 .add(sequenceListPanel, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
-                .add(sequenceTabbedPane, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 418, Short.MAX_VALUE)
+                .add(sequenceTabbedPane, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 408, Short.MAX_VALUE)
                 .add(3, 3, 3)
                 .add(settingsPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.CENTER)
                     .add(acquireButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 20, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
@@ -3739,7 +3921,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             if (e.getType() == TableModelEvent.INSERT) {
 //                IJ.showMessage("insert");
             }
-            updateAutofocusToolTip(currentAcqSetting);
+            initializeAutofocusPanel(currentAcqSetting);
+//            enableAutofocusPane(currentAcqSetting.isAutofocus());
             updatingAcqSettingTable=false;
         }
     }
@@ -3747,11 +3930,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     //handles selection events in acqSettingTable;  called from anonymous class
     public void acqSettingSelectionChanged(ListSelectionEvent e) {
         ListSelectionModel lsm = (ListSelectionModel) e.getSource();
-//            int firstIndex = e.getFirstIndex();
-//            int lastIndex = e.getLastIndex();
         int minIndex = lsm.getMinSelectionIndex();
         if (minIndex >= 0) {
-//            cAcqSettingIdx = minIndex;
             AcqSetting newSetting = acqSettings.get(minIndex);
             if (currentAcqSetting != newSetting) {
                 currentAcqSetting = newSetting;
@@ -3763,7 +3943,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 ((LayoutPanel) acqLayoutPanel).setAcqSetting(currentAcqSetting, true);
                 updateAcqSettingTab(currentAcqSetting);
                 updateProcessorTreeView(currentAcqSetting);
-                updateAutofocusToolTip(currentAcqSetting);
 /*                try {
                     core.setChannelGroup(currentAcqSetting.getChannelGroupStr());
                 } catch (Exception ex) {
@@ -3785,76 +3964,80 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }
 
     private SequenceSettings createMDASettings(AcqSetting acqSetting) {
-//        experimentName=acqSetting.getName();
-        SequenceSettings settings = new SequenceSettings();
-
-//        try {
-//            StrVector availableChannels = core.getAvailableConfigs(channelGroupStr);
-            if (acqSetting.getChannelGroupStr()==null || acqSetting.getChannelGroupStr().equals("")) {
-                String chGroupStr=MMCoreUtils.loadAvailableChannelConfigs(this,core,"");
-                currentAcqSetting.setChannelGroupStr(chGroupStr);
-            }    
-            StrVector availableChannels = core.getAvailableConfigs(acqSetting.getChannelGroupStr());
-            if (availableChannels == null || availableChannels.isEmpty()) {
-                acqSetting.setChannelGroupStr(MMCoreUtils.loadAvailableChannelConfigs(this,core,acqSetting.getChannelGroupStr()));
-            }
-            if (!initializeChannelTable(acqSetting)) {
-                return null;
-            }
-            /*
-             if (Math.abs(zStackStepSize) < acqEng.getMinZStepUm()) {
-             zStackStepSize = acqEng.getMinZStepUm();
-             }
-             */
-            settings.numFrames = timelapseCheckBox.isSelected() ? acqSetting.getFrames() : 1;
-            settings.slices = new ArrayList<Double>();
-            if (zStackCheckBox.isSelected()) {
-         //       double z = NumberUtils.displayStringToDouble(zStackBeginField_Old.getText());
-                double z = acqSetting.getZBegin();
-                for (int i = 0; i < acqSetting.getZSlices(); i++) {
-                    settings.slices.add(z);
-                    if (acqSetting.getZBegin() < acqSetting.getZEnd()) {
-                        z += acqSetting.getZStepSize();
-                    } else {
-                        z -= acqSetting.getZStepSize();
-                    }
-                }
-            } else {
-                settings.slices.add(new Double(0));
-            }
-            settings.relativeZSlice = true;
-            settings.channels = new ArrayList<ChannelSpec>();
-            ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-//            settings.channelGroup = channelGroupStr;
-            settings.channelGroup = acqSetting.getChannelGroupStr();
-            for (int i = 0; i < ctm.getRowCount(); i++) {
-                Channel c = ctm.getRowData(i);
-                ChannelSpec cs = new ChannelSpec();
-                cs.config = c.getName();
-                cs.exposure = c.getExposure();
-                cs.color = c.getColor();
-                cs.doZStack = zStackCheckBox.isSelected();
-                cs.zOffset = c.getZOffset();
-                cs.useChannel = true;
-                //cs.camera = core.getCameraDevice();
-                settings.channels.add(cs);
-            }
-            settings.useAutofocus = autofocusCheckBox.isSelected();
-            settings.usePositionList = true;
-            settings.slicesFirst = (acqOrderList.getSelectedIndex() == 1 | acqOrderList.getSelectedIndex() == 3);
-            settings.timeFirst = acqOrderList.getSelectedIndex() >= 2;
-            settings.save = true;
-            settings.keepShutterOpenChannels = false;
-            settings.keepShutterOpenSlices = false;
-            settings.intervalMs = acqSetting.getIntervalInMilliS();
-            settings.skipAutofocusCount = 0;
-            settings.prefix = acqSetting.getName();
-            settings.root = imageDestPath;
-//            IJ.log("AcqFrame.createMDASettings: imageDestPath"+imageDestPath);
-/*        } catch (ParseException p) {
-            ReportingUtils.showError(p);
+        //make sure channelgroup is set, set new one if not
+        if (acqSetting.getChannelGroupStr()==null || acqSetting.getChannelGroupStr().equals("")) {
+            String chGroupStr=MMCoreUtils.loadAvailableChannelConfigs(this,core,"");
+            currentAcqSetting.setChannelGroupStr(chGroupStr);
+        }    
+        //check that channels choses are in selected channelgroup
+        StrVector availableChannels = core.getAvailableConfigs(acqSetting.getChannelGroupStr());
+        if (availableChannels == null || availableChannels.isEmpty()) {
+            acqSetting.setChannelGroupStr(MMCoreUtils.loadAvailableChannelConfigs(this,core,acqSetting.getChannelGroupStr()));
+        }
+        if (!initializeChannelTable(acqSetting)) {
             return null;
-        }*/
+        }
+        //ok, create new mda sequence settings
+        SequenceSettings settings = new SequenceSettings();
+        //setup time-lapse
+//            settings.numFrames = timelapseCheckBox.isSelected() ? acqSetting.getFrames() : 1;
+        settings.numFrames = acqSetting.isTimelapse() ? acqSetting.getFrames() : 1;
+        settings.intervalMs = acqSetting.getTotalIntervalInMilliS();
+        
+        //setup z-stack
+        settings.slices = new ArrayList<Double>();
+        if (zStackCheckBox.isSelected()) {
+            double z = acqSetting.getZBegin();
+            for (int i = 0; i < acqSetting.getZSlices(); i++) {
+                settings.slices.add(z);
+                if (acqSetting.getZBegin() < acqSetting.getZEnd()) {
+                    z += acqSetting.getZStepSize();
+                } else {
+                    z -= acqSetting.getZStepSize();
+                }
+            }
+        } else {
+            settings.slices.add(new Double(0));
+        }
+        settings.relativeZSlice = true;
+        settings.keepShutterOpenSlices = acqSetting.isKeepZShutterOpen();
+        
+        //setup channels
+        settings.channels = new ArrayList<ChannelSpec>();
+        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
+//            settings.channelGroup = channelGroupStr;
+        settings.channelGroup = acqSetting.getChannelGroupStr();
+        for (int i = 0; i < ctm.getRowCount(); i++) {
+            Channel c = ctm.getRowData(i);
+            ChannelSpec cs = new ChannelSpec();
+            cs.config = c.getName();
+            cs.exposure = c.getExposure();
+            cs.color = c.getColor();
+            cs.doZStack = zStackCheckBox.isSelected();
+            cs.zOffset = c.getZOffset();
+            cs.useChannel = true;
+            //cs.camera = core.getCameraDevice();
+            settings.channels.add(cs);
+        }
+        settings.keepShutterOpenChannels = acqSetting.isKeepChShutterOpen();
+        
+        //setup autofocus
+//            settings.useAutofocus = autofocusCheckBox.isSelected();
+        settings.useAutofocus = acqSetting.isAutofocus();
+        settings.skipAutofocusCount = acqSetting.getAutofocusSkipFrames();
+        //the actual autofocus properties need to be set in MMCore object before starting the acquisition
+
+        //setup xy positions
+        settings.usePositionList = true;
+        
+        //setup acquisition order
+        settings.slicesFirst = (acqOrderList.getSelectedIndex() == 1 | acqOrderList.getSelectedIndex() == 3);
+        settings.timeFirst = acqOrderList.getSelectedIndex() >= 2;
+        
+        //save images to disk, use acquisition sequence name as prefix, set root directory 
+        settings.save = true;
+        settings.prefix = acqSetting.getName();
+        settings.root = imageDestPath;
         return settings;
     }
     
@@ -3862,7 +4045,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         moveToScreenCoordButton.setEnabled(b);
         stageControlButton.setEnabled(b);
         setLandmarkButton.setEnabled(b && !acqLayout.isEmpty());
-//        findLandmarkButton.setEnabled(b);
         snapButton.setEnabled(b);
         liveButton.setEnabled(b);
         autoExposureButton.setEnabled(b);
@@ -3904,6 +4086,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         tileOverlapField.setEnabled(b);
         autofocusButton.setEnabled(b);
         autofocusImportButton.setEnabled(b);
+        afSkipFrameSpinner.setEnabled(b);
+        afPropertyTable.setEnabled(b);
         clearRoiButton.setEnabled(b);
         closeGapsButton.setEnabled(b);
         
@@ -3936,8 +4120,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         removeChannelButton.setEnabled(b);
         channelUpButton.setEnabled(b);
         channelDownButton.setEnabled(b);
-        enableTimelapsePane(b);
-        enableZStackPane(b);
+        enableComponent(afPanel,true,autofocusCheckBox.isSelected());
+        enableComponent(zStackPanel,true,zStackCheckBox.isSelected());
+        enableComponent(timelapsePanel,true,timelapseCheckBox.isSelected());
     }
 /*
     public JSONObject createSummary(AcqSetting as, SequenceSettings s, PositionList pl) {
@@ -5204,9 +5389,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         if (!acqEng2010.isRunning() && isAcquiring) {
             //problem in syncing GUI and acqEng2010 status
 //            imagingFinished(null);
+/*
             if (displayUpdater != null) {
 //                displayUpdater.imagingFinished(null);
             }
+*/
 //            IJ.log("AcqFrame.acquireButtonActionPerformed: Problem - GUI is unaware that acqEng2010 is not running");
         } else {
 //            IJ.log("Acquisition is still running");
@@ -5293,10 +5480,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 siteOverlapCheckBox.setSelected(currentAcqSetting.isSiteOverlap());
                 insideOnlyCheckBox.setSelected(currentAcqSetting.isInsideOnly());
 
-                newAreaButton.setEnabled(!acqLayout.isEmpty && acqLayout.isAreaAdditionAllowed());
-                removeAreaButton.setEnabled(!acqLayout.isEmpty && acqLayout.isAreaRemovalAllowed());
-                mergeAreasButton.setEnabled(!acqLayout.isEmpty && acqLayout.isAreaMergingAllowed());
-                mergeAreasButton.setToolTipText(!acqLayout.isEmpty && acqLayout.isAreaMergingAllowed() ? "Merge areas" : "Areas cannot be merged in this layout");
+                newAreaButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
+                removeAreaButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaRemovalAllowed());
+                mergeAreasButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaMergingAllowed());
+                mergeAreasButton.setToolTipText(!acqLayout.isEmpty() && acqLayout.isAreaMergingAllowed() ? "Merge areas" : "Areas cannot be merged in this layout");
 
                 if (mergeAreasDialog != null) {
                     mergeAreasDialog.removeAllAreas();
@@ -5358,120 +5545,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         //            layoutScrollPane.getViewport().revalidate();
         //            layoutScrollPane.getViewport().repaint();
 /*        }     */
-    }
-
-    private void setFrames() {
-        /*        AcqSetting setting=null;
-         if (acqSettings!=null && acqSettings.size() > cAcqSettingIdx)
-         setting=acqSettings.get(cAcqSettingIdx);*/
-        String tpStr = framesField.getText();
-        if (tpStr.isEmpty()) {
-            tpStr = "0";
-            //           timePointsField.setText(tpStr);
-        }
-        int tp = Integer.parseInt(tpStr);
-        if (tp <= 0) {
-            JOptionPane.showMessageDialog(null, "Error: Please enter a number bigger than 0", "Error Message", JOptionPane.ERROR_MESSAGE);
-            tp = 1;
-            if (currentAcqSetting != null) {
-                currentAcqSetting.setFrames(tp);
-            }
-            framesField.setText(Integer.toString(tp));
-            framesField.requestFocus();
-        } else {
-            if (currentAcqSetting != null) {
-                currentAcqSetting.setFrames(tp);
-            }
-            calculateDuration(currentAcqSetting);
-        }
-    }
-
-    private void setSecInterval() {
-        /*        AcqSetting setting=null;
-         if (acqSettings!=null && acqSettings.size() > cAcqSettingIdx)
-         setting=acqSettings.get(cAcqSettingIdx);*/
-        String sStr = intSecField.getText();
-        if (sStr.isEmpty()) {
-            sStr = "0";
-            intSecField.setText(sStr);
-            if (currentAcqSetting != null) {
-                currentAcqSetting.setSecondsInterval(0);
-            }
-            calculateDuration(currentAcqSetting);
-        } else {
-            int s = Integer.parseInt(sStr);
-            if ((s < 0) || (s > 59)) {
-                JOptionPane.showMessageDialog(this, "Error: Please enter a number between 0-59", "Error Message", JOptionPane.ERROR_MESSAGE);
-                if (currentAcqSetting != null) {
-                    currentAcqSetting.setSecondsInterval(0);
-                }
-                intSecField.setText(Integer.toString(0));
-                intSecField.requestFocus();
-            } else {
-                if (currentAcqSetting != null) {
-                    currentAcqSetting.setSecondsInterval(s);
-                }
-                calculateDuration(currentAcqSetting);
-            }
-        }
-    }
-
-    private void setMinInterval() {
-        /*        AcqSetting setting=null;
-         if (acqSettings!=null && acqSettings.size() > cAcqSettingIdx)
-         setting=acqSettings.get(cAcqSettingIdx);*/
-        String mStr = intMinField.getText();
-        if (mStr.isEmpty()) {
-            mStr = "0";
-            intMinField.setText(mStr);
-            currentAcqSetting.setMinutesInterval(0);
-            calculateDuration(currentAcqSetting);
-        } else {
-            int m = Integer.parseInt(mStr);
-            if ((m < 0) || (m > 59)) {
-                JOptionPane.showMessageDialog(null, "Error: Please enter a number between 0-59", "Error Message", JOptionPane.ERROR_MESSAGE);
-                if (currentAcqSetting != null) {
-                    currentAcqSetting.setMinutesInterval(0);
-                }
-                intMinField.setText(Integer.toString(0));
-                intMinField.requestFocus();
-            } else {
-                if (currentAcqSetting != null) {
-                    currentAcqSetting.setMinutesInterval(m);
-                }
-                calculateDuration(currentAcqSetting);
-            }
-        }
-    }
-
-    private void setHourInterval() {
-        /*        AcqSetting setting=null;
-         if (acqSettings!=null && acqSettings.size()>cAcqSettingIdx)
-         setting=acqSettings.get(cAcqSettingIdx);*/
-        String hStr = intHourField.getText();
-        if (hStr.isEmpty()) {
-            hStr = "0";
-            intHourField.setText(hStr);
-            if (currentAcqSetting != null) {
-                currentAcqSetting.setHoursInterval(0);
-            }
-            calculateDuration(currentAcqSetting);
-        } else {
-            int h = Integer.parseInt(hStr);
-            if (h > AcqSetting.MAX_HOUR_INT) {
-                JOptionPane.showMessageDialog(null, "Error: Please enter a number smaller than " + Integer.toString(AcqSetting.MAX_HOUR_INT), "Error Message", JOptionPane.ERROR_MESSAGE);
-                if (currentAcqSetting != null) {
-                    currentAcqSetting.setHoursInterval(0);
-                }
-                intHourField.setText(Integer.toString(0));
-                intHourField.requestFocus();
-            } else {
-                if (currentAcqSetting != null) {
-                    currentAcqSetting.setHoursInterval(h);
-                }
-                calculateDuration(currentAcqSetting);
-            }
-        }
     }
 
     private void mergeAreasButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_mergeAreasButtonActionPerformed
@@ -7005,26 +7078,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }//GEN-LAST:event_clusterCheckBoxActionPerformed
 
     private void binningComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_binningComboBoxActionPerformed
-        //        if (acqSettings!=null && acqSettings.size()>0) {
-            if (currentAcqSetting != null) {
-                //            AcqSetting setting = acqSettings.get(cAcqSettingIdx);
-                currentAcqSetting.setBinning(Integer.parseInt((String) binningComboBox.getSelectedItem()));
-                updatePixelSize(currentAcqSetting.getObjective());
-            }
+        if (currentAcqSetting != null) {
+            //            AcqSetting setting = acqSettings.get(cAcqSettingIdx);
+            currentAcqSetting.setBinning(Integer.parseInt((String) binningComboBox.getSelectedItem()));
+            updatePixelSize(currentAcqSetting.getObjective());
+        }
     }//GEN-LAST:event_binningComboBoxActionPerformed
-
-    private void autofocusCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_autofocusCheckBoxItemStateChanged
-        /*        if (acqSettings!=null && acqSettings.size()>0) {
-            AcqSetting setting = acqSettings.get(cAcqSettingIdx);*/
-            if (currentAcqSetting != null) {
-                currentAcqSetting.enableAutofocus(autofocusCheckBox.isSelected());
-            }
-            if (autofocusCheckBox.isSelected()) {
-                zStackCenteredCheckBox.setText("Centered around autofocus Z-position");
-            } else {
-                zStackCenteredCheckBox.setText("Centered around reference Z-position");
-            }
-    }//GEN-LAST:event_autofocusCheckBoxItemStateChanged
 
     private void tileOverlapFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_tileOverlapFieldActionPerformed
         JComponent source = (JComponent) evt.getSource();
@@ -7053,19 +7112,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             setMaxSites();
         }
     }//GEN-LAST:event_maxSitesFieldFocusLost
-
-    private void zStackCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_zStackCheckBoxActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_zStackCheckBoxActionPerformed
-
-    private void zStackCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_zStackCheckBoxItemStateChanged
-        if (currentAcqSetting != null) {
-            /*        if (acqSettings!=null && acqSettings.size()>0) {
-                AcqSetting setting = acqSettings.get(cAcqSettingIdx);*/
-                currentAcqSetting.enableZStack(zStackCheckBox.isSelected());
-            }
-            enableZStackPane(zStackCheckBox.isSelected());
-    }//GEN-LAST:event_zStackCheckBoxItemStateChanged
 
     private void objectiveComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_objectiveComboBoxActionPerformed
         if (evt.getSource() == objectiveComboBox) {
@@ -7128,57 +7174,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             setClusterYField();
         }
     }//GEN-LAST:event_clusterYFieldFocusLost
-
-    private void timelapseCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_timelapseCheckBoxItemStateChanged
-        //        if (acqSettings!=null && acqSettings.size()>0) {
-            //            AcqSetting setting = acqSettings.get(cAcqSettingIdx);
-            if (currentAcqSetting != null) {
-                currentAcqSetting.enableTimelapse(timelapseCheckBox.isSelected());
-            }
-            if (timelapseCheckBox.isSelected()) {
-                //           if (acqSettings!=null && acqSettings.size() > cAcqSettingIdx)
-                if (currentAcqSetting != null) {
-                    calculateDuration(currentAcqSetting);
-                } else {
-                    calculateDuration(null);
-                }
-            } else {
-                durationText.setText("No Time-lapse acquisition");
-            }
-            enableTimelapsePane(timelapseCheckBox.isSelected());
-    }//GEN-LAST:event_timelapseCheckBoxItemStateChanged
-
-    private void framesFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_framesFieldFocusLost
-        setFrames();
-    }//GEN-LAST:event_framesFieldFocusLost
-
-    private void framesFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_framesFieldActionPerformed
-        setFrames();
-    }//GEN-LAST:event_framesFieldActionPerformed
-
-    private void intSecFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_intSecFieldFocusLost
-        setSecInterval();
-    }//GEN-LAST:event_intSecFieldFocusLost
-
-    private void intSecFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_intSecFieldActionPerformed
-        setSecInterval();
-    }//GEN-LAST:event_intSecFieldActionPerformed
-
-    private void intMinFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_intMinFieldFocusLost
-        setMinInterval();
-    }//GEN-LAST:event_intMinFieldFocusLost
-
-    private void intMinFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_intMinFieldActionPerformed
-        setMinInterval();
-    }//GEN-LAST:event_intMinFieldActionPerformed
-
-    private void intHourFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_intHourFieldFocusLost
-        setHourInterval();
-    }//GEN-LAST:event_intHourFieldFocusLost
-
-    private void intHourFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_intHourFieldActionPerformed
-        setHourInterval();
-    }//GEN-LAST:event_intHourFieldActionPerformed
 
     private void reverseButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_reverseButtonActionPerformed
         /*        if (acqSettings!=null && acqSettings.size()>0) {
@@ -7691,8 +7686,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }    
     }//GEN-LAST:event_stageControlButtonActionPerformed
 
-    private void updateAutofocusToolTip(AcqSetting setting) {
-        String text="";
+    private void initializeAutofocusPanel(AcqSetting setting) {
+        afSkipFrameSpinner.setValue(setting.getAutofocusSkipFrames());
+        String text;
+        afModeLabel.setText(setting.getAutofocusDevice()==null ? "not selected":setting.getAutofocusDevice());
+        afPropertyTable.setModel(new AFTableModel(setting.getAutofocusProperties()));
         if (setting.getAutofocusDevice()!=null) {
             text="<html><b>AF method: " +setting.getAutofocusDevice()+"</b><br>";
             JSONObject properties=setting.getAutofocusProperties();
@@ -7720,7 +7718,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 JOptionPane.showMessageDialog(this,"No autofocus device/plugin installed.");
             }
             currentAcqSetting.setAutofocusSettings(af, core);
-            updateAutofocusToolTip(currentAcqSetting);
+            initializeAutofocusPanel(currentAcqSetting);
         } catch (MMException ex) {
             if (af!=null) {
                 JOptionPane.showMessageDialog(this,"Error transferrring properties for "+af.getDeviceName());
@@ -7863,7 +7861,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                             break;
                                         }
                                         ImageStatistics stats=ipArray[0].getStatistics();
-                                        IJ.log("stats.maxCount: "+Integer.toString(stats.maxCount));
                                         if ((stats.max < Math.pow(2,core.getImageBitDepth())-1) // less than 50% dynamic range
                                         || stats.maxCount < MAX_SATURATION*ipArray[0].getWidth()*ipArray[0].getHeight()){
                                             //underexposed
@@ -7910,23 +7907,24 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                 @Override
                                 protected void done() {
                                     frame.dispose();
-                                    if (ipArray==null) {
-                                        //problem with snapping images
-                                        JOptionPane.showMessageDialog(guiFrame, "Problem with image acquisition.");
-                                    }
-                                    ipArray = MMCoreUtils.snapImageWithZOffset(core, channelGroup,c.getName(), optimalExp , 0);//c.getZOffset());
-                                    ImagePlus imp = new ImagePlus("Auto-Exposure: "+c.getName(),ipArray[0]);
-                                    imp.show();
                                     if (!isCancelled()) {
-                                        if (optimalExp==MAX_EXPOSURE) {
-                                            JOptionPane.showMessageDialog(guiFrame, "Reached maximum exposure ("+MAX_EXPOSURE+" ms).");
-                                        }
-                                        optimalExp=0.1*(Math.round(optimalExp*10));
-                                        int result=JOptionPane.showConfirmDialog(guiFrame,"Suggested exposure time for channel "+c.getName()+": "+formatNumber("0.0", optimalExp)+" ms.\n"
-                                            + "Adjust exposure time to new value?","Auto-Exposure",JOptionPane.YES_NO_OPTION);
-                                        if (result==JOptionPane.YES_OPTION) {
-                                            c.setExposure(optimalExp);
-                                            ctm.fireTableRowsUpdated(row, row);
+                                        if (ipArray==null) {
+                                            //problem with snapping images
+                                            JOptionPane.showMessageDialog(guiFrame, "Problem with image acquisition.");
+                                        } else {
+                                            ipArray = MMCoreUtils.snapImageWithZOffset(core, channelGroup,c.getName(), optimalExp , 0);//c.getZOffset());
+                                            ImagePlus imp = new ImagePlus("Auto-Exposure: "+c.getName(),ipArray[0]);
+                                            imp.show();
+                                            if (optimalExp==MAX_EXPOSURE) {
+                                                JOptionPane.showMessageDialog(guiFrame, "Reached maximum exposure ("+MAX_EXPOSURE+" ms).");
+                                            }
+                                            optimalExp=0.1*(Math.round(optimalExp*10));
+                                            int result=JOptionPane.showConfirmDialog(guiFrame,"Suggested exposure time for channel "+c.getName()+": "+formatNumber("0.0", optimalExp)+" ms.\n"
+                                                + "Adjust exposure time to new value?","Auto-Exposure",JOptionPane.YES_NO_OPTION);
+                                            if (result==JOptionPane.YES_OPTION) {
+                                                c.setExposure(optimalExp);
+                                                ctm.fireTableRowsUpdated(row, row);
+                                            }
                                         }
                                     }
                                     enableGUI(true);
@@ -7968,6 +7966,58 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }        
     }//GEN-LAST:event_autoExposureButtonActionPerformed
 
+    private void afSkipFrameSpinnerStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_afSkipFrameSpinnerStateChanged
+        if (currentAcqSetting!=null) {
+            currentAcqSetting.setAutofocusSkipFrames((Integer)afSkipFrameSpinner.getValue());
+        }
+    }//GEN-LAST:event_afSkipFrameSpinnerStateChanged
+
+    private void chShutterCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_chShutterCheckBoxItemStateChanged
+        if (currentAcqSetting!=null) {
+            currentAcqSetting.setKeepChShutterOpen(chShutterCheckBox.isSelected());
+        }
+    }//GEN-LAST:event_chShutterCheckBoxItemStateChanged
+
+    private void zShutterCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_zShutterCheckBoxItemStateChanged
+        if (currentAcqSetting!=null) {
+            currentAcqSetting.setKeepZShutterOpen(zShutterCheckBox.isSelected());
+        }
+    }//GEN-LAST:event_zShutterCheckBoxItemStateChanged
+
+    private void intHourSpinnerStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_intHourSpinnerStateChanged
+        if (currentAcqSetting!=null) {
+            currentAcqSetting.setHoursInterval(((Number)intHourSpinner.getValue()).intValue());
+            calculateDuration(currentAcqSetting);
+        }
+    }//GEN-LAST:event_intHourSpinnerStateChanged
+
+    private void intMinSpinnerStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_intMinSpinnerStateChanged
+        if (currentAcqSetting!=null) {
+            currentAcqSetting.setMinutesInterval(((Number)intMinSpinner.getValue()).intValue());
+            calculateDuration(currentAcqSetting);
+        }
+    }//GEN-LAST:event_intMinSpinnerStateChanged
+
+    private void intSecSpinnerStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_intSecSpinnerStateChanged
+        if (currentAcqSetting!=null) {
+            currentAcqSetting.setSecondsInterval(((Number)intSecSpinner.getValue()).intValue());
+            calculateDuration(currentAcqSetting);
+        }
+    }//GEN-LAST:event_intSecSpinnerStateChanged
+
+    private void intMillisSpinnerStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_intMillisSpinnerStateChanged
+        if (currentAcqSetting!=null) {
+            currentAcqSetting.setMillisecondsInterval(((Number)intMillisSpinner.getValue()).intValue());
+            calculateDuration(currentAcqSetting);
+        }
+    }//GEN-LAST:event_intMillisSpinnerStateChanged
+
+    private void timepointSpinnerStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_timepointSpinnerStateChanged
+        if (currentAcqSetting!=null) {
+            currentAcqSetting.setFrames(((Number)timepointSpinner.getValue()).intValue());
+            calculateDuration(currentAcqSetting);
+        }
+    }//GEN-LAST:event_timepointSpinnerStateChanged
 
     private void saveLayout() {
         JFileChooser jfc = new JFileChooser();
@@ -8091,19 +8141,24 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JButton addROIFinderButton;
     private javax.swing.JButton addScriptAnalyzerButton;
     private javax.swing.JButton addZFilterButton;
+    private javax.swing.JLabel afModeLabel;
+    private javax.swing.JPanel afPanel;
+    private javax.swing.JTable afPropertyTable;
+    private javax.swing.JSpinner afSkipFrameSpinner;
     private javax.swing.JButton areaDownButton;
     private javax.swing.JLabel areaLabel;
     private javax.swing.JTable areaTable;
     private javax.swing.JButton areaUpButton;
     private javax.swing.JButton autoExposureButton;
     private javax.swing.JButton autofocusButton;
-    private javax.swing.JCheckBox autofocusCheckBox;
     private javax.swing.JButton autofocusImportButton;
     private javax.swing.JComboBox binningComboBox;
     private javax.swing.JButton browseImageDestPathButton;
     private javax.swing.ButtonGroup buttonGroup1;
     private javax.swing.ButtonGroup buttonGroup2;
     private javax.swing.JButton cancelThreadButton;
+    private javax.swing.JPanel chPanel;
+    private javax.swing.JCheckBox chShutterCheckBox;
     private javax.swing.JButton channelDownButton;
     private javax.swing.JTable channelTable;
     private javax.swing.JButton channelUpButton;
@@ -8121,20 +8176,18 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JButton editProcessorButton;
     private javax.swing.JLabel expSettingsFileLabel;
     private javax.swing.JTextField experimentTextField;
-    private javax.swing.JTextField framesField;
     private javax.swing.JCheckBox insideOnlyCheckBox;
-    private javax.swing.JTextField intHourField;
-    private javax.swing.JTextField intMinField;
-    private javax.swing.JTextField intSecField;
+    private javax.swing.JSpinner intHourSpinner;
+    private javax.swing.JSpinner intMillisSpinner;
+    private javax.swing.JSpinner intMinSpinner;
+    private javax.swing.JSpinner intSecSpinner;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel10;
+    private javax.swing.JLabel jLabel11;
     private javax.swing.JLabel jLabel12;
-    private javax.swing.JLabel jLabel13;
     private javax.swing.JLabel jLabel14;
     private javax.swing.JLabel jLabel15;
     private javax.swing.JLabel jLabel16;
-    private javax.swing.JLabel jLabel17;
-    private javax.swing.JLabel jLabel18;
     private javax.swing.JLabel jLabel19;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel20;
@@ -8144,6 +8197,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JLabel jLabel24;
     private javax.swing.JLabel jLabel25;
     private javax.swing.JLabel jLabel26;
+    private javax.swing.JLabel jLabel27;
     private javax.swing.JLabel jLabel28;
     private javax.swing.JLabel jLabel29;
     private javax.swing.JLabel jLabel3;
@@ -8152,6 +8206,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JLabel jLabel32;
     private javax.swing.JLabel jLabel33;
     private javax.swing.JLabel jLabel34;
+    private javax.swing.JLabel jLabel35;
     private javax.swing.JLabel jLabel36;
     private javax.swing.JLabel jLabel37;
     private javax.swing.JLabel jLabel4;
@@ -8160,14 +8215,15 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JLabel jLabel7;
     private javax.swing.JLabel jLabel8;
     private javax.swing.JLabel jLabel9;
+    private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel10;
     private javax.swing.JPanel jPanel11;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
-    private javax.swing.JPanel jPanel4;
     private javax.swing.JPanel jPanel5;
     private javax.swing.JPanel jPanel6;
     private javax.swing.JPanel jPanel9;
+    private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JScrollPane jScrollPane3;
     private javax.swing.JScrollPane jScrollPane4;
@@ -8216,15 +8272,16 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JLabel tileSizeLabel;
     private javax.swing.JComboBox tilingDirComboBox;
     private javax.swing.JComboBox tilingModeComboBox;
-    private javax.swing.JCheckBox timelapseCheckBox;
+    private javax.swing.JPanel timelapsePanel;
     private javax.swing.JLabel timepointLabel;
+    private javax.swing.JSpinner timepointSpinner;
     private javax.swing.JLabel totalAreasLabel;
     private javax.swing.JLabel totalTilesLabel;
     private javax.swing.JButton zOffsetButton;
+    private javax.swing.JCheckBox zShutterCheckBox;
     private javax.swing.JSpinner zSlicesSpinner;
     private javax.swing.JFormattedTextField zStackBeginField;
     private javax.swing.JCheckBox zStackCenteredCheckBox;
-    private javax.swing.JCheckBox zStackCheckBox;
     private javax.swing.JFormattedTextField zStackEndField;
     private javax.swing.JPanel zStackPanel;
     private javax.swing.JLabel zStackTotalDistLabel;
@@ -8232,159 +8289,15 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JToggleButton zoomButton;
     // End of variables declaration//GEN-END:variables
 
-/*    
-    private AcqLayout loadLayout(File file) {//returns true if layout has been changed
-//        IJ.log("AcqFrame.loadLayout: "+absPath);
-        BufferedReader br;
-        StringBuilder sb=new StringBuilder();
-        JSONObject layoutObj=null;
-        try {
-            br = new BufferedReader(new FileReader(file));
-            String line;
-            while ((line = br.readLine()) !=null) {
-                sb.append(line);
-            }
-            JSONObject expSettingsObj=new JSONObject(sb.toString());
-            layoutObj=expSettingsObj.getJSONObject(AcqLayout.TAG_LAYOUT);
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IOException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (JSONException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-        }
-//        acqLayout=new AcqLayout(layoutObj, file);
-        AcqLayout layout=AcqLayout.createFromJSONObject(layoutObj, file);
-        return layout;
-    }
-*/
 
     private void setTilingInsideAreaOnly(boolean b) {
-//        if (acqSettings!=null && acqSettings.size()>cAcqSettingIdx) {
-//            AcqSetting setting = acqSettings.get(cAcqSettingIdx);
-//        if (currentAcqSetting!=null) {
         currentAcqSetting.enableInsideOnly(b);
         if (!calculating && recalculateTiles) {
             calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
         }
-//        }
     }
-    
-
-    private String createChannelNamePrefString() {
-        String str = "";
-        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-        for (int i = 0; i < ctm.getRowCount(); i++) {
-            str += ctm.getValueAt(i, 0) + "\n";
-        }
-        return str;
-    }
-
-    private String createChannelExpPrefString() {
-        String str = "";
-        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-        for (int i = 0; i < ctm.getRowCount(); i++) {
-            str += ctm.getValueAt(i, 1) + "\n";
-        }
-        return str;
-    }
-
-    private String createChannelZOffsetPrefString() {
-        String str = "";
-        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-        for (int i = 0; i < ctm.getRowCount(); i++) {
-            str += ctm.getValueAt(i, 2) + "\n";
-        }
-        return str;
-    }
-
-    private String createChannelStitchingPrefString() {
-        String str = "";
-        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-        for (int i = 0; i < ctm.getRowCount(); i++) {
-            str += ctm.getValueAt(i, 3) + "\n";
-        }
-        return str;
-    }
-
-    private String createChannelColorPrefString() {
-        String str = "";
-        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-        for (int i = 0; i < ctm.getRowCount(); i++) {
-            str += Channel.colorToHexString((Color) ctm.getValueAt(i, 4)) + "\n";
-        }
-        return str;
-    }
-
-    private void parseChannelConfig(String chStr, String expStr, String zOffsetStr, String stitchStr, String colorStr) {
-        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-        int row = 0;
-        int start = 0;
-        ArrayList<String> ch = new ArrayList<String>();
-        while (start < chStr.length() && chStr.indexOf("\n", start) > 0) {
-            int end = chStr.indexOf("\n", start);
-            ch.add(chStr.substring(start, end));
-            start = end + 1;
-            row++;
-        }
-        row = 0;
-        start = 0;
-        ArrayList<Double> exp = new ArrayList<Double>();
-        while (start < expStr.length() && expStr.indexOf("\n", start) > 0) {
-            int end = expStr.indexOf("\n", start);
-            exp.add(Double.parseDouble(expStr.substring(start, end)));
-            start = end + 1;
-            row++;
-        }
-        row = 0;
-        start = 0;
-        ArrayList<Double> zOffset = new ArrayList<Double>();
-        while (start < zOffsetStr.length() && zOffsetStr.indexOf("\n", start) > 0) {
-            int end = zOffsetStr.indexOf("\n", start);
-            zOffset.add(Double.parseDouble(zOffsetStr.substring(start, end)));
-            start = end + 1;
-            row++;
-        }
-        row = 0;
-        start = 0;
-        ArrayList<Boolean> stitch = new ArrayList<Boolean>();
-        while (start < stitchStr.length() && zOffsetStr.indexOf("\n", start) > 0) {
-            int end = stitchStr.indexOf("\n", start);
-            stitch.add(Boolean.parseBoolean(stitchStr.substring(start, end)));
-            start = end + 1;
-            row++;
-        }
-        row = 0;
-        start = 0;
-        ArrayList<String> colorList = new ArrayList<String>();
-        while (start < colorStr.length() && colorStr.indexOf("\n", start) > 0) {
-            int end = colorStr.indexOf("\n", start);
-            colorList.add(colorStr.substring(start, end));
-            start = end + 1;
-            row++;
-        }
-        /*        useChannelList=new ArrayList<Channel>();
-         for (int i=0; i<ch.size(); i++) {
-         Color color=Color.GRAY;
-         if (i < colorList.size())
-         color=Color.decode(colorList.get(i));
-         double exposure=0;
-         if (i < exp.size())
-         exposure=exp.get(i);
-         double zOffs=0;
-         if (i < zOffset.size())
-         zOffs=zOffset.get(i);
-         boolean st=false;
-         if (i < stitch.size())
-         st=stitch.get(i);
-         useChannelList.add(new Channel(ch.get(i),exposure,zOffs,st,color));
-         }
-         */
-//        IJ.log("finish parsing Channel Config");
-        initializeChannelTable(currentAcqSetting); //adds last used channels to Table if found in availableChannels
-    }
-
-    public void loadPreferences() {
+        
+    private void loadPreferences() {
         expSettingsFile  = new File(Prefs.get("edu.virginia.autoimage.expSettingsFile", Prefs.getHomeDir()));
         dataProcessorPath=Prefs.get("edu.virginia.autoimage.dataProcessorPath", Prefs.getHomeDir());
         imageDestPath = Prefs.get("edu.virginia.autoimage.rootDir", Prefs.getHomeDir());
@@ -8395,7 +8308,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         showZProfileCheckBox.setSelected(Boolean.parseBoolean(Prefs.get("edu.virginia.autoimage.showZProfile", "true")));
     }
 
-    public void savePreferences() {        
+    private void savePreferences() {        
         Prefs.set("edu.virginia.autoimage.expSettingsFile", expSettingsFile.getAbsolutePath());
         Prefs.set("edu.virginia.autoimage.dataProcessorPath", dataProcessorPath);
         Prefs.set("edu.virginia.autoimage.rootDir", rootDirLabel.getText());
@@ -8494,8 +8407,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     private void updateAcqSettingTab(AcqSetting setting) {
         recalculateTiles = false;
-        binningComboBox.setSelectedItem(Integer.toString(setting.getBinning()));
+        
+        //objective and binning
         objectiveComboBox.setSelectedItem(setting.getObjective());
+        binningComboBox.setSelectedItem(Integer.toString(setting.getBinning()));
+        
+        //tiling
         tilingModeComboBox.setSelectedItem(setting.getTilingMode());
         tilingDirComboBox.setSelectedItem(setting.getTilingDir());
         clusterCheckBox.setSelected(setting.isCluster());
@@ -8514,22 +8431,33 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         maxSitesLabel.setEnabled(setting.getTilingMode() == TilingSetting.Mode.RANDOM || setting.getTilingMode() == TilingSetting.Mode.RUNTIME);
         insideOnlyCheckBox.setSelected(setting.isInsideOnly());
         acqOrderList.setSelectedItem(AcqSetting.ACQ_ORDER_LIST[setting.getAcqOrder()]);
+        
+        //autofocus
+        initializeAutofocusPanel(setting);
         autofocusCheckBox.setSelected(setting.isAutofocus());
-        zStackCheckBox.setSelected(setting.isZStack());
-        timelapseCheckBox.setSelected(setting.isTimelapse());
-        enableTimelapsePane(setting.isTimelapse());
+        
+        //channels
         initializeChannelTable(setting);
+        chShutterCheckBox.setSelected(setting.isKeepChShutterOpen());
+        
+        //z-Stack
         zStackCenteredCheckBox.setSelected(setting.isZStackCentered());
         zStackBeginField.setValue(setting.getZBegin());
         zStackEndField.setValue(setting.getZEnd());
         zStepSizeField.setValue(setting.getZStepSize());
         zSlicesSpinner.setValue(setting.getZSlices());
-        enableZStackPane(setting.isZStack());
-        intHourField.setText(Integer.toString(setting.getHoursInterval()));
-        intMinField.setText(Integer.toString(setting.getMinutesInterval()));
-        intSecField.setText(Integer.toString(setting.getSecondsInterval()));
-        framesField.setText(Integer.toString(setting.getFrames()));
+        zShutterCheckBox.setSelected(setting.isKeepZShutterOpen());
+        zStackCheckBox.setSelected(setting.isZStack());
+        
+        //timelapse
+        timepointSpinner.setValue(setting.getFrames());
+        intHourSpinner.setValue(setting.getHoursInterval());
+        intMinSpinner.setValue(setting.getMinutesInterval());
+        intSecSpinner.setValue(setting.getSecondsInterval());
+        intMillisSpinner.setValue(setting.getMillisecondsInterval());
         calculateDuration(setting);
+        timelapseCheckBox.setSelected(setting.isTimelapse());
+        
         //updatePixelSize(setting.getObjective());
         recalculateTiles = true;
     }
@@ -8633,10 +8561,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         //set active layout
         if (layout!=null) {
             acqLayout=layout;        
-            newAreaButton.setEnabled(!acqLayout.isEmpty && acqLayout.isAreaAdditionAllowed());
-            removeAreaButton.setEnabled(!acqLayout.isEmpty && acqLayout.isAreaRemovalAllowed());
-            mergeAreasButton.setEnabled(!acqLayout.isEmpty && acqLayout.isAreaMergingAllowed());
-            mergeAreasButton.setToolTipText(!acqLayout.isEmpty && acqLayout.isAreaMergingAllowed() ? "Merge areas" : "Areas cannot be merged in this layout");
+            newAreaButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
+            removeAreaButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaRemovalAllowed());
+            mergeAreasButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaMergingAllowed());
+            mergeAreasButton.setToolTipText(!acqLayout.isEmpty() && acqLayout.isAreaMergingAllowed() ? "Merge areas" : "Areas cannot be merged in this layout");
             ((LayoutPanel) acqLayoutPanel).setAcquisitionLayout(acqLayout, getMaxFOV());
             layoutFileLabel.setText(acqLayout.getName());
             if (acqLayout.isEmpty()) {
@@ -8709,7 +8637,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     
  
     private void loadAvailableObjectiveLabels() {
-//        objectiveComboBox.removeAllItems();
         objectiveComboBox.setModel(new DefaultComboBoxModel(new String[]{}));
         boolean found=false;
         try {
@@ -8723,7 +8650,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             if (!found) {               
                 objectiveDevStr=MMCoreUtils.selectDeviceStr(this,core,"Objective");
             }   
-            if (!objectiveDevStr.equals("")) {
+            if (objectiveDevStr!=null && !objectiveDevStr.equals("")) {
                 StrVector props = core.getDevicePropertyNames(objectiveDevStr);
                 for (String propsStr : props) {
                     if (propsStr.equals("Label")) {
@@ -8731,7 +8658,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         availableObjectives = new ArrayList<String>((int)allowedVals.size());
                         for (int j = 0; j < allowedVals.size(); j++) {
                             availableObjectives.add(allowedVals.get(j));
-//                            objectiveComboBox.addItem(allowedVals.get(j));
                         }
                         objectiveComboBox.setModel(new DefaultComboBoxModel(allowedVals.toArray()));
                     }
@@ -8743,7 +8669,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         String obj="";
         for (int i=0; i<objectiveComboBox.getItemCount(); i++)
             obj=obj+(String)objectiveComboBox.getItemAt(i)+", ";         
-        IJ.log("Objectives found: objectiveDevStr="+objectiveDevStr+"; "+obj);
+        IJ.log("Objectives found for device "+objectiveDevStr+"(objectiveDevStr): "+obj);
     }
 
     private double getMaxFOV() { //searches for largest pixel size calibration and multiplies it with horiz and vert detector pixel # (for objective with lowest mag)
@@ -8789,21 +8715,28 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         if (setting != null) {
             //intervalInSeconds = intHours*3600+intMinutes*60+intSeconds;
             int frames = setting.getFrames();
-            long totalSeconds = (frames - 1) * setting.getIntervalInMilliS() / 1000;
-            if (totalSeconds > 0) {
+            long totalMillis = (frames - 1) * setting.getTotalIntervalInMilliS();
+            if (totalMillis > 0) {
                 String dStr, hStr, minStr, secStr;
-                double d = Math.floor(totalSeconds / (3600 * 24));
+                double d = Math.floor(totalMillis / (3600000 * 24));
                 dStr = formatNumber("", d);
-                totalSeconds = (long) (totalSeconds % (3600 * 24));
-                double h = Math.floor(totalSeconds / 3600);
+                totalMillis = (long) (totalMillis % (3600000 * 24));
+                double h = Math.floor(totalMillis / 3600000);
                 hStr = formatNumber("00", h);
-                totalSeconds = (long) (totalSeconds % 3600);
-                double m = Math.floor(totalSeconds / 60);
+                totalMillis = (long) (totalMillis % 3600000);
+                double m = Math.floor(totalMillis / 60000);
                 minStr = formatNumber("00", m);
-                totalSeconds = (long) (totalSeconds % 60);
-                secStr = formatNumber("00", (double) totalSeconds);
+                totalMillis = (long) (totalMillis % 60000);
+                double s = Math.floor(totalMillis / 1000);
+                secStr = formatNumber("00", s)
+                        +"."
+                        +formatNumber("000", Math.floor(totalMillis % 1000));
                 if (frames != 1) {
-                    durationText.setText(dStr + "d " + hStr + "h " + minStr + "m " + secStr + "s");
+                    durationText.setText(
+                            dStr + "d "
+                          + hStr + "h:" 
+                          + minStr + "m:"
+                          + secStr + "s");
                 } else {
                     durationText.setText("No Time-lapse acquisition.");
                 }
@@ -8814,33 +8747,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         }
     }
-
-    private void enableZStackPane(boolean enable) {
-        if ((zStackCheckBox.isSelected() && enable) | !enable) {
-            acqModePane.setEnabledAt(1, enable);
-            Component[] comps = acqModePane.getComponents();
-            if (comps[1] instanceof Container) {
-                Container componentAsContainer = (Container) comps[1];
-                for (Component c : componentAsContainer.getComponents()) {
-                    c.setEnabled(enable);
-                }
-            }
-            if (zStackCenteredCheckBox.isSelected()) {
-                zStackBeginField.setEnabled(false);
-                zStackEndField.setEnabled(false);
-            }
-        }
-    }
-
-    private void enableTimelapsePane(boolean enable) {
-        if ((timelapseCheckBox.isSelected() && enable) | !enable) {
-            acqModePane.setEnabledAt(2, enable);
-            Component[] comps = acqModePane.getComponents();
-            if (comps[2] instanceof Container) {
-                Container componentAsContainer = (Container) comps[2];
-                for (Component c : componentAsContainer.getComponents()) {
-                    c.setEnabled(enable);
-                }
+    
+    private void enableComponent(Component component, boolean enableThis, boolean enableChildren) {
+        component.setEnabled(enableThis);
+        if (component instanceof Container) {
+            for (int i=0; i<((Container)component).getComponentCount(); i++) {
+                enableComponent(((Container)component).getComponent(i),enableChildren, enableChildren);
             }
         }
     }

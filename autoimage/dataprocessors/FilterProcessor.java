@@ -37,7 +37,6 @@ public abstract class FilterProcessor<E,T> extends BranchedProcessor<E> implemen
     protected String key_; //key to retrieve property of JSONObject in TaggedImages that will be filtered
     protected List<T> values_; //accepted values for property retrieved with key_
     protected long imagesAfterFiltering; //used to adjust dimension properties of TaggedImage (# of 'CHANNELS', 'FRAMES', 'SLICES')
-//    protected TaggedImageStorageDiskDefault storage;
     protected JSONObject newSummary;
     protected Map<String,Long> sitesPerArea;
     protected Map<String,List<String>> clustersPerArea;
@@ -609,87 +608,11 @@ public abstract class FilterProcessor<E,T> extends BranchedProcessor<E> implemen
         return meta;
     }
     
-/*   
-    //creates copy of element
-    //if meta!=null, metadata in copied element will be replaced by meta, otherwise keep original metadata
-    @Override
-    protected E createCopy(E element) {
-        JSONObject meta=null;
-        E copy=null;
-        if (element instanceof File) {
-            TaggedImage ti=null;
-            ImagePlus imp=null; 
-            imp=IJ.openImage(((File)element).getAbsolutePath());
-            if (imp!=null && imp.getProperty("Info") != null) {
-                try {
-                    meta = new JSONObject((String)imp.getProperty("Info"));
-                    String newDir=new File(workDir).getParentFile().getAbsolutePath();
-                    ImageProcessor ip=imp.getProcessor();
-                    if (meta.getJSONObject(MMTags.Root.SUMMARY).getString(MMTags.Summary.PIX_TYPE).equals("RGB32")) {
-                        //RGB32 images hold pixel data in int[] --> convert to byte[]
-                        ti=new TaggedImage(MMCoreUtils.convertIntToByteArray((int[])ip.getPixels()),new JSONObject(meta.toString()));
-                    }
-                    else if (meta.getJSONObject(MMTags.Root.SUMMARY).getString(MMTags.Summary.PIX_TYPE).equals("RGB64")) {
-                        if (imp.isComposite()) {
-                            CompositeImage ci=(CompositeImage)imp;
-                            short[] totalArray=new short[ci.getWidth()*ci.getHeight()*4];
-                            for (int channel=0; channel< ci.getNChannels(); channel++) {
-                                ImageProcessor proc=imp.getStack().getProcessor(channel+1);
-                                short[] chPixels=(short[])proc.getPixels();
-                                for (int i=0;i<chPixels.length;i++) {
-                                    totalArray[(2-channel) + 4*i] = chPixels[i]; // B,G,R
-                                }
-                            }
-                            ti=new TaggedImage(totalArray,new JSONObject(meta.toString()));
-                        }
-                        
-                    } else {//8-bit or 16-bit grayscale
-                        ti=ImageUtils.makeTaggedImage(ip);
-                        ti.tags=new JSONObject(meta.toString());                        
-                    }
-                    String newPrefix=new File(workDir).getName();
-                    //update metadata
-                    ti.tags=updateTagValue(ti.tags, newDir, newPrefix, false);
-                    if (storage==null) {
-                        storage = new TaggedImageStorageDiskDefault (workDir,true,ti.tags.getJSONObject(MMTags.Root.SUMMARY));
-                    }
-                    storage.putImage(ti);
-
-                    String posName="";
-                    File copiedFile=new File(new File(new File(newDir,newPrefix),meta.getString("PositionName")),
-                                                    ti.tags.getString("FileName"));
-                    copy=(E)copiedFile;
-                } catch (JSONException ex) {
-                    IJ.log(this.getClass().getName()+ ": Cannot retrieve 'Info' metadata from file. "+ex);
-                    Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
-//                    copy=super.createCopy(element);
-                } catch (Exception ex) {
-                    IJ.log(this.getClass().getName()+ ": Error writing file to storage. "+ex);
-                    Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            } else {
-                IJ.log(this.getClass().getName()+": Cannot open image");
-//                copy=super.createCopy(element);
-            }
-       } else if (element instanceof TaggedImage) {
-            copy=super.createCopy(element);
-            meta=((TaggedImage)element).tags;
-            try {
-                meta=updateTagValue(meta,null,null, true);
-                ((TaggedImage)copy).tags=meta;
-            } catch (JSONException ex) {
-                Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
-            }
-       }
-       return copy;
-    }    
-      */
-    
     @Override
     protected List<E> processElement(E element) {
         // create copy, update metadata and pass accepted elements through
         List<E> list=new ArrayList<E>(1);
-        list.add(createCopy(element));
+        list.add(createModifiedOutput(element));
         return list;
     }
 

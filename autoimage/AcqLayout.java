@@ -6,8 +6,6 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.NoninvertibleTransformException;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -18,12 +16,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.RejectedExecutionHandler;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.swing.ProgressMonitor;
-import javax.swing.SwingWorker;
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
@@ -39,101 +33,52 @@ import org.json.JSONObject;
  *
  * @author Karsten Siller
  */
-public class AcqLayout  implements PropertyChangeListener {
+public class AcqLayout {
+    public final static String TAG_CLASS_NAME = "CLASS";
+    public final static String TAG_LANDMARK = "LANDMARK";
+    public final static String TAG_LAYOUT = "LAYOUT";
+    public final static String TAG_LAYOUT_BOTTOM_MATERIAL = "BOTTOM_MATERIAL";
+    public final static String TAG_LAYOUT_BOTTOM_THICKNESS = "BOTTOM_THICKNESS";
+    public final static String TAG_LAYOUT_COORD_X = "LAYOUT_COORD_X";
+    public final static String TAG_LAYOUT_COORD_Y = "LAYOUT_COORD_Y";
+    public final static String TAG_LAYOUT_COORD_Z = "LAYOUT_COORD_Z";
+    //    public static final String TAG_REF_IMAGE_FILE="REF_IMAGE_FILE";
+    public final static String TAG_LAYOUT_HEIGHT = "LAYOUT_HEIGHT";
+    public final static String TAG_LAYOUT_LENGTH = "LAYOUT_LENGTH";
+    public final static String TAG_LAYOUT_WIDTH = "LAYOUT_WIDTH";
+    public final static String TAG_NAME = "NAME";
+    public final static String TAG_STAGE_X = "STAGE_X";
+    public final static String TAG_STAGE_Y = "STAGE_Y";
+    public final static String TAG_STAGE_Z = "STAGE_Z";
+    public final static String TAG_TILE_SEED_FILE = "TILE_SEEDS";
+    public final static String TAG_VERSION = "VERSION";
     
-    protected String name;
-    protected boolean isEmpty;
-    protected boolean isModified;
-    protected double width;//in um
-    protected double height;//in um
-    protected double length;//in um
-    protected String bottomMaterial;
-    protected double bottomThickness;//in um
-    protected String version;
+    private String name;
+    private boolean isEmpty;
+    private boolean isModified;
+    private double width;//in um
+    private double height;//in um
+    private double length;//in um
+    private String bottomMaterial;
+    private double bottomThickness;//in um
+    private String version;
     private AffineTransform stageToLayoutTransform;
     private AffineTransform layoutToStageTransform;
     private Vec3d normalVec;//normal to layout reference plane
-    protected File file;
+    private File file;
     
     private double escapeZPos; //z-stage is moved to this position when moving xystage to avoid collision with plate
 
-    protected List<Area> areas;
-    protected List<RefArea> landmarks;
-    private ProgressMonitor tileCalcMonitor;
-    private TileCalcTask tileTask;
-  
-    public static final String TAG_VERSION="VERSION";
-    public static final String TAG_CLASS_NAME="CLASS";
-    public static final String TAG_NAME="NAME";
-    public static final String TAG_LAYOUT_WIDTH="LAYOUT_WIDTH";
-    public static final String TAG_LAYOUT_LENGTH="LAYOUT_LENGTH";
-    public static final String TAG_LAYOUT_HEIGHT="LAYOUT_HEIGHT";
-    public static final String TAG_LAYOUT_BOTTOM_MATERIAL="BOTTOM_MATERIAL";
-    public static final String TAG_LAYOUT_BOTTOM_THICKNESS="BOTTOM_THICKNESS";
-    public static final String TAG_LAYOUT="LAYOUT";
-    public static final String TAG_LANDMARK="LANDMARK";
-    public static final String TAG_TILE_SEED_FILE="TILE_SEEDS";
-    public static final String TAG_STAGE_X="STAGE_X";
-    public static final String TAG_STAGE_Y="STAGE_Y";
-    public static final String TAG_STAGE_Z="STAGE_Z";
-    public static final String TAG_LAYOUT_COORD_X="LAYOUT_COORD_X";
-    public static final String TAG_LAYOUT_COORD_Y="LAYOUT_COORD_Y";
-    public static final String TAG_LAYOUT_COORD_Z="LAYOUT_COORD_Z";
-//    public static final String TAG_REF_IMAGE_FILE="REF_IMAGE_FILE";
-    
+    private List<Area> areas;
+    private List<RefArea> landmarks;
+     
     private static final String VERSION="1.0";
     private static final double ESCAPE_ZPOS_SAFETY=50; //keeps z-stage at least 50um below plate
     
     
-    
-    class TileCalcTask extends SwingWorker<Void, Void> {
-        
-        private ThreadPoolExecutor executor;
-        
-        public TileCalcTask(ThreadPoolExecutor executor) {
-            this.executor=executor;
-        }   
-        
-        @Override
-        public Void doInBackground() {
-//            int progress = 0;
-            setProgress(0);
-            try {
-                Thread.sleep(20);
-                while (!executor.isTerminated() && !isCancelled()) {
-                    Thread.sleep(200);
-                    setProgress((int)executor.getCompletedTaskCount());
-                }
-            } catch (InterruptedException ignore) {
-            }
-            return null; 
-        }
- 
-        @Override
-        public void done() {
-//            executor.shutdown();
-            if (isCancelled()) {
-            //    IJ.showMessage("cancelled");
-            } else {
-              //  IJ.showMessage("finished");
-//            tileCalcMonitor.setProgress(0);
-            }    
-        }
-    }
-    
-    public class RejectedExecutionHandlerImpl implements RejectedExecutionHandler {
-    
-        @Override
-        public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
-            System.out.println(r.toString() + " is rejected");
-        }
-    }    
-
-    
     public AcqLayout() {
         createEmptyLayout();
     }
-
     
     public static AcqLayout loadLayout(File file) {//returns true if layout has been changed
         BufferedReader br;
@@ -240,6 +185,10 @@ public class AcqLayout  implements PropertyChangeListener {
         }
         obj.put(RefArea.TAG_LANDMARK_ARRAY,landmarkArray);
         return obj;
+    }
+    
+    protected void initializeAreaList(int elements) {
+        areas=new ArrayList(elements);
     }
     
     //returns true if gaps exist between tiles
@@ -591,7 +540,6 @@ public class AcqLayout  implements PropertyChangeListener {
         return layoutToStageTransform;
     }
     
-
     public Vec3d getNormalVector() {
         return normalVec;
     }
@@ -616,8 +564,16 @@ public class AcqLayout  implements PropertyChangeListener {
         return bottomMaterial;
     }
     
+    public void setBottomMaterial(String material) {
+        bottomMaterial=material;
+    }
+    
     public double getBottomThickness() {
         return bottomThickness;
+    }
+    
+    public void setBottomThickness(double thickness) {
+        bottomThickness=thickness;
     }
     
     public double getStagePosX(Area a, int tileIndex) {
@@ -798,7 +754,7 @@ public class AcqLayout  implements PropertyChangeListener {
 
     //returns null if fov surrounding layout coordinate does not touch any area
     public Area getFirstTouchingArea(double lx, double ly, double fovX, double fovY) {
-        int i=0;
+/*        int i=0;
         int index=-1;
         while ((index==-1) && (i<areas.size())) {
             if (areas.get(i).doesFovTouchArea(lx,ly, fovX, fovY))
@@ -808,7 +764,14 @@ public class AcqLayout  implements PropertyChangeListener {
         if (index!=-1)
             return areas.get(index);
         else
-            return null;
+            return null;*/
+        for (Area area:areas) {
+            if (area.doesFovTouchArea(lx, ly, fovX, fovY)) {
+                return area;
+            }
+        }
+        //none of the areas touches the 
+        return null;
     }
     
     //parameters are absolute stage positions
@@ -846,37 +809,39 @@ public class AcqLayout  implements PropertyChangeListener {
     
     
     public ArrayList<Area> getAllAreasTouching(double x, double y) {
-        ArrayList<Area> a = new ArrayList<Area>(areas.size());
-        for (int i=0; i<areas.size(); i++) {
-            if (areas.get(i).isInArea(x,y))
-                a.add(areas.get(i));    
+        ArrayList<Area> list = new ArrayList<Area>(areas.size());
+        for (Area area : areas) {
+            if (area.isInArea(x, y)) {
+                list.add(area);    
+            }
         }
-        return a; 
+        return list; 
     }
 
     public ArrayList<Area> getUnselectedAreasTouching(double x, double y) {
-        ArrayList<Area> al = new ArrayList<Area>(areas.size());
+        ArrayList<Area> list = new ArrayList<Area>(areas.size());
         for (Area area:areas) {
             if (!area.isSelectedForAcq() && area.isInArea(x,y))
-                al.add(area);    
+                list.add(area);    
         }
-        return al; 
+        return list; 
     }
 
     public ArrayList<Area> getSelectedAreasTouching(double x, double y) {
-        ArrayList<Area> al = new ArrayList<Area>(areas.size());
+        ArrayList<Area> list = new ArrayList<Area>(areas.size());
         for (Area area:areas) {
             if (area.isSelectedForAcq() && area.isInArea(x,y))
-                al.add(area);    
+                list.add(area);    
         }
-        return al; 
+        return list; 
     }
 
     public ArrayList<Area> getAllAreasInsideRect(Rectangle2D.Double r) {
         ArrayList<Area> a = new ArrayList<Area>(areas.size());
-        for (int i=0; i<areas.size(); i++) {
-            if (areas.get(i).isInsideRect(r))
-                a.add(areas.get(i));    
+        for (Area area : areas) {
+            if (area.isInsideRect(r)) {
+                a.add(area);    
+            }
         }
         return a; 
     }
@@ -917,25 +882,6 @@ public class AcqLayout  implements PropertyChangeListener {
     }
     
 
-    //fired by TileCalcTask
-    @Override
-    public void propertyChange(PropertyChangeEvent evt) {
-        if ("progress".equals(evt.getPropertyName()) ) {
-            int progress = (Integer) evt.getNewValue();
-            tileCalcMonitor.setProgress(progress);
-            String message =
-                String.format("Completed %d%%.\n", (int)((double)progress/areas.size()*100));
-            tileCalcMonitor.setNote(message);
-            if (tileCalcMonitor.isCanceled() || tileTask.isDone()) {
-                if (tileCalcMonitor.isCanceled()) {
-                    tileTask.cancel(true);
-                } 
-//                tileCalcMonitor.close();
-            }
-        }
-    }
-    
-   
     private void writeSingleTile(XMLStreamWriter xtw, Tile t) throws XMLStreamException {
         XMLUtils.wStartElement(xtw, Area.TAG_TILE);
             XMLUtils.writeLine(xtw, Area.TAG_NAME, t.name);
@@ -1162,7 +1108,9 @@ public class AcqLayout  implements PropertyChangeListener {
        
     }
         
-    //returns index of first area with duplicate name
+    /**
+     * @return index of first area with duplicate name. Returns -1 if all names are unique or list is empty 
+     */ 
     public int hasDuplicateAreaNames() {
         if (areas!=null) {
             for (int i=0; i<areas.size(); i++) {
@@ -1179,8 +1127,11 @@ public class AcqLayout  implements PropertyChangeListener {
     public void removeAreaById(int id) {
         if (areas!=null) {
             for (int i=0; i<areas.size(); i++) {
-                if (areas.get(i).getId()==id)
+                if (areas.get(i).getId()==id) {
                     areas.remove(i);
+                    //id is unique, so loop cen be exited after finding first match
+                    break;
+                }    
             }
         }
         isModified=true;

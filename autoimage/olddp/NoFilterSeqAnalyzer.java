@@ -46,7 +46,7 @@ public class NoFilterSeqAnalyzer<E> extends BranchedProcessor<E>{
         }
         return modElement;*/
         List<E> list = new ArrayList<E>(1);
-        list.add(createCopy(element));
+        list.add(createModifiedOutput(element));
         return list;
     }
 

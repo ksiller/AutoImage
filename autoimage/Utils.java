@@ -16,6 +16,7 @@ import java.awt.geom.Point2D;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.JOptionPane;
 import javax.swing.tree.DefaultMutableTreeNode;
 import mmcorej.TaggedImage;
 import org.apache.commons.math.linear.Array2DRowRealMatrix;
@@ -457,4 +459,27 @@ public class Utils {
         }
     }    
     
+    public static void writeJSONObjectToFile(String filename, JSONObject obj) {
+        FileWriter fw=null;
+        try {
+            fw = new FileWriter(new File(filename));
+            if (obj!=null) {
+                fw.write(obj.toString(4));
+            }
+        } catch (JSONException ex) {
+            JOptionPane.showMessageDialog(null,"Error parsing Acquisition Layout as JSONObject.");
+            Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(null,"Error saving Acquisition Layout as JSONObject.");
+            Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+        } finally {
+            if (fw!=null) {
+                try {
+                    fw.close();
+                } catch (IOException ex) {
+                    Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }        
+    }
 }

@@ -11,19 +11,15 @@ import java.util.GregorianCalendar;
 import java.util.Iterator;
 import java.util.List;
 import java.util.TimeZone;
-import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.tree.DefaultMutableTreeNode;
 import mmcorej.CMMCore;
-import mmcorej.StrVector;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.micromanager.api.Autofocus;
-import org.micromanager.utils.CoreAutofocus;
 import org.micromanager.utils.MMException;
-import org.micromanager.utils.PropertyItem;
 import org.micromanager.utils.ReportingUtils;
 
 /**
@@ -50,6 +46,8 @@ public class AcqSetting {
     public static final String TAG_NAME = "NAME";
     public static final String TAG_OBJ_GROUP_STR = "OBJECTIVE_GROUP_STR";
     public static final String TAG_CHANNEL_GROUP_STR = "CHANNEL_GROUP_STR";
+    public static final String TAG_CHANNEL_SHUTTER_OPEN = "CHANNEL_SHUTTER_OPEN";
+    
     
     public static final String TAG_OBJ_LABEL = "OBJECTIVE_LABEL";
     public static final String TAG_BINNING = "BINNING";
@@ -59,16 +57,19 @@ public class AcqSetting {
     public static final String TAG_AUTOFOCUS_SETTINGS = "AUTOFOCUS_SETTINGS";
     public static final String TAG_AUTOFOCUS_DEVICE_NAME = "AUTOFOCUS_DEVICE_NAME";
     public static final String TAG_AUTOFOCUS_PROPERTIES = "AUTOFOCUS_PROPERTY_ARRAY";
+    public static final String TAG_AUTOFOCUS_SKIP_FRAMES = "AUTOFOCUS_SKIP_FRAMES";
     public static final String TAG_Z_STACK = "Z_STACK";
     public static final String TAG_Z_STACK_CENTERED = "Z_STACK_CENTERED";
     public static final String TAG_Z_BEGIN = "Z_BEGIN";
     public static final String TAG_Z_END = "Z_END";
     public static final String TAG_Z_STEP_SIZE = "Z_STEP_SIZE";
+    public static final String TAG_Z_SHUTTER_OPEN = "Z_SHUTTER_OPEN";
     public static final String TAG_SLICES = "SLICES";
     public static final String TAG_TIMELAPSE = "TIMELAPSE";
-    public static final String TAG_HOUR_INTERVAL = "HOUR_INTERVAL";
-    public static final String TAG_MINUTE_INTERVAL = "MINUTE_INTERVAL";
-    public static final String TAG_SECOND_INTERVAL = "SECOND_INTERVAL";
+//    public static final String TAG_HOUR_INTERVAL = "HOUR_INTERVAL";
+//    public static final String TAG_MINUTE_INTERVAL = "MINUTE_INTERVAL";
+//    public static final String TAG_SECOND_INTERVAL = "SECOND_INTERVAL";
+    public static final String TAG_MILLIS_INTERVAL = "MILLIS_INTERVAL";
     public static final String TAG_FRAMES = "FRAMES";
     public static final String TAG_ACQ_ORDER = "ACQ_ORDER";
     public static final String TAG_IMAGE_PROCESSOR_TREE = "IMAGE_PROCESSOR_TREE";
@@ -88,6 +89,7 @@ public class AcqSetting {
     protected TileManager tileManager;
 
     private boolean autofocus;      //visible
+    private int afSkipFrames;       //visible
     private JSONObject autofocusSettings;
     private boolean zStack;         //visible
     private boolean zStackCentered; //visible
@@ -95,13 +97,16 @@ public class AcqSetting {
     private double zEnd;            //visible
     private double zStepSize;       //visible
     private int slices;             //visible
+    private boolean zShutterOpen;    //visible
     private boolean timelapse;      //visible
     private int hours;
     private int minutes;
     private int seconds;
+    private int milliseconds;
     private long intervalInMS; //visible
     private int frames;             //visible
     private List<Channel> channels; //visible 
+    private boolean chShutterOpen;  //visible
     private int acqOrder;           //visible
     private List<Runnable> runnables;
     private DefaultMutableTreeNode imageProcRoot;
@@ -190,14 +195,17 @@ public class AcqSetting {
         setObjective(objective,oPixSize);        
         autofocus=autof;
         autofocusSettings=new JSONObject();
+        afSkipFrames=0;
         channelGroupStr="";
         channels=new ArrayList<Channel>();
+        chShutterOpen=false;
         startTime=new ScheduledTime(ScheduledTime.ASAP,0);
         zStack=false;
         zStackCentered=true;
         zBegin=0;
         zEnd=0;
         zStepSize=0;
+        zShutterOpen=false;
         slices=1;
         timelapse=false;
         intervalInMS=0;
@@ -217,6 +225,11 @@ public class AcqSetting {
             name=obj.getString(TAG_NAME);
             objectiveDevStr=obj.getString(TAG_OBJ_GROUP_STR);
             channelGroupStr=obj.getString(TAG_CHANNEL_GROUP_STR);
+            try {
+                chShutterOpen=obj.getBoolean(TAG_CHANNEL_SHUTTER_OPEN);
+            } catch (JSONException e) {
+                chShutterOpen=false;
+            }
             binning=obj.getInt(TAG_BINNING);
             try {
                 JSONObject fovObj=obj.getJSONObject(TAG_FIELD_OF_VIEW);
@@ -228,18 +241,38 @@ public class AcqSetting {
             setObjective(obj.getString(TAG_OBJ_LABEL),-1);
             autofocus=obj.getBoolean(TAG_AUTOFOCUS);
             autofocusSettings=obj.getJSONObject(TAG_AUTOFOCUS_SETTINGS);
+            try {
+                afSkipFrames=obj.getInt(TAG_AUTOFOCUS_SKIP_FRAMES);
+            } catch (JSONException e) {
+                afSkipFrames=0;
+            }
             zStack=obj.getBoolean(TAG_Z_STACK);
             zStackCentered=obj.getBoolean(TAG_Z_STACK_CENTERED);
             zBegin=obj.getDouble(TAG_Z_BEGIN);
             zEnd=obj.getDouble(TAG_Z_END);
             zStepSize=obj.getDouble(TAG_Z_STEP_SIZE);
+            try {
+                zShutterOpen=obj.getBoolean(TAG_Z_SHUTTER_OPEN);
+            } catch (JSONException e) {
+                zShutterOpen=false;
+            }
             slices=obj.getInt(TAG_SLICES);                    
             timelapse=obj.getBoolean(TAG_TIMELAPSE);
-            hours=obj.getInt(TAG_HOUR_INTERVAL);                    
-            minutes=obj.getInt(TAG_MINUTE_INTERVAL);                    
-            seconds=obj.getInt(TAG_SECOND_INTERVAL);                    
-            intervalInMS=hours*3600000+minutes*60000+seconds*1000;
-            frames=obj.getInt(TAG_FRAMES);                    
+            try {
+                intervalInMS=obj.getLong(TAG_MILLIS_INTERVAL);
+            } catch (JSONException e) {
+                intervalInMS=0;
+            }
+            hours=(int)Math.floor(intervalInMS / 3600000);
+            minutes=(int)Math.floor((intervalInMS -(hours*3600000)) / 60000);
+            seconds=(int)Math.floor((intervalInMS -(hours*3600000 + minutes*60000)) / 1000);
+            milliseconds=(int)(intervalInMS % 1000);
+            IJ.log(Long.toString(intervalInMS));
+            IJ.log(Long.toString(hours));
+            IJ.log(Long.toString(minutes));
+            IJ.log(Long.toString(seconds));
+            IJ.log(Long.toString(milliseconds));
+            frames=obj.getInt(TAG_FRAMES);
             acqOrder=obj.getInt(TAG_ACQ_ORDER);                    
             startTime=new ScheduledTime(obj.getJSONObject(TAG_START_TIME));
             tiling=new TilingSetting(obj.getJSONObject(TilingSetting.TAG_TILING));    
@@ -323,6 +356,32 @@ public class AcqSetting {
         return autofocusSettings;
     }
     
+    public int getAutofocusSkipFrames() {
+        return afSkipFrames;
+    }
+    
+    public void setAutofocusSkipFrames(int skipFrames) {
+        if (skipFrames >=0) {
+            afSkipFrames=skipFrames;
+        }
+    }
+    
+    public boolean isKeepZShutterOpen() {
+        return zShutterOpen;
+    }
+    
+    public void setKeepZShutterOpen(boolean b) {
+        zShutterOpen=b;
+    }
+    
+    public boolean isKeepChShutterOpen() {
+        return chShutterOpen;
+    }
+    
+    public void setKeepChShutterOpen(boolean b) {
+        chShutterOpen=b;
+    }
+    
     //trys to apply autofocusSettings to af object 
     public void applyAutofocusSettingsToDevice(Autofocus af) throws MMException {
         boolean error=false;
@@ -353,21 +412,22 @@ public class AcqSetting {
         obj.put(TAG_NAME,name);
         obj.put(TAG_OBJ_GROUP_STR, objectiveDevStr);
         obj.put(TAG_CHANNEL_GROUP_STR, channelGroupStr);
+        obj.put(TAG_CHANNEL_SHUTTER_OPEN, chShutterOpen);
         obj.put(TAG_OBJ_LABEL, objLabel);
         obj.put(TAG_BINNING, binning);
         obj.put(TAG_FIELD_OF_VIEW, fieldOfView.toJSONObject());
         obj.put(TAG_AUTOFOCUS, autofocus);
         obj.put(TAG_AUTOFOCUS_SETTINGS, autofocusSettings);
+        obj.put(TAG_AUTOFOCUS_SKIP_FRAMES, afSkipFrames);
         obj.put(TAG_Z_STACK, zStack);
         obj.put(TAG_Z_STACK_CENTERED, zStackCentered);
         obj.put(TAG_Z_BEGIN, zBegin);
         obj.put(TAG_Z_END, zEnd);
         obj.put(TAG_Z_STEP_SIZE, zStepSize);
+        obj.put(TAG_Z_SHUTTER_OPEN, zShutterOpen);
         obj.put(TAG_SLICES, slices);                    
         obj.put(TAG_TIMELAPSE, timelapse);
-        obj.put(TAG_HOUR_INTERVAL, hours);                    
-        obj.put(TAG_MINUTE_INTERVAL, minutes);                    
-        obj.put(TAG_SECOND_INTERVAL, seconds);                    
+        obj.put(TAG_MILLIS_INTERVAL, intervalInMS);                    
         obj.put(TAG_FRAMES, frames);                    
         obj.put(TAG_ACQ_ORDER, acqOrder);                    
         obj.put(TAG_START_TIME, startTime.toJSONObject());
@@ -405,7 +465,7 @@ public class AcqSetting {
         copy.setZStepSize(this.zStepSize);
         copy.setZSlices(this.slices);
         copy.enableTimelapse(this.timelapse);
-        copy.setMilliSInterval(this.intervalInMS);
+        copy.setTotalMilliSInterval(this.intervalInMS);
         copy.setFrames(frames);
         copy.setAcqOrder(this.acqOrder);
         for (Runnable r:runnables) 
@@ -692,7 +752,7 @@ public class AcqSetting {
     
     public void setHoursInterval(int h) {
         hours=h;
-        intervalInMS=hours*3600000+minutes*60000+seconds*1000;
+        intervalInMS=hours*3600000+minutes*60000+seconds*1000+milliseconds;
     }
     
     public int getHoursInterval() {
@@ -701,7 +761,7 @@ public class AcqSetting {
     
     public void setMinutesInterval(int m) {
         minutes=m;
-        intervalInMS=hours*3600000+minutes*60000+seconds*1000;
+        intervalInMS=hours*3600000+minutes*60000+seconds*1000+milliseconds;
     }
     
     public int getMinutesInterval() {
@@ -710,21 +770,31 @@ public class AcqSetting {
     
     public void setSecondsInterval(int s) {
         seconds=s;
-        intervalInMS=hours*3600000+minutes*60000+seconds*1000;
+        intervalInMS=hours*3600000+minutes*60000+seconds*1000+milliseconds;
     }
     
     public int getSecondsInterval() {
         return seconds;
     }
     
-    public void setMilliSInterval(long ms) {
+    public void setMillisecondsInterval(int millis) {
+        milliseconds=millis;
+        intervalInMS=hours*3600000+minutes*60000+seconds*1000+milliseconds;
+    }
+    
+    public int getMillisecondsInterval() {
+        return milliseconds;
+    }
+    
+    public void setTotalMilliSInterval(long ms) {
         intervalInMS=ms;
         hours=(int) Math.floor(intervalInMS/1000/3600);
         minutes=(int) Math.floor(((intervalInMS/1000)%3600)/60);
         seconds=(int)((intervalInMS/1000) -(hours*3600+minutes*60));
+        milliseconds=(int)(intervalInMS - (hours*3600000 + minutes*60000 + seconds*1000));
     }
     
-    public long getIntervalInMilliS() {
+    public long getTotalIntervalInMilliS() {
         return intervalInMS;
     }
     
