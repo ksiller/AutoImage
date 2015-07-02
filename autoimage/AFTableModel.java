@@ -28,18 +28,18 @@ public class AFTableModel extends AbstractTableModel {
             afSettings=new String[2][0];
         } else {
             afSettings=new String[2][settings.length()];
-        }
-        Iterator keys=settings.keys();
-        int row=0;
-        while (keys.hasNext()) {
-            String key=(String)keys.next();
-            afSettings[0][row]=key;
-            try {
-                afSettings[1][row]=settings.getString(key);
-            } catch (JSONException ex) {
-                afSettings[1][row]="no entry";
+            Iterator keys=settings.keys();
+            int row=0;
+            while (keys.hasNext()) {
+                String key=(String)keys.next();
+                afSettings[0][row]=key;
+                try {
+                    afSettings[1][row]=settings.getString(key);
+                } catch (JSONException ex) {
+                    afSettings[1][row]="no entry";
+                }
+                row++;
             }
-            row++;
         }
     }
 

@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage;
 
 import autoimage.area.Area;
@@ -26,7 +22,7 @@ import org.micromanager.api.ScriptInterface;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 public class RefPointListDialog extends javax.swing.JDialog implements IStageMonitorListener {
 
@@ -231,10 +227,8 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
             double stageY=core.getYPosition(xyStageName);
             double stageZ=core.getPosition(zStageName);
             stagePositionChanged(new Double[]{stageX, stageY, stageZ});
-//            updateStagePosLabel(stageX,stageY,stageZ);
 
             updateStageRotAndTilt();
-//            stagePosLabel.setText(Double.toString(stageX)+"; "+Double.toString(stageY)+"; "+Double.toString(stageZ));            
         } catch (Exception ex) {
             Logger.getLogger(RefPointListDialog.class.getName()).log(Level.SEVERE, null, ex);
         } 
@@ -265,7 +259,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
     synchronized public void addListener(IRefPointListener listener) {
         if (!listeners.contains(listener))
             listeners.add(listener);
-        IJ.log(getClass().getName()+": "+listeners.size()+" listeners");
+        IJ.log(getClass().getName()+": "+listeners.size()+" total listeners");
     }
         
     synchronized public void removeListener(IRefPointListener listener) {
@@ -277,7 +271,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
     private void notifySelectionListeners(RefArea refArea) {
         synchronized (listeners) {
             for (IRefPointListener l:listeners) {
-                l.selectedRefPointChanged(refArea);
+                l.referencePointSelectionChanged(refArea);
             }
         }
     }
@@ -285,7 +279,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
     private void notifyRefAreaListeners(List<RefArea> refAreas) {
         synchronized (listeners) {
             for (IRefPointListener l:listeners) {
-                l.referencePointsChanged(refAreas);
+                l.referencePointsUpdated(refAreas);
             }
         }
     }
@@ -458,7 +452,6 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
 
 
     private void updateStageRotAndTilt() {
-//        IJ.log(getClass().getName()+".updateStagePosAndTilt");
         int mappedPos=acqLayout.getNoOfMappedStagePos();
         if (mappedPos == 0) {
             tiltLabel.setText("unknown");
@@ -557,7 +550,13 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
                 double stageY=core.getYPosition(xyStageName);
                 double stageZ=core.getPosition(zStageName);
                 for (int i=0; i<model.getRowCount(); i++) {
-                    if (i!=row & Math.round((Double)model.getValueAt(i,1))==Math.round(stageX) & Math.round((Double)model.getValueAt(i,2))==Math.round(stageY)) {
+                    RefArea rp=model.getRowData(i);
+                    if (i!=row 
+                            && rp.isStagePosFound() 
+                            && Math.round(rp.getStageCoordX())==Math.round(stageX)
+                            && Math.round(rp.getStageCoordY())==Math.round(stageY)
+                            && Math.round(rp.getStageCoordZ())==Math.round(stageZ)) {
+//                    if (i!=row & Math.round((Double)model.getValueAt(i,1))==Math.round(stageX) & Math.round((Double)model.getValueAt(i,2))==Math.round(stageY)) {
                         JOptionPane.showMessageDialog(this, "A Reference Point is already defined for this stage position!");   
                         return;
                     }
@@ -764,7 +763,7 @@ public class RefPointListDialog extends javax.swing.JDialog implements IStageMon
     class SharedListSelectionHandler implements ListSelectionListener {
         @Override
         public void valueChanged(ListSelectionEvent e) {  
-                ListSelectionModel lsm = (ListSelectionModel)e.getSource();
+            ListSelectionModel lsm = (ListSelectionModel)e.getSource();
  
             for (RefArea rp : rpList) {
                 rp.setSelected(false);

@@ -103,7 +103,7 @@ public class AcqSettingTableModel extends AbstractTableModel {
     }
 
     public void addRow(Object value, int row) {
-        if (row != -1 && row < settings.size()) {
+        if (row !=-1 && row < settings.size()) {
             settings.add(row, (AcqSetting) value);
             fireTableRowsInserted(row, row);
         } else {
@@ -173,7 +173,8 @@ public class AcqSettingTableModel extends AbstractTableModel {
             }
             settings.remove(rowIdxArray[i]);
         }
-        fireTableRowsDeleted(rowIdxArray[0], rowIdxArray[rowIdxArray.length - 1]);
+        fireTableDataChanged();
+        //fireTableRowsDeleted(rowIdxArray[0], rowIdxArray[rowIdxArray.length - 1]);
     }
 
     public int rowDown(int rowIdx) {

@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage;
 
 
@@ -1298,8 +1294,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     //called from RefPointListDialog on EDT
     @Override
-    public void referencePointsChanged(List<RefArea> refAreas) {
-//        IJ.showMessage("AcqFrame.referencePointChanged");
+    public void referencePointsUpdated(List<RefArea> refAreas) {
         setLandmarkFound(acqLayout.getNoOfMappedStagePos() > 0);
         calcTilePositions(
                 null, 
@@ -1310,7 +1305,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }
 
     @Override
-    public void selectedRefPointChanged(RefArea refArea) {
+    public void referencePointSelectionChanged(RefArea refArea) {
         acqLayoutPanel.repaint();
     }
 
@@ -1743,7 +1738,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
         //initialize and start stage and live-mode monitors
         //refresh every 100ms
-        stageMonitor = new StagePosMonitor(core,100,false);
+        stageMonitor = new StagePosMonitor(core,100);
         stageMonitor.addListener(this);
         stageMonitor.addListener((LayoutPanel)acqLayoutPanel);
         stageMonitor.execute();        
@@ -3875,6 +3870,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 || e.getType() == TableModelEvent.DELETE 
                 || e.getType() == TableModelEvent.INSERT)) {
 //                || e.getType() == TableModelEvent.UPDATE)) {
+            
+            IJ.log("AcqSettingTable.changed");
             updatingAcqSettingTable=true;
 /*            for (AcqSetting setting:acqSettings)
                 acqSettingComboBox.addItem(setting.getName());*/
@@ -3884,7 +3881,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 //                IJ.showMessage("insert");
             }
             initializeAutofocusPanel(currentAcqSetting);
-//            enableAutofocusPane(currentAcqSetting.isAutofocus());
             updatingAcqSettingTable=false;
         }
     }
@@ -5752,8 +5748,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             JOptionPane.showMessageDialog(this, "Setting cannot be deleted.\nAt least one setting needs to be defined.");
         } else if (acqSettingTable.getSelectedRowCount() > 0) {
             int[] selectedRows = acqSettingTable.getSelectedRows();
+            int[] selectedModelRows = new int[selectedRows.length];
+            for (int i=0; i<selectedRows.length; i++) {
+                selectedModelRows[i]=acqSettingTable.convertRowIndexToModel(selectedRows[i]);
+            }
             int firstRow = selectedRows[0];
-            atm.removeRows(selectedRows);
+            atm.removeRows(selectedModelRows);
             if (firstRow >= atm.getRowCount()) {
                 acqSettingTable.setRowSelectionInterval(atm.getRowCount() - 1, atm.getRowCount() - 1);
             } else {
@@ -8375,7 +8375,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         maxSitesLabel.setEnabled(setting.getTilingMode() == TilingSetting.Mode.RANDOM || setting.getTilingMode() == TilingSetting.Mode.RUNTIME);
         insideOnlyCheckBox.setSelected(setting.isInsideOnly());
         acqOrderList.setSelectedItem(AcqSetting.ACQ_ORDER_LIST[setting.getAcqOrder()]);
-        
+
         //autofocus
         initializeAutofocusPanel(setting);
         autofocusCheckBox.setSelected(setting.isAutofocus());
@@ -8801,9 +8801,38 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         acqSettingTable.getModel().addTableModelListener(this);
         ListSelectionModel selectionModel = acqSettingTable.getSelectionModel();
         selectionModel.addListSelectionListener(new ListSelectionListener() {
+            
             @Override
             public void valueChanged(ListSelectionEvent e) {
-                acqSettingSelectionChanged(e);
+                if (e.getValueIsAdjusting()) {
+                    //don't do anything until value adjustment is completed
+                    return;
+                }    
+                ListSelectionModel lsm = (ListSelectionModel) e.getSource();
+                int minIndex = lsm.getMinSelectionIndex();
+                if (minIndex >= 0) {
+                    //convert minIndex (row in view) to index in TableModel, then retrieve the AcqSetting object
+//                    AcqSetting newSetting = ((AcqSettingTableModel)acqSettingTable.getModel()).getRowData(acqSettingTable.convertRowIndexToModel(minIndex));
+//                    AcqSetting newSetting = acqSettings.get(acqSettingTable.convertRowIndexToModel(minIndex));
+                    AcqSetting newSetting = acqSettings.get(minIndex);
+                    if (currentAcqSetting != newSetting) {
+                        currentAcqSetting = newSetting;
+                        sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
+                                "Sequence: "+currentAcqSetting.getName()));
+                        prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
+                        prevObjLabel = currentAcqSetting.getObjective();
+                        calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+                        ((LayoutPanel) acqLayoutPanel).setAcqSetting(currentAcqSetting, true);
+                        updateAcqSettingTab(currentAcqSetting);
+                        updateProcessorTreeView(currentAcqSetting);
+        /*                try {
+                            core.setChannelGroup(currentAcqSetting.getChannelGroupStr());
+                        } catch (Exception ex) {
+                            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                        }*/
+                        acqSettingTable.requestFocusInWindow();
+                    }
+                }            
             }
         });
     }
