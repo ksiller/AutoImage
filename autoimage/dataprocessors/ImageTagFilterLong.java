@@ -1,7 +1,6 @@
 package autoimage.dataprocessors;
 
 import java.util.List;
-import mmcorej.TaggedImage;
 
 /**
  * Class that specifically handles filtering using free text values representing Long objects 

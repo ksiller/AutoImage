@@ -372,11 +372,9 @@ public class AcqSetting {
     
     //trys to apply autofocusSettings to af object 
     public void applyAutofocusSettingsToDevice(Autofocus af) throws MMException {
-        boolean error=false;
         String property="";
         String key="";
-        error= af==null;
-        if (!error && af.getDeviceName().equals(getAutofocusDevice())) {
+        if (af!=null && af.getDeviceName().equals(getAutofocusDevice())) {
             JSONObject properties=getAutofocusProperties();
             Iterator<String> keys=properties.keys();
             while (keys.hasNext()) {
@@ -385,13 +383,12 @@ public class AcqSetting {
                     property = properties.getString(key);
                     af.setPropertyValue(key, property);
                 } catch (JSONException ex) {
-                    error=true;
+                    throw (new MMException("AcqSetting.applyAutofocusSettings: error setting property for "+af.getDeviceName()+", key: "+key+", property:" + property));
                 }
             }
-//            af.applySettings();
-        }
-        if (error) {
-            throw (new MMException("AcqSetting.applyAutofocusSettings: error setting property for "+af.getDeviceName()+", key: "+key+", property:" + property));
+            af.applySettings();
+        } else {
+            throw (new MMException("AcqSetting.applyAutofocusSettings: AF device=null or "+ getAutofocusDevice()+" not found"));
         }
     }
     

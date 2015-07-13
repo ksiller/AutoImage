@@ -128,7 +128,8 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
    protected abstract boolean acceptElement(E element);
    
    
-   /** If element is modified, a copy needs to be created;
+   /** 
+    * If element is modified, a copy needs to be created;
     * createModifiedOutput should handle that.
     * Copy should be passed to modifiedOutput_ queue via call of produceModified(modifiedElement); 
     * @param element incoming element from input_ queue
@@ -141,12 +142,12 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
    /**
     * Does not do anything by default.
     * Overwrite if metadata update is needed, e.g. after filtering 
-     * @param meta metadata of modified element
-     * @param newDir path to be set for "Directory" entry in summary metadata
-     * @param newPrefix name to be set for "Prefix" entry in summary metadata
-     * @param isTaggedImage if true, newDir and newPrefix values should be ignored since they will be defined by ImageCache
-     * @return modified metadata
-     * @throws org.json.JSONException if meta JSONObject cannot be parsed or modified
+    * @param meta metadata of modified element
+    * @param newDir path to be set for "Directory" entry in summary metadata
+    * @param newPrefix name to be set for "Prefix" entry in summary metadata
+    * @param isTaggedImage if true, newDir and newPrefix values should be ignored since they will be defined by ImageCache
+    * @return modified metadata
+    * @throws org.json.JSONException if meta JSONObject cannot be parsed or modified
     */
    public JSONObject updateTagValue(JSONObject meta,String newDir, String newPrefix, boolean isTaggedImage) throws JSONException {
        return meta;
@@ -167,9 +168,9 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
                 String newPrefix=new File(workDir).getName();
                 String newDir=new File(workDir).getParentFile().getAbsolutePath();
                 TaggedImage ti=MMCoreUtils.openAsTaggedImage(((File)element).getAbsolutePath());
-//                JSONObject meta = new JSONObject(ti.tags.toString()); 
                 //update metadata
                 if (savesImageCopy) {
+                    //this is the current default
                     ti.tags=updateTagValue(ti.tags, newDir, newPrefix, false);
                 } else {
                     //create TaggedImage without any pixel data
@@ -247,10 +248,10 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
          if (acceptElement(element)) { 
              try {
                  List<E> modifiedElements=processElement(element);
-                 if (modifiedElements!=null) { //image analysis was successful and processed element should be passed to next processor
-                     /* analyzers that form nodes need to place processed image in
+                 if (modifiedElements!=null) { //processing was successful and processed element should be passed to next processor
+                     /* processors that form nodes need to place processed image in
                      * modifiedOutput_ queue
-                     * for last analyzer in tree branch (='leaf') modifiedOutput_ == null,
+                     * for last processor in tree branch (='leaf') modifiedOutput_ == null,
                      * which is handled in produceModified method
                      */
                      for (E modElement:modifiedElements)

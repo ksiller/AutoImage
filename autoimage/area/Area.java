@@ -665,7 +665,7 @@ public abstract class Area {
                             return calcCenterTilePositions(fovX, fovY, setting);
                 case RANDOM:    
                             return calcRandomTilePositions(fovX, fovY, setting);
-                case RUNTIME:
+                case ADAPTIVE:
                             return calcRuntimeTilePositions(tileManager, fovX, fovY, setting);
                 case FILE:      {
                             unknownTileNum=true;

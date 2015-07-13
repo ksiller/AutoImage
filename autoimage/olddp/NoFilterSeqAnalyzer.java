@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage.olddp;
 
 import autoimage.dataprocessors.BranchedProcessor;
@@ -46,7 +42,8 @@ public class NoFilterSeqAnalyzer<E> extends BranchedProcessor<E>{
         }
         return modElement;*/
         List<E> list = new ArrayList<E>(1);
-        list.add(createModifiedOutput(element));
+        //does not create copy
+        list.add(element);
         return list;
     }
 

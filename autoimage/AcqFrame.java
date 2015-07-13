@@ -1553,12 +1553,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         instantiateStageControlPlugin();
         
         //initialize comboBox to select TilingMode
-        Object[] tilingModeOptions = new Object[]{
+/*        Object[] tilingModeOptions = new Object[]{
             TilingSetting.Mode.FULL,
             TilingSetting.Mode.CENTER,
             TilingSetting.Mode.RANDOM,
-            TilingSetting.Mode.RUNTIME};
-        tilingModeComboBox.setModel(new DefaultComboBoxModel(tilingModeOptions));
+            TilingSetting.Mode.ADAPTIVE};
+        tilingModeComboBox.setModel(new DefaultComboBoxModel(tilingModeOptions));*/
+        tilingModeComboBox.setModel(new DefaultComboBoxModel(TilingSetting.getTilingModes()));
 
         //initialize combobox to select TilingDirection
         Map<Object, Icon> icons = new HashMap<Object, Icon>();
@@ -1900,14 +1901,15 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         autoExposureButton = new javax.swing.JButton();
         chShutterCheckBox = new javax.swing.JCheckBox();
         afPanel = new javax.swing.JPanel();
-        autofocusImportButton = new javax.swing.JButton();
+        afRefreshButton = new javax.swing.JButton();
         afModeLabel = new javax.swing.JLabel();
-        autofocusButton = new javax.swing.JButton();
+        afConfigButton = new javax.swing.JButton();
         afSkipFrameSpinner = new javax.swing.JSpinner();
         jScrollPane1 = new javax.swing.JScrollPane();
         afPropertyTable = new javax.swing.JTable();
         jLabel27 = new javax.swing.JLabel();
         jLabel11 = new javax.swing.JLabel();
+        focusNowButton = new javax.swing.JButton();
         zStackPanel = new javax.swing.JPanel();
         jLabel19 = new javax.swing.JLabel();
         jLabel20 = new javax.swing.JLabel();
@@ -2612,23 +2614,23 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
         acqModePane.addTab("Channels", chPanel);
 
-        autofocusImportButton.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
-        autofocusImportButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/micromanager/icons/arrow_refresh.png"))); // NOI18N
-        autofocusImportButton.setToolTipText("Apply autofocus settings");
-        autofocusImportButton.addActionListener(new java.awt.event.ActionListener() {
+        afRefreshButton.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
+        afRefreshButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/org/micromanager/icons/arrow_refresh.png"))); // NOI18N
+        afRefreshButton.setToolTipText("Apply autofocus settings");
+        afRefreshButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                autofocusImportButtonActionPerformed(evt);
+                afRefreshButtonActionPerformed(evt);
             }
         });
 
         afModeLabel.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         afModeLabel.setText("jLabel35");
 
-        autofocusButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/wrench_orange.png"))); // NOI18N
-        autofocusButton.setToolTipText("Autofocus Configuration");
-        autofocusButton.addActionListener(new java.awt.event.ActionListener() {
+        afConfigButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/wrench_orange.png"))); // NOI18N
+        afConfigButton.setToolTipText("Configure autofocus settings");
+        afConfigButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                autofocusButtonActionPerformed(evt);
+                afConfigButtonActionPerformed(evt);
             }
         });
 
@@ -2674,6 +2676,15 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         jLabel11.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
         jLabel11.setText("Skip Frames: ");
 
+        focusNowButton.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
+        focusNowButton.setIcon(new javax.swing.ImageIcon("/Users/Karsten/NetBeansProjects/Advanced_MDA/src/autoimage/resources/find.png")); // NOI18N
+        focusNowButton.setToolTipText("Test autofocus now");
+        focusNowButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                focusNowButtonActionPerformed(evt);
+            }
+        });
+
         org.jdesktop.layout.GroupLayout afPanelLayout = new org.jdesktop.layout.GroupLayout(afPanel);
         afPanel.setLayout(afPanelLayout);
         afPanelLayout.setHorizontalGroup(
@@ -2685,8 +2696,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         .add(jScrollPane1, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
                         .add(6, 6, 6)
                         .add(afPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(autofocusButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
-                            .add(autofocusImportButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                            .add(afConfigButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(afRefreshButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                            .add(focusNowButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
                     .add(afPanelLayout.createSequentialGroup()
                         .add(jLabel11)
                         .add(3, 3, 3)
@@ -2710,9 +2722,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(afPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
                     .add(jScrollPane1, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 90, Short.MAX_VALUE)
                     .add(afPanelLayout.createSequentialGroup()
-                        .add(autofocusButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(afConfigButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                         .add(3, 3, 3)
-                        .add(autofocusImportButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
+                        .add(afRefreshButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
+                        .add(3, 3, 3)
+                        .add(focusNowButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 22, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)))
                 .add(3, 3, 3))
         );
 
@@ -2837,9 +2851,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                             .add(org.jdesktop.layout.GroupLayout.TRAILING, reverseButton, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, 1, Short.MAX_VALUE))
                         .add(3, 3, 3)
                         .add(zStackPanelLayout.createParallelGroup(org.jdesktop.layout.GroupLayout.LEADING)
-                            .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
-                                .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                .add(jLabel23))
+                            .add(org.jdesktop.layout.GroupLayout.TRAILING, jLabel23)
                             .add(org.jdesktop.layout.GroupLayout.TRAILING, zStackPanelLayout.createSequentialGroup()
                                 .add(jLabel26, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                 .addPreferredGap(org.jdesktop.layout.LayoutStyle.RELATED)
@@ -3083,7 +3095,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 .add(0, 0, 0)
                 .add(jPanel10, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.PREFERRED_SIZE)
                 .add(2, 2, 2)
-                .add(acqModePane, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, 168, Short.MAX_VALUE)
+                .add(acqModePane, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, org.jdesktop.layout.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .add(5, 5, 5))
         );
 
@@ -4039,11 +4051,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         clusterYField.setEnabled(b && clusterCheckBox.isSelected() && clusterCheckBox.isEnabled());
 //        clusterOverlapCheckBox.setEnabled(b && clusterCheckBox.isSelected() && clusterCheckBox.isEnabled() && currentAcqSetting.getTilingMode() != TilingSetting.Mode.CENTER);
         siteOverlapCheckBox.setEnabled(b && currentAcqSetting.getTilingMode() == TilingSetting.Mode.RANDOM);
-        maxSitesLabel.setEnabled(b && (currentAcqSetting.getTilingMode() == TilingSetting.Mode.RANDOM || currentAcqSetting.getTilingMode() == TilingSetting.Mode.RUNTIME));
+        maxSitesLabel.setEnabled(b && (currentAcqSetting.getTilingMode() == TilingSetting.Mode.RANDOM || currentAcqSetting.getTilingMode() == TilingSetting.Mode.ADAPTIVE));
         maxSitesField.setEnabled(maxSitesLabel.isEnabled());
         tileOverlapField.setEnabled(b);
-        autofocusButton.setEnabled(b);
-        autofocusImportButton.setEnabled(b);
+        afConfigButton.setEnabled(b);
+        afRefreshButton.setEnabled(b);
         afSkipFrameSpinner.setEnabled(b);
         afPropertyTable.setEnabled(b);
         clearRoiButton.setEnabled(b);
@@ -5234,13 +5246,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 processorTreeView.requestFocusInWindow();
                 return;
             }
-            if (setting.getTilingMode() == TilingSetting.Mode.RUNTIME) {
+            if (setting.getTilingMode() == TilingSetting.Mode.ADAPTIVE) {
                 if (setting==acqSettings.get(0)) {
                     recalculateTiles = false;
                     acqSettingTable.setRowSelectionInterval(i, i);
 //                    acqSettingListBox.setSelectedValue(setting.getName(), true);
                     recalculateTiles = true;
-                    JOptionPane.showMessageDialog(this, "'Runtime Tiling' cannot not be used for the first acquisition sequence.");
+                    JOptionPane.showMessageDialog(this, "'"+setting.getTilingMode().toString()+" Tiling' cannot not be used for the first acquisition sequence.");
                     return;
                 }
                 boolean roiFinderDefined=false;
@@ -5264,7 +5276,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     String s="";
                     for (String seq:list)
                         s=s+seq+"\n";
-                        JOptionPane.showMessageDialog(this, "In order to run acquisition sequence "+setting.getName()+ " in 'Runtime Tiling' mode, \n "
+                        JOptionPane.showMessageDialog(this, "In order to run acquisition sequence "+setting.getName()+ " in '"+setting.getTilingMode().toString()+" Tiling' mode, \n "
                                 + "a ROIFinder DataProcessor needs to be configured in one of these sequences: \n\n"
                                 + s);
                         return;
@@ -6028,7 +6040,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                     insertPos);
                             } else if (!(dpOfLastChildInParentNode instanceof TaggedImageAnalyzer) &&
                                 !(dpOfLastChildInParentNode instanceof BranchedProcessor)) {
-                                JOptionPane.showMessageDialog(null,"Conflict. Two DataProcessors at same hierarchy level. \nAdding branch point.");
+                                JOptionPane.showMessageDialog(null,"Conflict. Two DataProcessors in same branch. \nAdding branch point.");
                                 DefaultMutableTreeNode branchNode;
                                 if (isDescendantOfStorage) {
                                     branchNode=createAndAddProcessorNode((DefaultMutableTreeNode)selectedNode.getParent(),new NoFilterSeqAnalyzer<File>(""));
@@ -6956,7 +6968,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }//GEN-LAST:event_tilingModeComboBoxActionPerformed
 
-    private void autofocusButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_autofocusButtonActionPerformed
+    private void afConfigButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_afConfigButtonActionPerformed
         String currentAF=currentAcqSetting.getAutofocusDevice();
         if (currentAF != null) {
             try {
@@ -6970,7 +6982,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         }    
         app.getAutofocusManager().showOptionsDialog();
-    }//GEN-LAST:event_autofocusButtonActionPerformed
+    }//GEN-LAST:event_afConfigButtonActionPerformed
 
     private void acqOrderListActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_acqOrderListActionPerformed
         //        if (acqSettings!=null && acqSettings.size()>0) {
@@ -7651,7 +7663,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         autofocusCheckBox.setToolTipText(text);
     } 
     
-    private void autofocusImportButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_autofocusImportButtonActionPerformed
+    private void afRefreshButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_afRefreshButtonActionPerformed
         Autofocus af=null;
         try {
             af=app.getAutofocus();
@@ -7666,7 +7678,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
-    }//GEN-LAST:event_autofocusImportButtonActionPerformed
+    }//GEN-LAST:event_afRefreshButtonActionPerformed
 
     private void autoExposureButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_autoExposureButtonActionPerformed
         AbstractCellEditor ae = (AbstractCellEditor) channelTable.getCellEditor();
@@ -7960,6 +7972,39 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }//GEN-LAST:event_timepointSpinnerStateChanged
 
+    private void focusNowButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_focusNowButtonActionPerformed
+        String currentAF=currentAcqSetting.getAutofocusDevice();
+        if (currentAF != null) {
+            try {
+                app.getAutofocusManager().selectDevice(currentAF);
+                final Autofocus af=app.getAutofocus();
+                currentAcqSetting.applyAutofocusSettingsToDevice(af);
+//                app.getAutofocusManager().refresh();
+                //run AF in own thread as shown in MMStudio.java 
+                new Thread() {
+                    @Override
+                    public void run() {
+                        boolean inLiveMode = app.isLiveModeOn();
+                        if (inLiveMode) {
+                            app.enableLiveMode(false);
+                        }
+                        try {
+                            af.fullFocus();
+                        } catch (MMException ex) {
+                            ReportingUtils.logError(ex, this.getClass().getName()+": Autofocus execution");
+                        }
+                        if (inLiveMode) {
+                            app.enableLiveMode(true);
+                        }
+                    }
+                }.start();
+            } catch (MMException ex) {
+                JOptionPane.showMessageDialog(this,"Error in Autofocus device: " +ex.getMessage());
+                ReportingUtils.logError(ex, this.getClass().getName()+": Autofocus configuration");
+            }
+        }
+    }//GEN-LAST:event_focusNowButtonActionPerformed
+
     private void saveLayout() {
         JFileChooser jfc = new JFileChooser();
         jfc.setCurrentDirectory(acqLayout.getFile().getParentFile());
@@ -8082,17 +8127,17 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JButton addROIFinderButton;
     private javax.swing.JButton addScriptAnalyzerButton;
     private javax.swing.JButton addZFilterButton;
+    private javax.swing.JButton afConfigButton;
     private javax.swing.JLabel afModeLabel;
     private javax.swing.JPanel afPanel;
     private javax.swing.JTable afPropertyTable;
+    private javax.swing.JButton afRefreshButton;
     private javax.swing.JSpinner afSkipFrameSpinner;
     private javax.swing.JButton areaDownButton;
     private javax.swing.JLabel areaLabel;
     private javax.swing.JTable areaTable;
     private javax.swing.JButton areaUpButton;
     private javax.swing.JButton autoExposureButton;
-    private javax.swing.JButton autofocusButton;
-    private javax.swing.JButton autofocusImportButton;
     private javax.swing.JComboBox binningComboBox;
     private javax.swing.JButton browseImageDestPathButton;
     private javax.swing.ButtonGroup buttonGroup1;
@@ -8117,6 +8162,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private javax.swing.JButton editProcessorButton;
     private javax.swing.JLabel expSettingsFileLabel;
     private javax.swing.JTextField experimentTextField;
+    private javax.swing.JButton focusNowButton;
     private javax.swing.JCheckBox insideOnlyCheckBox;
     private javax.swing.JSpinner intHourSpinner;
     private javax.swing.JSpinner intMillisSpinner;
@@ -8371,8 +8417,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         siteOverlapCheckBox.setEnabled(setting.getTilingMode() == TilingSetting.Mode.RANDOM);
         tileOverlapField.setText(Integer.toString((int) (setting.getTileOverlap() * 100)));
         maxSitesField.setText(Integer.toString(setting.getMaxSites()));
-        maxSitesField.setEnabled(setting.getTilingMode() == TilingSetting.Mode.RANDOM || setting.getTilingMode() == TilingSetting.Mode.RUNTIME);
-        maxSitesLabel.setEnabled(setting.getTilingMode() == TilingSetting.Mode.RANDOM || setting.getTilingMode() == TilingSetting.Mode.RUNTIME);
+        maxSitesField.setEnabled(setting.getTilingMode() == TilingSetting.Mode.RANDOM || setting.getTilingMode() == TilingSetting.Mode.ADAPTIVE);
+        maxSitesLabel.setEnabled(setting.getTilingMode() == TilingSetting.Mode.RANDOM || setting.getTilingMode() == TilingSetting.Mode.ADAPTIVE);
         insideOnlyCheckBox.setSelected(setting.isInsideOnly());
         acqOrderList.setSelectedItem(AcqSetting.ACQ_ORDER_LIST[setting.getAcqOrder()]);
 

@@ -3,9 +3,7 @@ package autoimage.tools;
 import autoimage.AcqLayout;
 import autoimage.AcqPlateLayout;
 import autoimage.PlateConfiguration;
-//import autoimage.PlateConfiguration;
 import autoimage.Utils;
-import ij.IJ;
 import ij.Prefs;
 import java.io.File;
 import java.io.FileWriter;
@@ -19,7 +17,7 @@ import org.json.JSONObject;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 public class LayoutPlateManagerDlg extends javax.swing.JDialog {
 
@@ -366,6 +364,7 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
                 configuration.fileLocation=lastFileLocation;
             }
             fileLocationLabel.setText(configuration.fileLocation);
+            //convert all values from um to mm
             plateWidthField.setValue(configuration.width/1000);
             plateLengthField.setValue(configuration.length/1000);
             plateHeightField.setValue(configuration.height/1000);
@@ -430,13 +429,6 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
         PlateConfiguration config = getConfiguration();
         if ((config.width < config.distLeftEdgeToA1+(config.columns-1)*config.wellDistance+config.wellDiameter/2)
                 || (config.length < config.distTopEdgeToA1+(config.rows-1)*config.wellDistance+config.wellDiameter/2)) {
-            IJ.log(Double.toString(config.width));
-            IJ.log(Double.toString(config.length));
-            IJ.log(Double.toString(config.height));
-            IJ.log(Double.toString(config.distLeftEdgeToA1));
-            IJ.log(Double.toString(config.distTopEdgeToA1));
-            IJ.log(Double.toString(config.wellDistance));
-            IJ.log(Double.toString(config.wellDiameter));
             JOptionPane.showMessageDialog(this,"Cannot fit all wells into layout.");
             return;
         }

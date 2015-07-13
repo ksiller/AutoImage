@@ -55,7 +55,7 @@ public class ImageLoader extends ExtDataProcessor<TaggedImage> {
         try {
             TaggedImage element = poll();
 //            produce(element);
-            if (element instanceof TaggedImage && TaggedImageQueue.isPoison((TaggedImage)element)) {
+            if (TaggedImageQueue.isPoison(element)) {
                 produce(element);
                 IJ.log(getClass().getSimpleName()+" "+procName+" : Poison");
                 done=true;

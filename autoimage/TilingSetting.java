@@ -9,8 +9,16 @@ import org.json.JSONObject;
  * @author Karsten Siller
  */
 public class TilingSetting {
-    public enum Mode {FULL, CENTER, RANDOM, RUNTIME, FILE}
+
+    public enum Mode {FULL, CENTER, RANDOM, ADAPTIVE, FILE}
     Mode mode;
+    private static Object[] tilingModeOptions = new Object[]{
+        Mode.FULL,
+        Mode.CENTER,
+        Mode.RANDOM,
+        Mode.ADAPTIVE};
+    //Mode.File not supported yet
+    
     String tileCoordFName; //abspath to file with tilingcoords
     AcqSetting tileCoordSource; //used for runtime tile coord calculation
     boolean cluster;
@@ -60,7 +68,7 @@ public class TilingSetting {
     }
     
     public TilingSetting() {
-        mode=TilingSetting.Mode.FULL;
+        mode=Mode.FULL;
         tileCoordFName="";
         cluster=true;
         nrClusterTileX=1;
@@ -75,16 +83,17 @@ public class TilingSetting {
     public TilingSetting(JSONObject obj) throws JSONException {
         if (obj!=null) {
             String m=obj.getString(TAG_MODE);
-            if (m.equals(Mode.CENTER.toString()))
+            mode=Mode.valueOf(m);
+/*            if (m.equals(Mode.CENTER.toString()))
                 mode=Mode.CENTER;
             else if (m.equals(Mode.FULL.toString()))
                 mode=Mode.FULL;
             else if (m.equals(Mode.RANDOM.toString()))
                 mode=Mode.RANDOM;
-            else if (m.equals(Mode.RUNTIME.toString()))
-                mode=Mode.RUNTIME;
+            else if (m.equals(Mode.ADAPTIVE.toString()))
+                mode=Mode.ADAPTIVE;
             else if (m.equals(Mode.FILE.toString()))
-                mode=Mode.FILE;
+                mode=Mode.FILE;*/
             tileCoordFName=obj.getString(TAG_ROI_SOURCE_FILE);
             cluster=obj.getBoolean(TAG_CLUSTER);
             nrClusterTileX=obj.getInt(TAG_NR_CLUSTER_TILE_X);
@@ -95,6 +104,10 @@ public class TilingSetting {
             overlap=obj.getDouble(TAG_OVERLAP);
             direction=obj.getInt(TAG_DIRECTION);
         }
+    }
+    
+    public static Object[] getTilingModes() {
+        return tilingModeOptions;
     }
     
     public JSONObject toJSONObject() throws JSONException {

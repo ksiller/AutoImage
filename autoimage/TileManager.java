@@ -15,7 +15,7 @@ import java.util.logging.Logger;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 public class TileManager implements IStagePosListener {
     

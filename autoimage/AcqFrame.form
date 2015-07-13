@@ -1145,8 +1145,9 @@
                                           <Component id="jScrollPane1" pref="0" max="32767" attributes="0"/>
                                           <EmptySpace min="-2" pref="6" max="-2" attributes="0"/>
                                           <Group type="103" groupAlignment="0" attributes="0">
-                                              <Component id="autofocusButton" min="-2" pref="22" max="-2" attributes="0"/>
-                                              <Component id="autofocusImportButton" min="-2" pref="22" max="-2" attributes="0"/>
+                                              <Component id="afConfigButton" min="-2" pref="22" max="-2" attributes="0"/>
+                                              <Component id="afRefreshButton" min="-2" pref="22" max="-2" attributes="0"/>
+                                              <Component id="focusNowButton" min="-2" pref="22" max="-2" attributes="0"/>
                                           </Group>
                                       </Group>
                                       <Group type="102" alignment="0" attributes="0">
@@ -1177,9 +1178,11 @@
                                   <Group type="103" groupAlignment="0" attributes="0">
                                       <Component id="jScrollPane1" pref="90" max="32767" attributes="0"/>
                                       <Group type="102" alignment="0" attributes="0">
-                                          <Component id="autofocusButton" min="-2" pref="22" max="-2" attributes="0"/>
+                                          <Component id="afConfigButton" min="-2" pref="22" max="-2" attributes="0"/>
                                           <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
-                                          <Component id="autofocusImportButton" min="-2" pref="22" max="-2" attributes="0"/>
+                                          <Component id="afRefreshButton" min="-2" pref="22" max="-2" attributes="0"/>
+                                          <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
+                                          <Component id="focusNowButton" min="-2" pref="22" max="-2" attributes="0"/>
                                       </Group>
                                   </Group>
                                   <EmptySpace min="-2" pref="3" max="-2" attributes="0"/>
@@ -1188,7 +1191,7 @@
                         </DimensionLayout>
                       </Layout>
                       <SubComponents>
-                        <Component class="javax.swing.JButton" name="autofocusImportButton">
+                        <Component class="javax.swing.JButton" name="afRefreshButton">
                           <Properties>
                             <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
                               <Font name="Arial" size="10" style="0"/>
@@ -1199,7 +1202,7 @@
                             <Property name="toolTipText" type="java.lang.String" value="Apply autofocus settings"/>
                           </Properties>
                           <Events>
-                            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="autofocusImportButtonActionPerformed"/>
+                            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="afRefreshButtonActionPerformed"/>
                           </Events>
                         </Component>
                         <Component class="javax.swing.JLabel" name="afModeLabel">
@@ -1210,15 +1213,15 @@
                             <Property name="text" type="java.lang.String" value="jLabel35"/>
                           </Properties>
                         </Component>
-                        <Component class="javax.swing.JButton" name="autofocusButton">
+                        <Component class="javax.swing.JButton" name="afConfigButton">
                           <Properties>
                             <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
                               <Image iconType="3" name="/autoimage/resources/wrench_orange.png"/>
                             </Property>
-                            <Property name="toolTipText" type="java.lang.String" value="Autofocus Configuration"/>
+                            <Property name="toolTipText" type="java.lang.String" value="Configure autofocus settings"/>
                           </Properties>
                           <Events>
-                            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="autofocusButtonActionPerformed"/>
+                            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="afConfigButtonActionPerformed"/>
                           </Events>
                         </Component>
                         <Component class="javax.swing.JSpinner" name="afSkipFrameSpinner">
@@ -1265,6 +1268,20 @@
                             </Property>
                             <Property name="text" type="java.lang.String" value="Skip Frames: "/>
                           </Properties>
+                        </Component>
+                        <Component class="javax.swing.JButton" name="focusNowButton">
+                          <Properties>
+                            <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
+                              <Font name="Arial" size="10" style="0"/>
+                            </Property>
+                            <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
+                              <Image iconType="2" name="/Users/Karsten/NetBeansProjects/Advanced_MDA/src/autoimage/resources/find.png"/>
+                            </Property>
+                            <Property name="toolTipText" type="java.lang.String" value="Test autofocus now"/>
+                          </Properties>
+                          <Events>
+                            <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="focusNowButtonActionPerformed"/>
+                          </Events>
                         </Component>
                       </SubComponents>
                     </Container>
