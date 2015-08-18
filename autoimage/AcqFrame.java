@@ -3939,7 +3939,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             String chGroupStr=MMCoreUtils.loadAvailableChannelConfigs(this,core,"");
             currentAcqSetting.setChannelGroupStr(chGroupStr);
         }    
-        //check that channels choses are in selected channelgroup
+        //check that channels chosen are in selected channelgroup
         StrVector availableChannels = core.getAvailableConfigs(acqSetting.getChannelGroupStr());
         if (availableChannels == null || availableChannels.isEmpty()) {
             acqSetting.setChannelGroupStr(MMCoreUtils.loadAvailableChannelConfigs(this,core,acqSetting.getChannelGroupStr()));
@@ -7171,6 +7171,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         if (liveButton.getText().equals("Live")) {
             if (app.isLiveModeOn()) {
                 JOptionPane.showMessageDialog(this, "Live Mode is already running.", "Live Mode", JOptionPane.ERROR_MESSAGE);
+                app.getSnapLiveWin().toFront();
                 return;
             }
             if (channelTable.getSelectedRowCount() != 1) {
@@ -7195,6 +7196,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     public void run() {
                         app.getSnapLiveWin().toFront();
                         app.getSnapLiveWin().repaint();
+                        app.getSnapLiveWin().requestFocus();
                     }
                 });               
 
@@ -7203,159 +7205,174 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             app.enableLiveMode(false);
         }      
     }//GEN-LAST:event_liveButtonActionPerformed
+    
+    
+    private SequenceSettings createSettingsForSnapImages(AcqSetting acqSetting) {
+            //make sure channelgroup is set, set new one if not
+        if (acqSetting.getChannelGroupStr()==null || acqSetting.getChannelGroupStr().equals("")) {
+            String chGroupStr=MMCoreUtils.loadAvailableChannelConfigs(this,core,"");
+            currentAcqSetting.setChannelGroupStr(chGroupStr);
+        }    
+        //check that channels chosen are in selected channelgroup
+        StrVector availableChannels = core.getAvailableConfigs(acqSetting.getChannelGroupStr());
+        if (availableChannels == null || availableChannels.isEmpty()) {
+            acqSetting.setChannelGroupStr(MMCoreUtils.loadAvailableChannelConfigs(this,core,acqSetting.getChannelGroupStr()));
+        }
+        if (!initializeChannelTable(acqSetting)) {
+            return null;
+        }
+        //ok, create new mda sequence settings
+        SequenceSettings settings = new SequenceSettings();
+        //setup time-lapse
+        settings.numFrames = 1;
+        settings.intervalMs = 0;
+        
+        //setup z-stack
+        settings.slices = new ArrayList<Double>();
+/*        if (zStackCheckBox.isSelected()) {
+            double z = acqSetting.getZBegin();
+            for (int i = 0; i < acqSetting.getZSlices(); i++) {
+                settings.slices.add(z);
+                if (acqSetting.getZBegin() < acqSetting.getZEnd()) {
+                    z += acqSetting.getZStepSize();
+                } else {
+                    z -= acqSetting.getZStepSize();
+                }
+            }
+        } else {*/
+            settings.slices.add(new Double(0));
+/*        }*/
+        settings.relativeZSlice = true;
+        settings.keepShutterOpenSlices = acqSetting.isKeepZShutterOpen();
+        
+        //setup channels
+        settings.channels = new ArrayList<ChannelSpec>();
+        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
+//            settings.channelGroup = channelGroupStr;
+        settings.channelGroup = acqSetting.getChannelGroupStr();
+        for (int i = 0; i < ctm.getRowCount(); i++) {
+            Channel c = ctm.getRowData(i);
+            ChannelSpec cs = new ChannelSpec();
+            cs.config = c.getName();
+            cs.exposure = c.getExposure();
+            cs.color = c.getColor();
+            cs.doZStack = zStackCheckBox.isSelected();
+            cs.zOffset = c.getZOffset();
+            cs.useChannel = true;
+            //cs.camera = core.getCameraDevice();
+            settings.channels.add(cs);
+        }
+        settings.keepShutterOpenChannels = acqSetting.isKeepChShutterOpen();
+        
+        //setup autofocus
+//            settings.useAutofocus = autofocusCheckBox.isSelected();
+        settings.useAutofocus = acqSetting.isAutofocus();
+        settings.skipAutofocusCount = acqSetting.getAutofocusSkipFrames();
+        //the actual autofocus properties need to be set in MMCore object before starting the acquisition
+
+        //setup xy positions
+        settings.usePositionList = false;
+        
+        //setup acquisition order
+        settings.slicesFirst = true;
+        settings.timeFirst = false;
+        
+        //save images to disk, use acquisition sequence name as prefix, set root directory 
+        settings.save = false;
+//        settings.prefix = acqSetting.getName();
+//        settings.root = imageDestPath;
+        return settings;
+    }
+    
 
     private void snapButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_snapButtonActionPerformed
         AbstractCellEditor ae = (AbstractCellEditor) channelTable.getCellEditor();
         if (ae != null) {
             ae.stopCellEditing();
         }
-        /*        AcqSetting setting=null;
-        if (acqSettings!=null && acqSettings.size()>cAcqSettingIdx) {
-            setting=acqSettings.get(cAcqSettingIdx);
-        }*/
         if (channelTable.getSelectedRowCount() < 1) {
             JOptionPane.showMessageDialog(this, "Select at least one channel");
-        } else {
+            return;
+        }
+        try {
+            if (!currentAcqSetting.getObjective().equals(core.getProperty(objectiveDevStr, "Label"))) {
+                JOptionPane.showMessageDialog(this, "Switching to "+currentAcqSetting.getObjective()+" objective.");
+            }
+        } catch (Exception ex) {
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        if (!setObjectiveAndBinning(currentAcqSetting, true)) {
+            currentAcqSetting.setObjectiveDevStr(MMCoreUtils.changeConfigGroupStr(this,core,"Objective",""));
+            return;
+        }
+        String chGroupStr=MMCoreUtils.loadAvailableChannelConfigs(this,core,currentAcqSetting.getChannelGroupStr());
+        if (!chGroupStr.equals(currentAcqSetting.getChannelGroupStr())) {
+            currentAcqSetting.setChannelGroupStr(chGroupStr);
+            initializeChannelTable(currentAcqSetting);
+            return;
+        }
+        if (chGroupStr!=null) {
+            //read out currentROI setting and update ROI in detector of current AcqSetting
+            FieldOfView fov=currentAcqSetting.getFieldOfView();
+            Rectangle snapROI=fov.getROI_Pixel(currentAcqSetting.getBinning());
+            Rectangle coreROI=null;
+            boolean updatedROI=false;
+
             try {
-                if (!currentAcqSetting.getObjective().equals(core.getProperty(objectiveDevStr, "Label"))) {
-                    JOptionPane.showMessageDialog(this, "Switching to "+currentAcqSetting.getObjective()+" objective.");
-                }
-            } catch (Exception ex) {
-                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            if (setObjectiveAndBinning(currentAcqSetting, true)) {
-                String chGroupStr=MMCoreUtils.loadAvailableChannelConfigs(this,core,currentAcqSetting.getChannelGroupStr());
-                if (!chGroupStr.equals(currentAcqSetting.getChannelGroupStr())) {
-                    currentAcqSetting.setChannelGroupStr(chGroupStr);
-                    initializeChannelTable(currentAcqSetting);
-                } else {
-                    if (chGroupStr!=null) {
-                        int[] rows = channelTable.getSelectedRows();
-//                        ImageStack stack = new ImageStack(cCameraPixX / currentAcqSetting.getBinning(), cCameraPixY / currentAcqSetting.getBinning());
-                        
-                        //read out currentROI setting and update ROI in detector of current AcqSetting
-                        FieldOfView fov=currentAcqSetting.getFieldOfView();
-                        Rectangle snapROI=fov.getROI_Pixel(currentAcqSetting.getBinning());
-                        Rectangle coreROI=null;
-                        boolean updatedROI=false;
-                        
-                        try {
-                            coreROI=core.getROI();
-                            if (coreROI !=null 
-                                    && (coreROI.width != fov.getROI_Pixel(currentAcqSetting.getBinning()).width 
-                                    || coreROI.height != fov.getROI_Pixel(currentAcqSetting.getBinning()).height)) {
-                                JOptionPane.showMessageDialog(this, "ROIs are not supported. Clearing ROI.");
-//                                fov.clearROI();
-                                core.clearROI();
-                                for (AcqSetting setting:acqSettings) {
-//                                    FieldOfView fov=new FieldOfView(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel(),currentDetector.getFieldRotation());
-//                                    setting.setFieldOfView(fov);
-                                    setting.getFieldOfView().clearROI();
-                                }
-                            }    
-                        } catch (Exception ex) {
-                            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                        }
-
-                        /*
-                        // for future: handle ROIs
-                        try {
-                            coreROI=core.getROI();
-                            IJ.showMessage("coreROI: "+coreROI.toString()+ ", snapROI: "+(snapROI==null ? "null" : snapROI.toString()));
-                            if (coreROI!=null && !coreROI.equals(snapROI) && JOptionPane.showConfirmDialog(this,"The current camera ROI set in Micro-Manager is different then the ROI \n"
-                                        + "defined for this acquisition setting.\n"
-                                        + "Do you want to use the Micro-Manager camera ROI for this setting?","",JOptionPane.YES_NO_OPTION)==JOptionPane.YES_OPTION) {
-                                snapROI=coreROI;
-                                updatedROI=true;
-                            }
-                        } catch (Exception ex) {
-                            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                        }
-                        try {
-                            IJ.showMessage("coreROI: "+coreROI.toString()+ ", snapROI: "+(snapROI==null ? "null" : snapROI.toString()));
-                            if (snapROI!=null) {
-                                core.clearROI();
-                                core.setROI(snapROI.x, snapROI.y, snapROI.width, snapROI.height);
-                            } else {
-                                core.clearROI();
-                                stack = new ImageStack(fov.fullChipWidth_Pixel, fov.fullChipHeight_Pixel);
-                            }
-                            IJ.showMessage("coreROI: "+coreROI.toString()+ ", snapROI: "+(snapROI==null ? "null" : snapROI.toString()));
-                        } catch (Exception ex) {
-                            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                        }*/
-                        ImagePlus[] impArray=new ImagePlus[rows.length];
-                        int i = 0;
-                        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-                        for (int row : rows) {
-                            Channel c = ctm.getRowData(row);
-                            ImagePlus imp = MMCoreUtils.snapImagePlus(core, currentAcqSetting.getChannelGroupStr(),c.getName(), c.getExposure(), c.getZOffset(), MMCoreUtils.SCALE_NONE);
-                            if (imp==null) {
-                                JOptionPane.showMessageDialog(this, "Cannot snap image(s). Possible unknown image format.");
-                                return;
-                            }
-                            impArray[i]=imp;
-/*                            if (stack==null)
-                                stack = new ImageStack(ip.getWidth(),ip.getHeight());
-                            stack.addSlice(c.getName(),ip, i);*/
-                            i++;
-            
-                        }
-
-                        if (impArray[0].getProcessor() instanceof ColorProcessor || impArray[0].isComposite()) {
-                            //RGB32 or RGB64
-                            for (ImagePlus cimp: impArray) {
-                                cimp.setTitle("Snap: " +cimp.getTitle());
-                                cimp.show();
-                            }                 
-                        } else {
-                            //show composite image with channel LUTs
-//                            imp.setStack(stack, rows.length, 1, 1);
-                            ImagePlus hyperImp;
-                            if (impArray.length > 1) {
-                                RGBStackMerge merger=new RGBStackMerge();
-                                hyperImp=merger.mergeHyperstacks(impArray, true);
-                            } else {
-                                hyperImp=impArray[0];
-                            }
-                            Calibration cal = impArray[0].getCalibration();
-                            cal.setUnit("um");
-                            cal.pixelWidth = currentAcqSetting.getImagePixelSize();
-                            cal.pixelHeight = currentAcqSetting.getImagePixelSize();
-                            hyperImp.setCalibration(cal);
-
-                            CompositeImage ci = new CompositeImage(hyperImp);
-/*                            CompositeImage ci = new CompositeImage(imp);*/
-                            i = 0;
-                            LUT[] luts = new LUT[rows.length];
-                            for (int row : rows) {
-                                Channel ch=currentAcqSetting.getChannels().get(row);
-                                luts[i] = LUT.createLutFromColor(ch.getColor());//ctm.getRowData(row).getColor());
-                                i++;
-                            }
-                            ci.setTitle("Snap");
-                            ci.setLuts(luts);
-                            ci.show();
-                            IJ.run("Channels Tool...");
-                        }
-                        /* for future: handle ROIs
-                        if (updatedROI && JOptionPane.showConfirmDialog(this,"Do you want to keep this camera ROI for acquisition setting '"
-                                +currentAcqSetting.getName()+"'?","",JOptionPane.YES_NO_OPTION)==JOptionPane.YES_OPTION) {
-                            fov.setRoi_Pixel(snapROI);
-                            calcTilePositions(null,fov, currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
-                        }
-                        
-                        if (coreROI != null)
-                            try {
-                                core.setROI(coreROI.x,coreROI.y,coreROI.width,coreROI.height);
-                        } catch (Exception ex) {
-                            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                        }*/
+                coreROI=core.getROI();
+                if (coreROI !=null
+                        && (coreROI.width != fov.getROI_Pixel(currentAcqSetting.getBinning()).width 
+                        || coreROI.height != fov.getROI_Pixel(currentAcqSetting.getBinning()).height)) {
+                    JOptionPane.showMessageDialog(this, "ROIs are not supported. Clearing ROI.");
+                    core.clearROI();
+                    for (AcqSetting setting:acqSettings) {
+                        setting.getFieldOfView().clearROI();
                     }
-                }  
-            } else {
-                currentAcqSetting.setObjectiveDevStr(MMCoreUtils.changeConfigGroupStr(this,core,"Objective",""));
+                }    
+            } catch (Exception ex) {
+                ReportingUtils.logError(ex);
             }
+
+            SwingUtilities.invokeLater(new Runnable () {
+                @Override
+                public void run() {
+                    try {
+                        //execute autofocus if AF is selected
+                        if (currentAcqSetting.isAutofocus()) {
+                            focusNow(currentAcqSetting);
+                        }
+                        //setup snap image acquisition for selected channels
+                        String acqName="Snap "+(currentAcqSetting.isAutofocus() ? "(with Autofocus)" : "(no Autofocus)");
+                        int[] rows = channelTable.getSelectedRows();
+                        acqName=app.getUniqueAcquisitionName(acqName);
+                        app.openAcquisition(acqName, imageDestPath, 1, rows.length, 1, 1, true, false);
+                        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
+                        //String focusDevice=core.getFocusDevice();
+                        double startZPos=core.getPosition(zStageLabel);                            
+                        int i = 0;
+                        for (int row : rows) {
+                            Channel ch = ctm.getRowData(row);
+                            app.setChannelColor(acqName, i, ch.getColor());
+                            app.setChannelName(acqName, i, ch.getName());
+                            //apply channel z-offset
+                            core.setPosition(zStageLabel, startZPos+ch.getZOffset());
+                            core.setExposure(ch.getExposure());
+                            core.setConfig(currentAcqSetting.getChannelGroupStr(), ch.getName());
+                            core.waitForConfig(currentAcqSetting.getChannelGroupStr(), ch.getName());
+                            core.waitForDevice(zStageLabel);
+                            app.snapAndAddImage(acqName, 0, i, 0,0);
+                            i++;
+                        }
+                        // set channel contrast based on the first frame/slice
+                        app.setContrastBasedOnFrame(acqName, 0, 0);
+                        // return to original z position
+                        core.setPosition(zStageLabel, startZPos);
+                        core.waitForDevice(zStageLabel);
+                    } catch (Exception ex) {
+                        ReportingUtils.logError(ex);
+                    }
+                }
+            });
         }
     }//GEN-LAST:event_snapButtonActionPerformed
 
@@ -7700,223 +7717,193 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         } catch (Exception ex) {
             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
-        if (setObjectiveAndBinning(currentAcqSetting, true)) {
-            String chGroupStr=MMCoreUtils.loadAvailableChannelConfigs(this,core,currentAcqSetting.getChannelGroupStr());
-            if (!chGroupStr.equals(currentAcqSetting.getChannelGroupStr())) {
-                currentAcqSetting.setChannelGroupStr(chGroupStr);
-                initializeChannelTable(currentAcqSetting);
-            } else {
-                if (chGroupStr!=null) {
-                    final int row = channelTable.getSelectedRow();
-//                        ImageStack stack = new ImageStack(cCameraPixX / currentAcqSetting.getBinning(), cCameraPixY / currentAcqSetting.getBinning());
-
-                    //read out currentROI setting and update ROI in detector of current AcqSetting
-                    FieldOfView fov=currentAcqSetting.getFieldOfView();
-                    Rectangle snapROI=fov.getROI_Pixel(currentAcqSetting.getBinning());
-                    Rectangle coreROI=null;
-                    boolean updatedROI=false;
-
-                    try {
-                        coreROI=core.getROI();
-                        if (coreROI !=null 
-                                && (coreROI.width != fov.getROI_Pixel(currentAcqSetting.getBinning()).width 
-                                || coreROI.height != fov.getROI_Pixel(currentAcqSetting.getBinning()).height)) {
-                            JOptionPane.showMessageDialog(this, "ROIs are not supported. Clearing ROI.");
-//                                fov.clearROI();
-                            core.clearROI();
-                            for (AcqSetting setting:acqSettings) {
-//                                    FieldOfView fov=new FieldOfView(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel(),currentDetector.getFieldRotation());
-//                                    setting.setFieldOfView(fov);
-                                setting.getFieldOfView().clearROI();
-                            }
-                        }    
-                    } catch (Exception ex) {
-                        IJ.log(this.getClass().getName()+".autoExposureButtonActionPerformed: Exception - "+ex.getMessage());
-                        Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        if (!setObjectiveAndBinning(currentAcqSetting, true)) {
+            currentAcqSetting.setObjectiveDevStr(MMCoreUtils.changeConfigGroupStr(this,core,"Objective",""));
+            return;
+        }
+        String chGroupStr=MMCoreUtils.loadAvailableChannelConfigs(this,core,currentAcqSetting.getChannelGroupStr());
+        if (!chGroupStr.equals(currentAcqSetting.getChannelGroupStr())) {
+            currentAcqSetting.setChannelGroupStr(chGroupStr);
+            initializeChannelTable(currentAcqSetting);
+            return;
+        }
+        if (chGroupStr!=null) {
+            try {
+                //read out core's current ROI setting and compare to fov (should be full size chip)
+                FieldOfView fov=currentAcqSetting.getFieldOfView();
+                Rectangle coreROI=core.getROI();
+                if (coreROI !=null
+                        && (coreROI.width != fov.getROI_Pixel(currentAcqSetting.getBinning()).width
+                        || coreROI.height != fov.getROI_Pixel(currentAcqSetting.getBinning()).height)) {
+                    JOptionPane.showMessageDialog(this, "ROIs are not supported. Clearing ROI.");
+                    core.clearROI();
+                    for (AcqSetting setting:acqSettings) {
+                        setting.getFieldOfView().clearROI();
                     }
+                }
+            } catch (Exception ex) {
+                ReportingUtils.logError(ex);
+            }
 
-                    final ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-                    final Channel c = ctm.getRowData(row);
-                    final String channelGroup=currentAcqSetting.getChannelGroupStr();
+            final int row = channelTable.getSelectedRow();
+            final ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
+            final Channel c = ctm.getRowData(row);
+            final String channelGroup=currentAcqSetting.getChannelGroupStr();
 
-                    final JFrame guiFrame=this;
+            enableGUI(false);
+            acquireButton.setEnabled(false);
+            SwingUtilities.invokeLater(new Runnable() {
 
-/*                    
-                    AutoExposureTool aet=new AutoExposureTool(app,chGroupStr,c.getName(),c.getExposure(),true);
-                        
-                    ExecutorService executor=Executors.newSingleThreadExecutor();
-                    Future<Double> future=executor.submit(aet);
-                    double exp;
-                    try {
-                        exp=future.get();
-                    } catch (InterruptedException ex) {
-                          //exception caused by timeout of future.get()
-        //                return new ArrayList<File>();
-                    } catch (ExecutionException ex) {
-                        //this caused by InterruptedException in callable, so rethrow the InterruptedException to enforce call of cleanUp()
-                        IJ.log(this.getClass().getName()+": ExecutionException: caused by callable");
-                    }
+                @Override
+                public void run() {
+                    final JFrame frame=new JFrame("Auto-Exposure");
+                    frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+                    frame.setPreferredSize(new Dimension(400,120));
+                    frame.setResizable(false);
+                    frame.getContentPane().setLayout(new GridLayout(0,1));
 
-//                            double exp=aet.getOptimalExposure();
-                        if (exp==-1) {
-                            JOptionPane.showMessageDialog(this,"Canceled");
-                        } else {
-                            int result=JOptionPane.showConfirmDialog(guiFrame,"Suggested exposure time for channel "+c.getName()+": "+formatNumber("0.0", exp)+" ms.\n"
-                                            + "Adjust exposure time to new value?","Auto-Exposure",JOptionPane.YES_NO_OPTION);
-                                        if (result==JOptionPane.YES_OPTION) {
-                                            c.setExposure(exp);
-                                            ctm.fireTableRowsUpdated(row, row);
-                                        }                            
-                        }
-*/                    
-                    enableGUI(false);
-                    acquireButton.setEnabled(false);
-                    SwingUtilities.invokeLater(new Runnable() {
+                    JLabel label=new JLabel("Channel '"+c.getName()+"': Testing exposure");
+                    final JLabel expLabel=new JLabel("");
+
+                    JPanel panel = new JPanel();
+                    panel.setLayout(new BoxLayout(panel, BoxLayout.LINE_AXIS));
+                    panel.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
+                    panel.add(label);
+                    panel.add(Box.createRigidArea(new Dimension(10, 0)));
+                    panel.add(expLabel);
+                    panel.add(Box.createHorizontalGlue());
+
+                    frame.getContentPane().add(panel);
+
+                    final SwingWorker<Double, Double> worker = new SwingWorker<Double, Double>() {
+
+                        private double optimalExp;
+                        private ImageProcessor[] ipArray;
 
                         @Override
-                        public void run() {
-                            final JFrame frame=new JFrame("Auto-Exposure");
-                            frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-                            frame.setPreferredSize(new Dimension(400,120));
-                            frame.setResizable(false);
-                            frame.getContentPane().setLayout(new GridLayout(0,1));
+                        protected Double doInBackground() {
 
-                            JLabel label=new JLabel("Channel '"+c.getName()+"': Testing exposure");
-                            final JLabel expLabel=new JLabel("");
-
-                            JPanel panel = new JPanel();
-                            panel.setLayout(new BoxLayout(panel, BoxLayout.LINE_AXIS));
-                            panel.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
-                            panel.add(label);
-                            panel.add(Box.createRigidArea(new Dimension(10, 0)));
-                            panel.add(expLabel);
-                            panel.add(Box.createHorizontalGlue());
-
-                            frame.getContentPane().add(panel);
-
-                            final SwingWorker<Double, Double> worker = new SwingWorker<Double, Double>() {
-
-                                private double optimalExp;
-                                private ImageProcessor[] ipArray;
-
-                                @Override
-                                protected Double doInBackground() {
-
-                                    double newExp=c.getExposure();
-                                    publish(newExp);
-                                    double maxExp=-1;
-                                    double minExp=1;
-                                    boolean optimalExpFound=false;
-                                    int i=1;
-                                    while (!optimalExpFound && !isCancelled()) {
-                                        ipArray = MMCoreUtils.snapImageWithZOffset(core, channelGroup,c.getName(), newExp , 0);//c.getZOffset());
-                                        if (ipArray==null && ipArray.length>1) {
-                                            break;
-                                        }
-                                        ImageStatistics stats=ipArray[0].getStatistics();
-                                        if ((stats.max < Math.pow(2,core.getImageBitDepth())-1) // less than 50% dynamic range
+                            double newExp=c.getExposure();
+                            publish(newExp);
+                            double maxExp=-1;
+                            double minExp=1;
+                            boolean optimalExpFound=false;
+                            int i=1;
+                            while (!optimalExpFound && !isCancelled()) {
+                                ipArray = MMCoreUtils.snapImage(core, channelGroup,c.getName(), newExp);//c.getZOffset());
+                                if (ipArray==null && ipArray.length>1) {
+                                    break;
+                                }
+                                ImageStatistics stats=ipArray[0].getStatistics();
+                                if ((stats.max < Math.pow(2,core.getImageBitDepth())-1) // less than 50% dynamic range
                                         || stats.maxCount < MAX_SATURATION*ipArray[0].getWidth()*ipArray[0].getHeight()){
-                                            //underexposed
-                                            minExp=newExp;
-                                            if (maxExp==-1)
-                                                newExp*=2;
-                                            else
-                                                newExp=(minExp+maxExp)/2;
-                                            if (newExp >= MAX_EXPOSURE) {
-                                                newExp=MAX_EXPOSURE;
-                                                maxExp=MAX_EXPOSURE;
-                                            }
-                                        }  else {
-                                            //overexposed
-                                            maxExp=newExp;
-                                            newExp=(minExp+maxExp)/2;
-                                            if (newExp <=0) {
-                                                break;
-                                            }
-                                        }
-                                        publish(newExp);// Notify progress
-                                        optimalExpFound=Math.abs(maxExp/minExp - 1) < 0.01;
-                                        try {
-                                            Thread.sleep(100);
-                                        } catch (InterruptedException ex) {
-                                            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                                        }
-                                        i++;
+                                    //underexposed
+                                    minExp=newExp;
+                                    if (maxExp==-1)
+                                        newExp*=2;
+                                    else
+                                        newExp=(minExp+maxExp)/2;
+                                    if (newExp >= MAX_EXPOSURE) {
+                                        newExp=MAX_EXPOSURE;
+                                        maxExp=MAX_EXPOSURE;
                                     }
-                                    if (!isCancelled()) {
-                                        optimalExp=(maxExp+minExp)/2;
-                                    } else {
-                                        optimalExp=-1;
-                                    }    
-                                    return optimalExp;
-                                }
-
-                                @Override
-                                protected void process(List<Double> exp) {
-                                    String msg=formatNumber("0.0", exp.get(exp.size()-1))+" ms";
-                                    expLabel.setText(msg);
-                                }
-
-                                @Override
-                                protected void done() {
-                                    frame.dispose();
-                                    if (!isCancelled()) {
-                                        if (ipArray==null) {
-                                            //problem with snapping images
-                                            JOptionPane.showMessageDialog(guiFrame, "Problem with image acquisition.");
-                                        } else {
-                                            ipArray = MMCoreUtils.snapImageWithZOffset(core, channelGroup,c.getName(), optimalExp , 0);//c.getZOffset());
-                                            ImagePlus imp = new ImagePlus("Auto-Exposure: "+c.getName(),ipArray[0]);
-                                            imp.show();
-                                            if (optimalExp==MAX_EXPOSURE) {
-                                                JOptionPane.showMessageDialog(guiFrame, "Reached maximum exposure ("+MAX_EXPOSURE+" ms).");
-                                            }
-                                            optimalExp=0.1*(Math.round(optimalExp*10));
-                                            int result=JOptionPane.showConfirmDialog(guiFrame,"Suggested exposure time for channel "+c.getName()+": "+formatNumber("0.0", optimalExp)+" ms.\n"
-                                                + "Adjust exposure time to new value?","Auto-Exposure",JOptionPane.YES_NO_OPTION);
-                                            if (result==JOptionPane.YES_OPTION) {
-                                                c.setExposure(optimalExp);
-                                                ctm.fireTableRowsUpdated(row, row);
-                                            }
-                                        }
+                                }  else {
+                                    //overexposed
+                                    maxExp=newExp;
+                                    newExp=(minExp+maxExp)/2;
+                                    if (newExp <=0) {
+                                        break;
                                     }
-                                    enableGUI(true);
-                                    acquireButton.setEnabled(acqLayout.getNoOfMappedStagePos()>0);
                                 }
-
-                            }; //end SwingWorker
-
-                            frame.addWindowListener(new WindowAdapter() {
-                                @Override
-                                public void windowClosing(WindowEvent e) {
-                                    worker.cancel(true);
+                                publish(newExp);// Notify progress
+                                optimalExpFound=Math.abs(maxExp/minExp - 1) < 0.01;
+                                try {
+                                    Thread.sleep(100);
+                                } catch (InterruptedException ex) {
+                                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                                 }
-                            });
+                                i++;
+                            }
+                            if (!isCancelled()) {
+                                optimalExp=(maxExp+minExp)/2;
+                            } else {
+                                optimalExp=-1;
+                            }
+                            return optimalExp;
+                        }
 
-                            JButton cancelButton=new JButton("Cancel");
-                            cancelButton.addActionListener(new ActionListener() {
-                                @Override
-                                public void actionPerformed(ActionEvent e) {
-                                    worker.cancel(true);
+                        @Override
+                        protected void process(List<Double> exp) {
+                            String msg=formatNumber("0.0", exp.get(exp.size()-1))+" ms";
+                            expLabel.setText(msg);
+                        }
+
+                        @Override
+                        protected void done() {
+                            frame.dispose();
+                            if (!isCancelled()) {
+                                if (ipArray==null) {
+                                    //problem with snapping images
+                                    JOptionPane.showMessageDialog(null, "Problem with image acquisition.");
+                                } else {
+                                    try {
+                                        //resnap with new exposure and show image
+                                        String acqName="Auto-Exposure: "+c.getName();
+                                        acqName=app.getUniqueAcquisitionName(acqName);
+                                        app.openAcquisition(acqName, imageDestPath, 1, 1, 1, 1, true, false);
+                                        app.setChannelColor(acqName, 0, c.getColor());
+                                        app.setChannelName(acqName, 0, c.getName());
+                                        core.setExposure(optimalExp);
+                                        app.snapAndAddImage(acqName, 0, 0, 0,0);
+                                    } catch (Exception ex) {
+                                        ReportingUtils.logError(ex, this.getClass().getName()+": Auto-Exposure Error");
+                                    }
+
+                                    if (optimalExp==MAX_EXPOSURE) {
+                                        JOptionPane.showMessageDialog(null, "Reached maximum exposure ("+MAX_EXPOSURE+" ms).");
+                                    }
+                                    optimalExp=0.1*(Math.round(optimalExp*10));
+                                    int result=JOptionPane.showConfirmDialog(null,"Suggested exposure time for channel "+c.getName()+": "+formatNumber("0.0", optimalExp)+" ms.\n"
+                                            + "Adjust exposure time to new value?","Auto-Exposure",JOptionPane.YES_NO_OPTION);
+                                    if (result==JOptionPane.YES_OPTION) {
+                                        c.setExposure(optimalExp);
+                                        ctm.fireTableRowsUpdated(row, row);
+                                    }
                                 }
-                            });
-                            JPanel buttonPanel=new JPanel();
-                            buttonPanel.add(cancelButton);
-                            frame.getContentPane().add(buttonPanel);
+                            }
+                            enableGUI(true);
+                            acquireButton.setEnabled(acqLayout.getNoOfMappedStagePos()>0);
+                        }
 
-                            frame.pack();
-                            frame.setLocationRelativeTo(null);
-                            frame.setVisible(true);
+                    }; //end SwingWorker
 
-                            worker.execute();
+                    frame.addWindowListener(new WindowAdapter() {
+                        @Override
+                        public void windowClosing(WindowEvent e) {
+                            worker.cancel(true);
+                        }
+                    });
 
-                        } //end run()
-                    });//end invokeLater()
-                }
-            }  
-        } else {
-            currentAcqSetting.setObjectiveDevStr(MMCoreUtils.changeConfigGroupStr(this,core,"Objective",""));
-        }        
+                    JButton cancelButton=new JButton("Cancel");
+                    cancelButton.addActionListener(new ActionListener() {
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            worker.cancel(true);
+                        }
+                    });
+                    JPanel buttonPanel=new JPanel();
+                    buttonPanel.add(cancelButton);
+                    frame.getContentPane().add(buttonPanel);
+
+                    frame.pack();
+                    frame.setLocationRelativeTo(null);
+                    frame.setVisible(true);
+
+                    worker.execute();
+
+                } //end run()
+            });//end invokeLater()
+        }      
     }//GEN-LAST:event_autoExposureButtonActionPerformed
 
     private void afSkipFrameSpinnerStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_afSkipFrameSpinnerStateChanged
@@ -7972,7 +7959,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }//GEN-LAST:event_timepointSpinnerStateChanged
 
-    private void focusNowButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_focusNowButtonActionPerformed
+    private void focusNow(AcqSetting setting) {
         String currentAF=currentAcqSetting.getAutofocusDevice();
         if (currentAF != null) {
             try {
@@ -8002,7 +7989,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 JOptionPane.showMessageDialog(this,"Error in Autofocus device: " +ex.getMessage());
                 ReportingUtils.logError(ex, this.getClass().getName()+": Autofocus configuration");
             }
-        }
+        }        
+    }
+    
+    private void focusNowButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_focusNowButtonActionPerformed
+        focusNow(currentAcqSetting);
     }//GEN-LAST:event_focusNowButtonActionPerformed
 
     private void saveLayout() {

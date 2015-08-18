@@ -1,9 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package autoimage;
 
 import ij.CompositeImage;
@@ -15,6 +9,7 @@ import ij.plugin.RGBStackMerge;
 import ij.process.ByteProcessor;
 import ij.process.ColorProcessor;
 import ij.process.ImageProcessor;
+import ij.process.ImageStatistics;
 import ij.process.ShortProcessor;
 import java.io.File;
 import java.lang.reflect.Field;
@@ -34,13 +29,12 @@ import mmcorej.TaggedImage;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.micromanager.api.MMTags;
-import org.micromanager.utils.ImageUtils;
 import org.micromanager.utils.MMScriptException;
 import org.micromanager.utils.ReportingUtils;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 public class MMCoreUtils {
     
@@ -287,8 +281,10 @@ public class MMCoreUtils {
                         break;
                     }
                 case SCALE_AUTO: {  
-                        for (ImageProcessor ip:ipArray)
-                            ip.setMinAndMax(0, ipArray[0].getMax());
+                        for (ImageProcessor ip:ipArray) {
+                            ImageStatistics stats=ip.getStatistics();
+                            ip.setMinAndMax(0, stats.max);
+                        }
                         break; 
                     }
                 case SCALE_NONE: {
@@ -314,7 +310,7 @@ public class MMCoreUtils {
             imp.setTitle(ch);
         }
  
-        IJ.log("fullBitRange: "+Long.toString(fullBitRange));
+//        IJ.log("fullBitRange: "+Long.toString(fullBitRange));
         Calibration cal = imp.getCalibration();
         cal.setUnit("um");
         cal.pixelWidth = core.getPixelSizeUm();
