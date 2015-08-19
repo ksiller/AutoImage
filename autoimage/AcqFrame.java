@@ -7174,11 +7174,16 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 app.getSnapLiveWin().toFront();
                 return;
             }
-            if (channelTable.getSelectedRowCount() != 1) {
+            if (channelTable.getRowCount() > 1 && channelTable.getSelectedRowCount() != 1) {
                 JOptionPane.showMessageDialog(this, "Select one channel");
                 return;
-            }    
-            int[] rows = channelTable.getSelectedRows();
+            }
+            int[] rows;
+            if (channelTable.getRowCount()==1) {
+                rows=new int[]{0};
+            } else {
+                rows = channelTable.getSelectedRows();
+            }
             ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
             Channel c = ctm.getRowData(rows[0]);
             if (setObjectiveAndBinning(currentAcqSetting, true)) {
@@ -7190,8 +7195,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 } catch (Exception e) {
                     ReportingUtils.logError(e.getMessage());
                 }
+                //trick to show live window in front on all OS
+                if (app.getSnapLiveWin()!=null)
+                    app.getSnapLiveWin().close();
                 app.enableLiveMode(true);
-                SwingUtilities.invokeLater(new Runnable() {
+/*                SwingUtilities.invokeLater(new Runnable() {
                     @Override
                     public void run() {
                         app.getSnapLiveWin().toFront();
@@ -7199,7 +7207,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         app.getSnapLiveWin().requestFocus();
                     }
                 });               
-
+*/
             }
         } else {
             app.enableLiveMode(false);
@@ -7207,90 +7215,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }//GEN-LAST:event_liveButtonActionPerformed
     
     
-    private SequenceSettings createSettingsForSnapImages(AcqSetting acqSetting) {
-            //make sure channelgroup is set, set new one if not
-        if (acqSetting.getChannelGroupStr()==null || acqSetting.getChannelGroupStr().equals("")) {
-            String chGroupStr=MMCoreUtils.loadAvailableChannelConfigs(this,core,"");
-            currentAcqSetting.setChannelGroupStr(chGroupStr);
-        }    
-        //check that channels chosen are in selected channelgroup
-        StrVector availableChannels = core.getAvailableConfigs(acqSetting.getChannelGroupStr());
-        if (availableChannels == null || availableChannels.isEmpty()) {
-            acqSetting.setChannelGroupStr(MMCoreUtils.loadAvailableChannelConfigs(this,core,acqSetting.getChannelGroupStr()));
-        }
-        if (!initializeChannelTable(acqSetting)) {
-            return null;
-        }
-        //ok, create new mda sequence settings
-        SequenceSettings settings = new SequenceSettings();
-        //setup time-lapse
-        settings.numFrames = 1;
-        settings.intervalMs = 0;
-        
-        //setup z-stack
-        settings.slices = new ArrayList<Double>();
-/*        if (zStackCheckBox.isSelected()) {
-            double z = acqSetting.getZBegin();
-            for (int i = 0; i < acqSetting.getZSlices(); i++) {
-                settings.slices.add(z);
-                if (acqSetting.getZBegin() < acqSetting.getZEnd()) {
-                    z += acqSetting.getZStepSize();
-                } else {
-                    z -= acqSetting.getZStepSize();
-                }
-            }
-        } else {*/
-            settings.slices.add(new Double(0));
-/*        }*/
-        settings.relativeZSlice = true;
-        settings.keepShutterOpenSlices = acqSetting.isKeepZShutterOpen();
-        
-        //setup channels
-        settings.channels = new ArrayList<ChannelSpec>();
-        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-//            settings.channelGroup = channelGroupStr;
-        settings.channelGroup = acqSetting.getChannelGroupStr();
-        for (int i = 0; i < ctm.getRowCount(); i++) {
-            Channel c = ctm.getRowData(i);
-            ChannelSpec cs = new ChannelSpec();
-            cs.config = c.getName();
-            cs.exposure = c.getExposure();
-            cs.color = c.getColor();
-            cs.doZStack = zStackCheckBox.isSelected();
-            cs.zOffset = c.getZOffset();
-            cs.useChannel = true;
-            //cs.camera = core.getCameraDevice();
-            settings.channels.add(cs);
-        }
-        settings.keepShutterOpenChannels = acqSetting.isKeepChShutterOpen();
-        
-        //setup autofocus
-//            settings.useAutofocus = autofocusCheckBox.isSelected();
-        settings.useAutofocus = acqSetting.isAutofocus();
-        settings.skipAutofocusCount = acqSetting.getAutofocusSkipFrames();
-        //the actual autofocus properties need to be set in MMCore object before starting the acquisition
-
-        //setup xy positions
-        settings.usePositionList = false;
-        
-        //setup acquisition order
-        settings.slicesFirst = true;
-        settings.timeFirst = false;
-        
-        //save images to disk, use acquisition sequence name as prefix, set root directory 
-        settings.save = false;
-//        settings.prefix = acqSetting.getName();
-//        settings.root = imageDestPath;
-        return settings;
-    }
-    
-
     private void snapButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_snapButtonActionPerformed
         AbstractCellEditor ae = (AbstractCellEditor) channelTable.getCellEditor();
         if (ae != null) {
             ae.stopCellEditing();
         }
-        if (channelTable.getSelectedRowCount() < 1) {
+        if (channelTable.getRowCount() != 1 && channelTable.getSelectedRowCount() < 1) {
             JOptionPane.showMessageDialog(this, "Select at least one channel");
             return;
         }
@@ -7343,7 +7273,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         }
                         //setup snap image acquisition for selected channels
                         String acqName="Snap "+(currentAcqSetting.isAutofocus() ? "(with Autofocus)" : "(no Autofocus)");
-                        int[] rows = channelTable.getSelectedRows();
+                        int[] rows;
+                        if (channelTable.getRowCount() == 1) {
+                            rows=new int[]{0};
+                        } else {
+                            rows = channelTable.getSelectedRows();
+                        }
                         acqName=app.getUniqueAcquisitionName(acqName);
                         app.openAcquisition(acqName, imageDestPath, 1, rows.length, 1, 1, true, false);
                         ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
@@ -7706,7 +7641,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             JOptionPane.showMessageDialog(this, "This function is only supported for cameras producing 8-bit or 16-bit grayscale images.");
             return;            
         }
-        if (channelTable.getSelectedRowCount() != 1) {
+        if (channelTable.getRowCount() != 1 && channelTable.getSelectedRowCount() != 1) {
             JOptionPane.showMessageDialog(this, "Select one channel.");
             return;
         }
@@ -7745,7 +7680,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 ReportingUtils.logError(ex);
             }
 
-            final int row = channelTable.getSelectedRow();
+            final int row;
+            if (channelTable.getRowCount()==1) {
+                row=0;
+            } else {
+                row = channelTable.getSelectedRow();
+            }
             final ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
             final Channel c = ctm.getRowData(row);
             final String channelGroup=currentAcqSetting.getChannelGroupStr();
@@ -8771,6 +8711,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         boolean error = false;
         String groupStr=MMCoreUtils.loadAvailableChannelConfigs(this,core,setting.getChannelGroupStr());
         setting.setChannelGroupStr(groupStr);
+        try {
+            core.setChannelGroup(groupStr);
+            app.refreshGUI();
+        } catch (Exception ex) {
+            ReportingUtils.logError(ex);
+        }
 
         ChannelTableModel model = (ChannelTableModel) channelTable.getModel();
         for (int i = setting.getChannels().size() - 1; i >= 0; i--) {

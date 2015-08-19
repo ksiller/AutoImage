@@ -456,21 +456,14 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
                         ChannelData cd=model.getRowData(channelTable.getSelectedRow());
                         try {
                             core.setExposure(cd.getExposure());
-                            //                            core.setConfig(channelGroupStr, c.getName());
                             core.setConfig((String)groupComboBox.getSelectedItem(), cd.getConfigName());
-                            //gui.setChannelExposureTime(channelGroupStr, c.getName(), c.getExposure());
                             gui.refreshGUI();
-                            //gui.setConfigChanged(true);
                         } catch (Exception e) {
                         }
+                        //try to place snap window in front; OS-dependent: may or may not work 
+                        if (gui.getSnapLiveWin()!=null)
+                            gui.getSnapLiveWin().close();
                         gui.enableLiveMode(true);
-                        SwingUtilities.invokeLater(new Runnable() {
-                            @Override
-                            public void run() {
-                                gui.getSnapLiveWin().toFront();
-//                                gui.getSnapLiveWin().repaint();
-                            }
-                        });
                     } else {
                         gui.enableLiveMode(false);
                     }
@@ -481,12 +474,6 @@ public class ZOffsetDlg extends javax.swing.JDialog implements ILiveListener, IS
                         ChannelData cd=model.getRowData(row);
                         cd.setStageZPos(zPos);
                         cd.isSet(true);
-/*                        if (!model.hasReferenceSet()) {
-                            //set isReference --> indirectly sets new zOffset
-                            model.setValueAt(true,row,0);
-                        } else {
-                            //set new zOffset*/
-/*                        }*/
                         if (model.hasReferenceSet()) {
                             if (cd.isReference()) {
                                 //this is the reference channel, 

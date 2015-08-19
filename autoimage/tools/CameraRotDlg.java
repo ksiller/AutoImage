@@ -1113,15 +1113,17 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                         gui.refreshGUI();
                     } catch (Exception e) {
                     }
-                    gui.enableLiveMode(true);
                     //try to place snap window in front; OS-dependent: may or may not work 
-                    SwingUtilities.invokeLater(new Runnable() {
+                    if (gui.getSnapLiveWin()!=null)
+                        gui.getSnapLiveWin().close();
+                    gui.enableLiveMode(true);
+/*                    SwingUtilities.invokeLater(new Runnable() {
                         @Override
                         public void run() {
                             gui.getSnapLiveWin().toFront();
                             gui.getSnapLiveWin().repaint();
                         }
-                    });               
+                    });*/
                 } catch (ParseException ex) {
                     Logger.getLogger(CameraRotDlg.class.getName()).log(Level.SEVERE, null, ex);
                 }
