@@ -4,13 +4,7 @@ import autoimage.dataprocessors.ExtDataProcessor;
 import autoimage.dataprocessors.SiteInfoUpdater;
 import ij.IJ;
 import ij.ImagePlus;
-import ij.io.Opener;
 import ij.measure.Calibration;
-import ij.plugin.RGBStackMerge;
-import ij.process.ByteProcessor;
-import ij.process.ColorProcessor;
-import ij.process.ImageProcessor;
-import ij.process.ShortProcessor;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.io.File;
@@ -19,11 +13,9 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -42,9 +34,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.micromanager.api.DataProcessor;
 import org.micromanager.api.MMTags;
-import org.micromanager.utils.ImageUtils;
-import org.micromanager.utils.MDUtils;
-import org.micromanager.utils.MMScriptException;
 import org.micromanager.utils.ReportingUtils;
 
 /**
@@ -282,8 +271,6 @@ public class Utils {
         return Math.acos((v1.x*v2.x + v1.y*v2.y) / (Math.sqrt(v1.x*v1.x + v1.y*v1.y)*Math.sqrt(v2.x*v2.x + v2.y*v2.y)));
     }
        
-
-    
     
     public static AffineTransform calcAffTransform(Point2D.Double[] src, Point2D.Double[] dst) throws Exception {
         if (src == null || dst == null || src.length != dst.length || src.length==0)
@@ -296,30 +283,6 @@ public class Utils {
         }
         //two points: translation, scale, rotation
         if (src.length == 2) {
-/*            Point2D.Double v1=new Point2D.Double(src[1].x-src[0].x, src[1].y-src[0].y);
-            Point2D.Double v2=new Point2D.Double(dst[1].x-dst[0].x, dst[1].y-dst[0].y);
-            IJ.log("v1: "+v1.toString()+", v2:"+v2.toString());
-            at = new AffineTransform();
-            double angleRad=0;
-            double scale=1.0;
-            if (!v1.equals(v2)) {
-                angleRad=Utils.angle2D_Rad(v1, v2);
-                IJ.log("angleRad: "+angleRad);
-                double length_src=Math.sqrt(
-                        ((src[1].x-src[0].x)*(src[1].x-src[0].x))
-                       +((src[1].y-src[0].y)*(src[1].y-src[0].y)));
-                double length_dst=Math.sqrt(
-                        ((dst[1].x-dst[0].x)*(dst[1].x-dst[0].x))
-                       +((dst[1].y-dst[0].y)*(dst[1].y-dst[0].y)));
-                scale=length_dst/length_src;
-                at.rotate(angleRad);
-                //uniform scale
-                at.scale(scale,scale);
-                at.translate(dst[0].x - src[0].x, dst[0].y - src[0].y);
-            }
-            IJ.log("1. angle: "+angleRad/Math.PI*180+", scale: "+scale+", translate: "+(dst[0].x-src[0].x)+"/"+(dst[0].y-src[0].y));
-            IJ.log("1. "+at.toString());
-            */
             double dx=-(src[1].getY()-src[0].getY());
             double dy=src[1].getX()-src[0].getX();
             Point2D src2=new Point2D.Double(src[0].getX()+dx,src[0].getY()+dy);
@@ -334,7 +297,7 @@ public class Utils {
             RealMatrix inv_x=new LUDecompositionImpl(x).getSolver().getInverse();
             double[][] matrix = y.multiply(inv_x).getData();
             at = new AffineTransform(new double[] { matrix[0][0], matrix[1][0], matrix[0][1], matrix[1][1], matrix[0][2], matrix[1][2] });
-//            IJ.log("1mod. angle: "+angleRad/Math.PI*180+", scale: "+scale+", translate: "+(dst[0].x-src[0].x)+"/"+(dst[0].y-src[0].y));
+//            IJ.log("angle: "+angleRad/Math.PI*180+", scale: "+scale+", translate: "+(dst[0].x-src[0].x)+"/"+(dst[0].y-src[0].y));
             IJ.log("1mod. "+at.toString());
             IJ.log("1mod. angle: "+Math.atan2(at.getShearY(), at.getScaleY())/Math.PI*180);
         }
