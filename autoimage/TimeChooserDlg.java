@@ -19,6 +19,8 @@ public class TimeChooserDlg extends javax.swing.JDialog {
         okButton.setActionCommand("Ok");
         cancelButton.setActionCommand("Cancel");
         cachedDelta=Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        //initialize with 0s delay
+        cachedDelta.setTimeInMillis(0);
     }
 
     public void addOkCancelListener(ActionListener al) {
@@ -34,7 +36,8 @@ public class TimeChooserDlg extends javax.swing.JDialog {
                 break;
             }
             case AcqSetting.ScheduledTime.DELAY: {
-                cachedDelta.setTimeInMillis(time.startTimeMS);
+                //precaution: trim to h/min/s
+                cachedDelta.setTimeInMillis(time.startTimeMS % (1000 * 3600 * 24));
                 deltaHSpinner.setValue(cachedDelta.get(Calendar.HOUR));
                 deltaMinSpinner.setValue(cachedDelta.get(Calendar.MINUTE));
                 deltaSecSpinner.setValue(cachedDelta.get(Calendar.SECOND));

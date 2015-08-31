@@ -75,6 +75,7 @@ public class StitchCluster extends GroupProcessor<File> {
     
     public StitchCluster() {
         super ("Stitching Cluster");
+        //initialize criteria to setup image groups for each cluster in each area
         List<String> criteria=new ArrayList<String>();
         criteria.add(ExtImageTags.AREA_INDEX);
         criteria.add(ExtImageTags.CLUSTER_INDEX);
@@ -182,7 +183,7 @@ public class StitchCluster extends GroupProcessor<File> {
                 @Override
                 public List<File> call() throws InterruptedException {
                     jobNumber++;
-                    IJ.log(    "processGroup: starting job # "+jobNumber);
+                    IJ.log("   starting job # "+jobNumber);
             
                     List<File> stitchedFiles=new ArrayList<File>();
                     
@@ -254,7 +255,9 @@ public class StitchCluster extends GroupProcessor<File> {
                                     Long sliceIndex=meta.getLong(MMTags.Image.SLICE_INDEX);
                                     double xUM=meta.getDouble(MMTags.Image.XUM)/pixSize;
                                     double yUM=meta.getDouble(MMTags.Image.YUM)/pixSize;
-                                    double zUM=meta.getDouble(MMTags.Image.ZUM)/pixSize;
+                                    //double zUM=meta.getDouble(MMTags.Image.ZUM)/pixSize;
+                                    //ignore z stage position to avoid complication with sloping layouts 
+                                    double zUM=meta.getInt(MMTags.Image.SLICE_INDEX);
 
                                     if (!postStitchProcessing.equals("None")) {
                                         widthPx=meta.getDouble(MMTags.Image.WIDTH);
@@ -356,24 +359,6 @@ public class StitchCluster extends GroupProcessor<File> {
                             }    
                          //   IJ.runMacroFile("scripts/setOutput.bsh", sourceImagePath);
                             try {
-            /*                    Thread thread=Thread.currentThread();
-                                Macro.setOptions(thread, "type=[Positions from file] "
-                                                + "order=[Defined by TileConfiguration] "
-                                                + "directory=["+sourceImagePath+"] "
-                                                + "layout_file=["+configFile.getName()+"] "
-                                                + "fusion_method=["+fusionMethod+"] "
-                                                + "regression_threshold="+Double.toString(regressionTh)+" "
-                                                + "max/avg_displacement_threshold="+Double.toString(maxAvgDisplaceTh)+ " "
-                                                + "absolute_displacement_threshold="+Double.toString(absDisplaceTh)+ " "
-                                                + rois
-                                                + subpix
-                                                + compOverlap
-                                                + "ignore_z_stage"
-                                                + "computation_parameters=["+compParams+"] "
-                                                + "image_output=[Write to disk]");
-                                Object runPlugIn = IJ.runPlugIn("Grid/Collection stitching","");
-                                IJ.log("after call runPlugin");
-                                Macro.setOptions(thread,null);*/
                                 IJ.run("Grid/Collection stitching",
                                 "type=[Positions from file] "
                                 + "order=[Defined by TileConfiguration] "
@@ -389,7 +374,7 @@ public class StitchCluster extends GroupProcessor<File> {
                                 + (invertX?"invert_x ":"")
                                 + (invertY?"invert_y ":"")
                                 + (downSample ? "downsample_tiles " : "")
-                                + "ignore_z_stage "
+                                + "ignore_z "
                                 + "computation_parameters=["+compParams+"] "
                                 + "image_output=[Write to disk] ");
     //                            + "output_directory="+workDir);
@@ -429,8 +414,10 @@ public class StitchCluster extends GroupProcessor<File> {
                                 //wait for result stitched image file
                                     if (Thread.currentThread().isInterrupted())
                                         return new ArrayList<File>();
-
-                                    String name="img_t"+Integer.toString(t+1)+"_z"+Integer.toString(j+1)+"_c"+Integer.toString(i+1);
+                                    IJ.log("noOfFrames digits: "+Integer.toString(Long.toString(noOfFrames).length()));
+                                    IJ.log("noOfChannels digits: "+Integer.toString(Integer.toString(channels).length()));
+                                    IJ.log("noOfSlices digits: "+Integer.toString(Long.toString(noOfSlices).length()));
+                                    String name="img_t"+String.format("%0"+Integer.toString(Long.toString(noOfFrames).length())+"d", t+1)+"_z"+String.format("%0"+Integer.toString(Long.toString(noOfSlices).length())+"d",j+1)+"_c"+String.format("%0"+Integer.toString(Long.toString(channels).length())+"d",i+1);
                                     IJ.log("    processing result "+name);
                                     File resultFile=new File(sourceImagePath, name);
                                     File resultFile2=null;
@@ -731,19 +718,6 @@ public class StitchCluster extends GroupProcessor<File> {
         return true;
     }
 
-    /*
-    @Override
-    public JSONObject updateTagValue(JSONObject meta,String newDir, String newPrefix, boolean updateSummary) throws JSONException {
-        return meta;
-    }
-*/
-    
-/*    @Override
-    protected boolean groupIsComplete(Group<File> group) {
-        //this will force to wait with processing until after POISON is received
-        return false;
-    }
-*/
     @Override
     protected long determineMaxGroupSize(JSONObject meta) throws JSONException {
         //this will force to wait with processing until after File.POISON is received

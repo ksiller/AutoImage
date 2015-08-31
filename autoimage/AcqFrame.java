@@ -515,19 +515,20 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 imageCache.addImageCacheListener(imageListener);
                 
                 //setup and start new VirtualAcquisitionDisplay
-                virtualDisplay = new VirtualAcquisitionDisplay(imageCache, summaryMetadata.getString(MMTags.Summary.PREFIX));
-                imageCache.addImageCacheListener(virtualDisplay);
-                virtualDisplay.show();
-                
-//                displayUpdater = new DisplayUpdater(imageCache, acqSetting.getChannels(),acqSetting.getImagePixelSize());
-//                displayUpdater.execute();
+                if (!app.getHideMDADisplayOption()) {
+                    //display only if "hide MDA display" is not checked
+                    virtualDisplay = new VirtualAcquisitionDisplay(imageCache, summaryMetadata.getString(MMTags.Summary.PREFIX));
+                    imageCache.addImageCacheListener(virtualDisplay);
+                    virtualDisplay.show();
+                } else {
+                    virtualDisplay=null;
+                }
                 
                 if (mainImageStorageNode.getChildCount()>0) {
-                    //create fileoutputqueue and ProcessorTree
+                    // create fileoutputqueue and ProcessorTree
                     BlockingQueue<File> fileOutputQueue = new LinkedBlockingQueue<File>(1);
                     ProcessorTree.runFile(fileOutputQueue, (DefaultMutableTreeNode)mainImageStorageNode.getChildAt(0));
                     // Start pumping images into the ImageCache
-    //                  DefaultTaggedImageSink sink = new DefaultTaggedImageSink(procTreeOutputQueue, imageCache);
                     ExtTaggedImageSink sink = new ExtTaggedImageSink(procTreeOutputQueue, imageCache, fileOutputQueue);
                     sink.start();
                 } else {
@@ -784,7 +785,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         }    
         
-        virtualDisplay.close();
+        if (virtualDisplay!=null) {
+            virtualDisplay.close();
+        }
         int currentIndex=acqSettings.indexOf(currentAcqSetting);
         if ((acqSettings.size() > currentIndex + 1) && !isAborted) {
                 acqSettingTable.setRowSelectionInterval(currentIndex + 1, currentIndex + 1);
@@ -4515,6 +4518,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 public void run() {
                     try {
                         acquisitionTask.initialize();
+                        IJ.log(currentAcqSetting.getAbsoluteStart().getTime().toString());
                         timer.schedule(acquisitionTask, currentAcqSetting.getAbsoluteStart().getTime());
                     } catch (InterruptedException ex) {
                         IJ.log("Initialization canceled");
@@ -4782,6 +4786,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 case AcqSetting.ScheduledTime.DELAY: {
                     //convert to absolute time    
                     ms=lastms + setting.getStartTime().startTimeMS;
+                    IJ.log("lastms:"+Long.toString(lastms)+", ms:"+Long.toString(ms)+", startTime: "+Long.toString(setting.getStartTime().startTimeMS));
                     break;
                 }
                 case AcqSetting.ScheduledTime.ABSOLUTE: {
