@@ -1,20 +1,12 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package autoimage;
 
-import java.awt.Rectangle;
-import java.awt.geom.Point2D;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 public class Detector  {
     
@@ -38,7 +30,8 @@ public class Detector  {
     protected int height_Pixel;
     protected double fieldRotation;
 //    protected long dynamicRange;
-    protected String[] binningOptions;
+    protected String[] binningDesc;
+    protected Map<String,Integer> binningOptions;
     protected int bitDepth;
 
     public Detector() {
@@ -48,9 +41,10 @@ public class Detector  {
         width_Pixel=1;
         height_Pixel=1;
         fieldRotation=FieldOfView.ROTATION_UNKNOWN;
-        binningOptions=new String[] {"1"};
+        binningOptions=new HashMap<String,Integer>();
+        binningDesc=parseBinningDesc(binningOptions);
     }
-    
+    /*
     public Detector(JSONObject detObj) throws JSONException {
         if (detObj==null) {
             type="unknown";
@@ -58,7 +52,8 @@ public class Detector  {
             width_Pixel=1;
             height_Pixel=1;
             fieldRotation=FieldOfView.ROTATION_UNKNOWN;
-            binningOptions=new String[] {"1"};
+            binningDesc=new String[] {};
+            binningOptions=new HashMap<String,Integer>();
         } else {
             type=detObj.getString(TAG_TYPE);
             label=detObj.getString(TAG_LABEL);
@@ -67,33 +62,53 @@ public class Detector  {
         //    fieldRotation=detObj.getDouble(TAG_FIELD_ROTATION);
             fieldRotation=FieldOfView.ROTATION_UNKNOWN;
             JSONArray binningOpt=detObj.getJSONArray(TAG_BINNING_OPTIONS);
-            binningOptions=new String[binningOpt.length()];
+            binningDesc=new String[binningOpt.length()];
             for (int i=0; i<binningOpt.length(); i++) {
-                binningOptions[i]=binningOpt.getString(i);
+                binningDesc[i]=binningOpt.getString(i);
             }
         }     
     }
-    
-    public Detector (String lab, int pixX, int pixY, int bdepth, String[] binningOpt, double frot) {
+    */
+    public Detector (String lab, int pixX, int pixY, int bdepth, Map<String,Integer> binning, double frot) {
         type="unknown";
         label=lab;
         width_Pixel=pixX;
         height_Pixel=pixY;
         bitDepth=bdepth;
-        binningOptions=binningOpt;
+        binningOptions=binning;
+        binningDesc=parseBinningDesc(binning);
         fieldRotation=frot;
     }
     
     
     public Detector(Detector det) {
-        this (det.label,det.width_Pixel, det.height_Pixel, det.bitDepth, det.binningOptions.clone(), det.fieldRotation);
+        this (det.label,det.width_Pixel, det.height_Pixel, det.bitDepth, null, det.fieldRotation);
+        Map<String,Integer> bin=new HashMap<String, Integer>();
+        bin.putAll(det.binningOptions);
+        setBinningOptions(bin);
+    }
+    
+    private String[] parseBinningDesc(Map<String,Integer> binning) {
+        if (binning!=null) {
+            String[] b=new String[binning.size()];
+            int i=0;
+            for (String s:binning.keySet()) {
+                b[i]=s;
+                i++;
+            }
+            Arrays.sort(b);
+            return b;
+        } else {
+            return null;
+        }
     }
     
     @Override
     public String toString() {
         String bin="";
-        for (int i=0; i<binningOptions.length; i++)
-            bin=bin+binningOptions[i]+", ";
+        for (String option:binningDesc) {
+            bin=bin+option+" ("+Integer.toString(binningOptions.get(option))+"), ";
+        }
         return "Type: "+type
                 +"; Label: "+label
                 +"; Chip width: "+Integer.toString(width_Pixel)+" px"
@@ -103,21 +118,32 @@ public class Detector  {
                 +"; Field rotation (rad): "+(fieldRotation == FieldOfView.ROTATION_UNKNOWN ? "unknown" :Double.toString(fieldRotation));
     }
     
-    public void setBinningOptions(String[] binOpt) {
+    public void setBinningOptions(Map<String, Integer> binOpt) {
         binningOptions=binOpt;
+        binningDesc=parseBinningDesc(binOpt);
     }
     
-    public String[] getBinningOptions() {
+    public Map<String,Integer> getBinningOptions() {
         return binningOptions;
     }
     
-    public int getBinningOption(int index, int defaultVal) {
-        if (binningOptions==null || binningOptions.length < index)
-            return defaultVal;
-        else
-            return Integer.parseInt(binningOptions[index]);
+    public String getBinningDesc(int index) {
+        if (index>=0 && index<binningDesc.length) {
+            return binningDesc[index];
+        } else {
+            return null;
+        }    
     }
     
+    public Integer getBinningFactor(String option, int defaultVal) {
+        Integer bin=binningOptions.get(option);
+        if (bin==null) {
+            return new Integer(defaultVal);
+        } else {
+            return bin;
+        }
+    }
+        
     public double getFieldRotation() {
         return fieldRotation;
     }
@@ -147,14 +173,15 @@ public class Detector  {
         height_Pixel=pixY;
     }
 
-        
+/*        
     public JSONObject toJSONObject() {
         JSONObject detObj = new JSONObject();
         return detObj;
     }
-    
+*/    
     
     public boolean allowsBinning() {
-        return (binningOptions.length>1 && Integer.parseInt(binningOptions[1]) > 1);
+        return (binningDesc.length>1);
     }
+    
 }

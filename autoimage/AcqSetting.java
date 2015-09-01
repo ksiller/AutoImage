@@ -73,8 +73,9 @@ public class AcqSetting {
     private String channelGroupStr; //visible in GUI
     private String objLabel;        //visible in GUI
     private double objPixSize;      //internal based on existing MM calibration
+    private Detector detector;
     private FieldOfView fieldOfView;
-    private int binning;            //visible in GUI 
+    private String binningStr;            //visible in GUI 
     private TilingSetting tiling;
     private boolean isModified;
     protected TileManager tileManager;
@@ -172,13 +173,13 @@ public class AcqSetting {
     }
 
     public AcqSetting(String n, FieldOfView fov, String objective, double oPixSize) {
-        this(n, fov, objective, oPixSize, 1, false);
+        this(n, fov, objective, oPixSize, "1", false);
     }
 
 //    public AcqSetting(String n, FieldOfView fov, String objective, double oPixSize, double bin, boolean autof) {
-    public AcqSetting(String n, FieldOfView fov, String objective, double oPixSize, int bin, boolean autof) {
+    public AcqSetting(String n, FieldOfView fov, String objective, double oPixSize, String bin, boolean autof) {
         name=n;                     
-        binning=bin;
+        binningStr=bin;
         objectiveDevStr="";
         
         if (fov == null)
@@ -210,6 +211,7 @@ public class AcqSetting {
         totalTiles=0;
         isModified=false;
         tileManager = new TileManager(null, this);
+        detector=null;
     }
         
     public AcqSetting (JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
@@ -223,7 +225,7 @@ public class AcqSetting {
             } catch (JSONException e) {
                 chShutterOpen=false;
             }
-            binning=obj.getInt(TAG_BINNING);
+            binningStr=obj.getString(TAG_BINNING);
             try {
                 JSONObject fovObj=obj.getJSONObject(TAG_FIELD_OF_VIEW);
                 fieldOfView = new FieldOfView(fovObj);
@@ -280,9 +282,17 @@ public class AcqSetting {
                 imageProcRoot=Utils.createDefaultImageProcTree();
             }    
         }
+        detector=null;
     }
     
-
+    public void setDetector(Detector det) {
+        detector=det;
+    }
+    
+    public Detector getDetector() {
+        return detector;
+    }
+    
     public static JSONObject convertAutofocusSettings(Autofocus af, CMMCore core_) throws JSONException, MMException {
         JSONObject obj=new JSONObject();
         obj.put(TAG_AUTOFOCUS_DEVICE_NAME, af.getDeviceName());
@@ -399,7 +409,7 @@ public class AcqSetting {
         obj.put(TAG_CHANNEL_GROUP_STR, channelGroupStr);
         obj.put(TAG_CHANNEL_SHUTTER_OPEN, chShutterOpen);
         obj.put(TAG_OBJ_LABEL, objLabel);
-        obj.put(TAG_BINNING, binning);
+        obj.put(TAG_BINNING, binningStr);
         obj.put(TAG_FIELD_OF_VIEW, fieldOfView.toJSONObject());
         obj.put(TAG_AUTOFOCUS, autofocus);
         obj.put(TAG_AUTOFOCUS_SETTINGS, autofocusSettings);
@@ -440,7 +450,7 @@ public class AcqSetting {
     
     public AcqSetting duplicate() {
 //        AcqSetting copy = new AcqSetting(this.name, this.cameraPixX, this.cameraPixY, this.objLabel, this.objPixSize, this.binning, this.autofocus);
-        AcqSetting copy = new AcqSetting(this.name, new FieldOfView(fieldOfView), this.objLabel, this.objPixSize, this.binning, this.autofocus);
+        AcqSetting copy = new AcqSetting(this.name, new FieldOfView(fieldOfView), this.objLabel, this.objPixSize, this.binningStr, this.autofocus);
         for (Channel c:channels)
             copy.getChannels().add(c.duplicate());
         copy.setStartTime(new ScheduledTime(this.startTime.type,this.startTime.startTimeMS));
@@ -555,15 +565,19 @@ public class AcqSetting {
     }
     
     public double getImagePixelSize() {
-        return objPixSize*binning;
+        return objPixSize*detector.getBinningFactor(binningStr, -1);
     }
     
-    public void setBinning(int b) {
-        binning=b;
+    public void setBinning(String bin) {
+        binningStr=bin;
     }
 
-    public int getBinning() {
-        return binning;
+    public String getBinningDesc() {
+        return binningStr;
+    }
+
+    public int getBinningFactor() {
+        return detector.getBinningFactor(binningStr, -1);
     }
     
     public void setTilingMode(TilingSetting.Mode tm) {

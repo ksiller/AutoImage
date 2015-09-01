@@ -1,6 +1,5 @@
 package autoimage;
 
-//import ij.IJ;
 import autoimage.area.Area;
 import ij.IJ;
 import java.awt.AlphaComposite;
@@ -444,54 +443,48 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     
     public void drawFovAtCurrentStagePos(Graphics2D g2d) {
 //        IJ.log("LayoutPanel.drawFovAtCurrentStagePos: start");
-      //  if (stageXYPosUpdated) {
-            int bdPix=getBorderDimPix();
-            int binning=cAcqSetting.getBinning();
-            double objPixSize=cAcqSetting.getObjPixelSize();
-            
-            FieldOfView fov=cAcqSetting.getFieldOfView();
-            AffineTransform oldTransform=g2d.getTransform();
+        int bdPix=getBorderDimPix();
+        int binning=cAcqSetting.getBinningFactor();
+        double objPixSize=cAcqSetting.getObjPixelSize();
 
-            Point2D fullChipOrigin=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(
-                    currentStagePos_X ,
-                    currentStagePos_Y ));            
-            int x=bdPix+(int)Math.round(physToPixelRatio*(fullChipOrigin.getX()- fov.getFullWidth_UM(objPixSize)/2));
-            int y=bdPix+(int)Math.round(physToPixelRatio*(fullChipOrigin.getY()- fov.getFullHeight_UM(objPixSize)/2));
-            int w=(int)Math.ceil(fov.getFullWidth_UM(objPixSize)*physToPixelRatio);
-            int h=(int)Math.ceil(fov.getFullHeight_UM(objPixSize)*physToPixelRatio);
+        FieldOfView fov=cAcqSetting.getFieldOfView();
+        AffineTransform oldTransform=g2d.getTransform();
 
-            g2d.translate(x+w/2, y+h/2);
-//                double stageRotAngle=Math.atan2(acqLayout.getStageToLayoutTransform().getShearY(), acqLayout.getStageToLayoutTransform().getScaleY());
-            g2d.rotate(Area.getStageToLayoutRot());
-            if (fov.getFieldRotation() != FieldOfView.ROTATION_UNKNOWN) {
-                g2d.rotate(-fov.getFieldRotation());
-//                g2d.rotate(fov.getFieldRotation()/180*Math.PI);
-            }
-            g2d.translate(-x-w/2, -y-h/2);
-            g2d.setColor(COLOR_FOV);
-            g2d.drawRect(x,y,w,h);
-            
-            Point2D offset_UM=fov.getRoiOffset_UM(objPixSize);
-            Point2D roiOrigin=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(
-                    currentStagePos_X ,
-                    currentStagePos_Y ));
-            Composite oldComposite=g2d.getComposite();
-            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.5f));
-            Point2D lpoint=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(currentStagePos_X- fov.getFullWidth_UM(objPixSize)/2 + offset_UM.getX()
-                    ,currentStagePos_Y- fov.getFullHeight_UM(objPixSize)/2 + offset_UM.getY()));
-            x=bdPix+(int)Math.round(physToPixelRatio*(roiOrigin.getX()- fov.getFullWidth_UM(objPixSize)/2 + offset_UM.getX()));
-            y=bdPix+(int)Math.round(physToPixelRatio*(roiOrigin.getY()- fov.getFullHeight_UM(objPixSize)/2 + offset_UM.getY()));
-            w=(int)Math.ceil(fov.getRoiWidth_UM(objPixSize) * physToPixelRatio);
-            h=(int)Math.ceil(fov.getRoiHeight_UM(objPixSize) * physToPixelRatio);
+        Point2D fullChipOrigin=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(
+                currentStagePos_X ,
+                currentStagePos_Y ));            
+        int x=bdPix+(int)Math.round(physToPixelRatio*(fullChipOrigin.getX()- fov.getFullWidth_UM(objPixSize)/2));
+        int y=bdPix+(int)Math.round(physToPixelRatio*(fullChipOrigin.getY()- fov.getFullHeight_UM(objPixSize)/2));
+        int w=(int)Math.ceil(fov.getFullWidth_UM(objPixSize)*physToPixelRatio);
+        int h=(int)Math.ceil(fov.getFullHeight_UM(objPixSize)*physToPixelRatio);
 
-            g2d.fillRect(x,y,w,h);
-            g2d.setComposite(oldComposite);
-            g2d.setTransform(oldTransform);
-            g2d.setStroke(SOLID_STROKE);
-//            g2d.drawRect(x,y,w,h);
-            //g2d.rotate(-45);
+        g2d.translate(x+w/2, y+h/2);
+        g2d.rotate(Area.getStageToLayoutRot());
+        if (fov.getFieldRotation() != FieldOfView.ROTATION_UNKNOWN) {
+            g2d.rotate(-fov.getFieldRotation());
+        }
+        g2d.translate(-x-w/2, -y-h/2);
+        g2d.setColor(COLOR_FOV);
+        g2d.drawRect(x,y,w,h);
+
+        Point2D offset_UM=fov.getRoiOffset_UM(objPixSize);
+        Point2D roiOrigin=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(
+                currentStagePos_X ,
+                currentStagePos_Y ));
+        Composite oldComposite=g2d.getComposite();
+        g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.5f));
+        Point2D lpoint=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(currentStagePos_X- fov.getFullWidth_UM(objPixSize)/2 + offset_UM.getX()
+                ,currentStagePos_Y- fov.getFullHeight_UM(objPixSize)/2 + offset_UM.getY()));
+        x=bdPix+(int)Math.round(physToPixelRatio*(roiOrigin.getX()- fov.getFullWidth_UM(objPixSize)/2 + offset_UM.getX()));
+        y=bdPix+(int)Math.round(physToPixelRatio*(roiOrigin.getY()- fov.getFullHeight_UM(objPixSize)/2 + offset_UM.getY()));
+        w=(int)Math.ceil(fov.getRoiWidth_UM(objPixSize) * physToPixelRatio);
+        h=(int)Math.ceil(fov.getRoiHeight_UM(objPixSize) * physToPixelRatio);
+
+        g2d.fillRect(x,y,w,h);
+        g2d.setComposite(oldComposite);
+        g2d.setTransform(oldTransform);
+        g2d.setStroke(SOLID_STROKE);
 //            IJ.log("LayoutPanel.drawFovAtCurrentStagePos: "+Integer.toString(x)+", "+Integer.toString(y)+", "+Integer.toString(w)+", "+Integer.toString(h));
-       // }
     }
     
     public void setCurrentXYStagePos(double xPos, double yPos) {
@@ -543,9 +536,9 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
             Point2D[] screenp=new Point2D.Double[2];
             screenp[0] = new Point2D.Double(physToPixelRatio * layoutp[0].getX(), physToPixelRatio * layoutp[0].getY());
             screenp[1] = new Point2D.Double(physToPixelRatio * layoutp[1].getX(), physToPixelRatio * layoutp[1].getY());
-            IJ.log("stagep[0]: "+stagep[0].toString()+", stagep[1]: "+stagep[1].toString());
-            IJ.log("layoutp[0]: "+layoutp[0].toString()+", layoutp[1]: "+layoutp[1].toString());
-            IJ.log("screenp[0]: "+screenp[0].toString()+", screenp[1]: "+screenp[1].toString());
+//            IJ.log("stagep[0]: "+stagep[0].toString()+", stagep[1]: "+stagep[1].toString());
+//            IJ.log("layoutp[0]: "+layoutp[0].toString()+", layoutp[1]: "+layoutp[1].toString());
+//            IJ.log("screenp[0]: "+screenp[0].toString()+", screenp[1]: "+screenp[1].toString());
 /*            double lmx=acqLayout.getWidth()/2;
             double lmy=acqLayout.getHeight()/2;
             double radius=calcDist(0,0,lmx,lmy);
