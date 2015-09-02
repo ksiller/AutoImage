@@ -1792,7 +1792,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     public void calcTotalTileNumber() {
         currentAcqSetting.setTotalTiles(acqLayout.getTotalTileNumber());
-        ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.getSelectedRow());
+        ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.convertRowIndexToModel(acqSettingTable.getSelectedRow()));
     }
 
     public void cleanUp() {
@@ -3879,11 +3879,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 || e.getType() == TableModelEvent.INSERT)) {
 //                || e.getType() == TableModelEvent.UPDATE)) {
             
-            IJ.log("AcqSettingTable.changed");
             updatingAcqSettingTable=true;
-/*            for (AcqSetting setting:acqSettings)
-                acqSettingComboBox.addItem(setting.getName());*/
-//            initializeProgressTree(currentAcqSetting);
             updateProcessorTreeView(currentAcqSetting);
             if (e.getType() == TableModelEvent.INSERT) {
 //                IJ.showMessage("insert");
@@ -3893,34 +3889,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }
 
-    //handles selection events in acqSettingTable;  called from anonymous class
-    public void acqSettingSelectionChanged(ListSelectionEvent e) {
-        ListSelectionModel lsm = (ListSelectionModel) e.getSource();
-        int minIndex = lsm.getMinSelectionIndex();
-        if (minIndex >= 0) {
-            AcqSetting newSetting = acqSettings.get(minIndex);
-            if (currentAcqSetting != newSetting) {
-                currentAcqSetting = newSetting;
-                sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
-                        "Sequence: "+currentAcqSetting.getName()));
-                prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
-                prevObjLabel = currentAcqSetting.getObjective();
-                calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
-                ((LayoutPanel) acqLayoutPanel).setAcqSetting(currentAcqSetting, true);
-                updateAcqSettingTab(currentAcqSetting);
-                updateProcessorTreeView(currentAcqSetting);
-/*                try {
-                    core.setChannelGroup(currentAcqSetting.getChannelGroupStr());
-                } catch (Exception ex) {
-                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                }*/
-                acqSettingTable.requestFocusInWindow();
-            }
-        }
-    }
-
     public void setLandmarkFound(boolean b) {
-//        IJ.log("AcqFrame.setLandmarkFound("+b+")");
         acquireButton.setEnabled(b);
         moveToScreenCoordButton.setEnabled(b);
         newAreaButton.setEnabled(b);
@@ -5528,6 +5497,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 }
                 atm.rowDown(selRows, lastPlusOneIndex);
                 areaTable.setRowSelectionInterval(newSelRowInView, newSelRowInView + selRows.length - 1);
+                areaTable.scrollRectToVisible(areaTable.getCellRect(newSelRowInView,0,true));            
                 acqLayout.setModified(true);
             }
         }
@@ -5547,6 +5517,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 }
                 atm.rowUp(selRows, firstMinusOneIndex);
                 areaTable.setRowSelectionInterval(newSelRowInView, newSelRowInView + selRows.length - 1);
+                areaTable.scrollRectToVisible(areaTable.getCellRect(newSelRowInView,0,true));            
                 acqLayout.setModified(true);
             }
         }
@@ -5554,13 +5525,18 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     private void acqSettingDownButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_acqSettingDownButtonActionPerformed
         AcqSettingTableModel ctm = (AcqSettingTableModel) acqSettingTable.getModel();
-        int[] selRows = acqSettingTable.getSelectedRows();
-        if (selRows.length > 0 & selRows[selRows.length - 1] < ctm.getRowCount() - 1) {
-            int newSelRow = ctm.rowDown(selRows);
-            acqSettingTable.setRowSelectionInterval(newSelRow, newSelRow + selRows.length - 1);
-            acqLayout.setModified(true);
-//            cAcqSettingIdx=newSelRow;
+        int[] selRowsView = acqSettingTable.getSelectedRows();
+        int[] selRowsModel = new int[selRowsView.length];
+        for (int i=0; i<selRowsView.length; i++) {
+            selRowsModel[i]=acqSettingTable.convertRowIndexToModel(selRowsView[i]);
         }
+        if (selRowsView.length > 0 & selRowsView[selRowsView.length - 1] < ctm.getRowCount() - 1) {
+            int newSelRow = acqSettingTable.convertRowIndexToView(ctm.rowDown(selRowsModel));
+            acqSettingTable.setRowSelectionInterval(newSelRow, newSelRow + selRowsView.length - 1);
+            acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(newSelRow,0,true));            
+            acqLayout.setModified(true);
+        }
+
     }//GEN-LAST:event_acqSettingDownButtonActionPerformed
 
     private String createAcqSettingName() {
@@ -5583,6 +5559,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private void addAcqSettingButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addAcqSettingButtonActionPerformed
         AcqSetting setting = new AcqSetting(createAcqSettingName(), new FieldOfView(currentAcqSetting.getFieldOfView()), availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)), currentDetector.getBinningDesc(0), false);
         setting.setDetector(currentDetector);
+        setting.setObjectiveDevStr(currentAcqSetting.getObjectiveDevStr());
         //passes on copy of currentAcq.fieldOfView, including currentROI setting
 //        AcqSetting setting = new AcqSetting(createAcqSettingName(), new FieldOfView(currentAcqSetting.getFieldOfView()), availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)), false);
         //let user select ChannelGroupStr. if aborted, return value is null --> no sequence added
@@ -5591,29 +5568,19 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             return;
         setting.setChannelGroupStr(chGroupStr);
         AcqSettingTableModel atm = (AcqSettingTableModel) acqSettingTable.getModel();
-        int[] selectedRows = acqSettingTable.getSelectedRows();
-        int newRow;
-        if (selectedRows.length > 0) { //add after last selected row
-            newRow = selectedRows[selectedRows.length - 1] + 1;
-            atm.addRow(setting, newRow);
+        int[] selRowsView = acqSettingTable.getSelectedRows();
+        int newRowView;
+        if (selRowsView.length > 0) { //add after last selected row
+            newRowView = selRowsView[selRowsView.length - 1] + 1;
+            atm.addRow(setting, acqSettingTable.convertRowIndexToModel(newRowView));
         } else {//add to end
             atm.addRow(setting, -1);
-            newRow = atm.getRowCount() - 1;
+            newRowView = acqSettingTable.convertRowIndexToView(atm.getRowCount() - 1);
         }
 
-        acqSettingTable.setRowSelectionInterval(newRow, newRow);
+        acqSettingTable.setRowSelectionInterval(newRowView, newRowView);
+        acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(newRowView,0,true));            
         deleteAcqSettingButton.setEnabled(atm.getRowCount() > 1);
-
-        /*
-         acqSettings.add(setting);
-         DefaultListModel lm = (DefaultListModel)acqSettingListBox.getModel();
-         lm.addElement(setting.getName());
-         acqSettingListBox.revalidate();
-         acqSettingListBox.setSelectedIndex(acqSettings.size()-1);
-         */
-        //updateAcqSettingGUI(setting);
-
-
     }//GEN-LAST:event_addAcqSettingButtonActionPerformed
 
     private void setClusterXField() {
@@ -5696,17 +5663,17 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         if (atm.getRowCount() <= 1) {
             JOptionPane.showMessageDialog(this, "Setting cannot be deleted.\nAt least one setting needs to be defined.");
         } else if (acqSettingTable.getSelectedRowCount() > 0) {
-            int[] selectedRows = acqSettingTable.getSelectedRows();
-            int[] selectedModelRows = new int[selectedRows.length];
-            for (int i=0; i<selectedRows.length; i++) {
-                selectedModelRows[i]=acqSettingTable.convertRowIndexToModel(selectedRows[i]);
+            int[] selRowsView = acqSettingTable.getSelectedRows();
+            int[] selRowsModel = new int[selRowsView.length];
+            for (int i=0; i<selRowsView.length; i++) {
+                selRowsModel[i]=acqSettingTable.convertRowIndexToModel(selRowsView[i]);
             }
-            int firstRow = selectedRows[0];
-            atm.removeRows(selectedModelRows);
-            if (firstRow >= atm.getRowCount()) {
+            int firstRowView = selRowsView[0];
+            atm.removeRows(selRowsModel);
+            if (firstRowView >= atm.getRowCount()) {
                 acqSettingTable.setRowSelectionInterval(atm.getRowCount() - 1, atm.getRowCount() - 1);
             } else {
-                acqSettingTable.setRowSelectionInterval(firstRow, firstRow);
+                acqSettingTable.setRowSelectionInterval(firstRowView, firstRowView);
             }
         }
         deleteAcqSettingButton.setEnabled(atm.getRowCount() > 1);
@@ -5730,11 +5697,15 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     private void acqSettingUpButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_acqSettingUpButtonActionPerformed
         AcqSettingTableModel atm = (AcqSettingTableModel) acqSettingTable.getModel();
-        int[] selRows = acqSettingTable.getSelectedRows();
-        if (selRows.length > 0 & selRows[0] > 0) {
-            int newSelRow = atm.rowUp(selRows);
-            acqSettingTable.setRowSelectionInterval(newSelRow, newSelRow + selRows.length - 1);
-//            cAcqSettingIdx=newSelRow;
+        int[] selRowsView = acqSettingTable.getSelectedRows();
+        int[] selRowsModel = new int[selRowsView.length];
+        for (int i=0; i<selRowsView.length; i++) {
+            selRowsModel[i]=acqSettingTable.convertRowIndexToModel(selRowsView[i]);
+        }
+        if (selRowsView.length > 0 & selRowsView[0] > 0) {
+            int newSelRow = acqSettingTable.convertRowIndexToView(atm.rowUp(selRowsModel));
+            acqSettingTable.setRowSelectionInterval(newSelRow, newSelRow + selRowsView.length - 1);
+            acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(newSelRow,0,true));            
         }
     }//GEN-LAST:event_acqSettingUpButtonActionPerformed
 
@@ -6143,25 +6114,54 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         if (fc.getSelectedFile()!=null) {
             List<AcqSetting> list=loadAcquisitionSettings(fc.getSelectedFile());
             if (list!=null) {
+                //no selection: add new settings to end of table; else insert after selected setting
+                int selRowAfterAdd=acqSettingTable.getSelectedRowCount()==0 ? acqSettingTable.getRowCount() : acqSettingTable.getSelectedRow()+1;                
+                int[] selRowsView = acqSettingTable.getSelectedRows();
+                AcqSettingTableModel atm = (AcqSettingTableModel) acqSettingTable.getModel();
                 List<String> settingNames=new ArrayList<String>();
-                for (AcqSetting s:acqSettings)
+                for (AcqSetting s:acqSettings) {
                     settingNames.add(s.getName());
+                }
+                String renamingMessage = "";
+                int counter=1;
                 for (AcqSetting setting:list) {
+                    setting.setDetector(currentDetector);
                     if (!objectiveDevStr.equals(setting.getObjectiveDevStr())) {
                         setting.setObjectiveDevStr(objectiveDevStr);
                     }
-                    while (settingNames.contains(setting.getName())) {
-                        setting.setName(setting.getName()+"_1");
+                    int i=1;
+                    String originalName=setting.getName();
+                    String newName=originalName;
+                    while (settingNames.contains(newName)) {
+                        newName=setting.getName()+"_"+Integer.toString(i);
+                        i++;
+                    }
+                    if (!originalName.equals(newName)) {
+                        renamingMessage+=originalName+" --> "+newName+"\n";
+                        setting.setName(newName);
                     }
                     settingNames.add(setting.getName());
-                    acqSettings.add(setting);
+
+                    if (selRowsView.length > 0) { //add after last selected row
+                        atm.addRow(setting, acqSettingTable.convertRowIndexToModel(selRowsView[selRowsView.length - 1] + counter));
+                    } else {
+                        //-1: add to end of table
+                        atm.addRow(setting, -1);
+                    }
+                    counter++;
                 }
-//                IJ.log(settingNames.toString());
-                initializeAcqSettingTable();
+                if (renamingMessage.length() > 0) {
+                    JOptionPane.showMessageDialog(this,"The following settings have been renamed to avoid name duplications:\n"+renamingMessage);
+                }
+                acqSettingTable.setRowSelectionInterval(selRowAfterAdd, selRowAfterAdd);
+                acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(selRowAfterAdd,0,true));            
+                
+//                initializeAcqSejttingTable();
             } else {
                 JOptionPane.showMessageDialog(this,"Could not read acquisition settings from file '"+fc.getSelectedFile().getName()+"'.");
             }
         }
+        deleteAcqSettingButton.setEnabled(acqSettingTable.getRowCount() > 1);
     }//GEN-LAST:event_loadAcqSettingButtonActionPerformed
 
     private void saveAcqSettingButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveAcqSettingButtonActionPerformed
@@ -7025,7 +7025,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                     a.setUnknownTileNum(true);
                                 }
                                 currentAcqSetting.setTotalTiles(-1);
-                                ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.getSelectedRow());
+                                ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.convertRowIndexToModel(acqSettingTable.getSelectedRow()));
                             }
                             acqLayoutPanel.repaint();
                         }
@@ -7328,7 +7328,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 a.setUnknownTileNum(true);
             }
             currentAcqSetting.setTotalTiles(-1);
-            ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.getSelectedRow());
+            ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.convertRowIndexToModel(acqSettingTable.getSelectedRow()));
             acqLayoutPanel.repaint();
         }
         updatePixelSize(currentAcqSetting.getObjective());
@@ -8227,7 +8227,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 if (settings.size() == 0) {
                     FieldOfView fov=new FieldOfView(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel(),currentDetector.getFieldRotation());
                     AcqSetting setting = new AcqSetting("Seq_1", fov, availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)),currentDetector.getBinningDesc(0), false);
-                    setting.setDetector(currentDetector);
                     settings.add(setting);
                 }
             } catch (FileNotFoundException ex) {
@@ -8241,20 +8240,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 JOptionPane.showMessageDialog(this,"Cannot parse acquisition settings from file:\n"+file.getName());
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             }
-            /*need to check params
-             - objective
-             - pixel calib
-             - binning options 
-             - channels
-             - tilingmode (in particular random)
-             */ 
-
-            //update Model for AcqSetting Tables
-    /*        DefaultListModel lm = new DefaultListModel();
-            for (AcqSetting setting : settings) {
-                lm.addElement(setting.getName());
-            }*/
-            deleteAcqSettingButton.setEnabled(settings!=null && settings.size() > 1);
             return settings;
         }
     }
@@ -8265,15 +8250,14 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         
         //objective and binning
         objectiveComboBox.setSelectedItem(setting.getObjective());
-        IJ.log(setting.getName()+": trying to select binning mode " +setting.getBinningDesc());
         binningComboBox.setSelectedItem(setting.getBinningDesc());
         if (!setting.getBinningDesc().equals((String)binningComboBox.getSelectedItem())) {
             JOptionPane.showMessageDialog(this, "Setting: "+setting.getName()+"\n"
                     + "Camera does not support binning mode: "+setting.getBinningDesc()+".\n"
                     + "Switching to binning mode: "+(String)binningComboBox.getSelectedItem()+".");
+            IJ.log("Failed to select "+setting.getBinningDesc()+" binning mode. Switching to "+(String)binningComboBox.getSelectedItem()+" binning mode.");
         }
         setting.setBinning((String)binningComboBox.getSelectedItem());
-        IJ.log(setting.getName()+": selected binning mode " +setting.getBinningDesc());
         
         //tiling
         tilingModeComboBox.setSelectedItem(setting.getTilingMode());
@@ -8393,16 +8377,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 //                AcqSetting setting = new AcqSetting("Seq_1", cCameraPixX, cCameraPixY, availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)), Integer.parseInt(binningDesc[0]), false);
                 FieldOfView fov=new FieldOfView(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel(),currentDetector.getFieldRotation());
                 AcqSetting setting = new AcqSetting("Seq_1", fov, availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)),currentDetector.getBinningDesc(0), false);
-                setting.setDetector(currentDetector);
                 settings.add(setting);
                 expSettingsFile=new File(Prefs.getHomeDir(),"not found");
                 expSettingsFileLabel.setToolTipText("");    
             } else {
                 IJ.log("    Acquisition settings could not be loaded.");
-            }
-        } else {
-            for (AcqSetting setting:settings) {
-                setting.setDetector(currentDetector);
             }
         }
         IJ.log("    "+settings.size()+ " acquisition sequence(s) initialized.");
@@ -8412,6 +8391,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 if (!objectiveDevStr.equals(setting.getObjectiveDevStr())) {
                     setting.setObjectiveDevStr(objectiveDevStr);
                 } 
+                setting.setDetector(currentDetector);
             }
             currentAcqSetting=acqSettings.get(0);
          
@@ -8728,9 +8708,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 int minIndex = lsm.getMinSelectionIndex();
                 if (minIndex >= 0) {
                     //convert minIndex (row in view) to index in TableModel, then retrieve the AcqSetting object
-//                    AcqSetting newSetting = ((AcqSettingTableModel)acqSettingTable.getModel()).getRowData(acqSettingTable.convertRowIndexToModel(minIndex));
-//                    AcqSetting newSetting = acqSettings.get(acqSettingTable.convertRowIndexToModel(minIndex));
-                    AcqSetting newSetting = acqSettings.get(minIndex);
+                    AcqSetting newSetting = ((AcqSettingTableModel)acqSettingTable.getModel()).getRowData(acqSettingTable.convertRowIndexToModel(minIndex));
                     if (currentAcqSetting != newSetting) {
                         currentAcqSetting = newSetting;
                         sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
@@ -8741,11 +8719,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         ((LayoutPanel) acqLayoutPanel).setAcqSetting(currentAcqSetting, true);
                         updateAcqSettingTab(currentAcqSetting);
                         updateProcessorTreeView(currentAcqSetting);
-        /*                try {
-                            core.setChannelGroup(currentAcqSetting.getChannelGroupStr());
-                        } catch (Exception ex) {
-                            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                        }*/
                         acqSettingTable.requestFocusInWindow();
                     }
                 }            
@@ -9017,7 +8990,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 a.setUnknownTileNum(true);
             }
             currentAcqSetting.setTotalTiles(-1);
-            ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.getSelectedRow());
+            ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.convertRowIndexToModel(acqSettingTable.getSelectedRow()));
             return;
         }
         if (areas == null) {
@@ -9038,7 +9011,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
             for (Area area : areas) {
                 if (area.isSelectedForAcq()) {
-//                    Runnable retilingThread = new TilingThread(a,fovX, fovY, setting);
                     final Area a = area;
                     resultList.add(retilingExecutor.submit(new Callable<Integer>() { //returns number of tiles as Future<Integer>
                         @Override

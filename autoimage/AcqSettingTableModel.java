@@ -1,11 +1,5 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage;
 
-import ij.IJ;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -159,7 +153,6 @@ public class AcqSettingTableModel extends AbstractTableModel {
                 DefaultMutableTreeNode node = en.nextElement();
                 DataProcessor proc=(DataProcessor)node.getUserObject();
                 if (proc.isAlive()) {
-                    IJ.log("Remove AcqSetting '"+setting.getName()+"': requesting DataProcessor '"+proc.getName()+"' to stop");
                     proc.requestStop();
                 }
                 while (proc.isAlive()) {
@@ -169,12 +162,11 @@ public class AcqSettingTableModel extends AbstractTableModel {
                         Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                     }
                 }
-                IJ.log("Remove AcqSetting '"+setting.getName()+"': DataProcessor '"+proc.getName()+"' is not alive");
             }
             settings.remove(rowIdxArray[i]);
         }
-        fireTableDataChanged();
-        //fireTableRowsDeleted(rowIdxArray[0], rowIdxArray[rowIdxArray.length - 1]);
+        //fireTableDataChanged();
+        fireTableRowsDeleted(rowIdxArray[0], rowIdxArray[rowIdxArray.length - 1]);
     }
 
     public int rowDown(int rowIdx) {
