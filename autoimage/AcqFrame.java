@@ -8320,7 +8320,15 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         
         //objective and binning
         objectiveComboBox.setSelectedItem(setting.getObjective());
+        IJ.log(setting.getName()+": trying to select binning mode " +setting.getBinningDesc());
         binningComboBox.setSelectedItem(setting.getBinningDesc());
+        if (!setting.getBinningDesc().equals((String)binningComboBox.getSelectedItem())) {
+            JOptionPane.showMessageDialog(this, "Setting: "+setting.getName()+"\n"
+                    + "Camera does not support binning mode: "+setting.getBinningDesc()+".\n"
+                    + "Switching to binning mode: "+(String)binningComboBox.getSelectedItem()+".");
+        }
+        setting.setBinning((String)binningComboBox.getSelectedItem());
+        IJ.log(setting.getName()+": selected binning mode " +setting.getBinningDesc());
         
         //tiling
         tilingModeComboBox.setSelectedItem(setting.getTilingMode());
