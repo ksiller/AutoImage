@@ -2024,7 +2024,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         settingsPanel.setSize(new java.awt.Dimension(0, 649));
 
         sequenceTabbedPane.setBorder(javax.swing.BorderFactory.createTitledBorder(null, "Sequence:", javax.swing.border.TitledBorder.DEFAULT_JUSTIFICATION, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Lucida Grande", 0, 12))); // NOI18N
-        sequenceTabbedPane.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        sequenceTabbedPane.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         sequenceTabbedPane.setPreferredSize(new java.awt.Dimension(410, 540));
 
         areaTable.setModel(new AreaTableModel(null));
@@ -2168,7 +2168,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
-        tilingDirComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        tilingDirComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 11)); // NOI18N
         tilingDirComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
         tilingDirComboBox.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2179,7 +2179,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         jLabel1.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel1.setText("Objective:");
 
-        objectiveComboBox.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        objectiveComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 11)); // NOI18N
         objectiveComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
         objectiveComboBox.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2243,7 +2243,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         jLabel12.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel12.setText("Pixel:");
 
-        binningComboBox.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        binningComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 11)); // NOI18N
         binningComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
         binningComboBox.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2270,7 +2270,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
-        acqOrderList.setFont(new java.awt.Font("Arial", 0, 12)); // NOI18N
+        acqOrderList.setFont(new java.awt.Font("Lucida Grande", 0, 11)); // NOI18N
         acqOrderList.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 acqOrderListActionPerformed(evt);
@@ -2317,7 +2317,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         });
 
-        closeGapsButton.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
+        closeGapsButton.setFont(new java.awt.Font("Lucida Grande", 0, 10)); // NOI18N
         closeGapsButton.setText("Close Gaps");
         closeGapsButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2391,7 +2391,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                             .addComponent(maxSitesLabel)
                             .addGap(3, 3, 3)
                             .addComponent(maxSitesField, javax.swing.GroupLayout.PREFERRED_SIZE, 58, javax.swing.GroupLayout.PREFERRED_SIZE))))
-                .addContainerGap(9, Short.MAX_VALUE))
+                .addGap(3, 3, 3))
         );
 
         jPanel10Layout.linkSize(javax.swing.SwingConstants.HORIZONTAL, new java.awt.Component[] {clusterXField, clusterYField});
@@ -2672,7 +2672,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         jLabel11.setText("Skip Frames: ");
 
         focusNowButton.setFont(new java.awt.Font("Arial", 0, 10)); // NOI18N
-        focusNowButton.setIcon(new javax.swing.ImageIcon("/Users/Karsten/NetBeansProjects/Advanced_MDA/src/autoimage/resources/find.png")); // NOI18N
+        focusNowButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/autoimage/resources/find.png"))); // NOI18N
         focusNowButton.setToolTipText("Test autofocus now");
         focusNowButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -2715,7 +2715,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     .addComponent(afModeLabel))
                 .addGap(3, 3, 3)
                 .addGroup(afPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 90, Short.MAX_VALUE)
+                    .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
                     .addGroup(afPanelLayout.createSequentialGroup()
                         .addComponent(afConfigButton, javax.swing.GroupLayout.PREFERRED_SIZE, 22, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(3, 3, 3)
@@ -3076,22 +3076,23 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         jPanel5.setLayout(jPanel5Layout);
         jPanel5Layout.setHorizontalGroup(
             jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(jPanel5Layout.createSequentialGroup()
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel5Layout.createSequentialGroup()
+                .addGap(3, 3, 3)
                 .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jPanel10, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addGroup(jPanel5Layout.createSequentialGroup()
-                        .addGap(2, 2, 2)
+                        .addGap(3, 3, 3)
                         .addComponent(acqModePane, javax.swing.GroupLayout.PREFERRED_SIZE, 372, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addGap(3, 3, 3))
         );
         jPanel5Layout.setVerticalGroup(
             jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel5Layout.createSequentialGroup()
-                .addGap(0, 0, 0)
+                .addGap(3, 3, 3)
                 .addComponent(jPanel10, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(2, 2, 2)
-                .addComponent(acqModePane, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addGap(5, 5, 5))
+                .addComponent(acqModePane, javax.swing.GroupLayout.DEFAULT_SIZE, 164, Short.MAX_VALUE)
+                .addContainerGap())
         );
 
         sequenceTabbedPane.addTab("Acq Settings", jPanel5);
@@ -3603,7 +3604,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         settingsPanelLayout.setHorizontalGroup(
             settingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, settingsPanelLayout.createSequentialGroup()
-                .addGap(6, 6, 6)
+                .addGap(3, 3, 3)
                 .addGroup(settingsPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                     .addGroup(settingsPanelLayout.createSequentialGroup()
                         .addGap(6, 6, 6)
@@ -4167,14 +4168,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 return false;
             }
             
-
             try {
                 core.setProperty(core.getCameraDevice(), "Binning", setting.getBinningDesc());
-            
-//                if (updateGUI) {
-//                    app.refreshGUI();
-//                }
-
             } catch (Exception e) {
                 ReportingUtils.showError(e);
                 return false;
@@ -4189,51 +4184,18 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }
 
-    /*
-    private int saveAcquisitionSettingOld(File file, AcqSetting setting) {
-        try {
-            XMLStreamWriter xtw=AcqSetting.writeXMLHeader(file.getAbsolutePath());
-            setting.saveToXMLFile(xtw);
-            AcqSetting.closeXMLFile(xtw);
-            return XMLUtils.FILE_IO_OK;
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            return XMLUtils.FILE_NOT_FOUND;
-        } catch (XMLStreamException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            return XMLUtils.FILE_WRITE_ERROR;
-        }
-    }
     
-    private int saveAcquisitionSettingsOld(File file) {
-        try {
-            XMLStreamWriter xtw=AcqSetting.writeXMLHeader(file.getAbsolutePath());
-            for (AcqSetting setting:acqSettings) {
-                setting.saveToXMLFile(xtw);
-            }
-            AcqSetting.closeXMLFile(xtw);
-            return XMLUtils.FILE_IO_OK;
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            return XMLUtils.FILE_NOT_FOUND;
-        } catch (XMLStreamException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            return XMLUtils.FILE_WRITE_ERROR;
-        }
-    }
-    */
-    
-    private void saveAcquisitionSettings(File file) {
+    private void saveAcquisitionSettings(File file, List<AcqSetting> settings) {
         FileWriter fw=null;
         try {
             fw = new FileWriter(file);
             JSONObject obj=new JSONObject();
             JSONArray settingArray=new JSONArray();
-            for (int i=0; i<acqSettings.size(); i++) {
+            for (int i=0; i<settings.size(); i++) {
                 try {  
-                    settingArray.put(i,acqSettings.get(i).toJSONObject());
+                    settingArray.put(i,settings.get(i).toJSONObject());
                 } catch (JSONException ex) {
-                    JOptionPane.showMessageDialog(this,"Error parsing acquisition setting '"+acqSettings.get(i).getName()+"'.");
+                    JOptionPane.showMessageDialog(this,"Error parsing acquisition setting '"+settings.get(i).getName()+"'.");
                     Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
@@ -4256,30 +4218,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
 
     }
-    
-    private void saveAcquisitionSetting(File file, AcqSetting setting) {
-        FileWriter fw=null;
-        try {
-            fw = new FileWriter(file);
-                try {
-                    fw.write(setting.toJSONObject().toString(4));  
-                } catch (JSONException ex) {
-                    JOptionPane.showMessageDialog(this,"Error saving setting '"+setting.getName()+"'.");
-                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            
-            } 
-        } catch (IOException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            JOptionPane.showMessageDialog(this, "Error saving acquisition settings");
-        } finally {
-            try {
-                fw.close();
-            } catch (IOException ex) {
-                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
 
-    }
     
     private void saveExperimentSettings(File file) {
         FileWriter fw=null;
@@ -6266,7 +6205,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             if (result == JOptionPane.CANCEL_OPTION)
                 return;
             if (file.exists()) {
-                int overwrite=JOptionPane.showConfirmDialog(this,"File already exists.","Save Acquisiton Settings",JOptionPane.YES_NO_CANCEL_OPTION);
+                int overwrite=JOptionPane.showConfirmDialog(this,"File already exists. Overwrite?","Save Acquisiton Settings",JOptionPane.YES_NO_CANCEL_OPTION);
                 if (overwrite == JOptionPane.CANCEL_OPTION)
                     return;
                 if (overwrite == JOptionPane.OK_OPTION)
@@ -6282,9 +6221,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 break;
         } while (true);
         if (saveAllCB.isSelected())
-            saveAcquisitionSettings(file);
-        else
-            saveAcquisitionSetting(file,currentAcqSetting);
+            saveAcquisitionSettings(file, acqSettings);
+        else {
+            List<AcqSetting> settings=new ArrayList<AcqSetting>(1);
+            settings.add(currentAcqSetting);
+            saveAcquisitionSettings(file,settings);
+        }    
     }//GEN-LAST:event_saveAcqSettingButtonActionPerformed
 
     private void addDataProcFromFileButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addDataProcFromFileButtonActionPerformed
@@ -8289,10 +8231,14 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     settings.add(setting);
                 }
             } catch (FileNotFoundException ex) {
+                IJ.log("File not found");
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             } catch (IOException ex) {
+                IJ.log("File not found");
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             } catch (JSONException ex) {
+                IJ.log("Cannot parse acquisition settings from file: "+file.getName());
+                JOptionPane.showMessageDialog(this,"Cannot parse acquisition settings from file:\n"+file.getName());
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             }
             /*need to check params
@@ -8309,7 +8255,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 lm.addElement(setting.getName());
             }*/
             deleteAcqSettingButton.setEnabled(settings!=null && settings.size() > 1);
-            IJ.log("Loading acquisition settings completed.");
             return settings;
         }
     }
