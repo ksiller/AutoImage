@@ -53,12 +53,17 @@ public abstract class Area {
     public static final int SUPPORT_CUSTOM_LAYOUT = 2;
     public static final int SUPPORT_ALL_LAYOUTS = 128;
     
+    public static final int TILING_OK = 1;
+    public static final int TILING_ERROR = -1;
+    public static final int TILING_UNKNOWN_NUMBER = -2;
+    
     protected String name;
     protected static double cameraRot = FieldOfView.ROTATION_UNKNOWN;//in radians relative to x-y stage axis, NOT layout
     protected static double stageToLayoutRot = 0; //in radians
     protected static boolean optimizedForCameraRotation = true;
     protected List<Tile> tilePosList;//has absolute layout positions in um
     protected int tileNumber;
+    protected int tilingStatus;
     protected int id; //unique identifier, reflects order of addition 
     protected int index; //index in arraylist of selected areas; required for metadata annotation 
     protected double topLeftX; //in um
@@ -72,7 +77,7 @@ public abstract class Area {
     protected boolean selectedForMerge;
     protected String comment;
     protected boolean acquiring;
-    private boolean unknownTileNum; //is set when tilingmode is "runtime" or "file", or pixel size is not calibrated
+    private boolean unknownTileNum; //is set when tilingmode is "runtime" or "file", or pixel tiles is not calibrated
     private int noOfClusters;
     
     public static final Color COLOR_UNSELECTED_AREA = Color.GRAY;
@@ -112,6 +117,7 @@ public abstract class Area {
         comment=anot;
         acquiring=false;
         tilePosList=null;
+        tilingStatus=TILING_OK;
         unknownTileNum=true;
         noOfClusters=0;
         calcCenterAndDefaultPos();
@@ -175,6 +181,10 @@ public abstract class Area {
         return acquiring;
     }
 
+    public int getTilingStatus() {
+        return tilingStatus;
+    }
+    
     private List<Tile> copyCluster(int clusterNr, double offsetX, double offsetY, List<Tile> source) {
         List<Tile> newCluster=null;
         if (source!=null) {
@@ -240,7 +250,7 @@ public abstract class Area {
         double starty=seedY-(clusterH/2)+fovBounds.getHeight()/2;//*physToPixelRatio;
 
         if (!setting.isSiteOverlap() && overlapsOtherTiles(new Rectangle2D.Double(startx-fovBounds.getWidth()/2, starty-fovBounds.getHeight()/2, clusterW, clusterH),fovX,fovY)) {
-            return 0;
+            return TILING_ERROR;
         }
         
         double x;
@@ -322,7 +332,7 @@ public abstract class Area {
                 if (Thread.currentThread().isInterrupted()) {
                     tilePosList.clear();
 //                    IJ.log("Area.createCluster: interrupted, Area "+name);
-                    break;
+                    return TILING_UNKNOWN_NUMBER;
                 }    
                 x = startx+tileOffset.getX()*col;
                 row=vDir == 1 ? 0 : yTiles-1;
@@ -342,7 +352,7 @@ public abstract class Area {
                 if (Thread.currentThread().isInterrupted()) {
                     tilePosList.clear();
 //                    IJ.log("Area.createCluster: interrupted, Area "+name);
-                    break;
+                    return TILING_UNKNOWN_NUMBER;
                 }    
                 y = starty+tileOffset.getY()*row;
                 col=hDir == 1 ? 0 : xTiles-1;
@@ -360,7 +370,7 @@ public abstract class Area {
             }            
         }
   //      IJ.log("Area.creatCluster: end"); 
-        return siteCounter;
+        return TILING_OK;
     }
     
     public static Rectangle2D getFovBounds(double fovX, double fovY) {
@@ -524,24 +534,30 @@ public abstract class Area {
                 hDir=-hDir;
             }            
         }
-        unknownTileNum=Thread.currentThread().isInterrupted();
         noOfClusters = (tilePosList.size() > 0 ?  1 :  0);
-        return tilePosList.size();
+        unknownTileNum=Thread.currentThread().isInterrupted();
+        tilingStatus=TILING_OK;
+        if (unknownTileNum) {
+            tilingStatus=TILING_UNKNOWN_NUMBER;//aborted
+        } else if (tilePosList.size() == 0) {
+            tilingStatus=TILING_ERROR;//unsuccessful
+        }   
+        return (tilingStatus==TILING_OK ? tilePosList.size() : tilingStatus);
     }
 
-    private int calcRandomTilePositions(double fovX, double fovY, TilingSetting setting) throws InterruptedException {
+    private int calcRandomTilePositions(double fovX, double fovY, TilingSetting tSetting) throws InterruptedException {
         Rectangle2D fovBounds=getFovBounds(fovX, fovY);
-        Point2D tileOffset=calculateTileOffset(fovX, fovY, setting.getTileOverlap());
+        Point2D tileOffset=calculateTileOffset(fovX, fovY, tSetting.getTileOverlap());
 
-        int size=setting.getMaxSites();
-        if (setting.isCluster())
-            size=size*setting.getNrClusterTileX()*setting.getNrClusterTileY();
+        int size=tSetting.getMaxSites();
+        if (tSetting.isCluster())
+            size=size*tSetting.getNrClusterTileX()*tSetting.getNrClusterTileY();
         int iterations=0;
         double w;
         double h;
-        if (setting.isCluster() && (setting.getNrClusterTileX()>1 || setting.getNrClusterTileY()>1)) {
-            w=fovBounds.getWidth()+tileOffset.getX()*(setting.getNrClusterTileX()-1);
-            h=fovBounds.getHeight()+tileOffset.getY()*(setting.getNrClusterTileY()-1);
+        if (tSetting.isCluster() && (tSetting.getNrClusterTileX()>1 || tSetting.getNrClusterTileY()>1)) {
+            w=fovBounds.getWidth()+tileOffset.getX()*(tSetting.getNrClusterTileX()-1);
+            h=fovBounds.getHeight()+tileOffset.getY()*(tSetting.getNrClusterTileY()-1);
         } else {
 //                w=tileOffset.getX();
 //                h=tileOffset.getY();
@@ -552,16 +568,16 @@ public abstract class Area {
             tilePosList = new ArrayList<Tile>(size);
             noOfClusters=0;
             int attempts=0;
-            while (!Thread.currentThread().isInterrupted() && noOfClusters < setting.getMaxSites() && attempts < MAX_TILING_ATTEMPTS) {// && !abortTileCalc) {
+            while (!Thread.currentThread().isInterrupted() && noOfClusters < tSetting.getMaxSites() && attempts < MAX_TILING_ATTEMPTS) {// && !abortTileCalc) {
                 double x=topLeftX+Math.random()*width;
                 double y=topLeftY+Math.random()*height;
-                if (acceptTilePos(x,y,w,h,setting.isInsideOnly())) {
-                    if (setting.isCluster() && (setting.getNrClusterTileX()>1 || setting.getNrClusterTileY()>1)) {
-                        if (createCluster(noOfClusters,x,y,fovX,fovY, setting) > 0) {
+                if (acceptTilePos(x,y,w,h,tSetting.isInsideOnly())) {
+                    if (tSetting.isCluster() && (tSetting.getNrClusterTileX()>1 || tSetting.getNrClusterTileY()>1)) {
+                        if (createCluster(noOfClusters,x,y,fovX,fovY, tSetting) == TILING_OK) {
                             noOfClusters++;
                         }
                     } else {
-                        if (setting.isSiteOverlap() || (!setting.isSiteOverlap() && !overlapsOtherTiles(new Rectangle2D.Double(x-fovBounds.getWidth()/2,y-fovBounds.getHeight()/2,fovX,fovY),fovX,fovY))) {
+                        if (tSetting.isSiteOverlap() || (!tSetting.isSiteOverlap() && !overlapsOtherTiles(new Rectangle2D.Double(x-fovBounds.getWidth()/2,y-fovBounds.getHeight()/2,fovX,fovY),fovX,fovY))) {
                             tilePosList.add(new Tile(createTileName(0,noOfClusters), x, y, relPosZ));
                             noOfClusters++;
                         }
@@ -570,29 +586,31 @@ public abstract class Area {
                 attempts++;
             }
             iterations++;
-        } while (!Thread.currentThread().isInterrupted() && noOfClusters < setting.getMaxSites() && iterations < (MAX_TILING_ATTEMPTS/10)); // && !abortTileCalc) {
+        } while (!Thread.currentThread().isInterrupted() && noOfClusters < tSetting.getMaxSites() && iterations < (MAX_TILING_ATTEMPTS/10)); // && !abortTileCalc) {
     
-        unknownTileNum=(Thread.currentThread().isInterrupted() || (noOfClusters < setting.getMaxSites() && iterations >= MAX_TILING_ATTEMPTS/10));
-        if (noOfClusters < setting.getMaxSites() && iterations >= MAX_TILING_ATTEMPTS/10.0d) {
-            return -1;//unsuccessful
-        } else {
-            return tilePosList.size();
-        }
+        tilingStatus=TILING_OK;
+        unknownTileNum=(Thread.currentThread().isInterrupted());
+        if (unknownTileNum) {
+            tilingStatus=TILING_UNKNOWN_NUMBER;//aborted
+        } else if (noOfClusters < tSetting.getMaxSites() && iterations >= MAX_TILING_ATTEMPTS/10.0d) {
+                tilingStatus=TILING_ERROR;//unsuccessful
+        } 
+        return (tilingStatus==TILING_OK ? tilePosList.size() : tilingStatus);
     }
     
     private int calcCenterTilePositions(double fovX, double fovY, TilingSetting tSetting) throws InterruptedException {
-        int size=1;
+        int tiles=1;
         if (tSetting.isCluster())
-            size=size*tSetting.getNrClusterTileX()*tSetting.getNrClusterTileY();
-//        tilePosList.clear();
-        tilePosList = new ArrayList<Tile>(size);
+            tiles=tiles*tSetting.getNrClusterTileX()*tSetting.getNrClusterTileY();
+        tilePosList = new ArrayList<Tile>(tiles);
+        
         if (centerPos==null || defaultPos==null) {
             calcCenterAndDefaultPos();
         }
-        addTilesAroundSeed(0,centerPos.getX(), centerPos.getY(), fovX, fovY, tSetting);
-        unknownTileNum=Thread.currentThread().isInterrupted();
-        noOfClusters=tilePosList.size() > 0 ? 1 : 0;
-        return tilePosList.size();
+        tilingStatus=addTilesAroundSeed(0,centerPos.getX(), centerPos.getY(), fovX, fovY, tSetting);
+        unknownTileNum=tilingStatus==TILING_UNKNOWN_NUMBER;
+        noOfClusters=tilingStatus == TILING_OK ? 1 : 0;
+        return (tilingStatus==TILING_OK ? tilePosList.size() : tilingStatus);
     }
     
     
@@ -614,10 +632,10 @@ public abstract class Area {
             }
             else {
                 tilePosList.add(new Tile(createTileName(clusterNr,0), seedX, seedY, relPosZ));
-                return 1;
+                return TILING_OK;
             }    
         } else
-            return 0;
+            return TILING_ERROR;
     }
     
     
@@ -627,7 +645,8 @@ public abstract class Area {
             IJ.log("    Area.calcRuntimeTilePosition: "+(tileManager==null ? "tileManager=null" : "no ROIs"));
             unknownTileNum=true;
             tilePosList.clear();
-            return 0;
+            tilingStatus=TILING_UNKNOWN_NUMBER;
+            return tilingStatus;
         }
         tileManager.consolidateTiles(0);
         List<Tile> seedList=tileManager.getTiles(name);
@@ -639,12 +658,12 @@ public abstract class Area {
             tilePosList = new ArrayList<Tile>(size);
             int acceptedNr=0;
             while (!Thread.currentThread().isInterrupted() && seedList.size()>0 && acceptedNr <= tSetting.getMaxSites()) {// && !abortTileCalc) {
-                //use random index in seedList
-                int index=(int)Math.round(Math.random()*(seedList.size()-1));
-                if (addTilesAroundSeed(acceptedNr,seedList.get(index).centerX, seedList.get(index).centerY, fovX, fovY, tSetting) > 0) {
+                //use random idx in seedList
+                int idx=(int)Math.round(Math.random()*(seedList.size()-1));
+                if (addTilesAroundSeed(acceptedNr,seedList.get(idx).centerX, seedList.get(idx).centerY, fovX, fovY, tSetting) == TILING_OK) {
                     acceptedNr++;
                 }    
-                seedList.remove(index);
+                seedList.remove(idx);
             }
             for (Tile t:tilePosList) {
                 IJ.log("    Area.calcRuntimeTilePositions: layout: "+t.centerX+", "+t.centerY+", "+t.relZPos);
@@ -653,7 +672,11 @@ public abstract class Area {
             tilePosList.clear();
         }   
         unknownTileNum=Thread.currentThread().isInterrupted();
-        return tilePosList.size();
+        tilingStatus=TILING_OK;
+        if (unknownTileNum) {
+            tilingStatus=TILING_UNKNOWN_NUMBER;
+        } 
+        return (tilingStatus==TILING_OK ? tilePosList.size() : tilingStatus);
     }
 
     public synchronized int calcTilePositions(TileManager tileManager,double fovX, double fovY, TilingSetting setting) throws InterruptedException {
@@ -669,7 +692,7 @@ public abstract class Area {
                             return calcRuntimeTilePositions(tileManager, fovX, fovY, setting);
                 case FILE:      {
                             unknownTileNum=true;
-                            return 0;
+                            return TILING_UNKNOWN_NUMBER;
                         }
             }
         }
@@ -806,6 +829,8 @@ public abstract class Area {
     
     public void setSelectedForAcq(boolean b) {
         selectedForAcq=b;
+        if (!b) 
+            tilingStatus=TILING_OK;
     }
     
     public boolean isSelectedForAcq() {

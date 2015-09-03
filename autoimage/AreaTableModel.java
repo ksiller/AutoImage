@@ -70,10 +70,11 @@ import javax.swing.table.AbstractTableModel;
                 } else if (colIndex == 3) {
                     DecimalFormat df = new DecimalFormat("###,###,##0");
                     if (a.isSelectedForAcq()) {
-                        if (!a.hasUnknownTileNum())
-                            return df.format(a.getTileNumber());
-                        else
-                            return "???";
+                        switch (a.getTilingStatus()) {
+                            case Area.TILING_ERROR: return "Error";
+                            case Area.TILING_UNKNOWN_NUMBER: return "???";    
+                            default:return df.format(a.getTileNumber());
+                        }
                     } else {
                         return df.format(0);
                     }

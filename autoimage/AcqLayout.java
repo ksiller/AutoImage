@@ -1171,11 +1171,13 @@ public class AcqLayout {
     
     public long getTotalTileNumber() {
         long totalTiles=0;
+        boolean error=false;
         for (Area a:areas) {
             if (a.isSelectedForAcq())
                 totalTiles=totalTiles+a.getTileNumber();
+            error=error || (a.getTilingStatus()==Area.TILING_ERROR);
         }    
-        return totalTiles;
+        return (!error ? totalTiles : -totalTiles);
     }
 }
 

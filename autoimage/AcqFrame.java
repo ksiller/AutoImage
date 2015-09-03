@@ -203,12 +203,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     //Monitors and Task Executors
     private ThreadPoolExecutor retilingExecutor;
-//    private DisplayUpdater displayUpdater;
     private VirtualAcquisitionDisplay virtualDisplay;
     private final LiveModeMonitor liveModeMonitor;
     private final StagePosMonitor stageMonitor;
     private AcquisitionTask acquisitionTask=null;
-//    private final List<MMListenerInterface> MMListeners_ = (List<MMListenerInterface>) Collections.synchronizedList(new ArrayList<MMListenerInterface>());
 //    private TileManager tileManager;
 
     //MM Config Paramters
@@ -227,8 +225,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private String dataProcessorPath;
     private AcqLayout acqLayout;
     private List<AcqSetting> acqSettings;
-   // private Map<String,String> sequenceDirMap;
-//    private int cAcqSettingIdx;
     private AcqSetting currentAcqSetting;
     private TilingSetting prevTilingSetting;
     private String prevObjLabel;
@@ -243,17 +239,17 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private boolean mergeAreasMode;
     private boolean marking; //true in selectMode and annotationMode when left mouse button pressed and dragging
     private Point markStartScreenPos; //screen pos when left mouse button pressed
-    private Point markEndScreenPos; //screeen pos when left mouse button released; dragging: markStartScreenPos != markEnScreenPos 
+    private Point markEndScreenPos; //screeen pos when left mouse button released; dragging: markStartScreenPos != markEndScreenPos 
     private boolean isLeftMouseButton;
     private boolean isRightMouseButton;
     private boolean isAcquiring = false;
     private boolean isProcessing = false;
     private boolean isAborted = false;
     private boolean isWaiting = false;//true when user pressed 'Acquire' and app is waiting for AcquisitionTask to start acquiring at desired time
-    private boolean recalculateTiles = false;
-    private boolean calculating;
+    private boolean retilingAllowed = false;
+    private boolean isCalculatingTiles;
     private boolean retilingAborted;
-    private Area lastArea;
+    private Area mostRecentArea;
     private String lastMergeOption="Encompassing Rectangle";
     
     private final Cursor zoomCursor;
@@ -263,7 +259,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private static final String NOT_SPECIFIED = "<not specified>";
     private static final String NOT_SAVED = "not saved";
     private static final String SELECTING_AREA = "Selecting Area...";
+    private static final String RESIZING_AREA = "Resizing Area...";
     private static final String ADJUSTING_SETTINGS = "Adjusting Settings...";
+//    private static final String RESTORING_SETTINGS = "Restoring Settings...";
     
     private static double MAX_EXPOSURE = 10000; // ms
     private static double MAX_SATURATION = 0.0005; //1: all pixels saturated
@@ -799,9 +797,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             }*/
             //select first sequence setting;
-            recalculateTiles = false;
+            retilingAllowed = false;
             acqSettingTable.setRowSelectionInterval(0, 0);
-            recalculateTiles = true;
+            retilingAllowed = true;
         }
     }
     //end ImageCacheListener
@@ -1069,9 +1067,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             @Override
             public void run() {
                 liveButton.setText(isLive ? "Stop Live" : "Live");
-                snapButton.setEnabled(!isLive && !calculating && !isAcquiring);
-                autoExposureButton.setEnabled(!isLive && !calculating && !isAcquiring);
-        //        acquireButton.setEnabled(!isLive && !calculating && !isAcquiring && acqLayout.getNoOfMappedStagePos() > 0);
+                snapButton.setEnabled(!isLive && !isCalculatingTiles && !isAcquiring);
+                autoExposureButton.setEnabled(!isLive && !isCalculatingTiles && !isAcquiring);
+        //        acquireButton.setEnabled(!isLive && !isCalculatingTiles && !isAcquiring && acqLayout.getNoOfMappedStagePos() > 0);
             }
         });
     }
@@ -1207,7 +1205,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     @Override
     public void systemConfigurationLoaded() {
         instrumentOnline=false;
-        recalculateTiles=false;
+        retilingAllowed=false;
         acqEng2010 = app.getAcquisitionEngine2010();// .getAcquisitionEngine();
         core = app.getMMCore();
         zStageLabel = core.getFocusDevice();
@@ -1232,7 +1230,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
         
         initializeChannelTable(currentAcqSetting);
-        recalculateTiles=true;
+        retilingAllowed=true;
         instrumentOnline=true;
         IJ.log("System Configuration loaded.");
     }
@@ -1268,17 +1266,17 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
                 if (stagePos[0]!=null && stagePos[1]!=null) {
                     Area a = acqLayout.getFirstContainingAreaAbs(stagePos[0], stagePos[1], currentAcqSetting.getTileWidth_UM(), currentAcqSetting.getTileHeight_UM());
-                    if (a != lastArea) {
+                    if (a != mostRecentArea) {
                         if (a != null) {
                             areaLabel.setText("Area: "+a.getName());
                             a.setAcquiring(true);
                         } else {
                             areaLabel.setText("Area:");
                         }
-                        if (lastArea != null) {
-                            lastArea.setAcquiring(false);
+                        if (mostRecentArea != null) {
+                            mostRecentArea.setAcquiring(false);
                         }
-                        lastArea = a;
+                        mostRecentArea = a;
                     }
                     acqLayoutPanel.repaint(); 
                 }
@@ -1291,11 +1289,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     @Override
     public void referencePointsUpdated(List<RefArea> refAreas) {
         setLandmarkFound(acqLayout.getNoOfMappedStagePos() > 0);
-        calcTilePositions(
-                null, 
-                currentAcqSetting.getFieldOfView(), 
-                currentAcqSetting.getTilingSetting(), 
-                "Adjusting...");        
+        calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);        
         acqLayoutPanel.repaint();
     }
 
@@ -1356,18 +1350,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 progressBar.setString("");
                 progressBar.repaint();
             }
-            calculating = false;
-            boolean successful=true;
+            isCalculatingTiles = false;
+            boolean error=false;
             if (!retilingAborted) {
                 //check if all areas tiled successfully (Future<Integer> in resultList >=0;
                 for (Future<Integer> tiles:resultList) {
                     try {
-                        if (tiles.get()==-1) {
-                            JOptionPane.showMessageDialog(null, "Tiling unsuccessful. Reverting to previous settings.");
-                            successful=false;
-    //                        cancelCalculateTiles();
-                            break;
-                        }
+                        error=error || tiles.get()==Area.TILING_ERROR;
                     } catch (InterruptedException ex) {
                         Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                     } catch (ExecutionException ex) {
@@ -1375,32 +1364,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     }
                 }
             }
-            if (retilingAborted || !successful) {
-                recalculateTiles = false;
-                if (command.equals(ADJUSTING_SETTINGS)) {
-                    currentAcqSetting.setObjective(prevObjLabel, getObjPixelSize(prevObjLabel));
-                    currentAcqSetting.setTilingSetting(prevTilingSetting);
-                    ((LayoutPanel) acqLayoutPanel).setAcqSetting(currentAcqSetting, false);
-                    recalculateTiles = true;
-                    updateAcqSettingTab(currentAcqSetting);
-                    calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), "Restoring...");
-                } else if (command.equals(SELECTING_AREA) && restoreObj != null) {
-                    AreaTableModel atm = (AreaTableModel) areaTable.getModel();
-                    for (Area area : ((List<Area>) restoreObj)) {
-                        int id = area.getId();
-                        for (int j = 0; j < atm.getRowCount(); j++) {
-                            int idInRow = (Integer) atm.getValueAt(j, 4);
-                            // IJ.log(Integer.toString(id)+", "+Integer.toString(idInRow));
-                            if (idInRow == id) {
-                                atm.setValueAt(false, j, 0);
-                            }
-                        }
-                    }
-                }
-                retilingAborted = false;
-            } else {
-                calcTotalTileNumber();
-            }    
+            if (error) {
+                JOptionPane.showMessageDialog(null, "Tiling error.\nDeselect 'Inside only' and select 'Overlapping sites', or reduce tile/cluster size.");
+            }
+            updateTotalTileNumber();
             enableGUI(true);
             updateAcqLayoutPanel();
         }
@@ -1489,7 +1456,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         zoomCursor = toolkit.createCustomCursor(cursorImage, cursorHotSpot, "Zoom Cursor");
 
         acqSettings=null;
-        recalculateTiles = false;
+        retilingAllowed = false;
         zoomMode = false;
         selectMode = false;
         commentMode = false;
@@ -1644,17 +1611,16 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                     //create copy
                                     modArea = Area.createFromJSONObject(area.toJSONObject());
                                     if (modArea.showConfigDialog(new Rectangle2D.Double(0,0,acqLayout.getWidth(),acqLayout.getLength()))!=null) {
-                                        //update areatablemodel
-                                        model.setRowData(rowInModel, modArea);
                                         //recalculate tile positions
-                                        FieldOfView fov=currentAcqSetting.getFieldOfView();
-                                        modArea.calcTilePositions(
+                                        calcSingleAreaTilePositions(modArea, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), RESIZING_AREA);
+/*                                        int tiles=modArea.calcTilePositions(
                                                 currentAcqSetting.getTileManager(), 
                                                 fov.getRoiWidth_UM(currentAcqSetting.getObjPixelSize()), 
                                                 fov.getRoiHeight_UM(currentAcqSetting.getObjPixelSize()), 
-                                                currentAcqSetting.getTilingSetting());
-                                        //update layout panel
-                                        acqLayoutPanel.repaint();
+                                                currentAcqSetting.getTilingSetting());*/
+                                        //update areatablemodel
+                                        model.setRowData(rowInModel, modArea);
+                                        //update layout panel and tile numbers
                                         acqLayout.setModified(true);
                                     } else {
                                         //do nothing if editing was cancelled
@@ -1666,8 +1632,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                 } catch (InstantiationException ex) {
                                     Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                                 } catch (IllegalAccessException ex) {
-                                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                                } catch (InterruptedException ex) {
                                     Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                                 }
                             }
@@ -1725,7 +1689,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         processorTreeView.setCellRenderer(dtcr);
         ToolTipManager.sharedInstance().registerComponent(processorTreeView);
         
-        recalculateTiles = true;
+        retilingAllowed = true;
 
         setLandmarkFound(false);
         if (acqLayoutPanel != null) {
@@ -1790,7 +1754,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }
 
-    public void calcTotalTileNumber() {
+    public void updateTotalTileNumber() {
         currentAcqSetting.setTotalTiles(acqLayout.getTotalTileNumber());
         ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.convertRowIndexToModel(acqSettingTable.getSelectedRow()));
     }
@@ -3864,14 +3828,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     public void tableChanged(TableModelEvent e) {
         int row = e.getFirstRow();
         int column = e.getColumn();
-        if (e.getSource() == areaTable.getModel() && (e.getColumn() == 0 || e.getColumn() == TableModelEvent.ALL_COLUMNS || e.getType() == TableModelEvent.DELETE || e.getType() == TableModelEvent.INSERT)) {
+        if (e.getSource() == areaTable.getModel() && (column == 0 || e.getColumn() == TableModelEvent.ALL_COLUMNS || e.getType() == TableModelEvent.DELETE || e.getType() == TableModelEvent.INSERT)) {
             AreaTableModel atm = (AreaTableModel) areaTable.getModel();
-            if (recalculateTiles && column == 0 && (Boolean) atm.getValueAt(row, 0)) {
-                List<Area> al = new ArrayList<Area>(1);
-                al.add(atm.getRowData(row));
-                calcTilePositions(al, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), SELECTING_AREA);
-            } else
-                calcTotalTileNumber();
+            if (retilingAllowed && column == 0 && atm.getRowData(row).isSelectedForAcq()) {
+                calcSingleAreaTilePositions(atm.getRowData(row), currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), SELECTING_AREA);
+            } else {
+                updateTotalTileNumber();
+            }    
             updateAcqLayoutPanel();
         } else if (e.getSource() == acqSettingTable.getModel() && (e.getColumn() == 0 
                 || e.getColumn() == TableModelEvent.ALL_COLUMNS 
@@ -4598,10 +4561,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         String s = null;
 //        if (acqSettings!=null && acqSettings.size() > 0)
         if (currentAcqSetting != null) {
-            recalculateTiles = false;
+            retilingAllowed = false;
         }
         acqSettingTable.setRowSelectionInterval(0, 0);
-        recalculateTiles = true;
+        retilingAllowed = true;
         imageDestPath = createUniqueExpName(rootDirLabel.getText(), experimentTextField.getText());
         File imageDestDir = new File(imageDestPath);
         if (!imageDestDir.exists()) {
@@ -4845,7 +4808,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
             AreaTableModel atm = (AreaTableModel) areaTable.getModel();
             if (selectMode && al!=null) {
-                recalculateTiles = false;
+                retilingAllowed = false;
                 for (Area area : al) {
                     int id = area.getId();
                     for (int j = 0; j < atm.getRowCount(); j++) {
@@ -4859,12 +4822,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         }
                     }
                 }
-                recalculateTiles = true;
+                retilingAllowed = true;
                 if (isLeftMouseButton) {
-                    calcTilePositions(al, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), "Selecting Area...");
+                    calcTilePositions(al, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), SELECTING_AREA);
                     //updateAcqLayoutPanel is called automatically
                 } else {
-                    calcTotalTileNumber();
+                    updateTotalTileNumber();
                     updateAcqLayoutPanel();
                 }
             } else if (mergeAreasMode) {
@@ -5116,47 +5079,47 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             AcqSetting setting = acqSettings.get(i);
             if (setting.hasDuplicateChannels()) {
                 JOptionPane.showMessageDialog(this, "Cannot use same channel twice.", "Acquisition: " + setting.getName(), JOptionPane.ERROR_MESSAGE);
-                recalculateTiles = false;
+                retilingAllowed = false;
                 acqSettingTable.setRowSelectionInterval(i, i);
 //                acqSettingListBox.setSelectedValue(setting.getName(),true);
-                recalculateTiles = true;
+                retilingAllowed = true;
                 sequenceTabbedPane.setSelectedIndex(1);
                 channelTable.requestFocusInWindow();
                 return;
             }
             if (setting.getChannels().size() < 1) {
                 JOptionPane.showMessageDialog(this, "Add Channel for acquisition sequence " + setting.getName() + ".", "Acquisition: " + setting.getName(), JOptionPane.ERROR_MESSAGE);
-                recalculateTiles = false;
+                retilingAllowed = false;
                 acqSettingTable.setRowSelectionInterval(i, i);
 //                acqSettingListBox.setSelectedValue(setting.getName(), true);
-                recalculateTiles = true;
+                retilingAllowed = true;
                 sequenceTabbedPane.setSelectedIndex(1);
                 channelTable.requestFocusInWindow();
                 return;
             }
             if (setting.getImagePixelSize() == -1) {
-                recalculateTiles = false;
+                retilingAllowed = false;
                 acqSettingTable.setRowSelectionInterval(i, i);
 //                acqSettingListBox.setSelectedValue(setting.getName(), true);
-                recalculateTiles = true;
+                retilingAllowed = true;
                 JOptionPane.showMessageDialog(this, "Pixel size is not calibrated for acquisition sequence\n " + setting.getName() + ".", "Acquisition", JOptionPane.ERROR_MESSAGE);
                 return;
             }
             if (!Utils.imageStoragePresent(setting.getImageProcessorTree())) {
                 JOptionPane.showMessageDialog(this, "No Image Storage node defined for Acquisition sequence "+setting.getName());
-                recalculateTiles = false;
+                retilingAllowed = false;
                 acqSettingTable.setRowSelectionInterval(i, i);
-                recalculateTiles = true;
+                retilingAllowed = true;
                 sequenceTabbedPane.setSelectedIndex(2);
                 processorTreeView.requestFocusInWindow();
                 return;
             }
             if (setting.getTilingMode() == TilingSetting.Mode.ADAPTIVE) {
                 if (setting==acqSettings.get(0)) {
-                    recalculateTiles = false;
+                    retilingAllowed = false;
                     acqSettingTable.setRowSelectionInterval(i, i);
 //                    acqSettingListBox.setSelectedValue(setting.getName(), true);
-                    recalculateTiles = true;
+                    retilingAllowed = true;
                     JOptionPane.showMessageDialog(this, "'"+setting.getTilingMode().toString()+" Tiling' cannot not be used for the first acquisition sequence.");
                     return;
                 }
@@ -5320,17 +5283,17 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 ((LayoutPanel) acqLayoutPanel).setAcquisitionLayout(acqLayout, getMaxFOV());
                 layoutFileLabel.setText(acqLayout.getName());
                 layoutFileLabel.setToolTipText("LOADED FROM: "+acqLayout.getFile().getAbsolutePath());
-                lastArea = null;
+                mostRecentArea = null;
                 initializeAreaTable();
                 setLandmarkFound(false);
                 Area.setStageToLayoutRot(0);
                 RefArea.setStageToLayoutRot(0);
                 acqLayoutPanel.setCursor(normCursor);
-                recalculateTiles = false;
-                for (AcqSetting as : acqSettings) {
-                    as.enableSiteOverlap(true);
-                    as.enableInsideOnly(false);
-                }
+                retilingAllowed = false;
+//                for (AcqSetting as : acqSettings) {
+//                    as.enableSiteOverlap(true);
+//                    as.enableInsideOnly(false);
+//                }
                 siteOverlapCheckBox.setSelected(currentAcqSetting.isSiteOverlap());
                 insideOnlyCheckBox.setSelected(currentAcqSetting.isInsideOnly());
 
@@ -5354,7 +5317,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 refPointListDialog.addListener(this);
                 stageMonitor.addListener(refPointListDialog);
                 updatePixelSize(currentAcqSetting.getObjective());
-                recalculateTiles = true;
+                retilingAllowed = true;
                 calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
                 Rectangle r = layoutScrollPane.getVisibleRect();
                 ((LayoutPanel) acqLayoutPanel).calculateScale(r.width, r.height);
@@ -5374,23 +5337,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             o = (double) Integer.parseInt(tileOverlapField.getText()) / 100;
         } catch (NumberFormatException nfe) {
         }
-        /*        if ((o > AcqSetting.MAX_TILE_OVERLAP)) {
-         JOptionPane.showMessageDialog(null, "Error: Please enter a number between 0-"+Integer.toString(AcqSetting.MAX_TILE_OVERLAP)+".", "Error Message", JOptionPane.ERROR_MESSAGE);
-         //tileOverlap=0.2;
-         double tileO=0;
-         if (acqSettings!=null && acqSettings.size()>0) {
-         AcqSetting setting = acqSettings.get(cAcqSettingIdx);
-         if (currentAcqSetting!=null) {
-         tileO=currentAcqSetting.getTileOverlap();
-         }
-         tileOverlapField.setText(Integer.toString((int)(tileO*100)));
-         tileOverlapField.selectAll();
-         } else {*/
-        //tileOverlap=(double)o/100;
-/*            if (recalculateTiles && acqSettings!=null && acqSettings.size()>0) {
-         AcqSetting setting = acqSettings.get(cAcqSettingIdx);*/
-        //      && tileOverlapField.getInputVerifier().verify(tileOverlapField)
-        if (o != currentAcqSetting.getTileOverlap() && recalculateTiles && !calculating) {
+        if (o != currentAcqSetting.getTileOverlap() && retilingAllowed && !isCalculatingTiles) {
             prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
             prevObjLabel = currentAcqSetting.getObjective();
             currentAcqSetting.setTileOverlap(o);
@@ -5584,17 +5531,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }//GEN-LAST:event_addAcqSettingButtonActionPerformed
 
     private void setClusterXField() {
-        /*        String s=clusterXField.getText();
-         if (s.isEmpty())
-         s="1";*/
         try {
             int nr = Integer.parseInt(clusterXField.getText());
-            /*        if (nr<0 | nr > AcqSetting.MAX_CLUSTER_X) {
-             JOptionPane.showMessageDialog(null, "Error: Please enter a number between 1-"+Integer.toString(AcqSetting.MAX_CLUSTER_X)+".", "Error Message", JOptionPane.ERROR_MESSAGE);
-             clusterXField.setText(Integer.toString(1));
-             clusterXField.requestFocus();
-             } else {*/
-            if (nr != currentAcqSetting.getNrClusterX() && !calculating && recalculateTiles) {
+            if (nr != currentAcqSetting.getNrClusterX() && !isCalculatingTiles && retilingAllowed) {
                 prevObjLabel = currentAcqSetting.getObjective();
                 prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
                 currentAcqSetting.setNrClusterX(nr);
@@ -5602,22 +5541,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         } catch (NumberFormatException nfe) {
         }
-        /*        }*/
     }
 
     private void setClusterYField() {
-        /*        String s=clusterYField.getText();
-         if (s.isEmpty())
-         s="1";*/
         try {
             int nr = Integer.parseInt(clusterYField.getText());
-
-            /*        if (nr<0 | nr > AcqSetting.MAX_CLUSTER_Y) {
-             JOptionPane.showMessageDialog(null, "Error: Please enter a number between 1-"+Integer.toString(AcqSetting.MAX_CLUSTER_Y)+".", "Error Message", JOptionPane.ERROR_MESSAGE);
-             clusterYField.setText(Integer.toString(1));
-             clusterYField.requestFocus();
-             } else {*/
-            if (nr != currentAcqSetting.getNrClusterY() && !calculating && recalculateTiles) {
+            if (nr != currentAcqSetting.getNrClusterY() && !isCalculatingTiles && retilingAllowed) {
                 prevObjLabel = currentAcqSetting.getObjective();
                 prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
                 currentAcqSetting.setNrClusterY(nr);
@@ -5625,13 +5554,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         } catch (NumberFormatException nfe) {
         }
-        /*        }*/
     }
 
     private void setMaxSites() {
         try {
             int nr = Integer.parseInt(maxSitesField.getText());
-            if (nr != currentAcqSetting.getMaxSites() && !calculating && recalculateTiles) {
+            if (nr != currentAcqSetting.getMaxSites() && !isCalculatingTiles && retilingAllowed) {
                 prevObjLabel = currentAcqSetting.getObjective();
                 prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
                 currentAcqSetting.setMaxSites(nr);
@@ -5645,7 +5573,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         if (retilingExecutor != null && !retilingExecutor.isTerminated()) {
 //            IJ.log("AcqFrame.cancelThreadButtonActionPerformed");
             retilingAborted = true;
-            calculating = false;
+//            isCalculatingTiles = false;
             for (Area a:acqLayout.getAreaArray())
                 a.setUnknownTileNum(true);
             retilingExecutor.shutdownNow();
@@ -6865,7 +6793,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 return;
             }
         }
-        if (!calculating && recalculateTiles) {
+        if (!isCalculatingTiles && retilingAllowed) {
             prevObjLabel = currentAcqSetting.getObjective();
             prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
             currentAcqSetting.enableSiteOverlap(siteOverlapCheckBox.isSelected());
@@ -6898,7 +6826,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         siteOverlapCheckBox.setEnabled(newMode == TilingSetting.Mode.RANDOM);
         maxSitesField.setEnabled(newMode != TilingSetting.Mode.FULL && newMode != TilingSetting.Mode.CENTER);
         maxSitesLabel.setEnabled(newMode != TilingSetting.Mode.FULL && newMode != TilingSetting.Mode.CENTER);
-        if (!calculating && recalculateTiles) {
+        if (!isCalculatingTiles && retilingAllowed) {
             if (newMode != currentAcqSetting.getTilingMode()) {
                 prevObjLabel = currentAcqSetting.getObjective();
                 prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
@@ -6959,8 +6887,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         clusterLabel1.setEnabled(clusterCheckBox.isSelected());
         clusterLabel2.setEnabled(clusterCheckBox.isSelected());
         //        clusterOverlapCheckBox.setEnabled(clusterCheckBox.isSelected() && currentAcqSetting.getTilingMode() != TilingSetting.Mode.CENTER);
-        if (!calculating && recalculateTiles) {
-            //        if (recalculateTiles && acqSettings!=null && acqSettings.size()>0) {
+        if (!isCalculatingTiles && retilingAllowed) {
+            //        if (retilingAllowed && acqSettings!=null && acqSettings.size()>0) {
                 //            AcqSetting setting = acqSettings.get(cAcqSettingIdx);
                 //            setting.enableCluster(clusterCheckBox.isSelected());
                 prevObjLabel = currentAcqSetting.getObjective();
@@ -7012,19 +6940,19 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 if (currentAcqSetting != null) {
                     //                AcqSetting setting=acqSettings.get(cAcqSettingIdx);
                     if (!currentAcqSetting.getObjective().equals(selectedObjective)) {
-                        if (!calculating) {
+                        if (!isCalculatingTiles) {
                             prevObjLabel = currentAcqSetting.getObjective();
                             prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
                             currentAcqSetting.setObjective(selectedObjective, getObjPixelSize(selectedObjective));
                             //                        IJ.log("objectiveComboBoxActionPerformed. "+selectedObjective);
                             updatePixelSize(selectedObjective); // calls updateFOVDimension, updateTileOverlap, updateTileSizeLabel
-                            if (currentAcqSetting.getImagePixelSize() > 0 && recalculateTiles) {
+                            if (currentAcqSetting.getImagePixelSize() > 0 && retilingAllowed) {
                                 calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
                             } else if (currentAcqSetting.getImagePixelSize() <= 0) {
                                 for (Area a:acqLayout.getAreaArray()) {
                                     a.setUnknownTileNum(true);
                                 }
-                                currentAcqSetting.setTotalTiles(-1);
+                                currentAcqSetting.setTotalTiles(Area.TILING_UNKNOWN_NUMBER);
                                 ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.convertRowIndexToModel(acqSettingTable.getSelectedRow()));
                             }
                             acqLayoutPanel.repaint();
@@ -7035,7 +6963,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     }//GEN-LAST:event_objectiveComboBoxActionPerformed
 
     private void tilingDirComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_tilingDirComboBoxActionPerformed
-        if (!calculating && recalculateTiles) {
+        if (!isCalculatingTiles && retilingAllowed) {
             if ((Byte) tilingDirComboBox.getSelectedItem()!=currentAcqSetting.getTilingDir()) {
                 currentAcqSetting.setTilingDir((Byte) tilingDirComboBox.getSelectedItem());
                 calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
@@ -7321,13 +7249,13 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             setting.setFieldOfView(fov);
 //            setting.getFieldOfView().clearROI();
         }
-        if (currentAcqSetting.getImagePixelSize() > 0 && recalculateTiles) {
+        if (currentAcqSetting.getImagePixelSize() > 0 && retilingAllowed) {
             calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
         } else if (currentAcqSetting.getImagePixelSize() <= 0) {
             for (Area a:acqLayout.getAreaArray()) {
                 a.setUnknownTileNum(true);
             }
-            currentAcqSetting.setTotalTiles(-1);
+            currentAcqSetting.setTotalTiles(Area.TILING_UNKNOWN_NUMBER);
             ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.convertRowIndexToModel(acqSettingTable.getSelectedRow()));
             acqLayoutPanel.repaint();
         }
@@ -7341,7 +7269,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             newTileOverlap=Math.ceil(newTileOverlap*100)/100;
             tileOverlapField.setText(Integer.toString((int)Math.round(newTileOverlap*100)));
             currentAcqSetting.setTileOverlap(Double.parseDouble(tileOverlapField.getText())/100);
-            calcTilePositions(null,currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(),"Adjusting...");
+            calcTilePositions(null,currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(),ADJUSTING_SETTINGS);
         }
     }//GEN-LAST:event_closeGapsButtonActionPerformed
 
@@ -8141,7 +8069,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     private void setTilingInsideAreaOnly(boolean b) {
         currentAcqSetting.enableInsideOnly(b);
-        if (!calculating && recalculateTiles) {
+        if (!isCalculatingTiles && retilingAllowed) {
             calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
         }
     }
@@ -8246,7 +8174,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
 
     private void updateAcqSettingTab(AcqSetting setting) {
-        recalculateTiles = false;
+        retilingAllowed = false;
         
         //objective and binning
         objectiveComboBox.setSelectedItem(setting.getObjective());
@@ -8306,7 +8234,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         timelapseCheckBox.setSelected(setting.isTimelapse());
         
         //updatePixelSize(setting.getObjective());
-        recalculateTiles = true;
+        retilingAllowed = true;
     }
 
     private void updateProcessorTreeView(AcqSetting setting) {
@@ -8420,26 +8348,26 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             } else {
                 layoutFileLabel.setToolTipText("LOADED FROM: "+acqLayout.getFile().getAbsolutePath());
             } 
-            lastArea = null;
+            mostRecentArea = null;
             initializeAreaTable();
             setLandmarkFound(false);
             Area.setStageToLayoutRot(acqLayout.getStageToLayoutRot());
             RefArea.setStageToLayoutRot(acqLayout.getStageToLayoutRot());
             
             acqLayoutPanel.setCursor(normCursor);
-            recalculateTiles = false;
-            for (AcqSetting as : acqSettings) {
-                as.enableSiteOverlap(true);
-                as.enableInsideOnly(false);
-            }
+            retilingAllowed = false;
+//            for (AcqSetting as : acqSettings) {
+//                as.enableSiteOverlap(true);
+//                as.enableInsideOnly(false);
+//            }
             siteOverlapCheckBox.setSelected(currentAcqSetting.isSiteOverlap());
             insideOnlyCheckBox.setSelected(currentAcqSetting.isInsideOnly());
             if (mergeAreasDialog != null) {
                 mergeAreasDialog.removeAllAreas();
             }
-            updatePixelSize(currentAcqSetting.getObjective());
-            recalculateTiles = true;
-            calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
+//            updatePixelSize(currentAcqSetting.getObjective());
+//            retilingAllowed = true;
+//            calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
             Rectangle r = layoutScrollPane.getVisibleRect();
             ((LayoutPanel) acqLayoutPanel).calculateScale(r.width, r.height);
             areaTable.revalidate();
@@ -8464,7 +8392,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         }
         updatePixelSize(selObjective); //calls updateFOVDimension, updateTileOverlap, updateTileSizeLabel 
-            
+        retilingAllowed=true;    
         calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), SELECTING_AREA);
         IJ.log("Loading of experiment settings completed.");
     }    
@@ -8886,9 +8814,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
      */
     private void updateAcqLayoutPanel() {
         if (acqLayout != null) {
-            //           calcAndUpdateSelAndTotalTileNumber();
             totalAreasLabel.setText(Integer.toString(acqLayout.getNoOfSelectedAreas()));
-            totalTilesLabel.setText(Long.toString(currentAcqSetting.getTotalTiles()));
+            long tiles=acqLayout.getTotalTileNumber();
+            totalTilesLabel.setForeground(tiles>=0 ? Color.black : Color.red);
+            totalTilesLabel.setText(Long.toString(Math.abs(tiles)) + (tiles < 0 ? " (Error)" : ""));
             layoutScrollPane.getViewport().revalidate();
             layoutScrollPane.getViewport().repaint();
 
@@ -8981,23 +8910,28 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }
 
+    public void calcSingleAreaTilePositions(Area area, final FieldOfView fov, final TilingSetting setting, String cmd) {
+        List<Area> al = new ArrayList<Area>(1);
+        al.add(area);
+        calcTilePositions(al, fov, setting, cmd);
+    }
     //starts calculation of tile positions in new thread(s)
     //if areas==null, calculates for all areas in layout 
     public void calcTilePositions(List<Area> areas, final FieldOfView fov, final TilingSetting setting, String cmd) {
-        //if pixelsize is unknown (<=0), tile positions cannot be calculated
         if (currentAcqSetting.getImagePixelSize()<=0) {
+            //if pixelsize is unknown (<=0), tile positions cannot be calculated
             for (Area a:acqLayout.getAreaArray()) {
                 a.setUnknownTileNum(true);
             }
-            currentAcqSetting.setTotalTiles(-1);
+            currentAcqSetting.setTotalTiles(Area.TILING_UNKNOWN_NUMBER);
             ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.convertRowIndexToModel(acqSettingTable.getSelectedRow()));
             return;
         }
         if (areas == null) {
             areas = acqLayout.getAreaArray();
         }
-        if (!calculating && areas != null && areas.size() > 0) {
-            calculating = true;
+        if (!isCalculatingTiles && areas != null && areas.size() > 0) {
+            isCalculatingTiles = true;
             retilingAborted = false;
 
             enableGUI(false);
