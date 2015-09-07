@@ -1,14 +1,16 @@
 package autoimage;
 
 import autoimage.area.Area;
+import ij.IJ;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import javax.swing.table.AbstractTableModel;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
     public class AreaTableModel extends AbstractTableModel {
 
@@ -53,7 +55,11 @@ import javax.swing.table.AbstractTableModel;
 
         @Override
         public Class getColumnClass(int colIdx) {
-            return getValueAt(0, colIdx).getClass();
+            if (areas==null || areas.isEmpty()) {
+                return Object.class;
+            } else {           
+                return getValueAt(0, colIdx).getClass();
+            }    
         }
 
         @Override
@@ -135,23 +141,7 @@ import javax.swing.table.AbstractTableModel;
                 return null;
             }
         }
-/*
-        public int rowDown(int[] rowIdx) {
-            //           IJ.log("AreaTableModel.rowDown: "+Integer.toString(rowIdx[0])+", "+Integer.toString(rowIdx[rowIdx.length-1])+", "+Integer.toString(rowIdx.length));
-            if (rowIdx.length == 1 & rowIdx[0] < getRowCount() - 1) {
-                Collections.swap(areas, rowIdx[0], rowIdx[0] + 1);
-                fireTableRowsUpdated(rowIdx[0], rowIdx[0] + 1);
-                return rowIdx[0] + 1;
-            } else if (rowIdx[0] >= 0 && rowIdx[rowIdx.length - 1] < getRowCount() - 1) {
-                Area a = acqLayout.getAreaById((Integer) getValueAt(rowIdx[rowIdx.length - 1] + 1, 1));
-                areas.add(rowIdx[0], a.duplicate());
-                areas.remove(rowIdx[rowIdx.length - 1] + 2);
-                fireTableRowsUpdated(rowIdx[0], rowIdx[rowIdx.length - 1] + 1);
-                return rowIdx[0] + 1;
-            }
-            return rowIdx[0];
-        }
-*/
+
         /*
         @Param rowIdx: array of indices in model
         @Param lastPlusIndex: model rowindex that corresponds to 1 below selection in view
@@ -159,8 +149,9 @@ import javax.swing.table.AbstractTableModel;
         public void rowDown(int[] rowIdx, int lastPlusOneIndex) {
             //create copy 
             Area temp=areas.get(lastPlusOneIndex);
-            //move last entry in selection to 
+            //move last entry in selection
             areas.set(lastPlusOneIndex, areas.get(rowIdx[rowIdx.length-1]));
+            //iterate for the rest
             for (int i=rowIdx.length-1; i>0; i--) {
                 areas.set(rowIdx[i], areas.get(rowIdx[i-1]));
             }
@@ -169,22 +160,6 @@ import javax.swing.table.AbstractTableModel;
 //            return 0;
         }
 
-/*        
-        public int rowUp(int[] rowIdx) {
-            if (rowIdx.length == 1 & rowIdx[0] > 0) {
-                Collections.swap(areas, rowIdx[0], rowIdx[0] - 1);
-                fireTableRowsUpdated(rowIdx[0] - 1, rowIdx[0]);
-                return rowIdx[0] - 1;
-            } else if (rowIdx[0] > 0 && rowIdx[rowIdx.length - 1] < getRowCount()) {
-                Area a = acqLayout.getAreaById((Integer) getValueAt(rowIdx[0] - 1, 1));
-                areas.add(rowIdx[rowIdx.length - 1] + 1, a.duplicate());
-                areas.remove(rowIdx[0] - 1);
-                fireTableRowsUpdated(rowIdx[0] - 1, rowIdx[rowIdx.length - 1]);
-                return rowIdx[0] - 1;
-            }
-            return rowIdx[0];
-        }
-*/
         /*
         @Param rowIdx: array of indices in model
         @Param firstMinusOneIndex: model rowindex that corresponds to 1 below selection in view
@@ -192,30 +167,23 @@ import javax.swing.table.AbstractTableModel;
         public void rowUp(int[] rowIdx, int firstMinusOneIndex) {
             //create copy 
             Area temp=areas.get(firstMinusOneIndex);
-            //move last entry in selection to 
+            //move last first entry in selection
             areas.set(firstMinusOneIndex, areas.get(rowIdx[0]));
+            //iterate for the rest
             for (int i=0; i<rowIdx.length-1; i++) {
                 areas.set(rowIdx[i], areas.get(rowIdx[i+1]));
             }
             areas.set(rowIdx[rowIdx.length-1],temp);
             fireTableRowsUpdated(0,getRowCount()-1);
-//            return 0;
-        }
-
-        public void removeRow(Object element) {
-            for (int i = 0; i < areas.size(); i++) {
-                if (((Area) element).getId() == areas.get(i).getId()) {
-                    areas.remove(i);
-                    fireTableRowsDeleted(i, i);
-                }
-            }
         }
 
         public void removeRows(int[] rowIdx) {
-            for (int i = rowIdx[rowIdx.length - 1]; i >= rowIdx[0]; i--) {
-                areas.remove(i);
+            Arrays.sort(rowIdx);
+            for (int i = rowIdx.length - 1; i >= 0; i--) {
+                areas.remove(rowIdx[i]);
+//                fireTableRowsDeleted(rowIdx[i],rowIdx[i]);
             }
-            fireTableRowsDeleted(rowIdx[0], rowIdx[rowIdx.length - 1]);
+            fireTableDataChanged();
         }
 
         private void updateTileCell(int rowIndex) {

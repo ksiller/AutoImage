@@ -169,7 +169,7 @@ public class AcqPlateLayout extends AcqLayout {
     }
     
     @Override
-    public boolean isAreaRenamingAllowed() {
+    public boolean isAreaEditingAllowed() {
         return false;
     }
     

@@ -28,7 +28,6 @@ import org.micromanager.api.ScriptInterface;
 public class MergeAreasDlg extends javax.swing.JDialog implements TableModelListener {
 
     private JTable areaTable;
-//    private AcqFrame acqFrame;
     private AcqLayout acqLayout;
     private final List<IMergeAreaListener> listeners;
     private ExecutorService listenerExecutor;
@@ -36,41 +35,14 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
    //implementation of TableModelListener
     @Override
     public void tableChanged(TableModelEvent tme) {
-//        acqFrame.setMergeAreasBounds(calcMergeAreasBounds());
-//        IJ.showMessage("tableChanged: "+Boolean.toString(SwingUtilities.isEventDispatchThread()));
         synchronized (listeners) {
-/*            for (final IMergeAreaListener l : listeners) {
-               listenerExecutor.submit(new Runnable (){
-                    @Override
-                    public void run() {*/
-                        for (IMergeAreaListener l:listeners)
-                            l.mergeAreaSelectionChanged(((AreaTableModel)areaTable.getModel()).getAreaList());
-/*                    }
-                });
-            }*/
+            for (IMergeAreaListener l:listeners)
+                l.mergeAreaSelectionChanged(((AreaTableModel)areaTable.getModel()).getAreaList());
         }    
     }
 
-/*    
-   @Override
-   public void stateChanged(ChangeEvent e) {
-        try {
-            IJ.showMessage("stateChanged");
-            GUIUtils.invokeLater(new Runnable() {
-                @Override
-                public void run() {
-                    areaTable.revalidate();
-                }
-            });
-        } catch (InterruptedException ex) {
-            ReportingUtils.logError(ex);
-        } catch (InvocationTargetException ex) {
-            ReportingUtils.logError(ex);
-       }
-    }
-*/
 
-   private class AreaTableModel extends AbstractTableModel {
+    private class AreaTableModel extends AbstractTableModel {
       private static final long serialVersionUID = 1L;
       public final String[] COLUMN_NAMES = new String[] {
             "Area",
@@ -245,23 +217,16 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
         mergeButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-//                mergeAreas();
                 List<Area> selectedAreas=((AreaTableModel)areaTable.getModel()).getAreaList();
                 final List<Area> mergingAreas=new ArrayList<Area>(selectedAreas.size());
                 for (Area area:selectedAreas)
                     mergingAreas.add(area);
                 synchronized (listeners) {
 	            for (final IMergeAreaListener l : listeners) {
-/*                        listenerExecutor.submit(new Runnable (){
-                            @Override
-                            public void run() {*/
                                 l.mergeAreas(mergingAreas);
-/*                            }
-                        });*/
                     }
                 }    
                 removeAllAreas();
-//                savePosition();
                 dispose();
             }
         });
@@ -331,65 +296,5 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
         }
     }
    
-/*
-   private String createNewAreaName() {
-       String s="";
-       boolean exists=true;
-       List<Area> areas=acqLayout.getAreaArray();
-       int n=1;
-       while (exists) {
-            s="Merged_Area_"+Integer.toString(n);
-            exists=false;
-           for (Area area : areas) {
-               if (s.equals(area.getName())) {
-                   exists=true;
-               }
-           }
-            n++;
-       }
-       return s;
-   }   
-*/
-    
-/*   
-   private Rectangle2D.Double calcMergeAreasBoundss() { 
-       AreaTableModel atm=(AreaTableModel)areaTable.getModel();
-       List<Area> mergingAreas=atm.getAreaList();
-       if (mergingAreas!=null & mergingAreas.size()>1) {
-            double minX=(Double)atm.getValueAt(0,1);
-            double maxX=minX+(Double)atm.getValueAt(0,3);
-            double minY=(Double)atm.getValueAt(0,2);
-            double maxY=minY+(Double)atm.getValueAt(0,4);
-            double z=0;
-            for (int row=1;row<atm.getRowCount();row++) {
-                if ((Double)atm.getValueAt(row,1)<minX)
-                    minX=(Double)atm.getValueAt(row,1);
-                if ((Double)atm.getValueAt(row,2)<minY)
-                    minY=(Double)atm.getValueAt(row,2);
-                if ((Double)atm.getValueAt(row,1)+(Double)atm.getValueAt(row,3)>maxX)
-                    maxX=(Double)atm.getValueAt(row,1)+(Double)atm.getValueAt(row,3);
-                if ((Double)atm.getValueAt(row,2)+(Double)atm.getValueAt(row,4)>maxY)
-                    maxY=(Double)atm.getValueAt(row,2)+(Double)atm.getValueAt(row,4);    
-            }
-           return new Rectangle2D.Double(minX,minY,maxX-minX,maxY-minY);
-       } else
-           return null;
-   }
-   
-   
-   private void mergeAreas() {
-       Rectangle2D.Double r=calcMergeAreasBounds();
-       if (r!=null) {
-           List<Area> layoutAreas=acqLayout.getAreaArray();
-            Area mergedArea=new RectArea(createNewAreaName(),acqLayout.createUniqueAreaId(),r.x, r.y, 0, r.width, r.height, false, "");
-            AreaTableModel atm=(AreaTableModel)areaTable.getModel();
-            layoutAreas.removeAll(atm.getAreaList());
-            layoutAreas.add(mergedArea);
-            removeAllAreas();//in MergeAreasDlg
-            acqLayout.setModified(true);
-       } else 
-           IJ.log(getClass().getName()+": mergeAreaBounds == null");
-   } 
-*/   
 
 }

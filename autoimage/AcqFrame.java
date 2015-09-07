@@ -72,6 +72,7 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
@@ -127,6 +128,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JViewport;
 import javax.swing.ListSelectionModel;
+import javax.swing.RowSorter;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.ToolTipManager;
@@ -1595,7 +1597,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         }
                 }
                 });
-                if (acqLayout.isAreaRenamingAllowed()) {
+                if (acqLayout.isAreaEditingAllowed()) {
                     JMenuItem editItem=new JMenuItem("Edit");
                     editItem.addActionListener(new ActionListener() {
 
@@ -1613,11 +1615,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                     if (modArea.showConfigDialog(new Rectangle2D.Double(0,0,acqLayout.getWidth(),acqLayout.getLength()))!=null) {
                                         //recalculate tile positions
                                         calcSingleAreaTilePositions(modArea, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), RESIZING_AREA);
-/*                                        int tiles=modArea.calcTilePositions(
-                                                currentAcqSetting.getTileManager(), 
-                                                fov.getRoiWidth_UM(currentAcqSetting.getObjPixelSize()), 
-                                                fov.getRoiHeight_UM(currentAcqSetting.getObjPixelSize()), 
-                                                currentAcqSetting.getTilingSetting());*/
                                         //update areatablemodel
                                         model.setRowData(rowInModel, modArea);
                                         //update layout panel and tile numbers
@@ -4521,7 +4518,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         if (ace != null) {
             ace.stopCellEditing();
         }
-        AreaTableModel atm = (AreaTableModel) areaTable.getModel();
         ace = (AbstractCellEditor) areaTable.getCellEditor();
         if (ace != null) {
             ace.stopCellEditing();
@@ -4812,7 +4808,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 for (Area area : al) {
                     int id = area.getId();
                     for (int j = 0; j < atm.getRowCount(); j++) {
-                        int idInRow = (Integer) atm.getValueAt(j, 1);
+                        int idInRow = atm.getRowData(j).getId();
                         if (idInRow == id) {
                             if (isLeftMouseButton) {
                                 atm.setValueAt(true, j, 0);
@@ -4843,8 +4839,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 gd.showDialog();
                 if (!gd.wasCanceled()) {
                     String annot = gd.getNextString();
-                    for (Area a : al) {
-                        int id = a.getId();
+                    for (Area area : al) {
+/*                        int id = area.getId();
                         for (int j = 0; j < atm.getRowCount(); j++) {
                             int idInRow = (Integer) atm.getValueAt(j, 1);
                             if (idInRow == id) {
@@ -4852,7 +4848,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                     atm.setValueAt(annot, j, 4);
                                 }
                             }
-                        }
+                        }*/
+                        area.setComment(annot);
                     }
                 }
                 commentButton.requestFocus();
@@ -5380,13 +5377,21 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private void removeAreaButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_removeAreaButtonActionPerformed
         List<Area> areas = acqLayout.getAreaArray();
         if (areas.size() > 0) {
-            int[] rows = areaTable.getSelectedRows();
-            if (rows.length > 0) {
+            int[] rowsInView = areaTable.getSelectedRows();
+            if (rowsInView.length > 0) {
+                int newSelection=rowsInView[0];
+                int[] rows=new int[rowsInView.length];
                 AreaTableModel atm = (AreaTableModel) areaTable.getModel();
-                for (int i=0; i<rows.length; i++) {
-                    rows[i]=areaTable.convertRowIndexToModel(rows[i]);
+                for (int i=rowsInView.length-1; i>=0; i--) {
+                    //convert row indices in view to model
+                    //need to remove rows from bottom to ensure rowsorter stays in sync 
+                    rows[rowsInView.length-1-i]=areaTable.convertRowIndexToModel(rowsInView[i]);
                 }
                 atm.removeRows(rows);
+                newSelection=Math.min(newSelection, atm.getRowCount()-1);
+                areaTable.setRowSelectionInterval(newSelection, newSelection);
+                areaTable.setRowSelectionInterval(newSelection, newSelection);
+                areaTable.scrollRectToVisible(areaTable.getCellRect(newSelection,0,true));            
                 acqLayout.setModified(true);
             }
         }
@@ -5422,6 +5427,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 //            AreaTableModel atm=(AreaTableModel)areaTable.getModel();
                 //            Object[] data = new Object[]{a.isSelected(), a.getName(),new Integer(0), a.getAnnotation(), a.getId()};
                 //            atm.addRow(data);
+                int newSelection=areaTable.getRowCount()-1;
+                areaTable.setRowSelectionInterval(newSelection, newSelection);
+                areaTable.setRowSelectionInterval(newSelection, newSelection);
+                areaTable.scrollRectToVisible(areaTable.getCellRect(newSelection,0,true));            
                 acqLayout.setModified(true);
                 acqLayoutPanel.repaint();
             } catch (Exception ex) {
@@ -8656,21 +8665,20 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     
     public List<Area> updateAreaListFromAreaTableView(boolean updateLayout, boolean updateTableModel) {
         IJ.log("AcqFrame.updateAreaListFromAreaTableView()");
+        AreaTableModel atm=(AreaTableModel)areaTable.getModel();
         List<Area> newList=new ArrayList<Area>(areaTable.getRowCount());
         for (int i=0;i < areaTable.getRowCount(); i++) {
-            int id=(Integer)areaTable.getValueAt(i, 1);
-            newList.add(acqLayout.getAreaById(id));
+            newList.add(atm.getRowData(areaTable.convertRowIndexToModel(i)));
         }
         if (updateLayout) {
             acqLayout.setAreaArray(newList);
         }
         if (updateTableModel) {
-            AreaTableModel atm=(AreaTableModel)areaTable.getModel();
             atm.setData(newList,true);
         }
         return newList;
     }
-        
+      
     private void initializeAreaTable() {
         if (acqLayout != null) {
             List<Area> l=acqLayout.getAreaArray();
@@ -8687,19 +8695,20 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         areaTable.getColumnModel().getColumn(2).setMaxWidth(200);
         areaTable.getColumnModel().getColumn(2).setMinWidth(35);
         
-        model.setAreaRenamingAllowed(acqLayout.isAreaRenamingAllowed());
+        model.setAreaRenamingAllowed(acqLayout.isAreaEditingAllowed());
         TableRowSorter sorter = new TableRowSorter<AreaTableModel>(model);
         sorter.setComparator(2, acqLayout.getAreaNameComparator());
         sorter.setComparator(3, acqLayout.getTileNumberComparator());
+        sorter.setSortsOnUpdates(false);
         sorter.addRowSorterListener(new RowSorterListener() {
 
             @Override
             public void sorterChanged(RowSorterEvent e) {
-                if (e.getType()==RowSorterEvent.Type.SORTED)
-                   // ((AreaTableModel)areaTable.getModel()).matchModelDataWithView();
+                if (e.getType()==RowSorterEvent.Type.SORTED) {
                     acqLayout.setModified(true);
+                }    
             }
-        });
+        }); 
         areaTable.setRowSorter(sorter);
     }
 

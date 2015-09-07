@@ -1145,7 +1145,7 @@ public class AcqLayout {
         return isModified;
     }
     
-    public boolean isAreaRenamingAllowed() {
+    public boolean isAreaEditingAllowed() {
         return true;
     }
     
