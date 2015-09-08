@@ -2,7 +2,6 @@ package autoimage.dataprocessors;
 
 import autoimage.ExtImageTags;
 import autoimage.MMCoreUtils;
-import autoimage.Utils;
 import ij.IJ;
 import java.awt.Component;
 import java.io.File;

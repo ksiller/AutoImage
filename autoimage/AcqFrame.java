@@ -4193,47 +4193,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         }
     }
-    /*
-    private void saveExperimentSettingsOld(File file) {
-        File layoutFile=new File(imageDestPath,acqLayout.getFile().getName());
-        acqLayout.saveLayoutToXMLFile(layoutFile);
-        File acqSettingsFile=new File(imageDestPath,"AcqSettings.XML");
-        saveAcquisitionSettings(acqSettingsFile);
-        File processorTreeFile=new File(imageDestPath, "ProcTree.txt");
-        saveProcessorTree(processorTreeFile, acqSettings);
-        try {
-            Utils.copyFile(layoutFile, new File(Prefs.getHomeDir(),"LastLayout.XML"));
-            Utils.copyFile(acqSettingsFile, new File(Prefs.getHomeDir(),"LastAcqSettings.XML"));
-            Utils.copyFile(processorTreeFile, new File(Prefs.getHomeDir(),"LastProcTree.txt"));
-        } catch (IOException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        try {
-            XMLUtils.initialize();
-            XMLOutputFactory xof =  XMLOutputFactory.newInstance();
-            XMLStreamWriter xtw = xof.createXMLStreamWriter(new FileOutputStream(file.getAbsolutePath()), "UTF-8"); 
-            xtw.writeStartDocument("utf-8","1.0"); 
-            xtw.writeCharacters(XMLUtils.LINE_FEED);
-                        
-            XMLUtils.wStartElement(xtw, "EXPERIMENT_SETTINGS");
-                XMLUtils.writeLine(xtw, TAG_VERSION, "1.0");
-                XMLUtils.writeLine(xtw, TAG_STORAGE_DESTINATION,new File(imageDestPath).getParentFile().getAbsolutePath());
-                XMLUtils.writeLine(xtw, TAG_EXP_NAME,new File(imageDestPath).getName());
-                XMLUtils.writeLine(xtw, TAG_LAYOUT_FILE, layoutFile.getAbsolutePath());
-                XMLUtils.writeLine(xtw, TAG_ACQ_SETTING_FILE, acqSettingsFile.getAbsolutePath());
-                XMLUtils.writeLine(xtw, TAG_PROCESSOR_TREE_FILE, processorTreeFile.getAbsolutePath());
-            XMLUtils.wEndElement(xtw);
-            
-            xtw.writeEndDocument(); 
-            xtw.flush();
-            xtw.close();
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex); 
-        } catch (XMLStreamException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-        }    
-    }
-    */
+
+    
     private void saveProcessorTree(File file, AcqSetting setting) {
         FileWriter fw=null;
         try {
@@ -4266,69 +4227,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         }
     }
     
-/*    
-    private int saveProcessorTreeXML(File file, DefaultMutableTreeNode procRoot) {
-        if (procRoot==null) {
-            return XMLUtils.FILE_WRITE_ERROR;
-        }
-        try {
-            XMLStreamWriter xtw=XMLUtils.writeXMLHeader(file.getAbsolutePath());
-            DataProcessor dp=(DataProcessor)procRoot.getUserObject();
-            
-            XMLUtils.wStartElement(xtw, "ProcessorTree");
-                XMLUtils.wStartElement(xtw, "Processor");
-                                
-                XMLUtils.wEndElement(xtw);
-            XMLUtils.wEndElement(xtw);
-            
-            XMLUtils.closeXMLFile(xtw);
-            return XMLUtils.FILE_IO_OK;
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            return XMLUtils.FILE_NOT_FOUND;
-        } catch (XMLStreamException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            return XMLUtils.FILE_WRITE_ERROR;
-        }
-    }
-*/    
- 
-/*    
-    private void saveProcessorTree(File file, List<AcqSetting> settings) {
-        FileWriter fw=null;
-        try {
-            fw = new FileWriter(file);
-            JSONObject procDef=new JSONObject();
-            JSONArray procTreeArray=new JSONArray();
-            for (AcqSetting setting:settings) {
-                JSONObject procObj= new JSONObject();
-                procObj.put("SeqSetting",setting.getName());
-                procObj.put("ProcTree",Utils.processortreeToJSONObject(setting.getImageProcessorTree(),setting.getImageProcessorTree()));
-                procTreeArray.put(procObj);
-            }
-            procDef.put("Processor_Definition", procTreeArray);
-            fw.write(procDef.toString(4));
-            FileWriter fwXML=new FileWriter(new File("/Users/Karsten/Desktop/ProcTree.XML"));
-        } catch (IOException ex) {
-            IJ.log("IOException "+ex);
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (JSONException ex) {
-            IJ.log("JSONException "+ex);
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (Exception ex) {
-            IJ.log("Exception "+ex);
-        } finally {
-            if (fw!=null) {
-                try {
-                    fw.close();
-                } catch (IOException ex) {
-                IJ.log("IOException "+ex);
-                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }       
-        }
-    }
-*/
+    
     public void saveAcqLayoutToJSONObjectFile (File f) {
         FileWriter fw;
         try {
@@ -5651,17 +5550,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             procName=tag;
         FilterProcessor itf;
         if (tag.contains("Index")) {
-/*            if (isFile) {
-                List<Integer> argsInteger= new ArrayList<Integer>(args.size());
-                for (int i=0;i<args.size(); i++)
-                    argsInteger.add(Integer.parseInt(args.get(i)));
-                itf=new ImageTagFilterInt<File>(tag, argsInteger);
-            } else {*/
-                List<Long> argsLong= new ArrayList<Long>(args.size());
-                for (int i=0;i<args.size(); i++)
-                    argsLong.add(Long.parseLong(args.get(i)));
-                itf=new ImageTagFilterLong<TaggedImage>(tag, argsLong);
-//            }
+            List<Long> argsLong= new ArrayList<Long>(args.size());
+            for (int i=0;i<args.size(); i++)
+                argsLong.add(Long.parseLong(args.get(i)));
+            itf=new ImageTagFilterLong<TaggedImage>(tag, argsLong);
         } else {
             if (isFile)
                 itf=new ImageTagFilterString<File>(tag, args);            
@@ -5713,10 +5605,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             JOptionPane.showMessageDialog(null, "Select Node in Processor Tree");
             return;
         }
-/*        FilterProcessor itf=showImageTagFilterDlg(null,selectedNode);
-        if (itf!=null)
-            createAndAddProcessorNode(selectedNode,itf);
-        FilterProcessor itf=showImageTagFilterDlg(null,selectedNode);*/
         FilterProcessor itf = new ImageTagFilterString(ExtImageTags.AREA_NAME,null);
         itf.makeConfigurationGUI();
         itf.dispose();
@@ -5736,18 +5624,11 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             JOptionPane.showMessageDialog(null, "Select Node in Processor Tree");
             return;
         }
-//        FilterProcessor itf=showChannelFilterDlg(null, selectedNode);
-//        if (itf!=null)
-//            createAndAddProcessorNode(selectedNode, itf);
         ImageTagFilterOptString itf=new ImageTagFilterOptString(MMTags.Image.CHANNEL_NAME,null);
-//        List<String> channels=new ArrayList<String>((int)availableChannels.size());
-//        for (String ch:availableChannels)
-//            channels.add(ch);
         List<String> chList=new ArrayList<String>();
         for (Channel ch:currentAcqSetting.getChannels())
             chList.add(ch.getName());
         itf.setOptions(chList);
-//        itf.setOptions(Arrays.asList(availableChannels.toArray()));
         itf.makeConfigurationGUI();
         itf.dispose();
         if (!"".equals(itf.getKey())) {
@@ -5763,28 +5644,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             JOptionPane.showMessageDialog(null, "Select Node in Processor Tree");
             return;
         }
-//        FilterProcessor itf=showZFilterDlg(null, selectedNode);
-//        if (itf!=null)
-//            createAndAddProcessorNode(selectedNode, itf);
-//        ImageTagFilterOpt itf;
-/*        if (Utils.isDescendantOfImageStorageNode(currentAcqSetting.getImageProcessorTree(), selectedNode)) {
-            itf=new ImageTagFilterOptInt(MMTags.Image.SLICE_INDEX,null);
-//            itf=new ImageTagFilterOptLong(MMTags.Image.SLICE_INDEX,null);
-        } else { 
-            itf=new ImageTagFilterOptLong(MMTags.Image.SLICE_INDEX,null);
-//        }
-        List<String> slices=new ArrayList<String>();
-        for (long l=0;l<currentAcqSetting.getZSlices();l++)
-            slices.add(Long.toString(l));
-        itf.setOptions(slices);
-        itf.makeConfigurationGUI();
-        itf.dispose();
-        if (!"".equals(itf.getKey())) {
-            createAndAddProcessorNode(selectedNode,itf);    
-        }    
-        */
-        
-        
         ImageTagFilterOpt itf=new ImageTagFilterOptLong(MMTags.Image.SLICE_INDEX,null);
         List<String> slices=new ArrayList<String>();
         for (long l=0;l<currentAcqSetting.getZSlices();l++)
@@ -6590,10 +6449,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         filepanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         panel.add(filepanel);
             
-        JCheckBox saveAllCB = new JCheckBox("Save processor tree for all acquisition settings");
-        saveAllCB.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.add(saveAllCB);
-        
         File file;
         do {    
             int result = JOptionPane.showConfirmDialog(this, panel, 
@@ -6617,13 +6472,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             } else
                 break;
         } while (true);
-        if (saveAllCB.isSelected()) {
-            //saveProcessorTree(file,acqSettings);
-            //not supported
-        } else {
-            saveProcessorTree(file,currentAcqSetting);
-         //   saveProcessorTreeForXML(new File(file.getParentFile(),"ProcForXML.txt"),currentAcqSetting);
-        }    
+        saveProcessorTree(file,currentAcqSetting);
     }//GEN-LAST:event_saveProcTreeButtonActionPerformed
 
     private void showZProfileCheckBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_showZProfileCheckBoxActionPerformed

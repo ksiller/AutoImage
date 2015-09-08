@@ -3,7 +3,6 @@ package autoimage.dataprocessors;
 import autoimage.ExtImageTags;
 import autoimage.ImageFileQueue;
 import autoimage.MMCoreUtils;
-import autoimage.Utils;
 import bsh.EvalError;
 import bsh.Interpreter;
 import bsh.TargetError;
@@ -54,7 +53,6 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
     protected boolean saveRT_;
     protected ResultsTable rTable_; //new table for each image
     protected static String scriptDir = "";
-//    protected TaggedImageStorageDiskDefault storage;
     
     
     public ScriptAnalyzer() {
@@ -75,12 +73,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
         processIncompleteGrps=true;
         processOnTheFly=true;
     }
-/*    
-    @Override
-    protected void initialize() {
-        storage=null;
-    }
-*/    
+
     @Override
     public boolean isSupportedDataType(Class<?> clazz) {
         return clazz==java.io.File.class;
@@ -144,70 +137,6 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
         args_=args;
     }
     
-    /*
-    //creates copy of element
-    //if meta!=null, metadata in copied element will be replaced by meta, otherwise keep original metadata
-    @Override
-    protected File createModifiedOutput(File element) {
-        JSONObject meta=null;
-        File copy=null;
-        TaggedImage ti=null;
-        ImagePlus imp=null; 
-        imp=IJ.openImage(((File)element).getAbsolutePath());
-        if (imp!=null && imp.getProperty("Info") != null) {
-            try {
-                meta = new JSONObject((String)imp.getProperty("Info"));
-                String newDir=new File(workDir).getParentFile().getAbsolutePath();
-                ImageProcessor ip=imp.getProcessor();
-                if (meta.getJSONObject(MMTags.Root.SUMMARY).getString(MMTags.Summary.PIX_TYPE).equals("RGB32")) {
-                    //RGB32 elements hold pixel data in int[] --> convert to byte[]
-                    ti=new TaggedImage(MMCoreUtils.convertIntToByteArray((int[])ip.getPixels()),new JSONObject(meta.toString()));
-                }
-                else if (meta.getJSONObject(MMTags.Root.SUMMARY).getString(MMTags.Summary.PIX_TYPE).equals("RGB64")) {
-                    if (imp.isComposite()) {
-                        CompositeImage ci=(CompositeImage)imp;
-                        short[] totalArray=new short[ci.getWidth()*ci.getHeight()*4];
-                        for (int channel=0; channel< ci.getNChannels(); channel++) {
-                            ImageProcessor proc=imp.getStack().getProcessor(channel+1);
-                            short[] chPixels=(short[])proc.getPixels();
-                            for (int i=0;i<chPixels.length;i++) {
-                                totalArray[(2-channel) + 4*i] = chPixels[i]; // B,G,R
-                            }
-                        }
-                        ti=new TaggedImage(totalArray,new JSONObject(meta.toString()));
-                    }
-
-                } else {//8-bit or 16-bit grayscale
-                    ti=ImageUtils.makeTaggedImage(ip);
-                    ti.tags=new JSONObject(meta.toString());                        
-                }
-                String newPrefix=new File(workDir).getName();
-                //update metadata
-                ti.tags=updateTagValue(ti.tags, newDir, newPrefix, true);
-                if (storage==null) {
-                    storage = new TaggedImageStorageDiskDefault (workDir,true,ti.tags.getJSONObject(MMTags.Root.SUMMARY));
-                }
-                storage.putImage(ti);
-
-                String posName="";
-                File copiedFile=new File(new File(new File(newDir,newPrefix),meta.getString("PositionName")),
-                                                ti.tags.getString("FileName"));
-                copy=copiedFile;
-            } catch (JSONException ex) {
-                IJ.log(this.getClass().getName()+ ": Cannot retrieve 'Info' metadata from file. "+ex);
-                Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
-//                    copy=super.createModifiedOutput(element);
-            } catch (Exception ex) {
-                IJ.log(this.getClass().getName()+ ": Error writing file to storage. "+ex);
-                Logger.getLogger(FilterProcessor.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        } else {
-            IJ.log(this.getClass().getName()+": Cannot open image");
-//                copy=super.createModifiedOutput(element);
-        }
-       return copy;
-    }    
-*/
     protected boolean saveResultsTable(List<File> modFiles) {
         if (rTable_==null) {
             return false;
@@ -223,16 +152,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
             String cSlice=Long.toString(meta.getLong(MMTags.Image.SLICE_INDEX));
             IJ.log("cframe: "+cFrame);
             IJ.log("cSlice: "+cSlice);
-/*            File path;
-            path=new File(workDir,area+"-Cluster"+cluster+"-Site"+site);
-            try {
-                if (!path.exists()) {
-                    path.mkdirs(); 
-                }
-            } catch (Exception e) {
-                IJ.log("  Cannot create directory");
-            }    
-*/
+
             String resultName="Results-";
             if (criteriaKeys.contains(ExtImageTags.AREA_COMMENT)) {
                 resultName+=meta.getString(ExtImageTags.AREA_COMMENT);
@@ -281,18 +201,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
     
     private boolean executePy(List<File> files, String dirForResults) {
         IJ.log(    "Excuting Py script:"+script_+"; args="+args_);
-/*        JSONObject params = new JSONObject();
-        try {
-            params.put("workdir",workDir);
-            JSONArray fileArray=new JSONArray();
-            for (File f:files) {
-                fileArray.put(f.getAbsolutePath());
-            }
-            params.put("imageFiles",fileArray);
-            params.put("args", args_);
-        } catch (JSONException ex) {
-            Logger.getLogger(ScriptAnalyzer.class.getName()).log(Level.SEVERE, null, ex);
-        }*/
+
         String fileList=new String();
         for (File f:files) {
             if (!f.exists()) {
@@ -302,21 +211,19 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
             fileList+=" filename="+f.getAbsolutePath();
         }
         try {
-//           Process process = Runtime.getRuntime().exec("python "+script_+" "+params.toString());
-//           Process process = Runtime.getRuntime().exec("python "+script_+" \"workDir="+workDir+fileList+" "+args_+"\"");
-           String arg[] = {
-               "python",
-               script_,
-               "workDir="+dirForResults+fileList+" "+args_
-           }; 
-           Process process = Runtime.getRuntime().exec(arg);
+            String arg[] = {
+                "python",
+                script_,
+                "workDir="+dirForResults+fileList+" "+args_
+            }; 
+            Process process = Runtime.getRuntime().exec(arg);
 //                process.waitFor();
-                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                String returnStr;
-                while ((returnStr = reader.readLine()) != null) {
-                    IJ.log("    Py script result: "+returnStr);
-                }
-                reader.close();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String returnStr;
+            while ((returnStr = reader.readLine()) != null) {
+                IJ.log("    Py script result: "+returnStr);
+            }
+            reader.close();
         } catch (IOException ex) {
             IJ.log("Problem executing script: "+script_);
             Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
@@ -407,10 +314,9 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
             for (File f:group.elements) {
                 IJ.log("    "+f.getAbsolutePath());
                 modFiles.add(createModifiedOutput(f));
-                
             }
             if (execute(modFiles)) {
-                if (saveRT_ ) {
+                if (saveRT_) {
                     saveResultsTable(modFiles);
                 }
                 processResults(modFiles);
@@ -597,18 +503,6 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
         return meta;
     }
 
-/*
-    @Override
-    protected void cleanUp() {
-        super.cleanUp();
-        if (storage!=null) {
-            storage.close(); 
-            //set to null so a new storage will be created when processor runs again
-            storage=null;
-        }
-
-    }
-*/
     
 }
 
