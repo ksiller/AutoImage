@@ -1,6 +1,7 @@
 package autoimage.dataprocessors;
 
 import autoimage.ExtImageTags;
+import autoimage.MMCoreUtils;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.Prefs;
@@ -23,6 +24,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.micromanager.acquisition.TaggedImageQueue;
 import org.micromanager.api.MMTags;
+import org.micromanager.utils.MMScriptException;
 
 /**
  * This class is used to simulate image acquisition in demo mode.
@@ -77,10 +79,9 @@ public class ImageLoader extends ExtDataProcessor<TaggedImage> {
                         path=new File(new File(imagePath,area+"-Site"+site),"img_"+String.format("%09d",t)+"_"+ch+"_"+String.format("%03d",z)+".tif");
                     IJ.log(this.getClass().getName()+": "+(path.exists() ? "found" : "not found ")+ path.getAbsolutePath());
                     ImagePlus imp=IJ.openImage(path.getAbsolutePath());
-                    ImageProcessor ip=imp.getProcessor();
-                    String metaStr=element.tags.toString();
-                    element=org.micromanager.utils.ImageUtils.makeTaggedImage(ip);
-                    element.tags=new JSONObject(metaStr);
+//                    element=org.micromanager.utils.ImageUtils.makeTaggedImage(imp.getProcessor);
+//                    element.tags=new JSONObject(element.tags.toString());
+                    element=MMCoreUtils.createTaggedImage(imp, new JSONObject(element.tags.toString()));
                 } catch (JSONException ex) {
                     IJ.log(this.getClass().getName()+": "+ex.getMessage());
                     Logger.getLogger(ImageLoader.class.getName()).log(Level.SEVERE, null, ex);

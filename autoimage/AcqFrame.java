@@ -72,7 +72,6 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.Enumeration;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
@@ -128,7 +127,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JViewport;
 import javax.swing.ListSelectionModel;
-import javax.swing.RowSorter;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.ToolTipManager;
@@ -446,7 +444,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     DataProcessor dp=(DataProcessor)node.getUserObject();
                     File procDir=new File (new File(new File (imageDestPath,"Processed"),acqSetting.getName()),"Proc"+String.format("%03d",i)+"-"+dp.getName());
                     if (!procDir.mkdirs()) {
-                        throw new MMException("Directories for Processed Images cannot be created.");
+                        IJ.log(procDir.getAbsolutePath());
+                        throw new MMException("Directories for Processed Images cannot be created.\n"+procDir.getAbsolutePath());
                     }            
                     if (dp instanceof SiteInfoUpdater) {
                         ((SiteInfoUpdater)dp).setPositionInfoList(posInfoList);
@@ -504,7 +503,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
                 TaggedImageStorage storage = new TaggedImageStorageDiskDefault(sequenceDir.getAbsolutePath(), true, summaryMetadata);
                 MMImageCache imageCache = new MMImageCache(storage);
-                imageCache.addImageCacheListener(imageListener);
                 
                 //setup and start new VirtualAcquisitionDisplay
                 if (!app.getHideMDADisplayOption()) {
@@ -515,6 +513,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 } else {
                     virtualDisplay=null;
                 }
+                imageCache.addImageCacheListener(imageListener);
                 
                 if (mainImageStorageNode.getChildCount()>0) {
                     // create fileoutputqueue and ProcessorTree
@@ -634,14 +633,20 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     @Override
     public void imagingFinished(String string) {
+        if (virtualDisplay!=null) {
+            VirtualAcquisitionDisplay vd=virtualDisplay;
+            virtualDisplay=null;
+            vd.close();
+            //VirtualAcquisitionDisplay.onWindowClose will call imagingFinished again
+            return;
+        }
         acquisitionTask=null;
         final AcqSetting acqSetting=currentAcqSetting;
         currentAcqSetting.getTileManager().clearList();
-        IJ.log("Finished acquiring sequence: "+currentAcqSetting.getName()+"\n");
-
+        IJ.log("Finished acquiring sequence: "+currentAcqSetting.getName()+"\n   "
+                +(string == null ? "null" :string));
         /* 
             string!=null: passed  by ImageCache when it receives a "Poison" image (=acquisition is done)
-        
             string==null: used by AcqFrame to indicate acquisition has been aborted 
         */
         if (string!=null) {
@@ -777,9 +782,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         }    
         
-        if (virtualDisplay!=null) {
-            virtualDisplay.close();
-        }
+//        if (virtualDisplay!=null) {
+//            virtualDisplay.close();
+//            virtualDisplay==null;    
+//        }
         int currentIndex=acqSettings.indexOf(currentAcqSetting);
         if ((acqSettings.size() > currentIndex + 1) && !isAborted) {
                 acqSettingTable.setRowSelectionInterval(currentIndex + 1, currentIndex + 1);
@@ -5513,22 +5519,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             }
         }
         deleteAcqSettingButton.setEnabled(atm.getRowCount() > 1);
-
-        /*
-         DefaultListModel lm = (DefaultListModel)acqSettingListBox.getModel();
-         if (lm.getSize() > 1) {
-         int[] selected=(int[])acqSettingListBox.getSelectedIndices();
-         if (selected.length > 0) {
-         for (int i = selected.length-1; i>=0; i--) {
-         lm.removeElementAt(selected[i]);
-         acqSettings.remove(selected[i]);
-         }     
-         }
-         acqSettingListBox.revalidate();
-         acqSettingListBox.setSelectedIndex(selected[0]);
-         } else {
-         JOptionPane.showMessageDialog(this, "Setting cannot be deleted.\nAt least one setting needs to be defined.");
-         }*/
     }//GEN-LAST:event_deleteAcqSettingButtonActionPerformed
 
     private void acqSettingUpButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_acqSettingUpButtonActionPerformed
@@ -6339,7 +6329,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         JFileChooser fc=new JFileChooser();
         fc.showOpenDialog(this);
         if (fc.getSelectedFile()!=null) {
-            BufferedReader br=null;           
+            BufferedReader br=null;  
+            JSONObject procTrees=null;
+            DefaultTreeModel model=(DefaultTreeModel)processorTreeView.getModel();
             try {
                 br = new BufferedReader(new FileReader(fc.getSelectedFile()));
                 StringBuilder sb = new StringBuilder();
@@ -6349,8 +6341,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     sb.append(line);
                     line = br.readLine();
                 }
-                JSONObject procTrees = new JSONObject(sb.toString());
-                JSONArray procArray= procTrees.getJSONArray("Processor_Definition");
+                procTrees = new JSONObject(sb.toString());
+                JSONArray procArray = procTrees.getJSONArray("Processor_Definition");
                 if (procArray!=null && procArray.length()>0) {
                     JSONObject procTreeObj=null;
                     if (procArray.length()>1) {
@@ -6377,7 +6369,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                         procTreeObj=procArray.getJSONObject(0);
                     }
                     procTreeObj=procTreeObj.getJSONObject("ProcTree");
-                    DefaultTreeModel model=(DefaultTreeModel)processorTreeView.getModel();
                     DefaultMutableTreeNode root=null;
                     try {
                         root = createProcessorTree(procTreeObj);
@@ -6393,11 +6384,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                     }
                     if (root!=null) {
                         currentAcqSetting.setImageProcTree(root);
-                        model.setRoot(root);
-                        model.reload();
-                        for (int i = 0; i < processorTreeView.getRowCount(); i++) {
-                            processorTreeView.expandRow(i);
-                        }
+                        updateProcessorTreeView(currentAcqSetting);
                     }
                 }
             } catch (FileNotFoundException ex) {
@@ -6407,8 +6394,37 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 JOptionPane.showMessageDialog(this,"Error loading Processor file.");
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             } catch (JSONException ex) {
-                JOptionPane.showMessageDialog(this,"Error parsing Processor file.");
-                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                //cannot parse JSONObject, try to load is as experiment settings file
+                try {
+                    List<AcqSetting> settings=loadAcquisitionSettings(procTrees.getJSONArray(AcqSetting.TAG_ACQ_SETTING_ARRAY));
+                    if (settings!=null && settings.size()>1) {
+                        String[] list=new String[settings.size()];
+                        for (int i=0; i<settings.size(); i++) {
+                            list[i]=settings.get(i).getName();
+                        }
+                        String selProcTree=(String)JOptionPane.showInputDialog(null, 
+                            "Multiple Image Processor Trees found. Select Processor Tree",
+                            "Load Processor Tree",
+                            JOptionPane.QUESTION_MESSAGE, 
+                            null, 
+                            list, 
+                            list[0]);
+                        if (selProcTree==null)
+                            return;
+                        int i=0;
+                        for (AcqSetting setting:settings) {
+                            if (setting.getName().equals(selProcTree)) {
+                                currentAcqSetting.setImageProcTree(setting.getImageProcessorTree());
+                                updateProcessorTreeView(currentAcqSetting);
+                                break;
+                            }
+                            i++;
+                        }
+                    }
+                } catch (JSONException jse) {    
+                    JOptionPane.showMessageDialog(this,"Error parsing Processor file.");
+                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                }
             } finally {
                 if (br!=null)
                     try {
@@ -7957,7 +7973,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     }
 
-    private List<AcqSetting> loadAcquisitionSettings(JSONArray acqSettingArray) throws JSONException {
+    private List<AcqSetting> loadAcquisitionSettings(JSONArray acqSettingArray) throws JSONException, IllegalArgumentException {
         List<AcqSetting> settings=new ArrayList<AcqSetting>();
         List<String> groupStr=Arrays.asList(core.getAvailableConfigGroups().toArray());
         for (int i=0; i<acqSettingArray.length(); i++) {
@@ -7979,13 +7995,16 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 }
                 settings.add(setting);
             } catch (ClassNotFoundException ex) {
-                IJ.log("Class not found #"+i);
+                IJ.log("Class not found, sequence #"+i);
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             } catch (InstantiationException ex) {
-                IJ.log("InstantiationException #"+i);
+                IJ.log("InstantiationException, sequence #"+i);
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             } catch (IllegalAccessException ex) {
-                IJ.log("IllegalAccessException #"+i);
+                IJ.log("IllegalAccessException, sequence #"+i);
+                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (IllegalArgumentException ex) {
+                IJ.log("IllegalArgumentException, sequence #"+Integer.toString(i)+": "+ex.toString());
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             }
         }

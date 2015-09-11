@@ -214,7 +214,7 @@ public class AcqSetting {
         detector=null;
     }
         
-    public AcqSetting (JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+    public AcqSetting (JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalArgumentException, IllegalAccessException {
         this("");
         if (obj!=null) {
             name=obj.getString(TAG_NAME);

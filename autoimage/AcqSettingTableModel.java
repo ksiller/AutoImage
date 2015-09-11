@@ -155,13 +155,13 @@ public class AcqSettingTableModel extends AbstractTableModel {
                 if (proc.isAlive()) {
                     proc.requestStop();
                 }
-                while (proc.isAlive()) {
+/*                while (proc.isAlive()) {
                     try {
                         Thread.sleep(500);
                     } catch (InterruptedException ex) {
                         Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                     }
-                }
+                }*/
             }
             settings.remove(rowIdxArray[i]);
         }

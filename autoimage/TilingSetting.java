@@ -80,7 +80,7 @@ public class TilingSetting {
         direction=DR_TILING;        
     }
     
-    public TilingSetting(JSONObject obj) throws JSONException {
+    public TilingSetting(JSONObject obj) throws JSONException, IllegalArgumentException {
         if (obj!=null) {
             String m=obj.getString(TAG_MODE);
             mode=Mode.valueOf(m);
