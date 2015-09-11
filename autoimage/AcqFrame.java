@@ -125,6 +125,7 @@ import javax.swing.JProgressBar;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.JViewport;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
@@ -136,7 +137,9 @@ import javax.swing.event.RowSorterEvent;
 import javax.swing.event.RowSorterListener;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.JTableHeader;
+import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableRowSorter;
 import javax.swing.text.AbstractDocument;
@@ -8563,6 +8566,17 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         areaTable.getColumnModel().getColumn(2).setMaxWidth(200);
         areaTable.getColumnModel().getColumn(2).setMinWidth(35);
         
+        areaTable.getColumnModel().getColumn(3).setCellRenderer(new TableCellRenderer() {
+
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                Component label=new DefaultTableCellRenderer().getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                if (value.toString().contains("Error")) {
+                    label.setForeground(Color.red);
+                }
+                return label;
+            }
+        });
         model.setAreaRenamingAllowed(acqLayout.isAreaEditingAllowed());
         TableRowSorter sorter = new TableRowSorter<AreaTableModel>(model);
         sorter.setComparator(2, acqLayout.getAreaNameComparator());

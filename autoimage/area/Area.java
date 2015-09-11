@@ -991,6 +991,10 @@ public abstract class Area {
                 return -1;
             if (a2.contains("?"))
                 return 1;
+            if (a1.contains(" (Error)"))
+                a1=a1.substring(0,a1.indexOf(" (Error"));
+            if (a2.contains(" (Error)"))
+                a2=a2.substring(0,a2.indexOf(" (Error"));
             Integer a1tiles = Integer.parseInt(a1);
             Integer a2tiles = Integer.parseInt(a2);;
             return a1tiles.compareTo(a2tiles);

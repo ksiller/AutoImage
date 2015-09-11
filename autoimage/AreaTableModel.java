@@ -77,7 +77,7 @@ import javax.swing.table.AbstractTableModel;
                     DecimalFormat df = new DecimalFormat("###,###,##0");
                     if (a.isSelectedForAcq()) {
                         switch (a.getTilingStatus()) {
-                            case Area.TILING_ERROR: return "Error";
+                            case Area.TILING_ERROR: return df.format(a.getTileNumber()) + " (Error)";
                             case Area.TILING_UNKNOWN_NUMBER: return "???";    
                             default:return df.format(a.getTileNumber());
                         }
