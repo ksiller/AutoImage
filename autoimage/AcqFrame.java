@@ -266,7 +266,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private static final String ADJUSTING_SETTINGS = "Adjusting Settings...";
 //    private static final String RESTORING_SETTINGS = "Restoring Settings...";
     
-    private static double MAX_EXPOSURE = 10000; // ms
+    //don't make final; may want to allow user to modify in future
+    private static String MAX_EXPOSURE_STR = "MaximumExposureMs";
+    private static double MAX_EXPOSURE_DEFAULT = 10000; // ms
     private static double MAX_SATURATION = 0.0005; //1: all pixels saturated
     
     protected static final String TAG_ROOT_DIR = "ROOT_DIR";
@@ -7372,10 +7374,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         if (ae != null) {
             ae.stopCellEditing();
         }
-        if (core.getBytesPerPixel() > 2) {
-            JOptionPane.showMessageDialog(this, "This function is only supported for cameras producing 8-bit or 16-bit grayscale images.");
-            return;            
-        }
         if (channelTable.getRowCount() != 1 && channelTable.getSelectedRowCount() != 1) {
             JOptionPane.showMessageDialog(this, "Select one channel.");
             return;
@@ -7424,7 +7422,20 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             final ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
             final Channel c = ctm.getRowData(row);
             final String channelGroup=currentAcqSetting.getChannelGroupStr();
-
+            
+            //try to read out camera's max exposure property for the selected channel config
+            double maxExp=MAX_EXPOSURE_DEFAULT;
+            try {
+                core.setConfig(channelGroup, c.getName());
+                if (core.getBytesPerPixel() > 2) {
+                    JOptionPane.showMessageDialog(this, "This function is only supported for cameras producing 8-bit or 16-bit grayscale images.");
+                    return;            
+                }
+                maxExp=Double.parseDouble(core.getProperty(core.getCameraDevice(), MAX_EXPOSURE_STR));
+            } catch (Exception e) {
+                //nothing to do; stick with default max exposure
+            }
+            final double maxExposure=maxExp;
             enableGUI(false);
             acquireButton.setEnabled(false);
             SwingUtilities.invokeLater(new Runnable() {
@@ -7478,9 +7489,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                         newExp*=2;
                                     else
                                         newExp=(minExp+maxExp)/2;
-                                    if (newExp >= MAX_EXPOSURE) {
-                                        newExp=MAX_EXPOSURE;
-                                        maxExp=MAX_EXPOSURE;
+                                    if (newExp >= maxExposure) {
+                                        newExp=maxExposure;
+                                        maxExp=maxExposure;
                                     }
                                 }  else {
                                     //overexposed
@@ -7534,8 +7545,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                                         ReportingUtils.logError(ex, this.getClass().getName()+": Auto-Exposure Error");
                                     }
 
-                                    if (optimalExp==MAX_EXPOSURE) {
-                                        JOptionPane.showMessageDialog(null, "Reached maximum exposure ("+MAX_EXPOSURE+" ms).");
+                                    if (optimalExp==maxExposure) {
+                                        JOptionPane.showMessageDialog(null, "Reached maximum exposure ("+maxExposure+" ms).");
                                     }
                                     optimalExp=0.1*(Math.round(optimalExp*10));
                                     int result=JOptionPane.showConfirmDialog(null,"Suggested exposure time for channel "+c.getName()+": "+formatNumber("0.0", optimalExp)+" ms.\n"

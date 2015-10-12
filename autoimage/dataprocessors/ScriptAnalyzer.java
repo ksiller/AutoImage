@@ -20,6 +20,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -137,69 +138,73 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
         args_=args;
     }
     
-    protected boolean saveResultsTable(List<File> modFiles) {
-        if (rTable_==null) {
-            return false;
+    private String createResultFilename(List<File> files) {
+        String filename=new File(workDir,"Results.txt").getAbsolutePath();
+        if (files==null || files.size()==0) {
+            return filename;
         }
-        File rtFile=null;
         try {
-            JSONObject meta=MMCoreUtils.parseMetadataFromFile(modFiles.get(0));
+            JSONObject meta=MMCoreUtils.parseMetadataFromFile(files.get(0));
             String area = meta.getString(ExtImageTags.AREA_NAME);
             String cluster=Long.toString(meta.getLong(ExtImageTags.CLUSTER_INDEX));
             String site=Long.toString(meta.getLong(ExtImageTags.SITE_INDEX));
             String channel=meta.getString(MMTags.Image.CHANNEL_NAME);
             String cFrame=Long.toString(meta.getLong(MMTags.Image.FRAME_INDEX));
             String cSlice=Long.toString(meta.getLong(MMTags.Image.SLICE_INDEX));
-            IJ.log("cframe: "+cFrame);
-            IJ.log("cSlice: "+cSlice);
 
-            String resultName="Results-";
+            filename=new File(workDir,"Results-").getAbsolutePath();
             if (criteriaKeys.contains(ExtImageTags.AREA_COMMENT)) {
-                resultName+=meta.getString(ExtImageTags.AREA_COMMENT);
+                filename+=meta.getString(ExtImageTags.AREA_COMMENT);
             }
             if (criteriaKeys.contains(MMTags.Image.POS_INDEX)) {
-                resultName+="-"+area+"-Cluster"+cluster+"-Site"+site;
+                filename+="-"+area+"-Cluster"+cluster+"-Site"+site;
             } else {
                 if (criteriaKeys.contains(ExtImageTags.CLUSTER_INDEX)) {
-                    resultName+="-"+area+"-Cluster"+cluster;
+                    filename+="-"+area+"-Cluster"+cluster;
                 } else {
                     if (criteriaKeys.contains(ExtImageTags.AREA_INDEX)) {
-                        resultName+="-"+area;
+                        filename+="-"+area;
                     }
                 }
             }
             if (criteriaKeys.contains(MMTags.Image.FRAME_INDEX)) {
-                resultName+="-Frame"+cFrame;
+                filename+="-T"+cFrame;
             }
             if (criteriaKeys.contains(MMTags.Image.CHANNEL_INDEX)) {
-                resultName+="-"+channel;
+                filename+="-"+channel;
             }
             if (criteriaKeys.contains(MMTags.Image.SLICE_INDEX)) {
-                resultName+="-Slice"+cSlice;
+                filename+="-Z"+cSlice;
             }
             //remove double "--";
-            resultName=resultName.replaceAll("--", "-");
-            resultName+=".txt";
-            String scriptName=new File(script_).getName();
-            IJ.log("  script: "+scriptName);
-            rtFile=new File(workDir,resultName);
-            IJ.log("    saving RT: "+rtFile.getAbsolutePath());
-            rTable_.saveAs(rtFile.getAbsolutePath());
-            return true;
-        } catch (JSONException ex) {
-            IJ.log("    saving RT: Cannot parse TaggedImage directory and prefix metadata: saving ResultsTable, script "+script_); 
+            filename=filename.replaceAll("--", "-");
+            filename+=".txt";    
+            } catch (JSONException ex) {
+                IJ.log("    saving RT: Cannot parse TaggedImage directory and prefix metadata: saving ResultsTable, script "+script_); 
+        }
+        return filename;
+    } 
+    
+    protected boolean saveResultsTable(ResultsTable rt, String resultFile) {
+        if (rt==null) {
             return false;
+        }
+        File rtFile=null;
+        try {
+            rtFile=new File(resultFile);
+            IJ.log("    saving RT: "+rtFile.getAbsolutePath());
+            rt.saveAs(rtFile.getAbsolutePath());
+            return true;
         } catch (FileNotFoundException ex) {
             IJ.log("    saving RT: "+rtFile.getAbsolutePath()+"FileNotFoundException: saving ResultsTable, script "+script_);
             return false;
         } catch (IOException ex) {
             IJ.log(this.getClass().getName()+"    I/O Error: saving ResultsTable, script "+script_);
             return false;
-        }   
-        
+        }          
     }
     
-    private boolean executePy(List<File> files, String dirForResults) {
+    private boolean executePy(List<File> files, String dirForResults, String resultFile) {
         IJ.log(    "Excuting Py script:"+script_+"; args="+args_);
 
         String fileList=new String();
@@ -214,10 +219,14 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
             String arg[] = {
                 "python",
                 script_,
-                "workDir="+dirForResults+fileList+" "+args_
+                "workDir="+dirForResults+" resultfile="+resultFile+fileList+" "+args_
             }; 
-            Process process = Runtime.getRuntime().exec(arg);
-//                process.waitFor();
+//            Process process = Runtime.getRuntime().exec(arg);
+
+            ProcessBuilder pb = new ProcessBuilder(Arrays.asList(arg));
+            pb.redirectErrorStream(true);
+            Process process=pb.start();
+
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
             String returnStr;
             while ((returnStr = reader.readLine()) != null) {
@@ -235,45 +244,48 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
         return true;
     }
     
-    private boolean executeBsh(List<File> files, String dirForResults) {
+    private boolean executeBsh(List<File> files, String dirForResults, String resultFile) {
+        if (files==null || files.size()==0) {
+            return true;
+        }
         String sourceFiles[]=new String[files.size()];
-            if (files.size()>0) {
-            try {
-                int i=0;
-                for (File f:files) {
-                    sourceFiles[i]=f.getAbsolutePath();
-                    i++;
-                }
-                Interpreter interpreter=new bsh.Interpreter();
-                interpreter.set("args","workDir="+dirForResults+" "+args_);
-                interpreter.set("sourceFiles",sourceFiles);
-                setScriptVariables(interpreter);
-                interpreter.source(script_);
-                rTable_=(ResultsTable)interpreter.get("rt");
-                getScriptVariables(interpreter);
-                IJ.log(    "Bsh Script executed:"+script_+".");
-            } catch ( TargetError e ) {
-                IJ.log("    "+this.getClass().getName()+": The script or code called by the script "
-                        +script_+" threw an exception: "+ e.getTarget() );
-                return false;
-            } catch ( EvalError e )    {
-                IJ.log("    "+this.getClass().getName()+": There was an error in evaluating the script "+script_+". " + e);
-                return false;
-            } catch (FileNotFoundException ex) {
-                IJ.log("    "+this.getClass().getName()+": Script "+script_+" not found.");
-                return false;
-            } catch (IOException ex) {
-                IJ.log("    "+this.getClass().getName()+"I/O Error in script "+script_+".");
-                return false;
-            } catch (Exception ex) {
-                IJ.log("    "+this.getClass().getName()+"General exception in script "+script_+". "+ex.getMessage());
-            } finally {
-            }    
+        try {
+            int i=0;
+            for (File f:files) {
+                sourceFiles[i]=f.getAbsolutePath();
+                i++;
+            }
+            Interpreter interpreter=new bsh.Interpreter();
+            interpreter.set("args", args_);
+            interpreter.set("workDir", dirForResults);
+            interpreter.set("sourceFiles",sourceFiles);
+            interpreter.set("resultfile",resultFile);
+            setScriptVariables(interpreter);
+            interpreter.source(script_);
+            rTable_=(ResultsTable)interpreter.get("rt");
+            getScriptVariables(interpreter);
+            IJ.log(    "Bsh Script executed:"+script_+".");
+        } catch ( TargetError e ) {
+            IJ.log("    "+this.getClass().getName()+": The script or code called by the script "
+                    +script_+" threw an exception: "+ e.getTarget() );
+            return false;
+        } catch ( EvalError e )    {
+            IJ.log("    "+this.getClass().getName()+": There was an error in evaluating the script "+script_+". " + e);
+            return false;
+        } catch (FileNotFoundException ex) {
+            IJ.log("    "+this.getClass().getName()+": Script "+script_+" not found.");
+            return false;
+        } catch (IOException ex) {
+            IJ.log("    "+this.getClass().getName()+"I/O Error in script "+script_+".");
+            return false;
+        } catch (Exception ex) {
+            IJ.log("    "+this.getClass().getName()+"General exception in script "+script_+". "+ex.getMessage());
+            return false;
         }    
         return true;
     }
         
-    private boolean execute(List<File> files) {
+    private boolean execute(List<File> files, String resultFilename) {
         if (files!=null && files.size()>0) {
             String dirForResults=files.get(0).getParent();
             if (!dirForResults.contains(workDir)) {
@@ -290,9 +302,9 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
                 }
             }
             if (script_.indexOf(".bsh")!=-1)
-                return executeBsh(files, dirForResults);
+                return executeBsh(files, dirForResults, resultFilename);
             else if (script_.indexOf(".py")!=-1)
-                return executePy(files, dirForResults);
+                return executePy(files, dirForResults, resultFilename);
             else
                return false;
         } else {
@@ -301,10 +313,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
     }
         
     protected void processResults(List<File> modFiles) {
-        for (File f:modFiles) {
-            IJ.log("    Processed File:"+f.getAbsolutePath()+".");
-        }
-        IJ.log("    Processed Results:"+script_+".");
+        IJ.log("    Processing completed:"+script_+".");
     }
     
     @Override
@@ -315,9 +324,10 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
                 IJ.log("    "+f.getAbsolutePath());
                 modFiles.add(createModifiedOutput(f));
             }
-            if (execute(modFiles)) {
+            String resultFile=createResultFilename(modFiles);
+            if (execute(modFiles, resultFile)) {
                 if (saveRT_) {
-                    saveResultsTable(modFiles);
+                    saveResultsTable(rTable_, resultFile);
                 }
                 processResults(modFiles);
             }

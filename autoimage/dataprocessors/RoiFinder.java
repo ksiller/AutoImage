@@ -67,6 +67,11 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
             tileManagerList.add(tileManager);
         selectedSeq=new ArrayList<String> ();
         listenerExecutor = Executors.newFixedThreadPool(1);
+        criteriaKeys.add(MMTags.Image.FRAME_INDEX);
+        criteriaKeys.add(MMTags.Image.POS_INDEX);
+        criteriaKeys.add(ExtImageTags.CLUSTER_INDEX);
+        criteriaKeys.add(ExtImageTags.AREA_INDEX);
+//        criteriaKeys.add(ExtImageTags.AREA_COMMENT);
     }
     
     @Override
@@ -99,7 +104,7 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
     public void setScriptVariables(Interpreter interpreter) throws EvalError {
         roiList= new ArrayList<RoiSeed>();
         interpreter.set("roiList",roiList);
-        interpreter.set("workDir",workDir);
+//        interpreter.set("workDir",workDir);
     }
 
     public void addTileManager(TileManager tileManager) {
@@ -127,20 +132,19 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
             JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
             double pixSize=summary.getDouble(MMTags.Summary.PIXSIZE);
             double detectorAngle=summary.getDouble(ExtImageTags.DETECTOR_ROTATION);
-            double stageCenterX=meta.getDouble(MMTags.Image.XUM);
-            double stageCenterY=meta.getDouble(MMTags.Image.YUM);
-            double stageZ=meta.getDouble(MMTags.Image.ZUM);
+            double firstImgX=meta.getDouble(MMTags.Image.XUM);
+            double firstImgY=meta.getDouble(MMTags.Image.YUM);
+            double firstImgZ=meta.getDouble(MMTags.Image.ZUM);
             final String area=meta.getString(ExtImageTags.AREA_NAME);
             double cosinus=Math.cos(detectorAngle);
             double sinus=Math.sin(detectorAngle);
-            if (roiList.size()>0){
+            if (roiList!=null && roiList.size()>0){
                 final List<Vec3d> stagePosList=new ArrayList<Vec3d>(roiList.size());
                 for (final RoiSeed roi:roiList) {
-                    //correct for detector rotation relative to stage
                     //1. translate to center -> dx/dy
-                    double dx;//offset from image center in micron
-                    double dy;//offset from image center in micron
-                    IJ.log("Roi: ("+roi.xPos+"/"+roi.yPos+"/"+roi.zPos+" ["+roi.unitXY+"/"+roi.unitXY+"/"+roi.unitZ+"]");
+                    double dx;//offset from image center x in um
+                    double dy;//offset from image center y in um
+                    double dz;//offset from from first image z in um
                     if (RoiSeed.IS_PIXEL.equals(roi.unitXY)) {
                         //if unitXY is not set, roi coordinates are in pixel
                         //--> convert pixel to micron
@@ -151,24 +155,28 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
                         dx=roi.xPos-pixSize*imgWidth/2;
                         dy=roi.yPos-pixSize*imgHeight/2;                        
                     }
-                    //2. rotate
-                    double x = (cosinus * dx) - (sinus * dy);
-                    double y = (sinus * dx) + (cosinus * dy);
-                    //3. translate to stage position of image center
-                    double dz;
+                    
+                    //2. calculate z-offset [in um] relative to first image in list
                     if (RoiSeed.IS_PIXEL.equals(roi.unitZ)) {
-                        //if unitXY is not set, roi coordinates are in z-step increments
+                        //if unitZ is not set, roi coordinates are in z-step increments
                         //--> convert pixel to micron
                         dz=roi.zPos*zStepSize;
                     } else {
-                        //roi coordinates are in micron
+                        //roi coordinates already in micron relative to first image in list
                         dz=roi.zPos;                        
                     }
-                    IJ.log("    roi (image): ("+(roi.xPos)+"/"+(roi.yPos)+"/"+(roi.zPos)+" ["+roi.unitXY+"/"+roi.unitXY+"/"+roi.unitZ+"]");
-                    IJ.log("    roi (image): ("+(roi.xPos*pixSize)+"/"+(roi.yPos*pixSize)+"/"+(roi.zPos*pixSize)+" [um/um/um]");
-                    IJ.log("    stageCenter (image): ("+(stageCenterX)+"/"+(stageCenterY)+"/"+(stageZ)+" [um/um/um]");
-                    IJ.log("    converted: ("+(stageCenterX + x)+"/"+(stageCenterY + y)+"/"+(stageZ+dz)+" ["+roi.unitXY+"/"+roi.unitXY+"/"+roi.unitZ+"]");
-                    stagePosList.add(new Vec3d(stageCenterX + x,stageCenterY + y,stageZ+dz));
+                    
+                    //3. rotate to compensate for camera rotation
+                    double x = (cosinus * dx) - (sinus * dy); //in um
+                    double y = (sinus * dx) + (cosinus * dy); //in um
+                    
+                    //4. calculate roi's absolute stage position [in um]
+                    stagePosList.add(new Vec3d(firstImgX + x,firstImgY + y,firstImgZ+dz));
+
+                    IJ.log("    roi (image): ("+(roi.xPos)+"/"+(roi.yPos)+"/"+(roi.zPos)+") ["+roi.unitXY+"/"+roi.unitXY+"/"+roi.unitZ+"]");
+                    IJ.log("    roi (relative to center of first image): ("+ dx +"/"+ dy +"/"+ dz +") [um/um/um]");
+                    IJ.log("    first image center (absolute): ("+(firstImgX)+"/"+(firstImgY)+"/"+(firstImgZ)+") [um/um/um]");
+                    IJ.log("    roi (absolute): ("+(firstImgX + x)+"/"+(firstImgY + y)+"/"+(firstImgZ+dz)+") [um/um/um]");
                 }
                 roiList.clear();
                     
@@ -248,12 +256,18 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
         
         channelCB.setSelected(criteriaKeys.contains(MMTags.Image.CHANNEL) || criteriaKeys.contains(MMTags.Image.CHANNEL_INDEX));
         slicesCB.setSelected(criteriaKeys.contains(MMTags.Image.SLICE) || criteriaKeys.contains(MMTags.Image.SLICE_INDEX));
-        framesCB.setSelected(criteriaKeys.contains(MMTags.Image.FRAME) || criteriaKeys.contains(MMTags.Image.FRAME_INDEX));
-        positionsCB.setSelected(criteriaKeys.contains(MMTags.Image.POS_NAME) || criteriaKeys.contains(MMTags.Image.POS_INDEX));
-        clustersCB.setSelected(criteriaKeys.contains(ExtImageTags.CLUSTER_INDEX));
-        areasCB.setSelected(criteriaKeys.contains(ExtImageTags.AREA_NAME) || criteriaKeys.contains(ExtImageTags.AREA_INDEX));
-        commentsCB.setSelected(criteriaKeys.contains(ExtImageTags.AREA_COMMENT));           
-            
+        framesCB.setSelected(true);//criteriaKeys.contains(MMTags.Image.FRAME) || criteriaKeys.contains(MMTags.Image.FRAME_INDEX));
+        positionsCB.setSelected(true);//(criteriaKeys.contains(MMTags.Image.POS_NAME) || criteriaKeys.contains(MMTags.Image.POS_INDEX));
+        clustersCB.setSelected(true);//(criteriaKeys.contains(ExtImageTags.CLUSTER_INDEX));
+        areasCB.setSelected(true);//(criteriaKeys.contains(ExtImageTags.AREA_NAME) || criteriaKeys.contains(ExtImageTags.AREA_INDEX));
+        commentsCB.setSelected(true);//(criteriaKeys.contains(ExtImageTags.AREA_COMMENT));
+        
+        framesCB.setEnabled(false);
+        positionsCB.setEnabled(false);
+        clustersCB.setEnabled(false);
+        areasCB.setEnabled(false);
+        commentsCB.setEnabled(false);
+        
         l=new JLabel("Script File:");
         l.setAlignmentX(Component.LEFT_ALIGNMENT);
         optionPanel.add(l);
@@ -347,7 +361,7 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
                 criteriaKeys.add(ExtImageTags.AREA_INDEX);
             }
             if (commentsCB.isSelected()) {
-                criteriaKeys.add(ExtImageTags.AREA_COMMENT);
+//                criteriaKeys.add(ExtImageTags.AREA_COMMENT);
             }
             script_=scriptField.getText();
             args_=argField.getText().replaceAll("\n", " ");
