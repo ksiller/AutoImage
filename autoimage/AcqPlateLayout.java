@@ -1,9 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package autoimage;
 
 import autoimage.area.RectWellArea;
@@ -74,10 +68,10 @@ public class AcqPlateLayout extends AcqLayout {
                     row=i;
                 else 
                     row=rows-i-1;
-                if (row>=Area.PLATE_ALPHABET.length)
+                if (row>=Area.PLATE_ROW_ALPHABET.length)
                     wellName=Integer.toString(id);
                 else
-                    wellName=Area.PLATE_ALPHABET[row]+Integer.toString(column+1);
+                    wellName=Area.PLATE_ROW_ALPHABET[row]+Integer.toString(column+1);
                 Area a=null;
                 if (wellShape.equals("Square"))
                     a = new RectWellArea(wellName, id, oX+wellDistance*column, oY+wellDistance*row,0,wellDiameter,wellDiameter,false,"");

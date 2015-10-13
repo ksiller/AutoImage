@@ -87,7 +87,8 @@ public abstract class Area {
     public static final Color COLOR_SELECTED_AREA = Color.RED;
     public static final Color COLOR_ACQUIRING_AREA = new Color(203,188,47);//Color.YELLOW;
     public static final Color COLOR_TILE_GRID = Color.RED;
-    public static final String[] PLATE_ALPHABET={"A","B","C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF"};
+    public static final String[] PLATE_ROW_ALPHABET={"A","B","C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF"};
+    public static final String[] PLATE_COL_ALPHABET=ColAlphabetFactory();
     public static final String TILE_NAME_PADDING = "%06d"; //padds tile name with preceding '0' to fill up to 6 digits
     public static final String CLUSTER_NAME_PADDING = "%06d";
     
@@ -123,6 +124,14 @@ public abstract class Area {
         calcCenterAndDefaultPos();
     }
 
+    private static String[] ColAlphabetFactory() {
+        String[] alphabet=new String[48];
+        for (int i=0; i<48; i++) {
+            alphabet[i]=Integer.toString(i+1);
+        }
+        return alphabet;
+    }       
+      
     public void enableOptimizedForCameraRotation(boolean b) {
         optimizedForCameraRotation=true;
     }
@@ -1082,6 +1091,5 @@ public abstract class Area {
      * 2: AcqLayout (Custom Layout)
      */
     public abstract int supportedLayouts();
-        
-      
+
 }

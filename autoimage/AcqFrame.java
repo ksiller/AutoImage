@@ -197,8 +197,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private JCheckBox autofocusCheckBox;
     private JCheckBox zStackCheckBox;
     private JCheckBox timelapseCheckBox;
-    private AcqRule layoutColumnHeader;
-    private AcqRule layoutRowHeader;
+    private AcqCustomRule layoutColumnHeader;
+    private AcqCustomRule layoutRowHeader;
     
     
     //Dialogs
@@ -1483,12 +1483,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         initComponents();
         
         //initialize LayoutPanel and layout headers
-//        AcqRule.setMaxZoom(64d);
-//        LayoutPanel.setMaxZoom(64d);
-        layoutColumnHeader = new AcqRule(SwingConstants.HORIZONTAL);
-        layoutRowHeader = new AcqRule(SwingConstants.VERTICAL);
+        layoutColumnHeader = new AcqCustomRule(SwingConstants.HORIZONTAL);
+        layoutRowHeader = new AcqCustomRule(SwingConstants.VERTICAL);
         layoutScrollPane.setColumnHeaderView(layoutColumnHeader);
         layoutScrollPane.setRowHeaderView(layoutRowHeader);
+        layoutRowHeader.addListener((LayoutScrollPane)layoutScrollPane);
+        layoutColumnHeader.addListener((LayoutScrollPane)layoutScrollPane);
         JLabel cornerLabel=new JLabel("mm");
         cornerLabel.setFont(new Font("Arial", Font.PLAIN, 12));
         JPanel cornerPanel=new JPanel();
@@ -1988,7 +1988,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         commentButton = new javax.swing.JToggleButton();
         showZProfileCheckBox = new javax.swing.JCheckBox();
         stageControlButton = new javax.swing.JButton();
-        layoutScrollPane = new javax.swing.JScrollPane();
+        layoutScrollPane = new LayoutScrollPane();
         acqLayoutPanel = new LayoutPanel(null,null);
 
         jLabel36.setText("jLabel36");
@@ -4595,11 +4595,9 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         Rectangle r = layoutScrollPane.getViewportBorderBounds();
         ((LayoutPanel) acqLayoutPanel).calculateScale(r.width, r.height);
         layoutColumnHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().width);
-//        layoutColumnHeader.calculateScale(r.width, r.height);
-        layoutColumnHeader.setScale(((LayoutPanel) acqLayoutPanel).getScale());
+        layoutColumnHeader.setScaleAndZoom(((LayoutPanel) acqLayoutPanel).getScale(), ((LayoutPanel) acqLayoutPanel).getZoom());
         layoutRowHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().height);
-//        layoutRowHeader.calculateScale(r.width, r.height);
-        layoutRowHeader.setScale(((LayoutPanel) acqLayoutPanel).getScale());
+        layoutRowHeader.setScaleAndZoom(((LayoutPanel) acqLayoutPanel).getScale(), ((LayoutPanel) acqLayoutPanel).getZoom());
         IJ.log("Pref size: layout-"+acqLayoutPanel.getPreferredSize().toString()+", column-"+layoutColumnHeader.getPreferredSize().toString()+", row-"+layoutRowHeader.getPreferredSize().toString());
         IJ.log("Scale: layout-"+Double.toString(((LayoutPanel)acqLayoutPanel).getScale())+", column-"+Double.toString(layoutColumnHeader.getScale())+", row-"+Double.toString(layoutRowHeader.getScale()));
         IJ.log("zoom: layout-"+Double.toString(((LayoutPanel)acqLayoutPanel).getZoom())+", column-"+Double.toString(layoutColumnHeader.getZoom())+", row-"+Double.toString(layoutRowHeader.getZoom()));
@@ -5258,16 +5256,35 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
                 Rectangle r = layoutScrollPane.getViewportBorderBounds();                
                 ((LayoutPanel) acqLayoutPanel).calculateScale(r.width, r.height);
+                
+                if (acqLayout instanceof AcqPlateLayout) {
+                    layoutColumnHeader = new AcqWellplateRule(SwingConstants.HORIZONTAL);
+                    layoutRowHeader = new AcqWellplateRule(SwingConstants.VERTICAL);
+                    AcqPlateLayout plate=(AcqPlateLayout)acqLayout;
+                    ((AcqWellplateRule)layoutColumnHeader).setOffset(plate.getLeftEdgeToA1());
+                    ((AcqWellplateRule)layoutColumnHeader).setWellDistance(plate.getWellDistance());
+                    ((AcqWellplateRule)layoutColumnHeader).setNoOfItems(plate.getColumns());
+                    ((AcqWellplateRule)layoutRowHeader).setOffset(plate.getTopEdgeToA1());
+                    ((AcqWellplateRule)layoutRowHeader).setWellDistance(plate.getWellDistance());
+                    ((AcqWellplateRule)layoutRowHeader).setNoOfItems(plate.getRows());
+                } else {
+                    layoutColumnHeader = new AcqCustomRule(SwingConstants.HORIZONTAL);
+                    layoutRowHeader = new AcqCustomRule(SwingConstants.VERTICAL);
+                }
+                layoutScrollPane.setColumnHeaderView(layoutColumnHeader);
+                layoutScrollPane.setRowHeaderView(layoutRowHeader);
+                layoutRowHeader.addListener((LayoutScrollPane)layoutScrollPane);
+                layoutColumnHeader.addListener((LayoutScrollPane)layoutScrollPane);                
+                layoutColumnHeader.setTotalUnits(layout.getWidth());
                 layoutColumnHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().width);
-                layoutColumnHeader.setScale(((LayoutPanel) acqLayoutPanel).getScale());
+                layoutColumnHeader.setScaleAndZoom(((LayoutPanel) acqLayoutPanel).getScale(), ((LayoutPanel) acqLayoutPanel).getZoom());
+                layoutRowHeader.setTotalUnits(layout.getLength());
                 layoutRowHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().height);
-                layoutRowHeader.setScale(((LayoutPanel) acqLayoutPanel).getScale());
+                layoutRowHeader.setScaleAndZoom(((LayoutPanel) acqLayoutPanel).getScale(), ((LayoutPanel) acqLayoutPanel).getZoom());
+
                 areaTable.revalidate();
-                areaTable.repaint();
-                //        layoutScrollPane.revalidate();
-                //        layoutScrollPane.repaint();
+//                areaTable.repaint();
             }
-            //            layoutScrollPane.setViewportView(acqLayoutPanel);
         }
     }//GEN-LAST:event_loadLayoutButtonActionPerformed
 
@@ -8267,8 +8284,6 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             mergeAreasButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaMergingAllowed());
             mergeAreasButton.setToolTipText(!acqLayout.isEmpty() && acqLayout.isAreaMergingAllowed() ? "Merge areas" : "Areas cannot be merged in this layout");
             ((LayoutPanel) acqLayoutPanel).setAcquisitionLayout(acqLayout, getMaxFOV());
-            layoutRowHeader.setPreferredSize(layoutScrollPane.getViewport().getHeight());
-            layoutColumnHeader.setPreferredSize(layoutScrollPane.getViewport().getWidth());
             layoutFileLabel.setText(acqLayout.getName());
             if (acqLayout.isEmpty()) {
                 layoutFileLabel.setToolTipText("");
@@ -8296,13 +8311,33 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 //            retilingAllowed = true;
 //            calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
             Rectangle r = layoutScrollPane.getViewportBorderBounds();            
-            layoutColumnHeader.setTotalUnits(layout.getWidth());
-            layoutRowHeader.setTotalUnits(layout.getLength());
             ((LayoutPanel) acqLayoutPanel).calculateScale(r.width, r.height);
+            
+            if (acqLayout instanceof AcqPlateLayout) {
+                layoutColumnHeader = new AcqWellplateRule(SwingConstants.HORIZONTAL);
+                layoutRowHeader = new AcqWellplateRule(SwingConstants.VERTICAL);
+                AcqPlateLayout plate=(AcqPlateLayout)acqLayout;
+                ((AcqWellplateRule)layoutColumnHeader).setOffset(plate.getLeftEdgeToA1());
+                ((AcqWellplateRule)layoutColumnHeader).setWellDistance(plate.getWellDistance());
+                ((AcqWellplateRule)layoutColumnHeader).setNoOfItems(plate.getColumns());
+                ((AcqWellplateRule)layoutRowHeader).setOffset(plate.getTopEdgeToA1());
+                ((AcqWellplateRule)layoutRowHeader).setWellDistance(plate.getWellDistance());
+                ((AcqWellplateRule)layoutRowHeader).setNoOfItems(plate.getRows());
+            } else {
+                layoutColumnHeader = new AcqCustomRule(SwingConstants.HORIZONTAL);
+                layoutRowHeader = new AcqCustomRule(SwingConstants.VERTICAL);
+            }
+            layoutScrollPane.setColumnHeaderView(layoutColumnHeader);
+            layoutScrollPane.setRowHeaderView(layoutRowHeader);
+            layoutColumnHeader.addListener((LayoutScrollPane)layoutScrollPane);                
+            layoutColumnHeader.setTotalUnits(layout.getWidth());
             layoutColumnHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().width);
-            layoutColumnHeader.setScale(((LayoutPanel) acqLayoutPanel).getScale());
+            layoutColumnHeader.setScaleAndZoom(((LayoutPanel) acqLayoutPanel).getScale(), ((LayoutPanel) acqLayoutPanel).getZoom());
+            layoutRowHeader.addListener((LayoutScrollPane)layoutScrollPane);
+            layoutRowHeader.setTotalUnits(layout.getLength());
             layoutRowHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().height);
-            layoutRowHeader.setScale(((LayoutPanel) acqLayoutPanel).getScale());
+            layoutRowHeader.setScaleAndZoom(((LayoutPanel) acqLayoutPanel).getScale(), ((LayoutPanel) acqLayoutPanel).getZoom());
+
             areaTable.revalidate();
             areaTable.repaint();
         }
