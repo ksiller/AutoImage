@@ -39,6 +39,7 @@ import java.awt.Container;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.Point;
@@ -128,6 +129,7 @@ import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JViewport;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.ToolTipManager;
@@ -195,6 +197,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
     private JCheckBox autofocusCheckBox;
     private JCheckBox zStackCheckBox;
     private JCheckBox timelapseCheckBox;
+    private AcqRule layoutColumnHeader;
+    private AcqRule layoutRowHeader;
     
     
     //Dialogs
@@ -1478,6 +1482,19 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         instrumentOnline = false; //to ensure that during app initialization instrument does not respond 
         initComponents();
         
+        //initialize LayoutPanel and layout headers
+//        AcqRule.setMaxZoom(64d);
+//        LayoutPanel.setMaxZoom(64d);
+        layoutColumnHeader = new AcqRule(SwingConstants.HORIZONTAL);
+        layoutRowHeader = new AcqRule(SwingConstants.VERTICAL);
+        layoutScrollPane.setColumnHeaderView(layoutColumnHeader);
+        layoutScrollPane.setRowHeaderView(layoutRowHeader);
+        JLabel cornerLabel=new JLabel("mm");
+        cornerLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        JPanel cornerPanel=new JPanel();
+        cornerPanel.add(cornerLabel);
+        layoutScrollPane.setCorner(JScrollPane.UPPER_LEFT_CORNER, cornerPanel);
+        
         acqModePane.setTabComponentAt(1, createAfPaneTab());
         acqModePane.setTabComponentAt(2, createZStackPaneTab());
         acqModePane.setTabComponentAt(3, createTimelapsePaneTab());
@@ -1687,7 +1704,7 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
         acqSettingTable.getSelectionModel().setSelectionInterval(0, 0);
         acqSettingTable.setDefaultEditor(AcqSetting.ScheduledTime.class, new StartTimeEditor());
 
-        //update border title in panel displaying acqusition settings
+        //update border title in panel displaying acquisition settings
         sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
                         "Sequence: "+currentAcqSetting.getName()));
 
@@ -4575,8 +4592,17 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 
     private void layoutScrollPaneComponentResized(java.awt.event.ComponentEvent evt) {//GEN-FIRST:event_layoutScrollPaneComponentResized
 //        IJ.log("AcqFrame.layoutScrollPaneComponentResized: resizing");
-        Rectangle r = layoutScrollPane.getVisibleRect();
+        Rectangle r = layoutScrollPane.getViewportBorderBounds();
         ((LayoutPanel) acqLayoutPanel).calculateScale(r.width, r.height);
+        layoutColumnHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().width);
+//        layoutColumnHeader.calculateScale(r.width, r.height);
+        layoutColumnHeader.setScale(((LayoutPanel) acqLayoutPanel).getScale());
+        layoutRowHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().height);
+//        layoutRowHeader.calculateScale(r.width, r.height);
+        layoutRowHeader.setScale(((LayoutPanel) acqLayoutPanel).getScale());
+        IJ.log("Pref size: layout-"+acqLayoutPanel.getPreferredSize().toString()+", column-"+layoutColumnHeader.getPreferredSize().toString()+", row-"+layoutRowHeader.getPreferredSize().toString());
+        IJ.log("Scale: layout-"+Double.toString(((LayoutPanel)acqLayoutPanel).getScale())+", column-"+Double.toString(layoutColumnHeader.getScale())+", row-"+Double.toString(layoutRowHeader.getScale()));
+        IJ.log("zoom: layout-"+Double.toString(((LayoutPanel)acqLayoutPanel).getZoom())+", column-"+Double.toString(layoutColumnHeader.getZoom())+", row-"+Double.toString(layoutRowHeader.getZoom()));
     }//GEN-LAST:event_layoutScrollPaneComponentResized
 
     private void acqLayoutPanelMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_acqLayoutPanelMouseClicked
@@ -4624,6 +4650,10 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 //                    IJ.log("zooming out: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
 //                    IJ.log("-----");
                 }
+                layoutColumnHeader.setZoom(newZoom);
+                layoutRowHeader.setZoom(newZoom);
+                layoutColumnHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().width);
+                layoutRowHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().height);
                 if ((newZoom != 1) && (newZoom != oldZoom)) {
                     Point newPos = new Point();
                     Dimension vpSizeNew = vp.getViewSize();
@@ -5226,8 +5256,12 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
                 updatePixelSize(currentAcqSetting.getObjective());
                 retilingAllowed = true;
                 calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
-                Rectangle r = layoutScrollPane.getVisibleRect();
+                Rectangle r = layoutScrollPane.getViewportBorderBounds();                
                 ((LayoutPanel) acqLayoutPanel).calculateScale(r.width, r.height);
+                layoutColumnHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().width);
+                layoutColumnHeader.setScale(((LayoutPanel) acqLayoutPanel).getScale());
+                layoutRowHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().height);
+                layoutRowHeader.setScale(((LayoutPanel) acqLayoutPanel).getScale());
                 areaTable.revalidate();
                 areaTable.repaint();
                 //        layoutScrollPane.revalidate();
@@ -8233,6 +8267,8 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
             mergeAreasButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaMergingAllowed());
             mergeAreasButton.setToolTipText(!acqLayout.isEmpty() && acqLayout.isAreaMergingAllowed() ? "Merge areas" : "Areas cannot be merged in this layout");
             ((LayoutPanel) acqLayoutPanel).setAcquisitionLayout(acqLayout, getMaxFOV());
+            layoutRowHeader.setPreferredSize(layoutScrollPane.getViewport().getHeight());
+            layoutColumnHeader.setPreferredSize(layoutScrollPane.getViewport().getWidth());
             layoutFileLabel.setText(acqLayout.getName());
             if (acqLayout.isEmpty()) {
                 layoutFileLabel.setToolTipText("");
@@ -8259,8 +8295,14 @@ public class AcqFrame extends javax.swing.JFrame implements ActionListener, Tabl
 //            updatePixelSize(currentAcqSetting.getObjective());
 //            retilingAllowed = true;
 //            calcTilePositions(null, currentAcqSetting.getFieldOfView(), currentAcqSetting.getTilingSetting(), ADJUSTING_SETTINGS);
-            Rectangle r = layoutScrollPane.getVisibleRect();
+            Rectangle r = layoutScrollPane.getViewportBorderBounds();            
+            layoutColumnHeader.setTotalUnits(layout.getWidth());
+            layoutRowHeader.setTotalUnits(layout.getLength());
             ((LayoutPanel) acqLayoutPanel).calculateScale(r.width, r.height);
+            layoutColumnHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().width);
+            layoutColumnHeader.setScale(((LayoutPanel) acqLayoutPanel).getScale());
+            layoutRowHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().height);
+            layoutRowHeader.setScale(((LayoutPanel) acqLayoutPanel).getScale());
             areaTable.revalidate();
             areaTable.repaint();
         }

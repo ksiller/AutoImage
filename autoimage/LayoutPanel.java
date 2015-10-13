@@ -38,7 +38,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     private static final Cursor normCursor = new Cursor(Cursor.DEFAULT_CURSOR);
     
     private static int LAYOUT_MAX_DIM = 20000;
-    private static int MAX_ZOOM = 64;
+    private static double MAX_ZOOM = 64;
     private static Color COLOR_BORDER = Color.WHITE;
     private static Color COLOR_UNSELECTED_AREA = Color.GRAY;
     private static Color COLOR_ACQUIRING_AREA = Color.YELLOW;
@@ -67,9 +67,6 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     private boolean showZProfile;
     private Rectangle2D.Double mergeAreasBounds; 
     private AffineTransform layoutTransform;
-
-    private double borderDim; //in physDim;
-    private double physToPixelRatio;
 
     private double zoom;
     private double scale;
@@ -132,11 +129,10 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     public void setAcquisitionLayout(AcqLayout al, double borderD) {
  //       IJ.log("LayoutPanel.setAcquisitionLayout: start");
         this.acqLayout=al;
-        borderDim=borderD;
         zoom=1;
         scale=1;
 //        IJ.log("LayoutPanel.setAcquisitionLayout: before calculatePhysToPixelRatio");
-        calculatePhysToPixelRatio();
+//        calculatePhysToPixelRatio();
 //        IJ.log("LayoutPanel.setAcquisitionLayout: after calculatePhysToPixelRatio");
 //        calculateScale(0,0);
 //        setPreferredSize(new Dimension(getPreferredLayoutWidth(),getPreferredLayoutHeight()));
@@ -144,6 +140,10 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         revalidate();
         repaint();
 //        IJ.log("LayoutPanel.setAcquisitionLayout: end");
+    }
+
+    static void setMaxZoom(double mZoom) {
+        MAX_ZOOM=mZoom;
     }
 
     public void setlayoutRotation(double rad) {
@@ -156,22 +156,13 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     
     //receives screen coordinate
     public double convertPixToLayoutCoord(int pix) {
-        return (pix/physToPixelRatio/scale/zoom)-borderDim;
+        return (pix/scale/zoom);
     }
     
     //receives screen coordinate
     public Point2D.Double convertPixToLayoutCoord(Point p) {
         return new Point2D.Double(convertPixToLayoutCoord(p.x),convertPixToLayoutCoord(p.y));
     }
-    
-    public int getBorderDimPix() {
-        int bdPix;
-        if ((borderDim>0) && (physToPixelRatio!=1))
-            bdPix=(int)Math.round(borderDim*physToPixelRatio);
-        else
-            bdPix=10;
-        return bdPix;
-     }
     
     //w, h: width and height of JScrollPane.getVisibleRect()
     public void calculateScale(int w, int h) { 
@@ -183,7 +174,8 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         }
 //        IJ.log("LayoutPanel.calculateScale: w="+Integer.toString(w)+", h="+Integer.toString(h)+", "+Double.toString(d.getWidth())+", "+Double.toString(d.getHeight()));    }
     }
-    
+
+/*    
     public void calculatePhysToPixelRatio() {
         if (acqLayout!=null) {
 //            physToPixelRatio=Math.min((double)LAYOUT_MAX_DIM/acqLayout.getWidth(),(double)LAYOUT_MAX_DIM/acqLayout.getHeight());
@@ -191,7 +183,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         } else
             physToPixelRatio=1;
     }
-
+*/
     
     private Dimension scaleDimension(Dimension dim, double factor) {
         return new Dimension((int)(factor*dim.width), (int)(factor*dim.height));
@@ -207,8 +199,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     
     private int getPreferredLayoutWidth() {
         if (acqLayout!=null) {
-//            return (int)Math.round(2*getBorderDimPix()+(int)Math.ceil(acqLayout.getWidth()*physToPixelRatio)*zoom);
-            return 2*getBorderDimPix()+(int)Math.ceil(acqLayout.getWidth()*physToPixelRatio);
+            return (int)Math.ceil(acqLayout.getWidth());
         } else
             return LAYOUT_MAX_DIM;
     }
@@ -216,8 +207,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     
     private int getPreferredLayoutLength() {
         if (acqLayout!=null) {
-//            return (int)Math.round(2*getBorderDimPix()+(int)Math.ceil(acqLayout.getHeight()*physToPixelRatio)*zoom);
-            return 2*getBorderDimPix()+(int)Math.ceil(acqLayout.getLength()*physToPixelRatio);
+            return (int)Math.ceil(acqLayout.getLength());
         } else
             return Math.round(LAYOUT_MAX_DIM/2);
     }
@@ -225,19 +215,11 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     
     @Override
     public Dimension getPreferredSize() {
-    //    int w = (int)(getPreferredLayoutWidth()*scale*zoom);  
-    //    int h = (int)(getPreferredLayoutHeight()*scale*zoom);  
-    //    return new Dimension(w, h);
         return scaleDimension(getPreferredLayoutSize(),scale*zoom);
-    //    return super.getPreferredSize();
     }
     
     @Override
     public Dimension getPreferredScrollableViewportSize() {
-//        IJ.log("LayoutPanel.getPreferredScrollableViewportSize()");
-//        return getPreferredSize();
-//        IJ.log("LayoutPanel.getPreferredScrollableViewPortSize:" +scaleDimension(getPreferredLayoutSize(),scale).toString());
-//        return new Dimension((int)Math.round(getPreferredLayoutWidth()*scale),(int)Math.round(getPreferredLayoutHeight()*scale));
         return scaleDimension(getPreferredLayoutSize(),scale);
     }
 
@@ -261,27 +243,23 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
 
     @Override
     public boolean getScrollableTracksViewportWidth() {
-        if (zoom == 1)
-            return true;
-        else
-            return false;
+        return (zoom == 1);
     }
 
     @Override
     public boolean getScrollableTracksViewportHeight() {
-       if (zoom == 1)
-            return true;
-        else
-            return false;
+        return (zoom == 1);
     }
 
     
     public double zoomIn() {
 //        IJ.log("zoom"+Double.toString(zoom)+", scale:"+Double.toString(scale));
 //        IJ.log("LayoutPanel.zoomIn: scaled getPreferredLayoutSize (zoom:"+Double.toString(zoom)+":" +scaleDimension(getPreferredLayoutSize(),zoom*scale).toString());
-        if (zoom < MAX_ZOOM)
-            zoom=zoom*2;
-//        setSize(new Dimension((int)(getPreferredLayoutWidth()*zoom),(int)(getPreferredLayoutHeight()*zoom)));
+        if (zoom < MAX_ZOOM) {
+            zoom=zoom*2; 
+        } else {
+            zoom=MAX_ZOOM;
+        }  
         setSize(scaleDimension(getPreferredLayoutSize(),zoom));
         revalidate();
         repaint();
@@ -327,7 +305,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
                 for (int i=0; i<areas.size(); i++) {
                     Area a=acqLayout.getAreaArray().get(i);
                     if (a.isSelectedForAcq())
-                        a.drawTiles(g2d, getBorderDimPix(), physToPixelRatio, tileWidth, tileHeight,tSetting);
+                        a.drawTiles(g2d, 0, 1, tileWidth, tileHeight,tSetting);
                 }
             }      
         }
@@ -346,7 +324,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
                 for (int i=0; i<areas.size(); i++) {
                     Area a=acqLayout.getAreaArray().get(i);
 //                    a.draw(g2d, getBorderDimPix(), physToPixelRatio, tileWidth, tileHeight,tSetting,true);
-                    a.drawArea(g2d, getBorderDimPix(), physToPixelRatio, showZProfile);
+                    a.drawArea(g2d, 0, 1, showZProfile);
                 }
                 drawTileGridForAllSelectedAreas(g2d);
             }    
@@ -357,15 +335,14 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
 //        IJ.log("drawLandmark");
         if ((acqLayout!=null) && (acqLayout.getLandmarks()!=null)) {
             List<RefArea> landmarks=acqLayout.getLandmarks();
-            int bdPix=getBorderDimPix();
             for (int i=0; i<landmarks.size(); i++) {
                 RefArea lm=landmarks.get(i);
-                int xo = bdPix + (int) Math.round(lm.getLayoutCoordOrigX()*physToPixelRatio);
-                int yo = bdPix + (int) Math.round(lm.getLayoutCoordOrigY()*physToPixelRatio);
-                int xCenter = bdPix + (int) Math.round(lm.getLayoutCoordX()*physToPixelRatio);
-                int yCenter = bdPix + (int) Math.round(lm.getLayoutCoordY()*physToPixelRatio);
-                int w = (int) Math.round(lm.getPhysWidth()*physToPixelRatio);
-                int h = (int) Math.round(lm.getPhysHeight()*physToPixelRatio);
+                int xo = (int) Math.round(lm.getLayoutCoordOrigX());
+                int yo = (int) Math.round(lm.getLayoutCoordOrigY());
+                int xCenter = (int) Math.round(lm.getLayoutCoordX());
+                int yCenter = (int) Math.round(lm.getLayoutCoordY());
+                int w = (int) Math.round(lm.getPhysWidth());
+                int h = (int) Math.round(lm.getPhysHeight());
 //                IJ.log("drawLandmark "+Integer.toString(i)+": "+Integer.toString(x)+" "+Integer.toString(y)+" "+Integer.toString(w)+" "+Integer.toString(h));
                 if (lm.isSelected())
                     g2d.setColor(COLOR_SEL_LANDMARK);
@@ -443,7 +420,6 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     
     public void drawFovAtCurrentStagePos(Graphics2D g2d) {
 //        IJ.log("LayoutPanel.drawFovAtCurrentStagePos: start");
-        int bdPix=getBorderDimPix();
         int binning=cAcqSetting.getBinningFactor();
         double objPixSize=cAcqSetting.getObjPixelSize();
 
@@ -453,10 +429,10 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         Point2D fullChipOrigin=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(
                 currentStagePos_X ,
                 currentStagePos_Y ));            
-        int x=bdPix+(int)Math.round(physToPixelRatio*(fullChipOrigin.getX()- fov.getFullWidth_UM(objPixSize)/2));
-        int y=bdPix+(int)Math.round(physToPixelRatio*(fullChipOrigin.getY()- fov.getFullHeight_UM(objPixSize)/2));
-        int w=(int)Math.ceil(fov.getFullWidth_UM(objPixSize)*physToPixelRatio);
-        int h=(int)Math.ceil(fov.getFullHeight_UM(objPixSize)*physToPixelRatio);
+        int x=(int)Math.round((fullChipOrigin.getX()- fov.getFullWidth_UM(objPixSize)/2));
+        int y=(int)Math.round((fullChipOrigin.getY()- fov.getFullHeight_UM(objPixSize)/2));
+        int w=(int)Math.ceil(fov.getFullWidth_UM(objPixSize));
+        int h=(int)Math.ceil(fov.getFullHeight_UM(objPixSize));
 
         g2d.translate(x+w/2, y+h/2);
         g2d.rotate(Area.getStageToLayoutRot());
@@ -475,10 +451,10 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.5f));
         Point2D lpoint=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(currentStagePos_X- fov.getFullWidth_UM(objPixSize)/2 + offset_UM.getX()
                 ,currentStagePos_Y- fov.getFullHeight_UM(objPixSize)/2 + offset_UM.getY()));
-        x=bdPix+(int)Math.round(physToPixelRatio*(roiOrigin.getX()- fov.getFullWidth_UM(objPixSize)/2 + offset_UM.getX()));
-        y=bdPix+(int)Math.round(physToPixelRatio*(roiOrigin.getY()- fov.getFullHeight_UM(objPixSize)/2 + offset_UM.getY()));
-        w=(int)Math.ceil(fov.getRoiWidth_UM(objPixSize) * physToPixelRatio);
-        h=(int)Math.ceil(fov.getRoiHeight_UM(objPixSize) * physToPixelRatio);
+        x=(int)Math.round((roiOrigin.getX()- fov.getFullWidth_UM(objPixSize)/2 + offset_UM.getX()));
+        y=(int)Math.round((roiOrigin.getY()- fov.getFullHeight_UM(objPixSize)/2 + offset_UM.getY()));
+        w=(int)Math.ceil(fov.getRoiWidth_UM(objPixSize));
+        h=(int)Math.ceil(fov.getRoiHeight_UM(objPixSize));
 
         g2d.fillRect(x,y,w,h);
         g2d.setComposite(oldComposite);
@@ -534,8 +510,8 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
             layoutp[1] = acqLayout.convertStageToLayoutPos_XY(stagep[1]);
 
             Point2D[] screenp=new Point2D.Double[2];
-            screenp[0] = new Point2D.Double(physToPixelRatio * layoutp[0].getX(), physToPixelRatio * layoutp[0].getY());
-            screenp[1] = new Point2D.Double(physToPixelRatio * layoutp[1].getX(), physToPixelRatio * layoutp[1].getY());
+            screenp[0] = new Point2D.Double(layoutp[0].getX(), layoutp[0].getY());
+            screenp[1] = new Point2D.Double(layoutp[1].getX(), layoutp[1].getY());
 //            IJ.log("stagep[0]: "+stagep[0].toString()+", stagep[1]: "+stagep[1].toString());
 //            IJ.log("layoutp[0]: "+layoutp[0].toString()+", layoutp[1]: "+layoutp[1].toString());
 //            IJ.log("screenp[0]: "+screenp[0].toString()+", screenp[1]: "+screenp[1].toString());
@@ -622,9 +598,6 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         g2d.setColor(COLOR_BORDER);
         g2d.fillRect(panelR.x, panelR.y, panelR.width, panelR.height); 
         
-        borderDim=10;
-
-        int bdPix=getBorderDimPix();
         Dimension dim=getPreferredLayoutSize();
         int w=dim.width;//+2*bdPix;
         int h=dim.height;//+2*bdPix;
@@ -658,20 +631,20 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
 //            Rectangle2D stageRect=a.getBounds();
 
             if (p!=null) {
-            Point2D start = new Point2D.Double(bdPix+p[0].getX(),bdPix+p[0].getY());
-            Point2D end = new Point2D.Double(bdPix+p[1].getX(),bdPix+p[1].getY());
+            Point2D start = new Point2D.Double(p[0].getX(),p[0].getY());
+            Point2D end = new Point2D.Double(p[1].getX(),p[1].getY());
             float[] dist = {0.0f, 0.5f, 1.0f};
             Color[] colors = {COLOR_TILT_HIGH, Color.BLACK, COLOR_TILT_LOW};
             LinearGradientPaint lg =new LinearGradientPaint(start, end, dist, colors);            
             g2d.setPaint(lg);
-            g2d.fill (new Rectangle2D.Double(bdPix, bdPix, w-2*bdPix, h-2*bdPix));
+            g2d.fill (new Rectangle2D.Double(0, 0, w, h));
             } else {
                 g2d.setColor(COLOR_LAYOUT_BACKGR);
-                g2d.fillRect(bdPix, bdPix, w-2*bdPix, h-2*bdPix); //getWidth(), getHeight());                
+                g2d.fillRect(0, 0, w, h); //getWidth(), getHeight());                
             }
         } else {
             g2d.setColor(COLOR_LAYOUT_BACKGR);
-            g2d.fillRect(bdPix, bdPix, w-2*bdPix, h-2*bdPix); //getWidth(), getHeight());
+            g2d.fillRect(0, 0, w, h); //getWidth(), getHeight());
         }
         
         //draw stage grid
@@ -683,16 +656,16 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
             if (mergeAreasBounds!=null) {
                 g2d.setColor(COLOR_SELECTED_AREA);
                 g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.3f));
-                g2d.fillRect((int)Math.round(bdPix+mergeAreasBounds.x*physToPixelRatio),
-                        (int)Math.round(bdPix+mergeAreasBounds.y*physToPixelRatio),
-                        (int)Math.round(mergeAreasBounds.width*physToPixelRatio),
-                        (int)Math.round(mergeAreasBounds.height*physToPixelRatio));
+                g2d.fillRect((int)Math.round(mergeAreasBounds.x),
+                        (int)Math.round(mergeAreasBounds.y),
+                        (int)Math.round(mergeAreasBounds.width),
+                        (int)Math.round(mergeAreasBounds.height));
                 g2d.setComposite(oldComposite);
                 g2d.setStroke(SOLID_STROKE);
-                g2d.draw(new Rectangle2D.Double(bdPix+mergeAreasBounds.x*physToPixelRatio,
-                        bdPix+mergeAreasBounds.y*physToPixelRatio,
-                        mergeAreasBounds.width*physToPixelRatio,
-                        mergeAreasBounds.height*physToPixelRatio));
+                g2d.draw(new Rectangle2D.Double(mergeAreasBounds.x,
+                        mergeAreasBounds.y,
+                        mergeAreasBounds.width,
+                        mergeAreasBounds.height));
             }
                 
         } else {
@@ -716,7 +689,10 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
 //        g2d.setStroke(oldStroke);
         g2d.setTransform(oldTransform);
         g2d.dispose();
-
+    }
+    
+    public double getScale() {
+        return scale;
     }
 }
 
