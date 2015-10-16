@@ -1,5 +1,6 @@
 package autoimage.area;
 
+import autoimage.api.SampleArea;
 import java.util.Comparator;
 
 /**
@@ -23,7 +24,7 @@ public class RectWellArea extends RectArea {
     }
 
     @Override
-    public String getShape() {
+    public String getShapeType() {
         return "Rectangular Well";
     }
     
@@ -65,7 +66,7 @@ public class RectWellArea extends RectArea {
     
     @Override
     public int supportedLayouts() {
-        return Area.SUPPORT_WELLPLATE_LAYOUT;
+        return SampleArea.SUPPORT_WELLPLATE_LAYOUT;
     }
 
     

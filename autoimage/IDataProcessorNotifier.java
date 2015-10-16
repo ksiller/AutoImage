@@ -1,5 +1,7 @@
 package autoimage;
 
+import autoimage.api.IDataProcessorListener;
+
 /**
  *
  * @author Karsten

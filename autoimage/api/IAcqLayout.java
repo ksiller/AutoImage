@@ -1,0 +1,231 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package autoimage.api;
+
+import autoimage.DoxelManager;
+import autoimage.FieldOfView;
+import autoimage.Tile;
+import autoimage.Vec3d;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.Point2D;
+import java.awt.geom.Rectangle2D;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.Future;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+/**
+ *
+ * @author Karsten Siller
+ */
+public interface IAcqLayout {
+    
+    public final static int NO_TILING_EXECUTOR = -1;
+    public final static int TILING_IN_PROGRESS = 1;
+    public final static int TILING_IS_TERMINATING = 2;
+    public final static int TILING_COMPLETED = 3;
+    public final static int TILING_ABORTED = 4;
+
+    void addArea(SampleArea a);
+
+    void addLandmark(RefArea lm);
+
+    // calculates 2D affine transform and normal vector for layout
+    void calcStageToLayoutTransform();
+
+    //returns minimal relative tile overlap (0 <= tileOverlap <=1) to eliminate all gaps
+    //considers camera field rotation and stage-to-layout rotation
+    double closeTilingGaps(FieldOfView fov, double accuracy);
+
+    Vec3d convertLayoutToStagePos(double layoutX, double layoutY, double layoutZ) throws Exception;
+
+    Point2D convertLayoutToStagePos_XY(Point2D layoutXY);
+
+    Vec3d convertStageToLayoutPos(double stageX, double stageY, double stageZ) throws Exception;
+
+    Point2D convertStageToLayoutPos_XY(Point2D stageXY);
+
+    int createUniqueAreaId();
+
+    void deleteArea(int index);
+
+    void deleteLandmark(int index);
+
+    void deleteLandmark(RefArea lm);
+
+    void deselectAllLandmarks();
+
+    ArrayList<SampleArea> getAllAreasInsideRect(Rectangle2D.Double r);
+
+    ArrayList<SampleArea> getAllAreasTouching(double x, double y);
+
+    int[] getAllContainingAreaIndices(double x, double y);
+
+    List<SampleArea> getAreaArray();
+
+    //areas are loaded with sequential IDs, starting with 1 --> SampleArea with id is most likey to be in areas.get(id-1). If not, the entire AreaArray is searched for the ID
+    SampleArea getAreaById(int id);
+
+    SampleArea getAreaByIndex(int index);
+
+    SampleArea getAreaByLayoutPos(double lx, double ly);
+
+    SampleArea getAreaByName(String name);
+
+    Comparator getAreaNameComparator();
+
+    String getBottomMaterial();
+
+    double getBottomThickness();
+
+    /*
+    //faulty: does not take stageToLayoutTransform into account
+    public double getStageZPosForLayoutPos(double layoutX, double layoutY) throws Exception {
+    if (getNoOfMappedStagePos() == 0)
+    throw new Exception("Converting z position: no Landmarks defined");
+    RefArea rp=getMappedLandmarks().get(0);
+    //        double z=((-normalVec.x*(layoutX-rp.getStageCoordX())-normalVec.y*(layoutY-rp.getStageCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
+    double z=((-normalVec.x*(layoutX-rp.getLayoutCoordX())-normalVec.y*(layoutY-rp.getLayoutCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
+    return z;
+    }
+     */
+    double getEscapeZPos();
+
+    File getFile();
+
+    //returns null if layout coordinate is not inside any area
+    SampleArea getFirstContainingArea(double lx, double ly);
+
+    //parameters are absolute stage positions
+    SampleArea getFirstContainingAreaAbs(double stageX, double stageY, double fovX, double fovY);
+
+    //returns null if fov surrounding layout coordinate does not touch any area
+    SampleArea getFirstTouchingArea(double lx, double ly, double fovX, double fovY);
+
+    double getHeight();
+
+    RefArea getLandmark(int index);
+
+    List<RefArea> getLandmarks();
+
+    //in radians
+    double getLayoutToStageRot();
+
+    AffineTransform getLayoutToStageTransform();
+
+    double getLength();
+
+    //returns list of RefArea for which stagePosMapped==true
+    List<RefArea> getMappedLandmarks();
+
+    String getName();
+
+    int getNoOfMappedStagePos();
+
+    int getNoOfSelectedAreas();
+
+    int getNoOfSelectedClusters();
+
+    Vec3d getNormalVector();
+
+    ArrayList<SampleArea> getSelectedAreasInsideRect(Rectangle2D.Double r);
+
+    ArrayList<SampleArea> getSelectedAreasTouching(double x, double y);
+
+    double getStagePosX(SampleArea a, int tileIndex);
+
+    double getStagePosY(SampleArea a, int tileIndex);
+
+    //in radians
+    double getStageToLayoutRot();
+
+    AffineTransform getStageToLayoutTransform();
+
+    //returns stageZ pos that corresponds to layout reference plane (layoutZ = 0) at stageX/stageY pos
+    double getStageZPosForStageXYPos(double stageX, double stageY) throws Exception;
+
+    Comparator getTileNumberComparator();
+
+    //returns angle between vertical vector and normalVec of layout (in degree)
+    double getTilt() throws Exception;
+
+    long getTotalTileNumber();
+
+    ArrayList<SampleArea> getUnselectedAreasInsideRect(Rectangle2D.Double r);
+
+    ArrayList<SampleArea> getUnselectedAreasTouching(double x, double y);
+
+    double getWidth();
+
+    /**
+     * @return index of first area with duplicate name. Returns -1 if all names are unique or list is empty
+     */
+    int hasDuplicateAreaNames();
+
+    //returns true if gaps exist between tiles
+    //considers camera field rotation and stage-to-layout rotation
+    boolean hasGaps(FieldOfView fov, double tileOverlap);
+
+    boolean isAreaAdditionAllowed();
+
+    boolean isAreaEditingAllowed();
+
+    boolean isAreaMergingAllowed();
+
+    boolean isAreaRemovalAllowed();
+
+    boolean isEmpty();
+
+    boolean isModified();
+
+    List<List<Tile>> readTileCoordsFromXMLFile(String fname);
+
+    void removeAreaById(int id);
+
+    void saveTileCoordsToXMLFile(String fname, TilingSetting setting, double tileW, double tileH, double pixSize);
+
+    void setAreaArray(List<SampleArea> al);
+
+    void setBottomMaterial(String material);
+
+    void setBottomThickness(double thickness);
+
+    void setFile(File f);
+
+    void setHeight(double h);
+
+    void setLandmark(int index, RefArea lm);
+
+    void setLandmarks(List<RefArea> lm);
+
+    void setLength(double l);
+
+    void setModified(boolean b);
+
+    void setName(String n);
+
+    void setWidth(double w);
+
+    JSONObject toJSONObject() throws JSONException;
+
+    void writeSingleArea(XMLStreamWriter xtw, SampleArea a, TilingSetting setting) throws XMLStreamException;
+    
+    public List<Future<Integer>> calculateTiles(List<SampleArea> areasToTile, final DoxelManager dManager, final double fovWidth_UM, final double fovHeight_UM, final TilingSetting tSetting);
+    
+    public int getTilingStatus();
+    
+    public long getCompletedTilingTasks();
+    
+    public double getCompletedTilingTasksPercent();
+    
+    public void cancelTileCalculation();
+    
+}

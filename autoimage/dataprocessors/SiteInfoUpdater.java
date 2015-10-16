@@ -4,8 +4,8 @@
  */
 package autoimage.dataprocessors;
 
-import autoimage.ExtImageTags;
-import autoimage.IDataProcessorListener;
+import autoimage.api.ExtImageTags;
+import autoimage.api.IDataProcessorListener;
 import autoimage.IDataProcessorNotifier;
 import ij.IJ;
 import java.util.ArrayList;

@@ -1,12 +1,14 @@
 package autoimage.dataprocessors;
 
-import autoimage.ExtImageTags;
+import autoimage.api.ExtImageTags;
+import autoimage.api.Doxel;
+import autoimage.api.IDoxelListener;
 import autoimage.MMCoreUtils;
-import autoimage.RoiSeed;
-import autoimage.TileManager;
-import autoimage.Utils;
 import autoimage.Vec3d;
+
+//share last directory for script files with ScriptAnalyzer
 import static autoimage.dataprocessors.ScriptAnalyzer.scriptDir;
+
 import bsh.EvalError;
 import bsh.Interpreter;
 import ij.IJ;
@@ -41,30 +43,29 @@ import org.micromanager.api.MMTags;
     
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<String> {
     
-    protected List<RoiSeed> roiList;
-//    protected List<Point2D> roiList;
+    protected List<Doxel> roiList;
     protected List<String> options_;
     protected List<String> selectedSeq;
-    private final List<TileManager> tileManagerList;
+    private final List<IDoxelListener> doxelListeners;
     private final ExecutorService listenerExecutor;
 
     public RoiFinder () {
         this("","","",null);
     }
     
-    public RoiFinder (final String script, final String args, String path, TileManager tileManager) {
-        this(false,script, args, path, tileManager,false);
+    public RoiFinder (final String script, final String args, String path, IDoxelListener listener) {
+        this(false,script, args, path, listener,false);
     }
 
-    public RoiFinder (boolean procIncompl,final String script, final String args, String path, TileManager tileManager, boolean saveRT) {
+    public RoiFinder (boolean procIncompl,final String script, final String args, String path, IDoxelListener listener, boolean saveRT) {
         super(procIncompl,script, args, path, saveRT);
-        tileManagerList=new ArrayList<TileManager>();
-        if (tileManager!=null)
-            tileManagerList.add(tileManager);
+        doxelListeners=new ArrayList<IDoxelListener>();
+        if (listener!=null)
+            doxelListeners.add(listener);
         selectedSeq=new ArrayList<String> ();
         listenerExecutor = Executors.newFixedThreadPool(1);
         criteriaKeys.add(MMTags.Image.FRAME_INDEX);
@@ -102,21 +103,21 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
     
     @Override
     public void setScriptVariables(Interpreter interpreter) throws EvalError {
-        roiList= new ArrayList<RoiSeed>();
+        roiList= new ArrayList<Doxel>();
         interpreter.set("roiList",roiList);
 //        interpreter.set("workDir",workDir);
     }
 
-    public void addTileManager(TileManager tileManager) {
-        tileManagerList.add(tileManager);
+    public void addDoxelListener(IDoxelListener listener) {
+        doxelListeners.add(listener);
     }
     
-    public void removeTileManager(TileManager tileManager) {
-        tileManagerList.remove(tileManager);
+    public void removeDoxelListener(IDoxelListener listener) {
+        doxelListeners.remove(listener);
     }
     
-    public void removeAllTileManagers() {
-        tileManagerList.clear();
+    public void removeAllDoxelListeners() {
+        doxelListeners.clear();
     }
     
     //files is list of working copies
@@ -125,74 +126,104 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
         IJ.log(    "    Processed Results:"+script_+".");
         try {
             JSONObject meta=MMCoreUtils.parseMetadataFromFile(files.get(0));
-            String name=meta.getString(MMTags.Image.POS_NAME);
+            String positionName=meta.getString(MMTags.Image.POS_NAME);
             int imgWidth=meta.getInt(MMTags.Image.WIDTH);
             int imgHeight=meta.getInt(MMTags.Image.HEIGHT);
             double zStepSize=meta.getDouble(MMTags.Image.ZUM);
             JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
             double pixSize=summary.getDouble(MMTags.Summary.PIXSIZE);
             double detectorAngle=summary.getDouble(ExtImageTags.DETECTOR_ROTATION);
+            //absolute x, y, z, t coordinates of first image in processed group
             double firstImgX=meta.getDouble(MMTags.Image.XUM);
             double firstImgY=meta.getDouble(MMTags.Image.YUM);
             double firstImgZ=meta.getDouble(MMTags.Image.ZUM);
+            double firstElapsedTimeMS=meta.getDouble(MMTags.Image.ELAPSED_TIME_MS);
+            Object firstTime=meta.get(MMTags.Image.TIME);
+            
             final String area=meta.getString(ExtImageTags.AREA_NAME);
             double cosinus=Math.cos(detectorAngle);
             double sinus=Math.sin(detectorAngle);
             if (roiList!=null && roiList.size()>0){
-                final List<Vec3d> stagePosList=new ArrayList<Vec3d>(roiList.size());
-                for (final RoiSeed roi:roiList) {
+                final List<Doxel> doxelList=new ArrayList<Doxel>(roiList.size());
+                for (final Doxel doxel:roiList) {
+
+                    IJ.log("    roi (image): ("+doxel.toString(false));
+                    
                     //1. translate to center -> dx/dy
                     double dx;//offset from image center x in um
                     double dy;//offset from image center y in um
                     double dz;//offset from from first image z in um
-                    if (RoiSeed.IS_PIXEL.equals(roi.unitXY)) {
-                        //if unitXY is not set, roi coordinates are in pixel
+                    //try to convert x,y, z coordinates to micron
+                    try {
+                        doxel.convertToMicron();
+                    } catch (IllegalArgumentException ex) {
+                        
+                    }
+                    if (Doxel.IS_PIXEL.equals(doxel.unitX)) {
+                        //if unitX is not set, doxel coordinates are in pixel
                         //--> convert pixel to micron
-                        dx=pixSize*(roi.xPos-imgWidth/2);
-                        dy=pixSize*(roi.yPos-imgHeight/2);
+                        dx=pixSize*(doxel.xPos-imgWidth/2);
                     } else {
                         //roi coordinates are in micron
-                        dx=roi.xPos-pixSize*imgWidth/2;
-                        dy=roi.yPos-pixSize*imgHeight/2;                        
+                        dx=doxel.xPos-pixSize*imgWidth/2;
+                    }
+                    if (Doxel.IS_PIXEL.equals(doxel.unitY)) {
+                        //if unitY is not set, doxel coordinates are in pixel
+                        //--> convert pixel to micron
+                        dy=pixSize*(doxel.yPos-imgHeight/2);
+                    } else {
+                        //roi coordinates are in micron
+                        dy=doxel.yPos-pixSize*imgHeight/2;                        
                     }
                     
                     //2. calculate z-offset [in um] relative to first image in list
-                    if (RoiSeed.IS_PIXEL.equals(roi.unitZ)) {
-                        //if unitZ is not set, roi coordinates are in z-step increments
+                    if (Doxel.IS_PIXEL.equals(doxel.unitZ)) {
+                        //if unitZ is not set, doxel coordinates are in z-step increments
                         //--> convert pixel to micron
-                        dz=roi.zPos*zStepSize;
+                        dz=doxel.zPos*zStepSize;
                     } else {
                         //roi coordinates already in micron relative to first image in list
-                        dz=roi.zPos;                        
+                        dz=doxel.zPos;                        
                     }
                     
                     //3. rotate to compensate for camera rotation
                     double x = (cosinus * dx) - (sinus * dy); //in um
                     double y = (sinus * dx) + (cosinus * dy); //in um
                     
-                    //4. calculate roi's absolute stage position [in um]
-                    stagePosList.add(new Vec3d(firstImgX + x,firstImgY + y,firstImgZ+dz));
+                    //4. calculate doxel's absolute xy stage position and relative z position [in um]
+                    doxel.xPos=firstImgX + x;
+                    doxel.yPos=firstImgY + y;
+                    doxel.zPos=firstImgZ + dz;
+                    doxel.unitX=Doxel.IS_MICROMETER;
+                    doxel.unitY=Doxel.IS_MICROMETER;
+                    doxel.unitZ=Doxel.IS_MICROMETER;
+                    
+                    //5. add other metadata
+                    doxel.time=firstElapsedTimeMS;//in millisecond
+                    doxel.unitTime=Doxel.IS_MILLISEC;
+                    doxel.put(ExtImageTags.AREA_NAME, area);
+                    doxel.put(MMTags.Image.POS_NAME,positionName);
+                    
+                    doxelList.add(doxel);
 
-                    IJ.log("    roi (image): ("+(roi.xPos)+"/"+(roi.yPos)+"/"+(roi.zPos)+") ["+roi.unitXY+"/"+roi.unitXY+"/"+roi.unitZ+"]");
                     IJ.log("    roi (relative to center of first image): ("+ dx +"/"+ dy +"/"+ dz +") [um/um/um]");
                     IJ.log("    first image center (absolute): ("+(firstImgX)+"/"+(firstImgY)+"/"+(firstImgZ)+") [um/um/um]");
-                    IJ.log("    roi (absolute): ("+(firstImgX + x)+"/"+(firstImgY + y)+"/"+(firstImgZ+dz)+") [um/um/um]");
+                    IJ.log("    roi doxel (absolute): "+doxel.toString(false));
                 }
                 roiList.clear();
                     
-                synchronized (tileManagerList) {
-                    for (final TileManager tm : tileManagerList) {
-                        listenerExecutor.submit(
-                           new Runnable() {
+                synchronized (doxelListeners) {
+                    for (final IDoxelListener tm : doxelListeners) {
+                        listenerExecutor.submit(new Runnable() {
                               @Override
                               public void run() {
-                                tm.stagePosListAdded(area,stagePosList,this);
+                                tm.doxelListAdded(doxelList,this);
                               }
                            });
                     }
                 }
       
-                IJ.log("    "+Integer.toString(stagePosList.size())+" ROIs added for area "+area);
+                IJ.log("    "+Integer.toString(doxelList.size())+" ROIs added for area "+area);
             } else {
                 IJ.log("    no ROIs found");
             }    

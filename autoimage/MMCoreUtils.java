@@ -1,5 +1,7 @@
 package autoimage;
 
+import autoimage.api.ExtImageTags;
+import autoimage.gui.AcqFrame;
 import ij.CompositeImage;
 import ij.IJ;
 import ij.ImagePlus;

@@ -1,9 +1,14 @@
 package autoimage.area;
 
+import autoimage.api.SampleArea;
 import autoimage.Tile;
-import autoimage.TilingSetting;
+import autoimage.api.TilingSetting;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
+import java.awt.Rectangle;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.GeneralPath;
+import java.awt.geom.PathIterator;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.beans.PropertyChangeEvent;
@@ -22,7 +27,7 @@ import org.json.JSONObject;
  *
  * @author Karsten Siller
  */
-public class RectArea extends Area{
+public class RectArea extends SampleArea{
     
 
     public RectArea() {
@@ -39,25 +44,23 @@ public class RectArea extends Area{
     }
            
     @Override
-    public String getShape() {
+    public String getShapeType() {
         return "Rectangle";
     }
        
     @Override
-    public void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio, boolean showZProfile) {
+    public void drawArea(Graphics2D g2d, boolean showZProfile) {
         g2d.setColor(getFillColor(showZProfile));
-        int x = bdPix + (int) Math.round(topLeftX*physToPixelRatio);
-        int y = bdPix + (int) Math.round(topLeftY*physToPixelRatio);
-        int w = (int) Math.round(width*physToPixelRatio);
-        int h = (int) Math.round(height*physToPixelRatio);    
-        g2d.fillRect(x,y,w,h); 
+    //    g2d.fill (new Rectangle2D.Double(topLeftX, topLeftY, width, height));
+        g2d.fill(shape);
         g2d.setColor(getBorderColor());
-        g2d.drawRect(x,y,w,h); 
+    //    g2d.draw (new Rectangle2D.Double(topLeftX, topLeftY, width, height));
+        g2d.draw(shape);
     }
     
     @Override
-    public void drawTiles(Graphics2D g2d, int bdPix, double physToPixelRatio, double fovX, double fovY, TilingSetting setting) {
-        drawTileByTileOvl(g2d, bdPix, physToPixelRatio, fovX, fovY,setting);
+    public void drawTiles(Graphics2D g2d, double fovX, double fovY, TilingSetting setting) {
+        drawTileByTileOvl(g2d, fovX, fovY,setting);
     }
     
     @Override
@@ -83,15 +86,16 @@ public class RectArea extends Area{
     } 
 
     @Override
-    public Area duplicate() {
+    public SampleArea duplicate() {
         RectArea newArea = new RectArea(this.getName());
-//        newArea.shape=this.getShape();
+//        newArea.shape=this.getShapeLabel();
         newArea.setId(this.getId());
         newArea.setTopLeftX(this.topLeftX);
         newArea.setTopLeftY(this.topLeftY);
-        newArea.setRelPosZ(this.relPosZ);
+        newArea.setRelativeZPos(this.relativeZPos);
         newArea.setWidth(this.width);
         newArea.setHeight(this.height);
+        newArea.affineTrans=new AffineTransform(this.affineTrans);
         newArea.setSelectedForAcq(isSelectedForAcq());
         newArea.setSelectedForMerge(isSelectedForMerge());
         newArea.setComment(this.comment);
@@ -112,8 +116,8 @@ public class RectArea extends Area{
 
     @Override
     public void calcCenterAndDefaultPos() {
-        centerPos=new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
-        defaultPos=centerPos;
+        centerXYPos=new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
+        defaultXYPos=centerXYPos;
     }
 
     @Override
@@ -127,7 +131,7 @@ public class RectArea extends Area{
     }
 
     @Override
-    public Area showConfigDialog(Rectangle2D layoutBounds) {
+    public SampleArea showConfigDialog(Rectangle2D layoutBounds) {
         JPanel optionPanel = new JPanel();
         GridLayout layout = new GridLayout(0,4);
         optionPanel.setLayout(layout);
@@ -145,7 +149,7 @@ public class RectArea extends Area{
         optionPanel.add(l);
         JFormattedTextField zField = new JFormattedTextField();
         zField.setColumns(10);
-        zField.setValue(new Double(relPosZ/1000));
+        zField.setValue(new Double(relativeZPos/1000));
         optionPanel.add(zField);
              
         l=new JLabel("Origin X (mm):",JLabel.RIGHT);
@@ -161,7 +165,7 @@ public class RectArea extends Area{
         optionPanel.add(l);
         final JFormattedTextField centerXField = new JFormattedTextField();
         centerXField.setColumns(10);
-        centerXField.setValue(new Double(getCenterPos().getX()/1000));
+        centerXField.setValue(new Double(getCenterXYPos().getX()/1000));
         optionPanel.add(centerXField);
 
         l=new JLabel("Origin Y (mm):",JLabel.RIGHT);
@@ -177,7 +181,7 @@ public class RectArea extends Area{
         optionPanel.add(l);
         final JFormattedTextField centerYField = new JFormattedTextField();
         centerYField.setColumns(10);
-        centerYField.setValue(new Double(getCenterPos().getY()/1000));
+        centerYField.setValue(new Double(getCenterXYPos().getY()/1000));
         optionPanel.add(centerYField);
 
         l=new JLabel("Width (mm):",JLabel.RIGHT);
@@ -204,7 +208,7 @@ public class RectArea extends Area{
                     double newValue = ((Number)topLeftXField.getValue()).doubleValue()*1000;
                     if (newValue != topLeftX) {
                         setTopLeftX(newValue);
-                        centerXField.setValue(new Double(getCenterPos().getX()/1000));
+                        centerXField.setValue(new Double(getCenterXYPos().getX()/1000));
                     }
                 }
             }
@@ -216,7 +220,7 @@ public class RectArea extends Area{
             public void propertyChange(PropertyChangeEvent evt) {
                 if (evt.getSource() == centerXField) {
                     double newValue = ((Number)centerXField.getValue()).doubleValue()*1000;
-                    if (newValue != getCenterPos().getX()) {
+                    if (newValue != getCenterXYPos().getX()) {
                         setTopLeftX(newValue-width/2);
                         topLeftXField.setValue(new Double(topLeftX/1000));
                     }
@@ -232,7 +236,7 @@ public class RectArea extends Area{
                     double newValue = ((Number)topLeftYField.getValue()).doubleValue()*1000;
                     if (newValue != topLeftY) {
                         setTopLeftY(newValue);//recalculates center pos
-                        centerYField.setValue(new Double(getCenterPos().getY()/1000));
+                        centerYField.setValue(new Double(getCenterXYPos().getY()/1000));
                     }
                 }
             }
@@ -244,7 +248,7 @@ public class RectArea extends Area{
             public void propertyChange(PropertyChangeEvent evt) {
                 if (evt.getSource() == centerYField) {
                     double newValue = ((Number)centerYField.getValue()).doubleValue()*1000;
-                    if (newValue != getCenterPos().getY()) {
+                    if (newValue != getCenterXYPos().getY()) {
                         setTopLeftY(newValue-height/2);
                         topLeftYField.setValue(new Double(topLeftY)/1000);
                     }
@@ -260,7 +264,7 @@ public class RectArea extends Area{
                     double newValue = ((Number)widthField.getValue()).doubleValue()*1000;
                     if (newValue != width) {
                         setWidth(newValue);
-                        centerXField.setValue(new Double(getCenterPos().getX()/1000));
+                        centerXField.setValue(new Double(getCenterXYPos().getX()/1000));
                     }
                 }
             }
@@ -274,17 +278,16 @@ public class RectArea extends Area{
                     double newValue = ((Number)heightField.getValue()).doubleValue()*1000;
                     if (newValue != height) {
                         setHeight(newValue);
-                        centerYField.setValue(new Double(getCenterPos().getY()/1000));
+                        centerYField.setValue(new Double(getCenterXYPos().getY()/1000));
                     }
                 }
             }
         });
-        
-     
+          
         int result;
         do {
             result = JOptionPane.showConfirmDialog(null, optionPanel, 
-                getShape()+": Configuration", JOptionPane.OK_CANCEL_OPTION);
+                getShapeType()+": Configuration", JOptionPane.OK_CANCEL_OPTION);
             if (result == JOptionPane.OK_OPTION && !isInsideRect(layoutBounds)) {
                 JOptionPane.showMessageDialog(null,"The area does not fit into the layout.");
             }
@@ -298,16 +301,20 @@ public class RectArea extends Area{
             setWidth(((Number)widthField.getValue()).doubleValue()*1000);
             setHeight(((Number)heightField.getValue()).doubleValue()*1000);
             //center pos will be set automatically
-            setRelPosZ(((Number)zField.getValue()).doubleValue()*1000);
+            setRelativeZPos(((Number)zField.getValue()).doubleValue()*1000);
             return this;
         }            
     }
 
     @Override
     public int supportedLayouts() {
-        return Area.SUPPORT_CUSTOM_LAYOUT;
+        return SampleArea.SUPPORT_CUSTOM_LAYOUT;
     }
 
+    @Override
+    protected void createShape() {
+        shape=new Rectangle2D.Double(centerXYPos.getX()-width/2, centerXYPos.getY()-height/2, width, height);
+    }
     
 }
 

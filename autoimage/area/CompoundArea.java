@@ -1,6 +1,7 @@
 package autoimage.area;
 
-import autoimage.TilingSetting;
+import autoimage.api.SampleArea;
+import autoimage.api.TilingSetting;
 import java.awt.Graphics2D;
 import java.awt.Shape;
 import java.awt.geom.Point2D;
@@ -14,7 +15,7 @@ import org.json.JSONObject;
  *
  * @author Karsten
  */
-public class CompoundArea extends Area {
+public class CompoundArea extends SampleArea {
     
     private List<java.awt.geom.Area> subtractAreas;
     private java.awt.geom.Area area;
@@ -37,16 +38,14 @@ public class CompoundArea extends Area {
     
     @Override
     protected void initializeFromJSONObject(JSONObject obj) throws JSONException {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override
     protected void addFieldsToJSONObject(JSONObject obj) throws JSONException {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override
-    public String getShape() {
+    public String getShapeType() {
         return "Compound";
     }
 /*
@@ -61,13 +60,13 @@ public class CompoundArea extends Area {
     }
 */
     @Override
-    public void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio, boolean showZProfile) {
+    public void drawArea(Graphics2D g2d, boolean showZProfile) {
         g2d.setColor(getFillColor(showZProfile));
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override
-    public void drawTiles(Graphics2D g2d, int bdPix, double physToPixelRatio, double fovX, double fovY, TilingSetting setting) {
+    public void drawTiles(Graphics2D g2d, double fovX, double fovY, TilingSetting setting) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
@@ -133,14 +132,14 @@ public class CompoundArea extends Area {
     }
 
     @Override
-    public Area duplicate() {
+    public SampleArea duplicate() {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override
     public void calcCenterAndDefaultPos() {
-        centerPos=new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
-        defaultPos=centerPos;
+        centerXYPos=new Point2D.Double(topLeftX+width/2,topLeftY+height/2);
+        defaultXYPos=centerXYPos;
     }
     
     @Override
@@ -154,15 +153,20 @@ public class CompoundArea extends Area {
     }
 
     @Override
-    public Area showConfigDialog(Rectangle2D layoutBounds) {
+    public SampleArea showConfigDialog(Rectangle2D layoutBounds) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override
     public int supportedLayouts() {
-//        return Area.SUPPORT_CUSTOM_LAYOUT;
+//        return SampleArea.SUPPORT_CUSTOM_LAYOUT;
         //not supported yet
         return 0;
+    }
+
+    @Override
+    protected void createShape() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
 

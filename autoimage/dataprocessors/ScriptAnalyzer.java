@@ -1,7 +1,7 @@
 package autoimage.dataprocessors;
 
-import autoimage.ExtImageTags;
-import autoimage.ImageFileQueue;
+import autoimage.api.ExtImageTags;
+import autoimage.api.ImageFileQueue;
 import autoimage.MMCoreUtils;
 import bsh.EvalError;
 import bsh.Interpreter;

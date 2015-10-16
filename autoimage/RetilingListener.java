@@ -1,18 +1,14 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage;
 
-import autoimage.area.Area;
+import autoimage.api.SampleArea;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 public interface RetilingListener {
     
-    public void areaRetiled(Area a);
+    public void areaRetiled(SampleArea a);
     public void retilingAborted();
     public void retilingFinished();
 }

@@ -7,7 +7,7 @@
 package autoimage.tools;
 
 import autoimage.FieldOfView;
-import autoimage.ILiveListener;
+import autoimage.api.ILiveListener;
 import autoimage.MMCoreUtils;
 import autoimage.Utils;
 import ij.CompositeImage;

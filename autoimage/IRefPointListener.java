@@ -1,5 +1,6 @@
 package autoimage;
 
+import autoimage.api.RefArea;
 import java.util.List;
 
 /**

@@ -4,6 +4,7 @@
  */
 package autoimage;
 
+import autoimage.api.ImageFileQueue;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.BlockingQueue;

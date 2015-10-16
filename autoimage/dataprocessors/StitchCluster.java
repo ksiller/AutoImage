@@ -1,6 +1,6 @@
 package autoimage.dataprocessors;
 
-import autoimage.ExtImageTags;
+import autoimage.api.ExtImageTags;
 import autoimage.FieldOfView;
 import autoimage.MMCoreUtils;
 import autoimage.Utils;

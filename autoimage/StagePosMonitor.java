@@ -1,5 +1,7 @@
 package autoimage;
 
+import autoimage.api.IStageMonitorListener;
+import autoimage.gui.AcqFrame;
 import ij.IJ;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
@@ -15,7 +17,7 @@ import mmcorej.CMMCore;
  *
  * @author Karsten Siller
  */
-class StagePosMonitor extends SwingWorker<Void, Double[]> {
+public class StagePosMonitor extends SwingWorker<Void, Double[]> {
 
     private CMMCore core;
     private String xyStageName;

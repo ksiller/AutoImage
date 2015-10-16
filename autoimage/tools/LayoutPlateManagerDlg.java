@@ -1,7 +1,7 @@
 package autoimage.tools;
 
-import autoimage.AcqLayout;
-import autoimage.AcqPlateLayout;
+import autoimage.AcqCustomLayout;
+import autoimage.AcqWellplateLayout;
 import autoimage.PlateConfiguration;
 import autoimage.Utils;
 import ij.Prefs;
@@ -440,7 +440,7 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
             JOptionPane.showMessageDialog(this,"Well-to-well distance has to be larger than the well diameter.");
             return;
         }
-        AcqLayout acqLayout= new AcqPlateLayout(new File(config.fileLocation,config.name),config);
+        AcqCustomLayout acqLayout= new AcqWellplateLayout(new File(config.fileLocation,config.name),config);
         JFileChooser jfc = new JFileChooser();
         if ("".equals(config.fileLocation)) {
             config.fileLocation=Prefs.getHomeDir();
@@ -472,21 +472,21 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
                 try {
                     JSONObject obj=acqLayout.toJSONObject();
                     if (obj!=null) {
-                        layoutObj.put(AcqLayout.TAG_LAYOUT,obj);
+                        layoutObj.put(AcqCustomLayout.TAG_LAYOUT,obj);
                         fw.write(layoutObj.toString(4));
                     }
                     startUpConfig=config;
                 } catch (JSONException ex) {
                     JOptionPane.showMessageDialog(null,"Error parsing Acquisition Layout as JSONObject.");
-                    Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
                 } catch (IOException ex) {
                     JOptionPane.showMessageDialog(null,"Error saving Acquisition Layout as JSONObject.");
-                    Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
                 } finally {
                     fw.close();
                 }        
             } catch (IOException ex) {
-                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
             }
             platenameField.setText(acqLayout.getName());
             lastFileLocation=acqLayout.getFile().getParent();
@@ -525,12 +525,12 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
                 JOptionPane.showMessageDialog(null, "Layout files have to be in txt format.\nLayout has not been loaded.", "", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            AcqLayout layout=AcqLayout.loadLayout(fc.getSelectedFile());
+            AcqCustomLayout layout=AcqCustomLayout.loadLayout(fc.getSelectedFile());
             if (layout==null) {
                 JOptionPane.showMessageDialog(this, "Layout file '"+f.getName()+"' could not be found or read!");
                 return;
             }
-            if (!(layout instanceof AcqPlateLayout)) {
+            if (!(layout instanceof AcqWellplateLayout)) {
                 JOptionPane.showMessageDialog(this, "Layout file '"+f.getName()+"' could not be found or read!");
                 return;
             }
@@ -540,14 +540,14 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
             configuration.width=layout.getWidth();
             configuration.length=layout.getLength();
             configuration.height=layout.getHeight();
-            configuration.columns=((AcqPlateLayout)layout).getColumns();
-            configuration.rows=((AcqPlateLayout)layout).getRows();
-            configuration.distLeftEdgeToA1=((AcqPlateLayout)layout).getLeftEdgeToA1();
-            configuration.distTopEdgeToA1=((AcqPlateLayout)layout).getTopEdgeToA1();
-            configuration.wellDiameter=((AcqPlateLayout)layout).getWellDiameter();
-            configuration.wellDistance=((AcqPlateLayout)layout).getWellDistance();
-            configuration.wellDepth=((AcqPlateLayout)layout).getWellDepth();
-            configuration.wellShape=((AcqPlateLayout)layout).getWellShape();
+            configuration.columns=((AcqWellplateLayout)layout).getColumns();
+            configuration.rows=((AcqWellplateLayout)layout).getRows();
+            configuration.distLeftEdgeToA1=((AcqWellplateLayout)layout).getLeftEdgeToA1();
+            configuration.distTopEdgeToA1=((AcqWellplateLayout)layout).getTopEdgeToA1();
+            configuration.wellDiameter=((AcqWellplateLayout)layout).getWellDiameter();
+            configuration.wellDistance=((AcqWellplateLayout)layout).getWellDistance();
+            configuration.wellDepth=((AcqWellplateLayout)layout).getWellDepth();
+            configuration.wellShape=((AcqWellplateLayout)layout).getWellShape();
             configuration.bottomMaterial=layout.getBottomMaterial();
             configuration.bottomThickness=layout.getBottomThickness();
             setConfiguration(configuration);

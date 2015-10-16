@@ -1,12 +1,13 @@
 package autoimage.tools;
 
-//import autoimage.area.Area;
-import autoimage.AcqFrame;
-import autoimage.AcqLayout;
-import autoimage.AcqPlateLayout;
-import autoimage.area.Area;
+//import autoimage.area.SampleArea;
+import autoimage.gui.AcqFrame;
+import autoimage.AcqCustomLayout;
+import autoimage.AcqWellplateLayout;
+import autoimage.api.SampleArea;
 import autoimage.Utils;
-import autoimage.guiutils.NumberTableCellRenderer;
+import autoimage.gui.NumberTableCellRenderer;
+import ij.IJ;
 import ij.Prefs;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
@@ -39,8 +40,8 @@ import org.json.JSONObject;
  */
 public class LayoutManagerDlg extends javax.swing.JDialog {
 
-    private AcqLayout startUpLayout;
-    //private AcqLayout currentLayout;
+    private AcqCustomLayout startUpLayout;
+    //private AcqCustomLayout currentLayout;
     private static String lastFileLocation="";
     private static Map<String, String> availableAreaClasses=null;
     private String lastAreaType=null;
@@ -50,16 +51,16 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         private class AreaTableModel extends AbstractTableModel {
 
         public final String[] COLUMN_NAMES = new String[]{"Area Id", "Area Name", "Type", "Origin (mm)", "Width (mm)", "Height (mm)", "Relative Z (mm)"};
-        private List<Area> areas;
+        private List<SampleArea> areas;
 
-        public AreaTableModel(List<Area> al) {
+        public AreaTableModel(List<SampleArea> al) {
             super();
             setData(al,false);
         }
 
-        public void setData(List<Area> al, boolean updateView) {
+        public void setData(List<SampleArea> al, boolean updateView) {
             if (al == null) {
-                al = new ArrayList<Area>();
+                al = new ArrayList<SampleArea>();
             }
             this.areas = al;
             if (updateView) {
@@ -67,7 +68,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
             }
         }
 
-        public List<Area> getAreaList() {
+        public List<SampleArea> getAreaList() {
             return areas;
         }
         
@@ -93,20 +94,20 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
 
         @Override
         public Object getValueAt(int rowIndex, int colIndex) {
-            Area a;
+            SampleArea a;
             if (areas != null & rowIndex < areas.size()) {
                 a = areas.get(rowIndex);
                 switch (colIndex) {
                     case 0: return a.getId();
                     case 1: return a.getName();
-                    case 2: return a.getShape();
+                    case 2: return a.getShapeType();
                     case 3: {//origin
                                 DecimalFormat df = new DecimalFormat("###,###,##0.000");
                                 return df.format(a.getTopLeftX()/1000)+" / "+df.format(a.getTopLeftY()/1000);
                             } 
                     case 4: return a.getWidth()/1000;
                     case 5: return a.getHeight()/1000;
-                    case 6: return a.getRelPosZ()/1000;
+                    case 6: return a.getRelativeZPos()/1000;
                     default: return null;
                 }
             } else {
@@ -121,7 +122,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
 
         @Override
         public void setValueAt(Object value, int rowIndex, int colIndex) {
-            Area area;
+            SampleArea area;
             if (areas != null & rowIndex < areas.size()) {
                 area = areas.get(rowIndex);
                 switch (colIndex) {
@@ -135,12 +136,12 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         }
 
         public void addRow(Object value) {
-            Area a = (Area) value;
+            SampleArea a = (SampleArea) value;
             areas.add(a);
             fireTableRowsInserted(getRowCount(), getRowCount());
         }
 
-        public Area getRowData(int rowIdx) {
+        public SampleArea getRowData(int rowIdx) {
             if (rowIdx >= 0 && rowIdx < areas.size()) {
                 return areas.get(rowIdx);
             } else {
@@ -153,7 +154,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         @Param lastPlusIndex: model rowindex that corresponds to 1 below selection in view
         */
         public int rowDown(int[] rowIdx, int lastPlusOneIndex) {
-            Area temp=areas.get(lastPlusOneIndex);
+            SampleArea temp=areas.get(lastPlusOneIndex);
             //move last entry in selection down one
             areas.set(lastPlusOneIndex, areas.get(rowIdx[rowIdx.length-1]));
             for (int i=rowIdx.length-1; i>0; i--) {
@@ -169,7 +170,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         @Param firstMinusOneIndex: model rowindex that corresponds to 1 below selection in view
         */
         public int rowUp(int[] rowIdx, int firstMinusOneIndex) {
-            Area temp=areas.get(firstMinusOneIndex);
+            SampleArea temp=areas.get(firstMinusOneIndex);
             //move first entry in selection up one
             areas.set(firstMinusOneIndex, areas.get(rowIdx[0]));
             for (int i=0; i<rowIdx.length-1; i++) {
@@ -182,7 +183,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
 
         public void removeRow(Object element) {
             for (int i = 0; i < areas.size(); i++) {
-                if (((Area) element).getId() == areas.get(i).getId()) {
+                if (((SampleArea) element).getId() == areas.get(i).getId()) {
                     areas.remove(i);
                     fireTableRowsDeleted(i, i);
                 }
@@ -196,7 +197,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
             fireTableRowsDeleted(rowIdx[0], rowIdx[rowIdx.length - 1]);
         }
 
-        private void setRowData(int rowIdx, Area area) {
+        private void setRowData(int rowIdx, SampleArea area) {
             if (rowIdx >=0 && rowIdx < areas.size()) { 
                 areas.set(rowIdx, area);
                 fireTableRowsUpdated(rowIdx,rowIdx);
@@ -216,12 +217,12 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         areaTable.setDefaultRenderer(Double.class, new NumberTableCellRenderer(new DecimalFormat("###,###,##0.000")));
         if (lastFileLocation.equals(""))
             lastFileLocation=Prefs.getHomeDir();
-        if (availableAreaClasses == null)
+        if (availableAreaClasses == null || availableAreaClasses.isEmpty())
             loadAvailableAreaClasses();
     }
 
     private void loadAvailableAreaClasses() {
-        Class clazz = Area.class;
+        Class clazz = SampleArea.class;
         URL location = clazz.getResource('/'+clazz.getName().replace('.', '/')+".class");
         String locationStr=location.toString().substring(0, location.toString().indexOf(".jar!")+6);
         String jarFileStr=locationStr.substring(locationStr.indexOf("file:")+5,locationStr.length()-2);
@@ -242,7 +243,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
             URL[] urls = { new URL(locationStr) };
             classLoader = URLClassLoader.newInstance(urls,
                 //    this.getClass().getClassLoader());
-                Area.class.getClassLoader());
+            SampleArea.class.getClassLoader());
 
             int i=0;
             availableAreaClasses=new HashMap<String,String>();
@@ -256,27 +257,40 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
                 className = className.replace('/', '.');
                 try {
                     clazz=Class.forName(className);
-                    //only add non-abstract Area classes that support custom layouts
-                    if (Area.class.isAssignableFrom(clazz) && !Modifier.isAbstract(clazz.getModifiers())) {
-                        Area area=(Area)clazz.newInstance();
-                        if ((area.supportedLayouts() & Area.SUPPORT_CUSTOM_LAYOUT) == Area.SUPPORT_CUSTOM_LAYOUT) {
-                            availableAreaClasses.put(area.getShape(), className);
+                    IJ.log(clazz.getName());
+                    //only add non-abstract SampleArea classes that support custom layouts
+                    if (SampleArea.class.isAssignableFrom(clazz) && !Modifier.isAbstract(clazz.getModifiers())) {
+                        IJ.log("    before creating new instance");
+                        SampleArea area=(SampleArea)clazz.newInstance();
+                        IJ.log("    after creating new instance");
+                        if ((area.supportedLayouts() & SampleArea.SUPPORT_CUSTOM_LAYOUT) == SampleArea.SUPPORT_CUSTOM_LAYOUT) {
+                            availableAreaClasses.put(area.getShapeType(), className);
                         }   
                     }
                 } catch (ClassNotFoundException ex) {
-                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                    IJ.log(ex.toString());
+                    Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
                 } catch (InstantiationException ex) {
-                    Logger.getLogger(LayoutManagerDlg.class.getName()).log(Level.SEVERE, null, ex);
+                    IJ.log(ex.toString());
+                    Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
                 } catch (IllegalAccessException ex) {
-                    Logger.getLogger(LayoutManagerDlg.class.getName()).log(Level.SEVERE, null, ex);
-                }                        
+                    IJ.log(ex.toString());
+                    Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
+                } catch (Exception ex) {
+                    //catch all other exceptions so we can continue with remaining class definitions
+                    Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
+                    IJ.log(ex.toString());
+                    for (StackTraceElement s:ex.getStackTrace()) {
+                        IJ.log(s.getClassName()+", "+s.getMethodName()+", "+s.getLineNumber());
+                    }
+                }                       
             }
             if (availableAreaClasses.isEmpty()) {
                 JOptionPane.showMessageDialog(this,"No 'Area' classes found.");
                 return;
             }
         } catch (IOException ex) {
-            Logger.getLogger(LayoutManagerDlg.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
         }
 
 
@@ -567,7 +581,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
-    public void setCustomLayout(AcqLayout layout) {
+    public void setCustomLayout(AcqCustomLayout layout) {
         if (layout!=null) {
             platenameField.setValue(layout.getName());
             if (layout.getFile()==null) {
@@ -583,7 +597,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         startUpLayout=layout;
     }
     
-    private AcqLayout getCustomLayout() {
+    private AcqCustomLayout getCustomLayout() {
         startUpLayout.setName((String)platenameField.getValue());
         startUpLayout.setFile(new File(fileLocationLabel.getText(),startUpLayout.getName()));
         //convert dimensions from mm to um
@@ -648,21 +662,21 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
                 try {
                     JSONObject obj=startUpLayout.toJSONObject();
                     if (obj!=null) {
-                        layoutObj.put(AcqLayout.TAG_LAYOUT,obj);
+                        layoutObj.put(AcqCustomLayout.TAG_LAYOUT,obj);
                         fw.write(layoutObj.toString(4));
                     }
 //                    startUpLayout=config;
                 } catch (JSONException ex) {
                     JOptionPane.showMessageDialog(null,"Error parsing Acquisition Layout as JSONObject.");
-                    Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
                 } catch (IOException ex) {
                     JOptionPane.showMessageDialog(null,"Error saving Acquisition Layout as JSONObject.");
-                    Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
                 } finally {
                     fw.close();
                 }        
             } catch (IOException ex) {
-                Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
             }
             platenameField.setText(startUpLayout.getName());
             lastFileLocation=startUpLayout.getFile().getParent();
@@ -701,12 +715,12 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
                 JOptionPane.showMessageDialog(null, "Layout files have to be in txt format.\nLayout has not been loaded.", "", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            AcqLayout layout=AcqLayout.loadLayout(fc.getSelectedFile());
+            AcqCustomLayout layout=AcqCustomLayout.loadLayout(fc.getSelectedFile());
             if (layout==null) {
                 JOptionPane.showMessageDialog(this, "Layout file '"+f.getName()+"' could not be found or read!");
                 return;
             }
-            if ((layout instanceof AcqPlateLayout)) {
+            if ((layout instanceof AcqWellplateLayout)) {
                 JOptionPane.showMessageDialog(this, "Layout file '"+f.getName()+"' encodes a well plate format, not a custom layout");
                 return;
             }
@@ -732,7 +746,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
                 }
             }
         }
-        startUpLayout=new AcqLayout();
+        startUpLayout=new AcqCustomLayout();
  //       if (lastFileLocation.equals("")) {
  //           lastFileLocation=Prefs.getHomeDir();
  //       }
@@ -741,7 +755,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
     }//GEN-LAST:event_newButtonActionPerformed
 
     private void removeAreaButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_removeAreaButtonActionPerformed
-        List<Area> areas = startUpLayout.getAreaArray();
+        List<SampleArea> areas = startUpLayout.getAreaArray();
         if (areas.size() > 0) {
             int[] rows = areaTable.getSelectedRows();
             if (rows.length > 0) {
@@ -801,11 +815,11 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         int index=areaTable.getSelectedRow();
         AreaTableModel model=(AreaTableModel)areaTable.getModel();
         int rowInModel=areaTable.convertRowIndexToModel(index);
-        Area area=model.getRowData(rowInModel);
+        SampleArea area=model.getRowData(rowInModel);
         try {
-            Area areaCopy=Area.createFromJSONObject(area.toJSONObject());
+            SampleArea areaCopy=SampleArea.createFromJSONObject(area.toJSONObject());
             //pass copy, so area can remain unchanged if user clicks 'Cancel'
-            Area modArea=areaCopy.showConfigDialog(new Rectangle2D.Double(0,0,startUpLayout.getWidth(), startUpLayout.getLength()));
+            SampleArea modArea=areaCopy.showConfigDialog(new Rectangle2D.Double(0,0,startUpLayout.getWidth(), startUpLayout.getLength()));
             if (modArea!=null) {// user clicked OK in dialog
                 model.setRowData(rowInModel,modArea);
                 startUpLayout.setModified(true);
@@ -845,7 +859,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
             Class clazz;
             try {
                 clazz = Class.forName(availableAreaClasses.get(selectedType));
-                Area newArea=((Area)clazz.newInstance());
+                SampleArea newArea=((SampleArea)clazz.newInstance());
                 newArea=newArea.showConfigDialog(new Rectangle2D.Double(0,0,startUpLayout.getWidth(), startUpLayout.getLength()));
                 if (newArea!=null) {
                     AreaTableModel model=(AreaTableModel)areaTable.getModel();

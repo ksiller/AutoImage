@@ -1,5 +1,8 @@
 package autoimage;
 
+import autoimage.api.ExtImageTags;
+import autoimage.api.RefArea;
+import autoimage.gui.ProcessorTree;
 import autoimage.dataprocessors.ExtDataProcessor;
 import autoimage.dataprocessors.SiteInfoUpdater;
 import ij.IJ;
@@ -431,10 +434,10 @@ public class Utils {
             }
         } catch (JSONException ex) {
             JOptionPane.showMessageDialog(null,"Error parsing Acquisition Layout as JSONObject.");
-            Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(null,"Error saving Acquisition Layout as JSONObject.");
-            Logger.getLogger(AcqLayout.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
         } finally {
             if (fw!=null) {
                 try {

@@ -1,9 +1,11 @@
 package autoimage.area;
 
+import autoimage.api.SampleArea;
 import autoimage.Tile;
-import autoimage.TilingSetting;
+import autoimage.api.TilingSetting;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
@@ -22,9 +24,9 @@ import org.json.JSONObject;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
-public class DonutArea extends Area {
+public class DonutArea extends SampleArea {
     private double ringWidth;
     
     public DonutArea() {
@@ -44,6 +46,9 @@ public class DonutArea extends Area {
         
     public void setRingWidth(double rw) {
         ringWidth=rw;
+        createShape();
+        createGeneralPath();
+        calcCenterAndDefaultPos();
     }
     
     public double getRingWidth() {
@@ -51,7 +56,7 @@ public class DonutArea extends Area {
     }
     
     @Override
-    public String getShape() {
+    public String getShapeType() {
         return "Donut";
     }
         
@@ -70,54 +75,40 @@ public class DonutArea extends Area {
     }
         
     @Override
-    public void drawArea(Graphics2D g2d, int bdPix, double physToPixelRatio, boolean showZProfile) {
+    public void drawArea(Graphics2D g2d, boolean showZProfile) {
         g2d.setColor(getFillColor(showZProfile));
 /*        if (acquiring) {
             g2d.setColor(COLOR_ACQUIRING_AREA);
         } else
             g2d.setColor(COLOR_UNSELECTED_AREA);
-*/        int x = bdPix + (int) Math.round(topLeftX*physToPixelRatio);
-        int y = bdPix + (int) Math.round(topLeftY*physToPixelRatio);
-        int w = (int) Math.round(width*physToPixelRatio);
-        int h = (int) Math.round(height*physToPixelRatio);  
-        
-        int holeX = bdPix + (int) Math.round((topLeftX+ringWidth)*physToPixelRatio);
-        int holeY = bdPix + (int) Math.round((topLeftY+ringWidth)*physToPixelRatio);
-        int holeWidth = (int) Math.round((width-2*ringWidth)*physToPixelRatio);
-        int holeHeight = (int) Math.round((height-2*ringWidth)*physToPixelRatio);    
-
-        java.awt.geom.Area donut = new java.awt.geom.Area(new Ellipse2D.Double(x, y, w, h));
+        int x = (int) Math.round(topLeftX);
+        int y = (int) Math.round(topLeftY);
+        int w = (int) Math.round(width);
+        int h = (int) Math.round(height);  
+*/        
+        int holeX = (int) Math.round((topLeftX+ringWidth));
+        int holeY = (int) Math.round((topLeftY+ringWidth));
+        int holeWidth = (int) Math.round((width-2*ringWidth));
+        int holeHeight = (int) Math.round((height-2*ringWidth));    
+/*
+        java.awt.geom.Area donut = new java.awt.geom.Area(new Ellipse2D.Double(topLeftX, topLeftY, width, height));
         java.awt.geom.Area hole = new java.awt.geom.Area(new Ellipse2D.Double(holeX, holeY, holeWidth, holeHeight));
         donut.subtract(hole);
         g2d.fill(donut);
         g2d.setColor(getBorderColor());
-/*        
-
-        if (selectedForMerge)
-            g2d.setColor(COLOR_MERGE_AREA_BORDER);
-        else
-            if (selectedForAcq)
-                g2d.setColor(COLOR_SELECTED_AREA_BORDER);
-            else    
-                g2d.setColor(COLOR_AREA_BORDER);
-*/
-        g2d.draw(new Ellipse2D.Double(x, y, w,h)); 
-/*        if (selectedForMerge)
-            g2d.setColor(COLOR_MERGE_AREA_BORDER);
-        else {
-            if (selectedForAcq)
-                g2d.setColor(COLOR_SELECTED_AREA_BORDER);
-            else    
-                g2d.setColor(COLOR_AREA_BORDER);
-        }        
-        */
+        g2d.draw(new Ellipse2D.Double(topLeftX, topLeftY, width, height)); 
         g2d.draw(new Ellipse2D.Double(holeX, holeY, holeWidth, holeHeight)); 
+ */   
+        g2d.setColor(getFillColor(showZProfile));
+        g2d.fill(shape);
+        g2d.setColor(getBorderColor());
+        g2d.draw(shape); 
     }
     
     
     @Override
-    public void drawTiles(Graphics2D g2d, int bdPix, double physToPixelRatio, double fovX, double fovY, TilingSetting setting) {
-        drawTileByTileOvl(g2d, bdPix, physToPixelRatio, fovX, fovY, setting);
+    public void drawTiles(Graphics2D g2d, double fovX, double fovY, TilingSetting setting) {
+        drawTileByTileOvl(g2d, fovX, fovY, setting);
     }
     
     //checks if coordinate is inside area
@@ -152,15 +143,16 @@ public class DonutArea extends Area {
     } 
 
     @Override
-    public Area duplicate() {
+    public SampleArea duplicate() {
         DonutArea newArea = new DonutArea(this.getName());
-//        newArea.shape=this.getShape();
+//        newArea.shape=this.getShapeLabel();
         newArea.setId(this.getId());
         newArea.setTopLeftX(this.topLeftX);
         newArea.setTopLeftY(this.topLeftY);
-        newArea.setRelPosZ(this.relPosZ);
+        newArea.setRelativeZPos(this.relativeZPos);
         newArea.setWidth(this.width);
         newArea.setHeight(this.height);
+        newArea.affineTrans=new AffineTransform(this.affineTrans);
         newArea.setSelectedForAcq(isSelectedForAcq());
         newArea.setSelectedForMerge(isSelectedForMerge());
         newArea.setComment(this.comment);
@@ -174,8 +166,8 @@ public class DonutArea extends Area {
 
     @Override
     public void calcCenterAndDefaultPos() {
-        centerPos=new Point2D.Double(topLeftX+width/2,topLeftY+ringWidth/2);
-        defaultPos=new Point2D.Double(topLeftX+width/2,topLeftY+ringWidth/2);
+        centerXYPos=new Point2D.Double(topLeftX+width/2,topLeftY+ringWidth/2);
+        defaultXYPos=new Point2D.Double(topLeftX+width/2,topLeftY+ringWidth/2);
     }
 
     @Override
@@ -189,7 +181,7 @@ public class DonutArea extends Area {
     }
 
     @Override
-    public Area showConfigDialog(Rectangle2D layoutBounds) {
+    public SampleArea showConfigDialog(Rectangle2D layoutBounds) {
         JPanel optionPanel = new JPanel();
         GridLayout layout = new GridLayout(0,4);
         optionPanel.setLayout(layout);
@@ -207,7 +199,7 @@ public class DonutArea extends Area {
         optionPanel.add(l);
         JFormattedTextField zField = new JFormattedTextField();
         zField.setColumns(10);
-        zField.setValue(new Double(relPosZ / 1000));
+        zField.setValue(new Double(relativeZPos / 1000));
         optionPanel.add(zField);
              
         l=new JLabel("Origin X (mm):",JLabel.RIGHT);
@@ -223,7 +215,7 @@ public class DonutArea extends Area {
         optionPanel.add(l);
         final JFormattedTextField centerXField = new JFormattedTextField();
         centerXField.setColumns(10);
-        centerXField.setValue(new Double(getCenterPos().getX() / 1000));
+        centerXField.setValue(new Double(getCenterXYPos().getX() / 1000));
         optionPanel.add(centerXField);
 
         l=new JLabel("Origin Y (mm):",JLabel.RIGHT);
@@ -239,7 +231,7 @@ public class DonutArea extends Area {
         optionPanel.add(l);
         final JFormattedTextField centerYField = new JFormattedTextField();
         centerYField.setColumns(10);
-        centerYField.setValue(new Double(getCenterPos().getY() / 1000));
+        centerYField.setValue(new Double(getCenterXYPos().getY() / 1000));
         optionPanel.add(centerYField);
 
         l=new JLabel("Width (mm):",JLabel.RIGHT);
@@ -274,7 +266,7 @@ public class DonutArea extends Area {
                     double newValue = ((Number)topLeftXField.getValue()).doubleValue() * 1000;
                     if (newValue != topLeftX) {
                         setTopLeftX(newValue);
-                        centerXField.setValue(new Double(getCenterPos().getX() / 1000));
+                        centerXField.setValue(new Double(getCenterXYPos().getX() / 1000));
                     }
                 }
             }
@@ -286,7 +278,7 @@ public class DonutArea extends Area {
             public void propertyChange(PropertyChangeEvent evt) {
                 if (evt.getSource() == centerXField) {
                     double newValue = ((Number)centerXField.getValue()).doubleValue() * 1000;
-                    if (newValue != getCenterPos().getX()) {
+                    if (newValue != getCenterXYPos().getX()) {
                         setTopLeftX(newValue-width/2);
                         topLeftXField.setValue(new Double(topLeftX / 1000));
                     }
@@ -302,7 +294,7 @@ public class DonutArea extends Area {
                     double newValue = ((Number)topLeftYField.getValue()).doubleValue() * 1000;
                     if (newValue != topLeftY) {
                         setTopLeftY(newValue);//recalculates center pos
-                        centerYField.setValue(new Double(getCenterPos().getY() / 1000));
+                        centerYField.setValue(new Double(getCenterXYPos().getY() / 1000));
                     }
                 }
             }
@@ -314,7 +306,7 @@ public class DonutArea extends Area {
             public void propertyChange(PropertyChangeEvent evt) {
                 if (evt.getSource() == centerYField) {
                     double newValue = ((Number)centerYField.getValue()).doubleValue() * 1000;
-                    if (newValue != getCenterPos().getY()) {
+                    if (newValue != getCenterXYPos().getY()) {
                         setTopLeftY(newValue-height/2);
                         topLeftYField.setValue(new Double(topLeftY / 1000));
                     }
@@ -330,7 +322,7 @@ public class DonutArea extends Area {
                     double newValue = ((Number)widthField.getValue()).doubleValue() * 1000;
                     if (newValue != width) {
                         setWidth(newValue);
-                        centerXField.setValue(new Double(getCenterPos().getX() / 1000));
+                        centerXField.setValue(new Double(getCenterXYPos().getX() / 1000));
                     }
                 }
             }
@@ -344,7 +336,7 @@ public class DonutArea extends Area {
                     double newValue = ((Number)heightField.getValue()).doubleValue() * 1000;
                     if (newValue != height) {
                         setHeight(newValue);
-                        centerYField.setValue(new Double(getCenterPos().getY() / 1000));
+                        centerYField.setValue(new Double(getCenterXYPos().getY() / 1000));
                     }
                 }
             }
@@ -353,7 +345,7 @@ public class DonutArea extends Area {
         int result;
         do {
             result = JOptionPane.showConfirmDialog(null, optionPanel, 
-                getShape()+": Configuration", JOptionPane.OK_CANCEL_OPTION);
+                getShapeType()+": Configuration", JOptionPane.OK_CANCEL_OPTION);
             if (result == JOptionPane.OK_OPTION && !isInsideRect(layoutBounds)) {
                 JOptionPane.showMessageDialog(null,"The area does not fit into the layout.");
             }
@@ -367,7 +359,7 @@ public class DonutArea extends Area {
             setWidth(((Number)widthField.getValue()).doubleValue()*1000);
             setHeight(((Number)heightField.getValue()).doubleValue()*1000);
             //center pos will be set automatically
-            setRelPosZ(((Number)zField.getValue()).doubleValue()*1000);            
+            setRelativeZPos(((Number)zField.getValue()).doubleValue()*1000);            
             setRingWidth(((Number)ringwidthField.getValue()).doubleValue()*1000);
             return this;
         }
@@ -376,7 +368,19 @@ public class DonutArea extends Area {
 
     @Override
     public int supportedLayouts() {
-        return Area.SUPPORT_CUSTOM_LAYOUT;
+        return SampleArea.SUPPORT_CUSTOM_LAYOUT;
+    }
+
+    @Override
+    protected void createShape() {
+        int holeX = (int) Math.round((topLeftX+ringWidth));
+        int holeY = (int) Math.round((topLeftY+ringWidth));
+        int holeWidth = (int) Math.round((width-2*ringWidth));
+        int holeHeight = (int) Math.round((height-2*ringWidth));    
+        java.awt.geom.Area donut = new java.awt.geom.Area(new Ellipse2D.Double(topLeftX, topLeftY, width, height));
+        java.awt.geom.Area hole = new java.awt.geom.Area(new Ellipse2D.Double(holeX, holeY, holeWidth, holeHeight));
+        donut.subtract(hole);
+        shape=donut;
     }
 
 

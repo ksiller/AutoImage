@@ -6,9 +6,9 @@
 
 package autoimage.tools;
 
-import autoimage.Channel;
-import autoimage.ILiveListener;
-import autoimage.IStageMonitorListener;
+import autoimage.api.Channel;
+import autoimage.api.ILiveListener;
+import autoimage.api.IStageMonitorListener;
 import ij.IJ;
 import java.awt.Component;
 import java.awt.Frame;

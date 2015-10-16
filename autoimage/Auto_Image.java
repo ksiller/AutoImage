@@ -1,5 +1,6 @@
 package autoimage;
 
+import autoimage.gui.AcqFrame;
 import org.micromanager.api.ScriptInterface;
 
 /**
@@ -19,7 +20,6 @@ public class Auto_Image implements org.micromanager.api.MMPlugin{
 
     @Override
     public void setApp(ScriptInterface app) {
-      //  gui = app;                                        
         if (acqFrame == null) {
             acqFrame = new AcqFrame(app);//gui);
         }
