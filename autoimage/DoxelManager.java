@@ -30,7 +30,7 @@ public class DoxelManager implements IDoxelListener {
         acqSetting=aSetting;
     }
     
-    public void setAcquisitionLayout(AcqCustomLayout aLayout) {
+    public void setAcquisitionLayout(IAcqLayout aLayout) {
         acqLayout=aLayout;
     }
     

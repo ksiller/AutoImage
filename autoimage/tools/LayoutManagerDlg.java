@@ -1,11 +1,11 @@
 package autoimage.tools;
 
-//import autoimage.area.SampleArea;
-import autoimage.gui.AcqFrame;
+import autoimage.AcqBasicLayout;
 import autoimage.AcqCustomLayout;
 import autoimage.AcqWellplateLayout;
 import autoimage.api.SampleArea;
 import autoimage.Utils;
+import autoimage.api.IAcqLayout;
 import autoimage.gui.NumberTableCellRenderer;
 import ij.IJ;
 import ij.Prefs;
@@ -40,7 +40,7 @@ import org.json.JSONObject;
  */
 public class LayoutManagerDlg extends javax.swing.JDialog {
 
-    private AcqCustomLayout startUpLayout;
+    private IAcqLayout startUpLayout;
     //private AcqCustomLayout currentLayout;
     private static String lastFileLocation="";
     private static Map<String, String> availableAreaClasses=null;
@@ -581,7 +581,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
-    public void setCustomLayout(AcqCustomLayout layout) {
+    public void setCustomLayout(IAcqLayout layout) {
         if (layout!=null) {
             platenameField.setValue(layout.getName());
             if (layout.getFile()==null) {
@@ -597,7 +597,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         startUpLayout=layout;
     }
     
-    private AcqCustomLayout getCustomLayout() {
+    private IAcqLayout getCustomLayout() {
         startUpLayout.setName((String)platenameField.getValue());
         startUpLayout.setFile(new File(fileLocationLabel.getText(),startUpLayout.getName()));
         //convert dimensions from mm to um
@@ -662,21 +662,21 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
                 try {
                     JSONObject obj=startUpLayout.toJSONObject();
                     if (obj!=null) {
-                        layoutObj.put(AcqCustomLayout.TAG_LAYOUT,obj);
+                        layoutObj.put(IAcqLayout.TAG_LAYOUT,obj);
                         fw.write(layoutObj.toString(4));
                     }
 //                    startUpLayout=config;
                 } catch (JSONException ex) {
                     JOptionPane.showMessageDialog(null,"Error parsing Acquisition Layout as JSONObject.");
-                    Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(LayoutManagerDlg.class.getName()).log(Level.SEVERE, null, ex);
                 } catch (IOException ex) {
                     JOptionPane.showMessageDialog(null,"Error saving Acquisition Layout as JSONObject.");
-                    Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(LayoutManagerDlg.class.getName()).log(Level.SEVERE, null, ex);
                 } finally {
                     fw.close();
                 }        
             } catch (IOException ex) {
-                Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(LayoutManagerDlg.class.getName()).log(Level.SEVERE, null, ex);
             }
             platenameField.setText(startUpLayout.getName());
             lastFileLocation=startUpLayout.getFile().getParent();
@@ -715,13 +715,13 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
                 JOptionPane.showMessageDialog(null, "Layout files have to be in txt format.\nLayout has not been loaded.", "", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            AcqCustomLayout layout=AcqCustomLayout.loadLayout(fc.getSelectedFile());
+            IAcqLayout layout=AcqBasicLayout.loadLayout(fc.getSelectedFile());
             if (layout==null) {
                 JOptionPane.showMessageDialog(this, "Layout file '"+f.getName()+"' could not be found or read!");
                 return;
             }
             if ((layout instanceof AcqWellplateLayout)) {
-                JOptionPane.showMessageDialog(this, "Layout file '"+f.getName()+"' encodes a well plate format, not a custom layout");
+                JOptionPane.showMessageDialog(this, "Layout file '"+f.getName()+"' does not encode a custom layout");
                 return;
             }
             startUpLayout=layout;

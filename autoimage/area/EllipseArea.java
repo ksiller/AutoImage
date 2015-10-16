@@ -2,12 +2,9 @@ package autoimage.area;
 
 import autoimage.api.SampleArea;
 import autoimage.Tile;
-import autoimage.api.TilingSetting;
-import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Ellipse2D;
-import java.awt.geom.GeneralPath;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.beans.PropertyChangeEvent;
@@ -45,29 +42,6 @@ public class EllipseArea extends SampleArea {
     public String getShapeType() {
         return "Ellipse";
     }
-    
-    @Override
-    public void drawArea(Graphics2D g2d, boolean showZProfile) {
-        g2d.setColor(getFillColor(showZProfile));
-/*        int x = (int) Math.round(topLeftX*physToPixelRatio);
-        int y = (int) Math.round(topLeftY*physToPixelRatio);
-        int w = (int) Math.round(width*physToPixelRatio);
-        int h = (int) Math.round(height*physToPixelRatio);  */  
-//        g2d.fillOval(topLeftX,topLeftY,width,height); 
-//        java.awt.geom.Area ellipse = new java.awt.geom.Area(new Ellipse2D.Double(topLeftX, topLeftY, width, height));
-//        g2d.fill(ellipse);
-        g2d.fill(shape);
-        g2d.setColor(getBorderColor());
-//        g2d.draw(new Ellipse2D.Double(topLeftX,topLeftY,width,height)); 
-        g2d.draw(shape);
-    }
-    
-    
-    @Override
-    public void drawTiles(Graphics2D g2d, double fovX, double fovY, TilingSetting setting) {
-        drawTileByTileOvl(g2d, fovX, fovY, setting);
-    }
-    
     
     @Override
     public boolean isInArea(double x, double y) {//checks of coordinate is inside area

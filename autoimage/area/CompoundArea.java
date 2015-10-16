@@ -1,8 +1,6 @@
 package autoimage.area;
 
 import autoimage.api.SampleArea;
-import autoimage.api.TilingSetting;
-import java.awt.Graphics2D;
 import java.awt.Shape;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
@@ -59,16 +57,7 @@ public class CompoundArea extends SampleArea {
         return area.getBounds2D().getHeight()/2;
     }
 */
-    @Override
-    public void drawArea(Graphics2D g2d, boolean showZProfile) {
-        g2d.setColor(getFillColor(showZProfile));
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
 
-    @Override
-    public void drawTiles(Graphics2D g2d, double fovX, double fovY, TilingSetting setting) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-    }
 
     @Override
     public boolean isInArea(double x, double y) {

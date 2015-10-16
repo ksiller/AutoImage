@@ -5,7 +5,7 @@ import java.util.Comparator;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 public class EllipseWellArea extends EllipseArea {
         

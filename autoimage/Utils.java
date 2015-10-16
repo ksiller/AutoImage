@@ -434,10 +434,10 @@ public class Utils {
             }
         } catch (JSONException ex) {
             JOptionPane.showMessageDialog(null,"Error parsing Acquisition Layout as JSONObject.");
-            Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(null,"Error saving Acquisition Layout as JSONObject.");
-            Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
         } finally {
             if (fw!=null) {
                 try {

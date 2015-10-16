@@ -2,13 +2,8 @@ package autoimage.area;
 
 import autoimage.api.SampleArea;
 import autoimage.Tile;
-import autoimage.api.TilingSetting;
-import java.awt.Graphics2D;
 import java.awt.GridLayout;
-import java.awt.Rectangle;
 import java.awt.geom.AffineTransform;
-import java.awt.geom.GeneralPath;
-import java.awt.geom.PathIterator;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.beans.PropertyChangeEvent;
@@ -47,22 +42,7 @@ public class RectArea extends SampleArea{
     public String getShapeType() {
         return "Rectangle";
     }
-       
-    @Override
-    public void drawArea(Graphics2D g2d, boolean showZProfile) {
-        g2d.setColor(getFillColor(showZProfile));
-    //    g2d.fill (new Rectangle2D.Double(topLeftX, topLeftY, width, height));
-        g2d.fill(shape);
-        g2d.setColor(getBorderColor());
-    //    g2d.draw (new Rectangle2D.Double(topLeftX, topLeftY, width, height));
-        g2d.draw(shape);
-    }
-    
-    @Override
-    public void drawTiles(Graphics2D g2d, double fovX, double fovY, TilingSetting setting) {
-        drawTileByTileOvl(g2d, fovX, fovY,setting);
-    }
-    
+
     @Override
     public boolean isInArea(double x, double y) {//checks of coordinate is inside area
         return ((x>=topLeftX) & (x<topLeftX+width) & (y>=topLeftY) & (y<topLeftY+height));
@@ -88,7 +68,6 @@ public class RectArea extends SampleArea{
     @Override
     public SampleArea duplicate() {
         RectArea newArea = new RectArea(this.getName());
-//        newArea.shape=this.getShapeLabel();
         newArea.setId(this.getId());
         newArea.setTopLeftX(this.topLeftX);
         newArea.setTopLeftY(this.topLeftY);
@@ -100,7 +79,6 @@ public class RectArea extends SampleArea{
         newArea.setSelectedForMerge(isSelectedForMerge());
         newArea.setComment(this.comment);
         newArea.setAcquiring(this.acquiring);
-//        newArea.setTilingSetting(this.tiling.duplicate());
         newArea.tilePosList=new ArrayList<Tile>(this.getTilePositions());
         newArea.setUnknownTileNum(this.hasUnknownTileNum());
         return newArea;

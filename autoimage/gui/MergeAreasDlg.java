@@ -1,7 +1,8 @@
 package autoimage.gui;
 
-import autoimage.AcqCustomLayout;
+//import autoimage.AcqCustomLayout;
 import autoimage.IMergeAreaListener;
+import autoimage.api.IAcqLayout;
 import autoimage.api.SampleArea;
 import ij.IJ;
 import java.awt.Dimension;
@@ -30,7 +31,7 @@ import org.micromanager.api.ScriptInterface;
 public class MergeAreasDlg extends javax.swing.JDialog implements TableModelListener {
 
     private JTable areaTable;
-    private AcqCustomLayout acqLayout;
+    private IAcqLayout acqLayout;
     private final List<IMergeAreaListener> listeners;
     private ExecutorService listenerExecutor;
 
@@ -138,7 +139,7 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
       
    }
 
-   public MergeAreasDlg(AcqFrame aFrame, AcqCustomLayout al, ScriptInterface gui) {
+   public MergeAreasDlg(AcqFrame aFrame, IAcqLayout al, ScriptInterface gui) {
       super(aFrame);
       listeners=new ArrayList<IMergeAreaListener>();
       listenerExecutor = Executors.newFixedThreadPool(1);
@@ -256,7 +257,7 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
         IJ.log(getClass().getName()+": "+listeners.size()+" listeners");
     }
 
-    public void setAcquisitionLayout(AcqCustomLayout acqL) {
+    public void setAcquisitionLayout(IAcqLayout acqL) {
         acqLayout=acqL;
     }    
    

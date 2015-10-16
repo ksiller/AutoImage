@@ -90,8 +90,8 @@ public class AcqWellplateLayout extends AcqCustomLayout {
     }
     
     @Override
-    protected void initializeFromJSONObject(JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
-        super.initializeFromJSONObject(obj);
+    public void initializeFromJSONObject(JSONObject obj,File f) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+        super.initializeFromJSONObject(obj,f);
         columns=obj.getInt(TAG_LAYOUT_COLUMNS);
         rows=obj.getInt(TAG_LAYOUT_ROWS);
         leftEdgeToA1=obj.getDouble(TAG_LAYOUT_LEFT_EDGE_TO_A1);

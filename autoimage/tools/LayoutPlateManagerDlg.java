@@ -1,9 +1,10 @@
 package autoimage.tools;
 
-import autoimage.AcqCustomLayout;
+import autoimage.AcqBasicLayout;
 import autoimage.AcqWellplateLayout;
 import autoimage.PlateConfiguration;
 import autoimage.Utils;
+import autoimage.api.IAcqLayout;
 import ij.Prefs;
 import java.io.File;
 import java.io.FileWriter;
@@ -440,7 +441,7 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
             JOptionPane.showMessageDialog(this,"Well-to-well distance has to be larger than the well diameter.");
             return;
         }
-        AcqCustomLayout acqLayout= new AcqWellplateLayout(new File(config.fileLocation,config.name),config);
+        IAcqLayout acqLayout= new AcqWellplateLayout(new File(config.fileLocation,config.name),config);
         JFileChooser jfc = new JFileChooser();
         if ("".equals(config.fileLocation)) {
             config.fileLocation=Prefs.getHomeDir();
@@ -472,21 +473,21 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
                 try {
                     JSONObject obj=acqLayout.toJSONObject();
                     if (obj!=null) {
-                        layoutObj.put(AcqCustomLayout.TAG_LAYOUT,obj);
+                        layoutObj.put(IAcqLayout.TAG_LAYOUT,obj);
                         fw.write(layoutObj.toString(4));
                     }
                     startUpConfig=config;
                 } catch (JSONException ex) {
                     JOptionPane.showMessageDialog(null,"Error parsing Acquisition Layout as JSONObject.");
-                    Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(LayoutPlateManagerDlg.class.getName()).log(Level.SEVERE, null, ex);
                 } catch (IOException ex) {
                     JOptionPane.showMessageDialog(null,"Error saving Acquisition Layout as JSONObject.");
-                    Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(LayoutPlateManagerDlg.class.getName()).log(Level.SEVERE, null, ex);
                 } finally {
                     fw.close();
                 }        
             } catch (IOException ex) {
-                Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(LayoutPlateManagerDlg.class.getName()).log(Level.SEVERE, null, ex);
             }
             platenameField.setText(acqLayout.getName());
             lastFileLocation=acqLayout.getFile().getParent();
@@ -525,7 +526,7 @@ public class LayoutPlateManagerDlg extends javax.swing.JDialog {
                 JOptionPane.showMessageDialog(null, "Layout files have to be in txt format.\nLayout has not been loaded.", "", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            AcqCustomLayout layout=AcqCustomLayout.loadLayout(fc.getSelectedFile());
+            IAcqLayout layout=AcqBasicLayout.loadLayout(fc.getSelectedFile());
             if (layout==null) {
                 JOptionPane.showMessageDialog(this, "Layout file '"+f.getName()+"' could not be found or read!");
                 return;

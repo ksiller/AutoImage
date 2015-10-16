@@ -1,17 +1,10 @@
 package autoimage.api;
 
-import autoimage.AcqCustomLayout;
 import autoimage.FieldOfView;
 import autoimage.Tile;
 import autoimage.DoxelManager;
 import autoimage.Vec3d;
 import ij.IJ;
-import java.awt.AlphaComposite;
-import java.awt.Color;
-import java.awt.Composite;
-import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.Graphics2D;
 import java.awt.Rectangle;
 import java.awt.Shape;
 import java.awt.geom.AffineTransform;
@@ -89,14 +82,6 @@ public abstract class SampleArea implements Shape {
     private boolean unknownTileNum; //is set when tilingmode is "runtime" or "file", or pixel tiles is not calibrated
     private int noOfClusters;
     
-    public static final Color COLOR_UNSELECTED_AREA = Color.GRAY;
-    public static final Color COLOR_AREA_BORDER = Color.WHITE;
-    public static final Color COLOR_SELECTED_AREA_BORDER = Color.YELLOW;
-    public static final Color COLOR_MERGE_AREA_BORDER = Color.RED; //new Color(51,115,188);
-    public static final Color COLOR_SELECTED_AREA = Color.RED;
-    public static final Color COLOR_ACQUIRING_AREA = new Color(203,188,47);//Color.YELLOW;
-    public static final Color COLOR_TILE_GRID = Color.RED;
-    public static final Color COLOR_LABEL = Color.WHITE;
     public static final String[] PLATE_ROW_ALPHABET={"A","B","C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF"};
     public static final String[] PLATE_COL_ALPHABET=ColAlphabetFactory();
     public static final String TILE_NAME_PADDING = "%06d"; //padds tile name with preceding '0' to fill up to 6 digits
@@ -722,42 +707,6 @@ public abstract class SampleArea implements Shape {
         return 0;
     }
 
-    public void drawAreaLabel(Graphics2D g2d, Font font) {
-        g2d.setColor(COLOR_LABEL);
-        g2d.setFont(font);
-        FontMetrics fm=g2d.getFontMetrics(font);
-        g2d.drawString(this.name,
-                (int)(this.centerXYPos.getX() - fm.getStringBounds(this.name, g2d).getWidth()/2),
-                (int)(this.centerXYPos.getY() + fm.getAscent() - (fm.getAscent() + fm.getDescent()) / 2));
-    }  
-    
-    public void drawTileByTileOvl(Graphics2D g2d, double fovX, double fovY, TilingSetting setting) { /*AcqSetting setting) {*/
-        if (tilePosList!=null) {
-            g2d.setColor(COLOR_TILE_GRID);
-                Composite oldComposite=g2d.getComposite();
-                g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.25f));
-            for (Tile t : tilePosList) {
-                int xo=(int)Math.round((t.centerX-fovX/2));
-                int yo=(int)Math.round((t.centerY-fovY/2));
-                int xCenter=(int)Math.round(t.centerX);
-                int yCenter=(int)Math.round(t.centerY);
-                int w=(int)Math.round(fovX);
-                int h=(int)Math.round(fovY);
-                
-                AffineTransform at=g2d.getTransform();
-                g2d.translate(xCenter,yCenter);
-                g2d.rotate(stageToLayoutRot);
-                if (cameraRot != FieldOfView.ROTATION_UNKNOWN) {
-                    g2d.rotate(-cameraRot);                        
-                }
-                g2d.translate(-xCenter,-yCenter);
-                g2d.fillRect(xo,yo,w,h);
-                g2d.setTransform(at);
-            }    
-            g2d.setComposite(oldComposite);
-        }
-    }
-
     public int getId() {
         return id;
     }
@@ -940,7 +889,7 @@ public abstract class SampleArea implements Shape {
         return info;
     }
     
-    public PositionList addTilePositions(PositionList pl, ArrayList<JSONObject> posInfoL, String xyStageLabel, String zStageLabel, AcqCustomLayout aLayout) {
+    public PositionList addTilePositions(PositionList pl, ArrayList<JSONObject> posInfoL, String xyStageLabel, String zStageLabel, IAcqLayout aLayout) {
         if (pl==null)
             pl=new PositionList();
         for (Tile tile:tilePosList) {
@@ -1071,36 +1020,7 @@ public abstract class SampleArea implements Shape {
             return a1tiles.compareTo(a2tiles);
         }
     };
-    
-    protected Color getFillColor(boolean showRelZPos) {
-        Color color=COLOR_UNSELECTED_AREA;
-        if (acquiring) {
-            color=COLOR_ACQUIRING_AREA;
-        } else {
-            if (showRelZPos) {
-                if (Math.round(relativeZPos)==0) {
-                    color=new Color(128,128,128);
-                } else if (Math.round(relativeZPos) < 0) {
-                    color=new Color(64,64,64);
-                } else if (Math.round(relativeZPos) > 0) {
-                    color=new Color(192,192,192);
-                }
-            }    
-        }
-        return color;
-    }
-
-    protected Color getBorderColor() {
-        if (selectedForMerge)
-            return COLOR_MERGE_AREA_BORDER;
-        else {
-            if (selectedForAcq)
-                return COLOR_SELECTED_AREA_BORDER;
-            else    
-                return COLOR_AREA_BORDER;
-        }   
-    }
-    
+        
     @Override
     public PathIterator getPathIterator(AffineTransform at) {
         return shape.getPathIterator(at);
@@ -1174,6 +1094,7 @@ public abstract class SampleArea implements Shape {
         return generalPath;
     }
 
+            
     /**
      * Used to convert JSONObject to SampleArea, 
      * derived classes should overwrite this to save fields that are not part of SampleArea class
@@ -1197,11 +1118,7 @@ public abstract class SampleArea implements Shape {
     protected abstract void calcCenterAndDefaultPos();
     
     protected abstract void createShape();
-    
-    public abstract void drawArea(Graphics2D g2d, boolean showZProfile);
-    
-    public abstract void drawTiles(Graphics2D g2d, double fovX, double fovY, TilingSetting setting);
-    
+            
     public abstract boolean isInArea(double x, double y);
 
     //redundant with contains?

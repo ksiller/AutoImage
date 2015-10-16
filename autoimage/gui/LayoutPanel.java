@@ -1,12 +1,13 @@
 package autoimage.gui;
 
-import autoimage.AcqCustomLayout;
 import autoimage.api.AcqSetting;
 import autoimage.FieldOfView;
+import autoimage.Tile;
 import autoimage.api.IStageMonitorListener;
 import autoimage.api.RefArea;
 import autoimage.api.TilingSetting;
 import autoimage.Vec3d;
+import autoimage.api.IAcqLayout;
 import autoimage.api.SampleArea;
 import ij.IJ;
 import java.awt.AlphaComposite;
@@ -16,15 +17,18 @@ import java.awt.Composite;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.LinearGradientPaint;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.Stroke;
 import java.awt.Toolkit;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.GeneralPath;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.List;
@@ -47,10 +51,14 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     private static int LAYOUT_MAX_DIM = 20000;//in um
     private static double MAX_ZOOM = 64;
     
-    private static Color COLOR_BORDER = Color.WHITE;
+    private static Color COLOR_PANEL_BACKGR = Color.WHITE;
     private static Color COLOR_UNSELECTED_AREA = Color.GRAY;
     private static Color COLOR_ACQUIRING_AREA = Color.YELLOW;
     private static Color COLOR_SELECTED_AREA = new Color(51,115,188);
+    private static Color COLOR_AREA_BORDER = Color.WHITE;
+    private static Color COLOR_SELECTED_AREA_BORDER = Color.YELLOW;
+    private static Color COLOR_MERGE_AREA_BORDER = Color.RED; //new Color(51,115,188);
+    private static Color COLOR_AREA_LABEL = Color.WHITE;
     private static Color COLOR_FOV = Color.CYAN;
     private static Color COLOR_TILE_GRID = Color.RED;
     private static Color COLOR_LANDMARK = Color.GREEN;
@@ -61,13 +69,14 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     private static Color COLOR_TILT_HIGH = Color.BLUE;
 
     private static final int LABEL_FONT_SIZE = 16;
-
+    private static final float STROKE_WIDTH = 1.5f;
     private static Stroke SOLID_STROKE = new BasicStroke(1.0f);
     private static Stroke DASHED_STROKE = new BasicStroke(1.0f, // line width
       /* cap style */BasicStroke.CAP_BUTT,
       /* join style, miter limit */BasicStroke.JOIN_BEVEL, 1.0f,
       /* the dash pattern */new float[] { 8.0f, 8.0f},0.0f);
-    private AcqCustomLayout acqLayout;
+    
+    private IAcqLayout acqLayout;
     private AcqSetting cAcqSetting;//reference to current AcqSetting
     private Point anchorMousePos;
     private Point prevMousePos;
@@ -87,7 +96,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         this(null,null);
     }
     
-    public LayoutPanel(AcqCustomLayout al, AcqSetting as) {
+    public LayoutPanel(IAcqLayout al, AcqSetting as) {
         super(true);
 //        IJ.log("LayoutPanel.constructor");
         setOpaque(true);
@@ -121,7 +130,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     //end IStageMonitorListener
     
 
-    public AcqCustomLayout getAcqLayout() {
+    public IAcqLayout getAcqLayout() {
         return acqLayout;
     }
     
@@ -131,7 +140,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         repaint();
     }
         
-    public void setAcquisitionLayout(AcqCustomLayout al, double borderD) {
+    public void setAcquisitionLayout(IAcqLayout al, double borderD) {
  //       IJ.log("LayoutPanel.setAcquisitionLayout: start");
         this.acqLayout=al;
         zoom=1;
@@ -295,7 +304,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     public double getZoom() {
         return zoom;
     }
-   
+       
     
     public void drawTileGridForAllSelectedAreas(Graphics2D g2d) {
 //        IJ.log("LayoutPanel.drawTileGridForAllAreas: start");
@@ -305,28 +314,95 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
                 double tileWidth=cAcqSetting.getTileWidth_UM();
                 double tileHeight=cAcqSetting.getTileHeight_UM();
                 TilingSetting tSetting=cAcqSetting.getTilingSetting();
+                
+                g2d.setColor(COLOR_TILE_GRID);
+                Composite oldComposite=g2d.getComposite();
+                g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.25f));
+                double cameraRot=cAcqSetting.getFieldOfView().getFieldRotation();
                 for (int i=0; i<areas.size(); i++) {
                     SampleArea a=acqLayout.getAreaArray().get(i);
-                    if (a.isSelectedForAcq())
-                        a.drawTiles(g2d, tileWidth, tileHeight,tSetting);
+                    if (a.isSelectedForAcq() && a.getTilePositions()!=null) {
+//                        a.drawTiles(g2d, tileWidth, tileHeight,tSetting);
+                        for (Tile t : a.getTilePositions()) {
+                            int xo=(int)Math.round((t.centerX-tileWidth/2));
+                            int yo=(int)Math.round((t.centerY-tileHeight/2));
+                            int xCenter=(int)Math.round(t.centerX);
+                            int yCenter=(int)Math.round(t.centerY);
+                            int w=(int)Math.round(tileWidth);
+                            int h=(int)Math.round(tileHeight);
+
+                            AffineTransform at=g2d.getTransform();
+                            g2d.translate(xCenter,yCenter);
+                            g2d.rotate(acqLayout.getStageToLayoutRot());
+                            if (cameraRot != FieldOfView.ROTATION_UNKNOWN) {
+                                g2d.rotate(-cameraRot);                        
+                            }
+                            g2d.translate(-xCenter,-yCenter);
+                            g2d.fillRect(xo,yo,w,h);
+                            g2d.setTransform(at);
+                        }  
+                    }
                 }
+                g2d.setComposite(oldComposite);
             }      
         }
 //        IJ.log("LayoutPanel.drawTileGridForAllAreas: end");
     }
 
+    protected Color getFillColor(SampleArea area, boolean showRelZPos) {
+        Color color=COLOR_UNSELECTED_AREA;
+        if (area.isAcquiring()) {
+            color=COLOR_ACQUIRING_AREA;
+        } else {
+            if (showRelZPos) {
+                double relativeZPos=area.getRelativeZPos();
+                if (Math.round(relativeZPos)==0) {
+                    color=new Color(128,128,128);
+                } else if (Math.round(relativeZPos) < 0) {
+                    color=new Color(64,64,64);
+                } else if (Math.round(relativeZPos) > 0) {
+                    color=new Color(192,192,192);
+                }
+            }    
+        }
+        return color;
+    }
+
+    protected Color getBorderColor(SampleArea area) {
+        if (area.isSelectedForMerge())
+            return COLOR_MERGE_AREA_BORDER;
+        else {
+            if (area.isSelectedForAcq())
+                return COLOR_SELECTED_AREA_BORDER;
+            else    
+                return COLOR_AREA_BORDER;
+        }   
+    }
+    
+    private void drawAreaLabel(Graphics2D g2d, Font font, SampleArea area) {
+        g2d.setColor(COLOR_AREA_LABEL);
+        g2d.setFont(font);
+        FontMetrics fm=g2d.getFontMetrics(font);
+        g2d.drawString(area.getName(),
+                (int)(area.getCenterXYPos().getX() - fm.getStringBounds(area.getName(), g2d).getWidth()/2),
+                (int)(area.getCenterXYPos().getY() + fm.getAscent() - (fm.getAscent() + fm.getDescent()) / 2));
+    }  
     
     private void drawAllAreas(Graphics2D g2d, Font font) {
 //        IJ.log("LayoutPanel.drawAllAreas");
         if (acqLayout!=null) {
             List<SampleArea> areas=acqLayout.getAreaArray();
             if (cAcqSetting!=null) {
-                for (SampleArea a:areas) {
-                    a.drawArea(g2d, showZProfile);
+                for (SampleArea area:areas) {
+                    g2d.setColor(getFillColor(area,showZProfile));
+                    GeneralPath shape=area.getGeneralPath();
+                    g2d.fill(shape);
+                    g2d.setColor(getBorderColor(area));
+                    g2d.draw(shape); 
                 }
                 if (showAreaLabels) {
                     for (SampleArea a:areas) {
-                        a.drawAreaLabel(g2d, font);
+                        drawAreaLabel(g2d, font, a);
                     }
                 }
                 drawTileGridForAllSelectedAreas(g2d);
@@ -438,7 +514,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         int h=(int)Math.ceil(fov.getFullHeight_UM(objPixSize));
 
         g2d.translate(x+w/2, y+h/2);
-        g2d.rotate(SampleArea.getStageToLayoutRot());
+        g2d.rotate(acqLayout.getStageToLayoutRot());
         if (fov.getFieldRotation() != FieldOfView.ROTATION_UNKNOWN) {
             g2d.rotate(-fov.getFieldRotation());
         }
@@ -555,6 +631,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     }
     
     private void drawStageGrid(Graphics2D g2d) {
+        g2d.setStroke(SOLID_STROKE);
         Rectangle2D layoutRect=new Rectangle2D.Double(0,0,acqLayout.getWidth(),acqLayout.getLength());
         java.awt.geom.Area a = new java.awt.geom.Area(layoutRect);
         a.transform(acqLayout.getLayoutToStageTransform());
@@ -596,6 +673,8 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         super.paintComponent(g);
 //        Graphics2D g2d = (Graphics2D) g;
         Graphics2D g2d = (Graphics2D)g.create();
+        g2d.addRenderingHints(new RenderingHints(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON));
+//        g2d.addRenderingHints(new RenderingHints(RenderingHints.KEY_STROKE_CONTROL,RenderingHints.VALUE_STROKE_DEFAULT));
         //save original g2d settings
         AffineTransform oldTransform=g2d.getTransform();
         Composite oldComposite=g2d.getComposite();
@@ -610,12 +689,20 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         Rectangle panelR=getBounds();
 
         //clear: fill panel with Border color
-        g2d.setColor(COLOR_BORDER);
+        g2d.setColor(COLOR_PANEL_BACKGR);
         g2d.fillRect(panelR.x, panelR.y, panelR.width, panelR.height); 
         
         Dimension dim=getPreferredLayoutSize();
 
         g2d.scale(scale*zoom, scale*zoom);
+        if (g2d.getRenderingHint(RenderingHints.KEY_ANTIALIASING)==RenderingHints.VALUE_ANTIALIAS_ON) {
+            float scale=(float)(1d/g2d.getTransform().getScaleX());
+            SOLID_STROKE=new BasicStroke(scale*STROKE_WIDTH);
+            DASHED_STROKE = new BasicStroke(scale, // line width
+                /* cap style */BasicStroke.CAP_BUTT,
+                /* join style, miter limit */BasicStroke.JOIN_BEVEL, scale,
+                /* the dash pattern */new float[] { scale*4, scale*4},0.0f);
+        }
 
         //draw background
         if (showZProfile) {

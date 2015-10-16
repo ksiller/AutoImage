@@ -1,6 +1,8 @@
 package autoimage.gui;
 
 
+//import autoimage.AcqCustomLayout;
+import autoimage.AcqBasicLayout;
 import autoimage.AcqCustomLayout;
 import autoimage.api.AcqSetting;
 import autoimage.AcqWellplateLayout;
@@ -241,7 +243,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private String imageDestPath;
     private String layoutPath;
     private String dataProcessorPath;
-    private AcqCustomLayout acqLayout;
+    private IAcqLayout acqLayout;
     private List<AcqSetting> acqSettings;
     private AcqSetting currentAcqSetting;
     private TilingSetting prevTilingSetting;
@@ -388,7 +390,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private class AcquisitionTask extends TimerTask {
 
         private AcqSetting acqSetting;
-        private AcqCustomLayout acqLayout;
+        private IAcqLayout acqLayout;
         private Autofocus autofocus;
         private final ImageCacheListener imageListener;
         private int totalImages;
@@ -401,7 +403,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         private boolean isWaiting=true;
         private boolean hasStarted=false;
         
-        AcquisitionTask (ScriptInterface app, AcqSetting setting, AcqCustomLayout layout, ImageCacheListener imgListener, File seqDir) {
+        AcquisitionTask (ScriptInterface app, AcqSetting setting, IAcqLayout layout, ImageCacheListener imgListener, File seqDir) {
 //            IJ.log("AcquisitionTask.constructor: begin");
             app_=app;
             acqSetting=setting;
@@ -1054,7 +1056,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         LayoutManagerDlg layoutDialog=new LayoutManagerDlg(this, modal);
         if (!acqLayout.isEmpty() && !(acqLayout instanceof AcqWellplateLayout)) {
             try {
-                layoutDialog.setCustomLayout(AcqCustomLayout.createFromJSONObject(acqLayout.toJSONObject(),acqLayout.getFile()));
+                layoutDialog.setCustomLayout(AcqBasicLayout.createFromJSONObject(acqLayout.toJSONObject(),acqLayout.getFile()));
             } catch (JSONException ex) {
                 layoutDialog.setCustomLayout(new AcqCustomLayout());
             }
@@ -4229,7 +4231,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             
                 updateAreaListFromAreaTableView(true,false);
                 JSONObject layoutObj=acqLayout.toJSONObject();
-                expSettingObj.put(AcqCustomLayout.TAG_LAYOUT, layoutObj);
+                expSettingObj.put(IAcqLayout.TAG_LAYOUT, layoutObj);
             } catch (JSONException ex) {
                 JOptionPane.showMessageDialog(this,"Error parsing layout file '"+acqLayout.getName()+"'.");
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
@@ -4307,15 +4309,15 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 }
             } catch (JSONException ex) {
                 JOptionPane.showMessageDialog(null,"Error parsing Acquisition Layout as JSONObject.");
-                Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             } catch (IOException ex) {
                 JOptionPane.showMessageDialog(null,"Error saving Acquisition Layout as JSONObject.");
-                Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             } finally {
                 fw.close();
             }        
         } catch (IOException ex) {
-            Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
     
@@ -5242,7 +5244,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 JOptionPane.showMessageDialog(null, "Layout files have to be in txt format.\nLayout has not been loaded.", "", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            AcqCustomLayout layout=AcqCustomLayout.loadLayout(f);
+            IAcqLayout layout=AcqBasicLayout.loadLayout(f);
             if (layout==null) {
                 if (f.getName().equals("LastExpSetting.txt"))
                     JOptionPane.showMessageDialog(this, "Last used layout file could not be found or read!");
@@ -7821,20 +7823,20 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 try {
                     JSONObject obj=acqLayout.toJSONObject();
                     if (obj!=null) {
-                        layoutObj.put(AcqCustomLayout.TAG_LAYOUT,obj);
+                        layoutObj.put(IAcqLayout.TAG_LAYOUT,obj);
                         fw.write(layoutObj.toString(4));
                     }
                 } catch (JSONException ex) {
                     JOptionPane.showMessageDialog(null,"Error parsing Acquisition Layout as JSONObject.");
-                    Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                 } catch (IOException ex) {
                     JOptionPane.showMessageDialog(null,"Error saving Acquisition Layout as JSONObject.");
-                    Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                 } finally {
                     fw.close();
                 }        
             } catch (IOException ex) {
-                Logger.getLogger(AcqCustomLayout.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             }
             
 //            layoutFile = f;
@@ -8237,7 +8239,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     
     private void loadExpSettings(File file, boolean revertToDefault) {
         List<AcqSetting> settings=null;
-        AcqCustomLayout layout=null;
+        IAcqLayout layout=null;
         if (!file.exists()) {
             IJ.log("Loading experiment settings: "+file.getAbsolutePath() + " not found, creating default settings.");
             JOptionPane.showMessageDialog(this, "Experiment setting file "+file.getAbsolutePath()+" not found.");
@@ -8252,7 +8254,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 }
                 JSONObject expSettingsObj=new JSONObject(sb.toString());
                 //returns null if problem with parsing of JSONObject
-                layout=AcqCustomLayout.createFromJSONObject(expSettingsObj.getJSONObject(AcqCustomLayout.TAG_LAYOUT), file);
+                layout=AcqBasicLayout.createFromJSONObject(expSettingsObj.getJSONObject(IAcqLayout.TAG_LAYOUT), file);
                 settings=loadAcquisitionSettings(expSettingsObj.getJSONArray(AcqSetting.TAG_ACQ_SETTING_ARRAY));  
             } catch (FileNotFoundException ex) {    
                     Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);

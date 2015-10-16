@@ -2,11 +2,9 @@ package autoimage.area;
 
 import autoimage.api.SampleArea;
 import autoimage.Tile;
-import autoimage.api.TilingSetting;
 import autoimage.gui.NumberTableCellRenderer;
 import ij.IJ;
 import java.awt.Dimension;
-import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -421,25 +419,6 @@ public class PolygonArea extends SampleArea {
         return topLeftY + polygon.getBounds2D().getHeight()/2;
     }
 */
-    @Override
-    public void drawArea(Graphics2D g2d, boolean showZProfile) {
-        g2d.setColor(getFillColor(showZProfile));
-/*        
-        int x = (int) Math.round(topLeftX*physToPixelRatio);
-        int y = (int) Math.round(topLeftY*physToPixelRatio);
-        int w = (int) Math.round(width*physToPixelRatio);
-        int h = (int) Math.round(height*physToPixelRatio);*/
-/*        AffineTransform at=new AffineTransform();
-        Shape polyShape=polygon.createTransformedShape(at);*/
-        g2d.fill(shape); 
-        g2d.setColor(getBorderColor());
-        g2d.draw(shape); 
-    }
-
-    @Override
-    public void drawTiles(Graphics2D g2d, double fovX, double fovY, TilingSetting setting) {
-        drawTileByTileOvl(g2d, fovX, fovY, setting);
-    }
 
     @Override
     public boolean isInArea(double x, double y) {

@@ -28,12 +28,33 @@ import org.json.JSONObject;
  */
 public interface IAcqLayout {
     
+    public final static String TAG_CLASS_NAME = "CLASS";
+    public final static String TAG_LANDMARK = "LANDMARK";
+    public final static String TAG_LAYOUT = "LAYOUT";
+    public final static String TAG_LAYOUT_BOTTOM_MATERIAL = "BOTTOM_MATERIAL";
+    public final static String TAG_LAYOUT_BOTTOM_THICKNESS = "BOTTOM_THICKNESS";
+    public final static String TAG_LAYOUT_COORD_X = "LAYOUT_COORD_X";
+    public final static String TAG_LAYOUT_COORD_Y = "LAYOUT_COORD_Y";
+    public final static String TAG_LAYOUT_COORD_Z = "LAYOUT_COORD_Z";
+    //    public static final String TAG_REF_IMAGE_FILE="REF_IMAGE_FILE";
+    public final static String TAG_LAYOUT_HEIGHT = "LAYOUT_HEIGHT";
+    public final static String TAG_LAYOUT_LENGTH = "LAYOUT_LENGTH";
+    public final static String TAG_LAYOUT_WIDTH = "LAYOUT_WIDTH";
+    public final static String TAG_NAME = "NAME";
+    public final static String TAG_STAGE_X = "STAGE_X";
+    public final static String TAG_STAGE_Y = "STAGE_Y";
+    public final static String TAG_STAGE_Z = "STAGE_Z";
+    public final static String TAG_TILE_SEED_FILE = "TILE_SEEDS";
+    public final static String TAG_VERSION = "VERSION";
+    
     public final static int NO_TILING_EXECUTOR = -1;
     public final static int TILING_IN_PROGRESS = 1;
     public final static int TILING_IS_TERMINATING = 2;
     public final static int TILING_COMPLETED = 3;
     public final static int TILING_ABORTED = 4;
 
+    void initializeFromJSONObject(JSONObject obj, File file) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException;
+    
     void addArea(SampleArea a);
 
     void addLandmark(RefArea lm);

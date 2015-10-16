@@ -1,10 +1,10 @@
 package autoimage.gui;
 
-import autoimage.AcqCustomLayout;
 import autoimage.IRefPointListener;
 import autoimage.api.IStageMonitorListener;
 import autoimage.api.RefArea;
 import autoimage.Vec3d;
+import autoimage.api.IAcqLayout;
 import autoimage.api.SampleArea;
 //import ij.IJ;
 import java.awt.event.WindowEvent;
@@ -32,7 +32,7 @@ import org.micromanager.api.ScriptInterface;
 public class RefPointListDlg extends javax.swing.JDialog implements IStageMonitorListener {
 
     private CMMCore core;
-    private AcqCustomLayout acqLayout;
+    private IAcqLayout acqLayout;
     private List<RefArea> rpList;
     private List<RefArea> rpBackup;
     private String xyStageName;
@@ -211,7 +211,7 @@ public class RefPointListDlg extends javax.swing.JDialog implements IStageMonito
         
 
     
-    public RefPointListDlg(java.awt.Frame parent, ScriptInterface gui, AcqCustomLayout aLayout) {
+    public RefPointListDlg(java.awt.Frame parent, ScriptInterface gui, IAcqLayout aLayout) {
         super(parent, false);
         listeners = new ArrayList<IRefPointListener>();
         this.core=gui.getMMCore();

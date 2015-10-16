@@ -1,8 +1,6 @@
 package autoimage;
 
-import autoimage.api.AcqSetting;
 import autoimage.api.TilingSetting;
-import autoimage.api.IAcqLayout;
 import autoimage.api.RefArea;
 import autoimage.gui.AcqFrame;
 import autoimage.api.SampleArea;
@@ -11,16 +9,12 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.NoninvertibleTransformException;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
@@ -46,25 +40,7 @@ import org.json.JSONObject;
  *
  * @author Karsten Siller
  */
-public class AcqCustomLayout implements IAcqLayout {
-    public final static String TAG_CLASS_NAME = "CLASS";
-    public final static String TAG_LANDMARK = "LANDMARK";
-    public final static String TAG_LAYOUT = "LAYOUT";
-    public final static String TAG_LAYOUT_BOTTOM_MATERIAL = "BOTTOM_MATERIAL";
-    public final static String TAG_LAYOUT_BOTTOM_THICKNESS = "BOTTOM_THICKNESS";
-    public final static String TAG_LAYOUT_COORD_X = "LAYOUT_COORD_X";
-    public final static String TAG_LAYOUT_COORD_Y = "LAYOUT_COORD_Y";
-    public final static String TAG_LAYOUT_COORD_Z = "LAYOUT_COORD_Z";
-    //    public static final String TAG_REF_IMAGE_FILE="REF_IMAGE_FILE";
-    public final static String TAG_LAYOUT_HEIGHT = "LAYOUT_HEIGHT";
-    public final static String TAG_LAYOUT_LENGTH = "LAYOUT_LENGTH";
-    public final static String TAG_LAYOUT_WIDTH = "LAYOUT_WIDTH";
-    public final static String TAG_NAME = "NAME";
-    public final static String TAG_STAGE_X = "STAGE_X";
-    public final static String TAG_STAGE_Y = "STAGE_Y";
-    public final static String TAG_STAGE_Z = "STAGE_Z";
-    public final static String TAG_TILE_SEED_FILE = "TILE_SEEDS";
-    public final static String TAG_VERSION = "VERSION";
+public class AcqCustomLayout extends AcqBasicLayout {
         
     private String name;
     private boolean isEmpty;
@@ -94,8 +70,8 @@ public class AcqCustomLayout implements IAcqLayout {
     public AcqCustomLayout() {
         createEmptyLayout();
     }
-    
-    public static AcqCustomLayout loadLayout(File file) {//returns true if layout has been changed
+/*    
+    public static IAcqLayout loadLayout(File file) {//returns true if layout has been changed
         BufferedReader br;
         StringBuilder sb=new StringBuilder();
         JSONObject layoutObj=null;
@@ -114,11 +90,11 @@ public class AcqCustomLayout implements IAcqLayout {
         } catch (JSONException ex) {
             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
-        AcqCustomLayout layout=AcqCustomLayout.createFromJSONObject(layoutObj, file);
+        IAcqLayout layout=AcqCustomLayout.createFromJSONObject(layoutObj, file);
         return layout;
     }
     
-    public static AcqCustomLayout createFromJSONObject(JSONObject obj, File f) {
+    public static IAcqLayout createFromJSONObject(JSONObject obj, File f) {
         AcqCustomLayout layout=null;
         if (obj!=null) {
             String className;
@@ -127,10 +103,7 @@ public class AcqCustomLayout implements IAcqLayout {
                 className = obj.getString(TAG_CLASS_NAME);
                 Class clazz=Class.forName(className);
                 layout=(AcqCustomLayout) clazz.newInstance();
-                layout.initializeFromJSONObject(obj);
-                layout.isEmpty=false;
-                layout.isModified=false;
-                layout.file=f;
+                layout.initializeFromJSONObject(obj, f);
                 try {
                     layout.calcStageToLayoutTransform();
         //        tileManager=new TileManager(this);
@@ -154,8 +127,9 @@ public class AcqCustomLayout implements IAcqLayout {
         }
         return layout;
     }
-    
-    protected void initializeFromJSONObject(JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+*/    
+    @Override
+    public void initializeFromJSONObject(JSONObject obj, File f) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         landmarks=new ArrayList<RefArea>();
         areas=new ArrayList<SampleArea>();
         version=obj.getString(TAG_VERSION);
@@ -176,6 +150,9 @@ public class AcqCustomLayout implements IAcqLayout {
             JSONObject landmarkObj=landmarkArray.getJSONObject(i);
             landmarks.add(new RefArea(landmarkObj));
         }
+        isEmpty=false;
+        isModified=false;
+        file=f;
     }
     
     @Override

@@ -2,8 +2,6 @@ package autoimage.area;
 
 import autoimage.api.SampleArea;
 import autoimage.Tile;
-import autoimage.api.TilingSetting;
-import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Ellipse2D;
@@ -73,44 +71,7 @@ public class DonutArea extends SampleArea {
         if (obj!=null)
             obj.put(TAG_RING_WIDTH,ringWidth);
     }
-        
-    @Override
-    public void drawArea(Graphics2D g2d, boolean showZProfile) {
-        g2d.setColor(getFillColor(showZProfile));
-/*        if (acquiring) {
-            g2d.setColor(COLOR_ACQUIRING_AREA);
-        } else
-            g2d.setColor(COLOR_UNSELECTED_AREA);
-        int x = (int) Math.round(topLeftX);
-        int y = (int) Math.round(topLeftY);
-        int w = (int) Math.round(width);
-        int h = (int) Math.round(height);  
-*/        
-        int holeX = (int) Math.round((topLeftX+ringWidth));
-        int holeY = (int) Math.round((topLeftY+ringWidth));
-        int holeWidth = (int) Math.round((width-2*ringWidth));
-        int holeHeight = (int) Math.round((height-2*ringWidth));    
-/*
-        java.awt.geom.Area donut = new java.awt.geom.Area(new Ellipse2D.Double(topLeftX, topLeftY, width, height));
-        java.awt.geom.Area hole = new java.awt.geom.Area(new Ellipse2D.Double(holeX, holeY, holeWidth, holeHeight));
-        donut.subtract(hole);
-        g2d.fill(donut);
-        g2d.setColor(getBorderColor());
-        g2d.draw(new Ellipse2D.Double(topLeftX, topLeftY, width, height)); 
-        g2d.draw(new Ellipse2D.Double(holeX, holeY, holeWidth, holeHeight)); 
- */   
-        g2d.setColor(getFillColor(showZProfile));
-        g2d.fill(shape);
-        g2d.setColor(getBorderColor());
-        g2d.draw(shape); 
-    }
-    
-    
-    @Override
-    public void drawTiles(Graphics2D g2d, double fovX, double fovY, TilingSetting setting) {
-        drawTileByTileOvl(g2d, fovX, fovY, setting);
-    }
-    
+         
     //checks if coordinate is inside area
     @Override
     public boolean isInArea(double x, double y) {
@@ -145,7 +106,6 @@ public class DonutArea extends SampleArea {
     @Override
     public SampleArea duplicate() {
         DonutArea newArea = new DonutArea(this.getName());
-//        newArea.shape=this.getShapeLabel();
         newArea.setId(this.getId());
         newArea.setTopLeftX(this.topLeftX);
         newArea.setTopLeftY(this.topLeftY);
@@ -157,7 +117,6 @@ public class DonutArea extends SampleArea {
         newArea.setSelectedForMerge(isSelectedForMerge());
         newArea.setComment(this.comment);
         newArea.setAcquiring(this.acquiring);
-//        newArea.setTilingSetting(this.tiling.duplicate());
         newArea.tilePosList=new ArrayList<Tile>(this.getTilePositions());
         newArea.setRingWidth(this.ringWidth);
         newArea.setUnknownTileNum(this.hasUnknownTileNum());
@@ -382,8 +341,5 @@ public class DonutArea extends SampleArea {
         donut.subtract(hole);
         shape=donut;
     }
-
-
-    
     
 }
