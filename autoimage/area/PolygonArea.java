@@ -2,6 +2,7 @@ package autoimage.area;
 
 import autoimage.api.SampleArea;
 import autoimage.Tile;
+import autoimage.Utils;
 import autoimage.gui.NumberTableCellRenderer;
 import ij.IJ;
 import java.awt.Dimension;
@@ -9,6 +10,8 @@ import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.GeneralPath;
+import java.awt.geom.NoninvertibleTransformException;
 import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
@@ -18,6 +21,8 @@ import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -56,16 +61,34 @@ public class PolygonArea extends SampleArea {
     
     private final static DecimalFormat NUMBER_FORMAT = new DecimalFormat("###,###,##0.000");
 
+    public void setPoints(List<Point2D> list) {
+        points=list;
+        this.createShape();
+        this.setRelDefaultPos();
+        this.createGeneralPath();
+    }
+
     private class PointTableModel extends AbstractTableModel {
 
-        private List<Point2D> pointList;
+        private List<Point2D> pointList;//vertices that define polygon centered at origin (0/0)
+        private PolygonArea area;
         private final String[] columnHeader=new String[]{"X (mm)", "Y (mm)"};
+        private boolean isAbsolute;
         
-        public PointTableModel(List<Point2D> list) {
+        public PointTableModel(PolygonArea area, List<Point2D> list) {
             super();
+            this.area=area;
+            isAbsolute=true;
             setData(list,false);
         }
 
+        public void enableAbsolute(boolean b) {
+            if (b!=isAbsolute) {
+                isAbsolute=b;
+                fireTableDataChanged();;
+            }    
+        }
+        
         public void setData(List<Point2D> pl, boolean updateView) {
             if (pl == null) {
                 pl = new ArrayList<Point2D>();
@@ -101,12 +124,19 @@ public class PolygonArea extends SampleArea {
         public Object getValueAt(int rowIndex, int columnIndex) {
             if (rowIndex <0 || rowIndex >= pointList.size())
                 return null;
+            Point2D rel=pointList.get(rowIndex);
+            Point2D p=new Point2D.Double(rel.getX(),rel.getY());
+            if (isAbsolute) {
+                AffineTransform at;
+                at = area.getShapeToPathTransform();
+                at.transform(rel, p);
+            }
             switch (columnIndex) {
                 case 0: {
-                            return pointList.get(rowIndex).getX() / 1000;
+                            return p.getX() / 1000;
                         }
                 case 1: {
-                            return pointList.get(rowIndex).getY() / 1000;
+                            return p.getY() / 1000;
                         }
                 default: return null;    
             }
@@ -119,21 +149,34 @@ public class PolygonArea extends SampleArea {
 
         @Override
         public void setValueAt(Object value, int rowIndex, int colIndex) {
-            Point2D point;
+            Point2D point=null;
             if (pointList != null & rowIndex < pointList.size()) {
-                point = pointList.get(rowIndex);
+//                point = pointList.get(rowIndex);
                 switch (colIndex) {
                     case 0: {
-                        point.setLocation((Double)value * 1000,point.getY());
-                        fireTableCellUpdated(rowIndex, colIndex);
+                        point=new Point2D.Double((Double)value * 1000,(Double)getValueAt(rowIndex,1)*1000);
                         break;
                     }
                     case 1: {
-                        point.setLocation(point.getX(),(Double)value * 1000);
-                        fireTableCellUpdated(rowIndex, colIndex);
+                        point=new Point2D.Double((Double)getValueAt(rowIndex,0)*1000,(Double)value * 1000);
                         break;
                     }
                 }
+                if (!isAbsolute) {
+                    pointList.get(rowIndex).setLocation(point);
+                } else {
+                    try {
+                        Point2D rel=point;
+                        AffineTransform at;
+                        at = area.getPathToShapeTransform();
+                        at.transform(point, rel);
+                        pointList.get(rowIndex).setLocation(rel);
+                    } catch (NoninvertibleTransformException ex) {
+                        Logger.getLogger(PolygonArea.class.getName()).log(Level.SEVERE, null, ex);
+                        IJ.log(this.getClass().getName()+": Problem with AffineTransform");
+                    }
+                }
+                fireTableCellUpdated(rowIndex, colIndex);
             }
         }
 
@@ -162,8 +205,9 @@ public class PolygonArea extends SampleArea {
         */
         public void rowsUp(int[] rowIdx, int firstMinusOneIndex) {
             Point2D temp=points.get(firstMinusOneIndex);
-            //move last entry in selection oen row up
+            //move first entry in selection one row up
             points.set(firstMinusOneIndex, points.get(rowIdx[0]));
+            //iterate for the rest
             for (int i=0; i<rowIdx.length-1; i++) {
                 points.set(rowIdx[i], points.get(rowIdx[i+1]));
             }
@@ -179,11 +223,17 @@ public class PolygonArea extends SampleArea {
             Point2D temp=points.get(lastPlusOneIndex);
             //move last entry in selection one row down 
             points.set(lastPlusOneIndex, points.get(rowIdx[rowIdx.length-1]));
+            //iterate for the rest
             for (int i=rowIdx.length-1; i>0; i--) {
                 points.set(rowIdx[i], points.get(rowIdx[i-1]));
             }
             points.set(rowIdx[0],temp);
+            
             fireTableRowsUpdated(0,getRowCount()-1);
+        }
+
+        private void updateAllRows() {
+            fireTableDataChanged();
         }
     
     }
@@ -192,25 +242,41 @@ public class PolygonArea extends SampleArea {
     
     public PolygonArea() {
         super();
-        createArea(new ArrayList<Point2D>(),0,0);
+        points=new ArrayList<Point2D>();
+        createShape();
+        setRelDefaultPos();
         createGeneralPath();
-        calcCenterAndDefaultPos();
     }
     
     public PolygonArea(String n) { //expects name identifier
         super(n);
-        createArea(new ArrayList<Point2D>(),0,0);
+        points=new ArrayList<Point2D>();
+        createShape();
+        setRelDefaultPos();
         createGeneralPath();
-        calcCenterAndDefaultPos();
     }
     
+    /**
+     * 
+     * @param n
+     * @param id
+     * @param ox
+     * @param oy
+     * @param oz
+     * @param pList: vertex points centered around (0/0)
+     * @param s
+     * @param anot 
+     */
     public PolygonArea(String n, int id, double ox, double oy, double oz, List<Point2D> pList, boolean s, String anot) {
-        super(n,id,ox,oy,oz,0.0,0.0,s,anot);
-        createArea(pList, ox, oy);
+        super(n,id,ox,oy,oz,s,anot);
+//        createArea(pList, ox, oy);
+        points=pList;
+        createShape();
+        setRelDefaultPos();
         createGeneralPath();
-        calcCenterAndDefaultPos();
     }
-        
+
+/*
     private double area(List<Point2D> pList) {
         if (pList != null) {
             int i, j, n = pList.size();
@@ -262,129 +328,77 @@ public class PolygonArea extends SampleArea {
         cy *= factor;
         return new Point2D.Double(cx,cy);
     }
-    
+*/    
     //vertex points are provided as  coordinates RELATIVE to offsetX/offsetY
     //to provide absolute coordinates, pass offsetX=0, offsetY=0
-    private void createArea(List<Point2D> pList, double offsetX, double offsetY) {
-        if (pList!=null) {
-            points=new ArrayList<Point2D>(pList.size());
-            Path2D polygon=new Path2D.Double();
-            if (pList.size()<=1) {
-                if (pList.size()==1) {
-                    points.add(new Point2D.Double(offsetX+pList.get(0).getX(), offsetY+pList.get(0).getY()));
-                    topLeftX=points.get(0).getX();
-                    topLeftY=points.get(0).getX();
-                } else {
-                    topLeftX=offsetX;
-                    topLeftY=offsetY;
-                }    
-            }
-            if (pList.size()>1) {
-                points.add(new Point2D.Double(offsetX+pList.get(0).getX(), offsetY+pList.get(0).getY()));
-                polygon.moveTo(points.get(0).getX(), points.get(0).getY());
-                for (int i=1; i< pList.size(); i++) {
-                    points.add(new Point2D.Double(offsetX+pList.get(i).getX(), offsetY+pList.get(i).getY()));
-                    polygon.lineTo(points.get(i).getX(), points.get(i).getY());
-                }
-                polygon.closePath();
-            }
-            topLeftX=polygon.getBounds2D().getX();
-            topLeftY=polygon.getBounds2D().getY();
-            width=polygon.getBounds2D().getWidth();
-            height=polygon.getBounds2D().getHeight();
-            shape=polygon;
-        } else {
-//            polygon=null;
-            shape=null;
-        }
-//        calcCenterAndDefaultPos();
-    }
-    
-    //vertex points are provided as ABSOLUTE coordinates
-    private void createArea(List<Point2D> pList) {
-        createArea(pList,0,0);
-        createGeneralPath();
-        calcCenterAndDefaultPos();
-    }
-    
-    @Override
-    public void setWidth(double w) {
-        //do nothing because width is determined by vertex points
-    }
 
-    @Override
-    public void setHeight(double h) {
-        //do nothing because width is determined by vertex points
-    }
     
+/*    
     //leads to horizontal translation
     @Override
     public void setTopLeftX(double x) {
-        double deltaX=x-topLeftX;
+        double deltaX=x-getTopLeftX();
         if (points!=null) {
-/*            for (Point2D point:points) {
-                point.setLocation(point.getX()+deltaX, point.getY());
-            }
-            topLeftX=x;
-            createArea(points, topLeftX, topLeftY);*/
+//            for (Point2D point:points) {
+//                point.setLocation(point.getX()+deltaX, point.getY());
+//            }
+//            topLeftX=x;
+//            createArea(points, topLeftX, topLeftY);
             createArea(points,deltaX,0);
             createGeneralPath();
             calcCenterAndDefaultPos();
         }
     }
-    
+  
     //leads to vertical translation
     @Override
     public void setTopLeftY(double y) {
-        double deltaY=y-topLeftY;
+        double deltaY=y-getTopLeftY();
         if (points!=null) {
-/*            for (Point2D point:points) {
-                point.setLocation(point.getX(), point.getY()+deltaY);
-            }
-            topLeftY=y;
-            createArea(points, topLeftX, topLeftY);*/
+//           for (Point2D point:points) {
+//                point.setLocation(point.getX(), point.getY()+deltaY);
+//            }
+//            topLeftY=y;
+//            createArea(points, topLeftX, topLeftY);
             createArea(points,0,deltaY);
             createGeneralPath();
             calcCenterAndDefaultPos();
         }
     }
-    
+/*    
     @Override
     public void setTopLeft(double x, double y) {
         double deltax=x-topLeftX;
         double deltay=y-topLeftY;
         if (points!=null) {
-/*            for (Point2D point:points) {
-                point.setLocation(point.getX()+deltax, point.getY()+deltay);
-            }
-            topLeftX=x;
-            topLeftY=y;
-            createArea(points, topLeftX, topLeftY);*/
+//            for (Point2D point:points) {
+//                point.setLocation(point.getX()+deltax, point.getY()+deltay);
+//            }
+//            topLeftX=x;
+//            topLeftY=y;
+//            createArea(points, topLeftX, topLeftY);
             createArea(points,deltax,deltay);
             createGeneralPath();
             calcCenterAndDefaultPos();
         }
     }
-    
+*/    
     @Override
     protected void initializeFromJSONObject(JSONObject obj) throws JSONException {
         JSONArray listarray=obj.getJSONArray(TAG_POINT_ARRAY);
-        List<Point2D> pList = new ArrayList<Point2D>();
+        points = new ArrayList<Point2D>();
         if (listarray!=null) {
             for (int i=0; i<listarray.length(); i++) {
-                pList.add(new Point2D.Double(0,0));
+                points.add(new Point2D.Double(0,0));
             }
             for (int i=0; i<listarray.length(); i++) {
                 JSONObject pointObj=listarray.getJSONObject(i);
                 int number=pointObj.getInt(TAG_NUMBER);
                 double x=pointObj.getDouble(TAG_COORD_X);
                 double y=pointObj.getDouble(TAG_COORD_Y);
-                pList.set(number,new Point2D.Double(x,y));
+                points.set(number,new Point2D.Double(x,y));
             }
-        }        
-        createArea(pList,0,0);
-        createGeneralPath();
-        calcCenterAndDefaultPos();
+        }       
     }
 
     @Override
@@ -408,37 +422,6 @@ public class PolygonArea extends SampleArea {
     public String getShapeType() {
         return "Polygon";
     }
-/*
-    @Override
-    public double getCenterX() {
-        return topLeftX + polygon.getBounds2D().getWidth()/2;
-    }
-
-    @Override
-    public double getCenterY() {
-        return topLeftY + polygon.getBounds2D().getHeight()/2;
-    }
-*/
-
-    @Override
-    public boolean isInArea(double x, double y) {
-        return shape.contains(x,y);
-    }
-
-    @Override
-    public boolean isFovInsideArea(double centerX, double centerY, double fovWidth, double fovHeight) {
-        return shape.contains(centerX-fovWidth/2, centerY-fovHeight/2, fovWidth, fovHeight);
-    }
-
-    @Override
-    public boolean doesFovTouchArea(double centerX, double centerY, double fovWidth, double fovHeight) {
-        return shape.intersects(centerX-fovWidth/2, centerY-fovHeight/2, fovWidth, fovHeight);
-    }
-
-    @Override
-    public boolean isInsideRect(Rectangle2D r) {
-        return r.contains(shape.getBounds2D());
-    }
 
     @Override
     public SampleArea duplicate() {
@@ -453,9 +436,9 @@ public class PolygonArea extends SampleArea {
 //        newArea.setTilingSetting(this.tiling.duplicate());
         newArea.tilePosList=new ArrayList<Tile>(this.getTilePositions());
         newArea.setUnknownTileNum(this.hasUnknownTileNum());
-        newArea.createArea(points,0,0);
-        createGeneralPath();
-        calcCenterAndDefaultPos();
+        newArea.createShape();
+        newArea.setRelDefaultPos();
+        newArea.createGeneralPath();
         return newArea;
     }
 
@@ -470,29 +453,35 @@ public class PolygonArea extends SampleArea {
         defaultXYPos=centerOfMass(points);
     }
 */
-    
+/*    
     @Override
     public void calcCenterAndDefaultPos() {
-        centerXYPos=centerOfMass(points);
+//        centerXYPos=centerOfMass(points);
+        Rectangle2D bounds=generalPath.getBounds2D();
+        centerXYPos=new Point2D.Double(bounds.getCenterX(),bounds.getCenterY());
+        topLeftX=bounds.getX();
+        topLeftY=bounds.getY();
         defaultXYPos=centerXYPos;
     }
-
+*/
+/*
     //returns absolute coordinates
     @Override
-    public List<Point2D> getOutlinePoints() {
+    public List<Point2D> getGeneralPathPoints() {
         return points;
     }
-
+*/
+/*    
     public List<Point2D> getOutlinePointsRel() {
         if (points==null)
             return null;
         List<Point2D> list=new ArrayList<Point2D>(points.size());
         for (Point2D p:points) {
-            list.add(new Point2D.Double(p.getX()-topLeftX,p.getY()-topLeftY));
+            list.add(new Point2D.Double(p.getX()-getTopLeftX(),p.getY()-getTopLeftY()));
         }
         return list;
     }
-    
+*/    
     @Override
     public SampleArea showConfigDialog(Rectangle2D layoutBounds) {
         JPanel optionPanel = new JPanel();
@@ -520,42 +509,54 @@ public class PolygonArea extends SampleArea {
         optionPanel.add(l);
         final JFormattedTextField topLeftXField = new JFormattedTextField();
         topLeftXField.setColumns(10);
-        topLeftXField.setValue(new Double(topLeftX) / 1000);
+        topLeftXField.setValue(new Double(getTopLeftX()) / 1000);
         optionPanel.add(topLeftXField);
         
-        l=new JLabel("Center X (mm):",JLabel.RIGHT);
-        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
-        optionPanel.add(l);
-        final JLabel centerXField = new JLabel(getCenterXYPos()==null ? "unknown" : NUMBER_FORMAT.format(getCenterXYPos().getX() / 1000));
-        optionPanel.add(centerXField);
-
         l=new JLabel("Origin Y (mm):",JLabel.RIGHT);
         l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
         optionPanel.add(l);
         final JFormattedTextField topLeftYField = new JFormattedTextField();
         topLeftYField.setColumns(10);
-        topLeftYField.setValue(new Double(topLeftY) / 1000);
+        topLeftYField.setValue(new Double(getTopLeftY()) / 1000);
         optionPanel.add(topLeftYField);
         
+        l=new JLabel("Center X (mm):",JLabel.RIGHT);
+        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        optionPanel.add(l);
+        final JFormattedTextField centerXField = new JFormattedTextField();
+        centerXField.setColumns(10);
+        centerXField.setValue(new Double(centerXYPos.getX()) / 1000);
+        optionPanel.add(centerXField);
+
         l=new JLabel("Center Y (mm):",JLabel.RIGHT);
         l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
         optionPanel.add(l);
-        final JLabel centerYField = new JLabel(getCenterXYPos()==null ? "unknown" : NUMBER_FORMAT.format(getCenterXYPos().getY() / 1000));
+        final JFormattedTextField centerYField = new JFormattedTextField();
+        centerYField.setColumns(10);
+        centerYField.setValue(new Double(centerXYPos.getY()) / 1000);
         optionPanel.add(centerYField);
 
         l=new JLabel("Width (mm):",JLabel.RIGHT);
         l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
         optionPanel.add(l);
-        final JLabel widthField = new JLabel(NUMBER_FORMAT.format(width / 1000));
+        final JLabel widthField = new JLabel(NUMBER_FORMAT.format(generalPath.getBounds2D().getWidth() / 1000));
         optionPanel.add(widthField);
 
         l=new JLabel("Height (mm):",JLabel.RIGHT);
         l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
         optionPanel.add(l);
-        final JLabel heightField = new JLabel(NUMBER_FORMAT.format(height / 1000));
+        final JLabel heightField = new JLabel(NUMBER_FORMAT.format(generalPath.getBounds2D().getHeight() / 1000));
         optionPanel.add(heightField);
         
-        final JTable pointTable = new JTable(new PointTableModel(points));
+        l=new JLabel("Rotation (degree):",JLabel.RIGHT);
+        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        optionPanel.add(l);
+        final JFormattedTextField rotationField = new JFormattedTextField();
+        rotationField.setColumns(10);
+        rotationField.setValue(new Double(Utils.getRotation(affineTrans))/Math.PI*180);
+        optionPanel.add(rotationField);        
+        
+        final JTable pointTable = new JTable(new PointTableModel(this,points));
         pointTable.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
         
         final JRadioButton absoluteButton = new JRadioButton("Absolute");
@@ -565,18 +566,18 @@ public class PolygonArea extends SampleArea {
             @Override
             public void actionPerformed(ActionEvent e) {
                 PointTableModel model=(PointTableModel)pointTable.getModel();
-                model.setData(getOutlinePoints(), true);
+                model.enableAbsolute(true);
             }
         });
 
-        final JRadioButton relativeButton = new JRadioButton("Relative to Origin");
+        final JRadioButton relativeButton = new JRadioButton("Relative to Area Center");
         relativeButton.setActionCommand("relative");
         relativeButton.addActionListener(new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
                 PointTableModel model=(PointTableModel)pointTable.getModel();
-                model.setData(getOutlinePointsRel(), true);
+                model.enableAbsolute(false);
             }
         });
 
@@ -604,24 +605,24 @@ public class PolygonArea extends SampleArea {
                     if ((evt.getColumn() == 0 || evt.getColumn() == 1)) {
                         IJ.log("     columnChanged");
                         PointTableModel model=(PointTableModel)pointTable.getModel();
-                        if (absoluteButton.isSelected()) {
-                            createArea(points);
-                            model.setData(getOutlinePoints(), true);
-                        } else if (relativeButton.isSelected()){
-                            createArea(model.pointList,topLeftX, topLeftY);
-                            model.setData(getOutlinePointsRel(), true);
-                        } 
+                        createShape();
+                        centerShape();
+//                        Point2D centerOffset=centerPath(shape);
+//                        affineTrans.transform(centerOffset, centerOffset);
+//                        setCenter(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());        
+                        setRelDefaultPos();
                         createGeneralPath();
-                        calcCenterAndDefaultPos();
+//                        model.setData(points,true);
+                        model.updateAllRows();
                     } else {
                         IJ.log("     other changes:" + evt.getColumn());
                     }
-                    topLeftXField.setValue(new Double(topLeftX / 1000));
-                    topLeftYField.setValue(new Double(topLeftY / 1000));
-                    centerXField.setText(getCenterXYPos()==null ? "?" : NUMBER_FORMAT.format(getCenterXYPos().getX() / 1000));
-                    centerYField.setText(getCenterXYPos()==null ? "?" : NUMBER_FORMAT.format(getCenterXYPos().getY() / 1000));
-                    widthField.setText(NUMBER_FORMAT.format(width / 1000));
-                    heightField.setText(NUMBER_FORMAT.format(height / 1000));
+                    topLeftXField.setValue(new Double(getTopLeftX() / 1000));
+                    topLeftYField.setValue(new Double(getTopLeftY() / 1000));
+                    centerXField.setValue(new Double(getCenterXYPos().getX() / 1000));
+                    centerYField.setValue(new Double(getCenterXYPos().getY() / 1000));
+                    widthField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getWidth() / 1000));
+                    heightField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getHeight() / 1000));
                 }
             }
         });
@@ -632,17 +633,15 @@ public class PolygonArea extends SampleArea {
             public void propertyChange(PropertyChangeEvent evt) {
                 if ((points!=null && points.size() > 0) && ((Double)evt.getNewValue() != (Double)evt.getOldValue())) {
                     PointTableModel model=(PointTableModel)pointTable.getModel();
-                    if (absoluteButton.isSelected()) {
-                        double dx=((Double)evt.getNewValue() * 1000)-topLeftX;
-                        createArea(points,dx,0);
-                        model.setData(getOutlinePoints(),true);
-                    } else if (relativeButton.isSelected()) {
-                        createArea(model.pointList,(Double)evt.getNewValue() * 1000,topLeftY);
-                        model.setData(getOutlinePointsRel(),true);
+//                    double dx=((Double)evt.getNewValue() * 1000)-getTopLeftX();
+                    double newValue = ((Number)topLeftXField.getValue()).doubleValue()*1000;
+                    if (newValue != getTopLeftX()) {
+                        setTopLeftX(newValue);//recalculates center pos
+                        //centerXField.setValue(new Double(getCenterXYPos().getY()/1000));
+                        centerXField.setValue(new Double(getCenterXYPos().getX() / 1000));
+//                        model.setData(points,true);
+                        model.updateAllRows();
                     }
-                    createGeneralPath();
-                    calcCenterAndDefaultPos();
-                    centerXField.setText(getCenterXYPos()==null ? "?" : NUMBER_FORMAT.format(getCenterXYPos().getX() / 1000));
                 }
             }
         });
@@ -652,22 +651,71 @@ public class PolygonArea extends SampleArea {
             @Override
             public void propertyChange(PropertyChangeEvent evt) {
                 if ((points!=null && points.size() > 0) && ((Double)evt.getNewValue() != (Double)evt.getOldValue())) {
-                    PointTableModel model=(PointTableModel)pointTable.getModel();
-                    if (absoluteButton.isSelected()) {
-                        double dy=((Double)evt.getNewValue() * 1000)-topLeftY;
-                        createArea(points,0,dy);
-                        model.setData(getOutlinePoints(),true);
-                    } else if (relativeButton.isSelected()) {
-                        createArea(model.pointList,topLeftX,(Double)evt.getNewValue() * 1000);
-                        model.setData(getOutlinePointsRel(),true);
+                    double newValue = ((Number)topLeftYField.getValue()).doubleValue()*1000;
+                    if (newValue != getTopLeftY()) {
+                        PointTableModel model=(PointTableModel)pointTable.getModel();
+                        setTopLeftY(newValue);//recalculates centerXYPos and generalPath
+                        centerYField.setText(getCenterXYPos()==null ? "?" : NUMBER_FORMAT.format(getCenterXYPos().getY() / 1000));
+//                        model.setData(points,true);
+                        model.updateAllRows();
                     }
-                    createGeneralPath();
-                    calcCenterAndDefaultPos();
-                    centerYField.setText(getCenterXYPos()==null ? "?" : NUMBER_FORMAT.format(getCenterXYPos().getY() / 1000));
                 }
             }
         });
 
+        centerXField.addPropertyChangeListener("value", new PropertyChangeListener() {
+
+            @Override
+            public void propertyChange(PropertyChangeEvent evt) {
+                if ((points!=null && points.size() > 0) && ((Double)evt.getNewValue() != (Double)evt.getOldValue())) {
+                    double newValue = ((Number)centerXField.getValue()).doubleValue()*1000;
+                    if (newValue != centerXYPos.getX()) {
+                        PointTableModel model=(PointTableModel)pointTable.getModel();
+                        setCenter(newValue, centerXYPos.getY());//recalculates generalPath
+                        topLeftXField.setValue(new Double(getTopLeftX() / 1000));
+//                        model.setData(points,true);
+                        model.updateAllRows();
+                    }
+                }
+            }
+        });
+        
+        centerYField.addPropertyChangeListener("value", new PropertyChangeListener() {
+
+            @Override
+            public void propertyChange(PropertyChangeEvent evt) {
+                if ((points!=null && points.size() > 0) && ((Double)evt.getNewValue() != (Double)evt.getOldValue())) {
+                    double newValue = ((Number)centerYField.getValue()).doubleValue()*1000;
+                    if (newValue != centerXYPos.getY()) {
+                        PointTableModel model=(PointTableModel)pointTable.getModel();
+                        setCenter(centerXYPos.getX(),newValue);//recalculates generalPath
+                        topLeftYField.setText(NUMBER_FORMAT.format(getTopLeftY() / 1000));
+//                        model.setData(points,true);
+                        model.updateAllRows();
+                    }
+                }
+            }
+        });
+        
+        rotationField.addPropertyChangeListener("value",new PropertyChangeListener() {
+
+            @Override
+            public void propertyChange(PropertyChangeEvent evt) {
+                if (evt.getSource() == rotationField) {
+                    double newValue = ((Number)rotationField.getValue()).doubleValue();
+                    //convert to rad
+                    newValue=newValue/180*Math.PI;
+                    if (newValue != Utils.getRotation(affineTrans)) {
+                        PointTableModel model=(PointTableModel)pointTable.getModel();
+                        setAffineTransform(Utils.createRotationAffineTrans(newValue));
+                        topLeftXField.setValue(new Double(getTopLeftX()/1000));
+                        topLeftYField.setValue(new Double(getTopLeftY()/1000));
+                        model.updateAllRows();
+                    }
+                }
+            }
+        });
+        
         SpringLayout springLayout = new SpringLayout();
         JPanel tablePanel=new JPanel();
         tablePanel.setLayout(springLayout);
@@ -679,14 +727,22 @@ public class PolygonArea extends SampleArea {
         newButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent arg0) {
-                Point2D point=new Point2D.Double(0,0);
+                Point2D point=new Point2D.Double(
+                        shape.getBounds2D().getMinX(), 
+                        shape.getBounds2D().getMinY());
                 PointTableModel model=(PointTableModel)pointTable.getModel();
                 model.addRow(point);
                 pointTable.changeSelection(pointTable.getRowCount()-1,pointTable.getRowCount(),false,false);
-                createArea(points,0,0);
+                createShape();
+                centerShape();
+//                Point2D centerOffset=centerPath(shape);
+//                affineTrans.transform(centerOffset, centerOffset);
+//                setCenter(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());        
+                setRelDefaultPos();
                 createGeneralPath();
-                calcCenterAndDefaultPos();
-                model.setData(getOutlinePoints(),true);
+                IJ.log("points.size: "+Integer.toString(points.size()));
+//                    model.setData(points,true);
+                model.updateAllRows();
             }
         });
         newButton.setToolTipText("Create new vertex point");
@@ -706,24 +762,30 @@ public class PolygonArea extends SampleArea {
 
         final JButton removeButton = new JButton(new ImageIcon(getClass().getResource("/autoimage/resources/delete.png")));
         removeButton.addActionListener(new ActionListener() {
-           @Override
-           public void actionPerformed(ActionEvent arg0) {
-               int selRowCount=pointTable.getSelectedRowCount();
-               if (selRowCount > 0) {
-                   int[] selRows=pointTable.getSelectedRows();
-                   for (int i=0; i<selRows.length; i++){
-                       selRows[i]=pointTable.convertRowIndexToModel(selRows[i]);
-                   }    
-                   PointTableModel model=(PointTableModel)pointTable.getModel();
-                   model.removeRows(selRows);
-                   createArea(points,0,0);
+            @Override
+            public void actionPerformed(ActionEvent arg0) {
+                int selRowCount=pointTable.getSelectedRowCount();
+                if (selRowCount > 0) {
+                    int[] selRows=pointTable.getSelectedRows();
+                    int[] rowsInModel=new int[selRows.length];
+                    for (int i=0; i<selRows.length; i++){
+                        rowsInModel[i]=pointTable.convertRowIndexToModel(selRows[i]);
+                    }
+                    PointTableModel model=(PointTableModel)pointTable.getModel();
+                    model.removeRows(rowsInModel);
+                    createShape();
+                    centerShape();
+//                    Point2D centerOffset=centerPath(shape);
+//                    affineTrans.transform(centerOffset, centerOffset);
+//                    setCenter(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());        
+                    setRelDefaultPos();
                     createGeneralPath();
-                    calcCenterAndDefaultPos();
-                   model.setData(getOutlinePoints(),true);
-               } else {
-                   JOptionPane.showMessageDialog(null, "Select at least one vertex point.");
-               }
-           }
+                    model.setData(points,true);
+//                    model.updateAllRows();
+                } else {
+                    JOptionPane.showMessageDialog(null, "Select at least one vertex point.");
+                }
+            }
         });
         removeButton.setToolTipText("Remove selected vertex points");
         tablePanel.add(removeButton);
@@ -742,6 +804,7 @@ public class PolygonArea extends SampleArea {
                     return;
                 }
                 if (selRows.length > 0 & selRows[0] > 0) {
+//                    int[] rowsInModel=new int[selRows.length];                
                     int newSelRowInView=selRows[0]-1;
                     //
                     int firstMinusOneIndex=pointTable.convertRowIndexToModel(selRows[0]-1);
@@ -751,10 +814,15 @@ public class PolygonArea extends SampleArea {
                     }
                     PointTableModel model=(PointTableModel)pointTable.getModel();
                     model.rowsUp(selRows, firstMinusOneIndex);
-                    createArea(points,0,0);
+                    createShape();
+                    centerShape();
+//                    Point2D centerOffset=centerPath(shape);
+//                        affineTrans.transform(centerOffset, centerOffset);
+//                    setCenter(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());        
+                    setRelDefaultPos();
                     createGeneralPath();
-                    calcCenterAndDefaultPos();
-                    model.setData(getOutlinePoints(),true);
+//                    model.setData(points,true);
+                    model.updateAllRows();
                     pointTable.setRowSelectionInterval(newSelRowInView, newSelRowInView + selRows.length - 1);
                 } 
             }
@@ -776,6 +844,7 @@ public class PolygonArea extends SampleArea {
                     return;
                 }
                 if (selRows.length > 0 & selRows[selRows.length - 1] < pointTable.getRowCount()) {
+//                    int[] rowsInModel=new int[selRows.length];                
                     int newSelRowInView=selRows[0]+1;
                     //
                     int lastPlusOneIndex=pointTable.convertRowIndexToModel(selRows[selRows.length-1]+1);
@@ -785,10 +854,15 @@ public class PolygonArea extends SampleArea {
                     }
                     PointTableModel model=(PointTableModel)pointTable.getModel();
                     model.rowsDown(selRows, lastPlusOneIndex);
-                    createArea(points,0,0);
+                    createShape();
+                    centerShape();
+//                    Point2D centerOffset=centerPath(shape);
+//                    affineTrans.transform(centerOffset, centerOffset);
+//                    setCenter(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());        
+                    setRelDefaultPos();
                     createGeneralPath();
-                    calcCenterAndDefaultPos();
-                    model.setData(getOutlinePoints(),true);
+//                    model.setData(points,true);
+                    model.updateAllRows();
                     pointTable.setRowSelectionInterval(newSelRowInView, newSelRowInView + selRows.length - 1);
                 }
             }
@@ -807,12 +881,21 @@ public class PolygonArea extends SampleArea {
         combinedPanel.add(buttonPanel);
         combinedPanel.add(Box.createRigidArea(new Dimension(0,5)));
         combinedPanel.add(tablePanel);
+        
+        pointTable.putClientProperty("terminateEditOnFocusLost", Boolean.TRUE);
         int result;
         boolean invalidParams;
         do {
             invalidParams=false;
             result = JOptionPane.showConfirmDialog(null, combinedPanel, 
                 getShapeType()+": Configuration", JOptionPane.OK_CANCEL_OPTION);
+            createShape();
+            centerShape();
+//            Point2D centerOffset=centerPath(shape);
+//            affineTrans.transform(centerOffset, centerOffset);
+//            setCenter(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());        
+            createGeneralPath();
+            setRelDefaultPos();
             if (result == JOptionPane.OK_OPTION && points.size() < 3) {
                 JOptionPane.showMessageDialog(null,"At least three vertex points need to be defined.");
                 invalidParams=true;
@@ -830,17 +913,89 @@ public class PolygonArea extends SampleArea {
             return this;
         }            
     }
+
+    /**
+     * 
+     * @param pList List<Point2D> containing x/y coordinates for all vertices. Connection order between vertices is given by order of objects in pList
+     * @return Path2D object describing the polygon
+     */
+    protected Path2D createPolygonFromPoints(List<Point2D> pList) {
+        if (pList==null || pList.isEmpty()) {
+            return new Path2D.Double();
+        } else {    
+            Path2D poly=new Path2D.Double();
+            poly.moveTo(pList.get(0).getX(), pList.get(0).getY());
+            if (pList.size()<=1) {
+            }
+            if (pList.size()>1) {
+                for (int i=1; i< pList.size(); i++) {
+                    poly.lineTo(pList.get(i).getX(), pList.get(i).getY());
+                }
+                poly.closePath();
+            }
+            return poly;
+        }
+    }
+
+    /**
+     * 
+     * @param path The Path2D object to be centered
+     * @return the translation vector applied to center the path
+     */
+    /*protected Point2D centerPath(Path2D path) {
+        double cx=path.getBounds2D().getCenterX();
+        double cy=path.getBounds2D().getCenterY();
+        //if properly centered, cx and cy should be 0
+        //if not we translate created shape to origin
+        AffineTransform at=new AffineTransform();
+        at.translate(-cx, -cy);
+        path.transform(at);
+        for (Point2D p:points) {
+            p.setLocation(p.getX()-cx, p.getY()-cy);
+        }
+        return new Point2D.Double(-cx,-cy);
+    }*/
+    
+    protected void centerShape() {
+        double cx=shape.getBounds2D().getCenterX();
+        double cy=shape.getBounds2D().getCenterY();
+        //if properly centered, cx and cy should be 0
+        //if not we translate created shape to origin
+        AffineTransform at=new AffineTransform();
+        at.translate(-cx, -cy);
+        shape.transform(at);
+        for (Point2D p:points) {
+            p.setLocation(p.getX()-cx, p.getY()-cy);
+        }
+        //need to update offsetXYPos to ensure that the generalPath positioning remains unchanged
+        Point2D centerOffset = new Point2D.Double(-cx,-cy);// shape translation vector
+        //apply the affineTrans to shape shape translation vector
+        affineTrans.transform(centerOffset, centerOffset);
+        //apply inverted translation vector
+//        setCenter(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());
+        centerXYPos=new Point2D.Double(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());
+    }
+    /**
+     * Points are expected to be relative coordinates defining this.shape centered around origin (0/0)
+     */
+    @Override
+    protected void createShape() {
+        if (points!=null && !points.isEmpty()) {
+            IJ.log(Integer.toString(points.size())+" points");
+            //create polygon
+            shape=createPolygonFromPoints(points);
+            //just to make sure, recenter shape and adjust centerXYPos accordingly
+//            Point2D centerOffset=centerPath(shape);
+//            setCenter(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());        
+        } else {
+            IJ.log("no points");
+            shape=new Path2D.Double();
+        }
+    }  
     
     @Override
     public int supportedLayouts() {
         return SampleArea.SUPPORT_CUSTOM_LAYOUT;
     }
-    
-    @Override
-    protected void createShape() {
-        createArea(points,0,0);
-//        createGeneralPath();
-//        calcCenterAndDefaultPos();
-    }
-    
+        
 }

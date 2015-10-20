@@ -720,7 +720,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     @Override
     public SampleArea getAreaByLayoutPos(double lx, double ly) {
         for (SampleArea a:areas) {
-            if (a.isInArea(lx,ly))
+            if (a.contains(lx,ly))
                 return a;
         }
         return null;
@@ -789,7 +789,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
         int i=0;
         int index=-1;
         while ((index==-1) && (i<areas.size())) {
-            if (areas.get(i).isInArea(lx,ly))
+            if (areas.get(i).contains(lx,ly))
                 index=i;
             i++;
         }
@@ -851,7 +851,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
         int[] indices = new int[areas.size()];
         int j=0;
         for (int i=0; i<areas.size(); i++) {
-            if (areas.get(i).isInArea(x,y))
+            if (areas.get(i).contains(x,y))
                 indices[j]=i;    
         }
         return indices;
@@ -862,7 +862,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     public ArrayList<SampleArea> getAllAreasTouching(double x, double y) {
         ArrayList<SampleArea> list = new ArrayList<SampleArea>(areas.size());
         for (SampleArea area : areas) {
-            if (area.isInArea(x, y)) {
+            if (area.contains(x, y)) {
                 list.add(area);    
             }
         }
@@ -873,7 +873,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     public ArrayList<SampleArea> getUnselectedAreasTouching(double x, double y) {
         ArrayList<SampleArea> list = new ArrayList<SampleArea>(areas.size());
         for (SampleArea area:areas) {
-            if (!area.isSelectedForAcq() && area.isInArea(x,y))
+            if (!area.isSelectedForAcq() && area.contains(x,y))
                 list.add(area);    
         }
         return list; 
@@ -883,7 +883,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     public ArrayList<SampleArea> getSelectedAreasTouching(double x, double y) {
         ArrayList<SampleArea> list = new ArrayList<SampleArea>(areas.size());
         for (SampleArea area:areas) {
-            if (area.isSelectedForAcq() && area.isInArea(x,y))
+            if (area.isSelectedForAcq() && area.contains(x,y))
                 list.add(area);    
         }
         return list; 
@@ -956,8 +956,10 @@ public class AcqCustomLayout extends AcqBasicLayout {
             XMLUtils.writeLine(xtw, SampleArea.TAG_NAME, a.getName());
             XMLUtils.writeLine(xtw, SampleArea.TAG_TOP_LEFT_X, java.lang.Double.toString(a.getTopLeftX()));
             XMLUtils.writeLine(xtw, SampleArea.TAG_TOP_LEFT_Y, java.lang.Double.toString(a.getTopLeftY()));
-            XMLUtils.writeLine(xtw, SampleArea.TAG_WIDTH, java.lang.Double.toString(a.getWidth()));
-            XMLUtils.writeLine(xtw, SampleArea.TAG_HEIGHT, java.lang.Double.toString(a.getHeight()));
+            XMLUtils.writeLine(xtw, SampleArea.TAG_CENTER_X, java.lang.Double.toString(a.getCenterXYPos().getX()));
+            XMLUtils.writeLine(xtw, SampleArea.TAG_CENTER_Y, java.lang.Double.toString(a.getCenterXYPos().getY()));
+            XMLUtils.writeLine(xtw, SampleArea.TAG_BOUNDS_WIDTH, java.lang.Double.toString(a.getBounds().getWidth()));
+            XMLUtils.writeLine(xtw, SampleArea.TAG_BOUNDS_HEIGHT, java.lang.Double.toString(a.getBounds().getHeight()));
             XMLUtils.writeLine(xtw, SampleArea.TAG_REL_POS_Z, java.lang.Double.toString(a.getRelativeZPos()));
             XMLUtils.writeLine(xtw, SampleArea.TAG_COMMENT, a.getComment());
             List<Tile> tl=a.getTilePositions();

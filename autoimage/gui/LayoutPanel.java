@@ -395,10 +395,10 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
             if (cAcqSetting!=null) {
                 for (SampleArea area:areas) {
                     g2d.setColor(getFillColor(area,showZProfile));
-                    GeneralPath shape=area.getGeneralPath();
-                    g2d.fill(shape);
+//                    GeneralPath shape=area.getGeneralPath();
+                    g2d.fill(area);
                     g2d.setColor(getBorderColor(area));
-                    g2d.draw(shape); 
+                    g2d.draw(area); 
                 }
                 if (showAreaLabels) {
                     for (SampleArea a:areas) {

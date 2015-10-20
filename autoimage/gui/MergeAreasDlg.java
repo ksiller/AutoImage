@@ -89,8 +89,8 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
                  case 0: return a.getName();
                  case 1: return a.getTopLeftX();
                  case 2: return a.getTopLeftY();
-                 case 3: return a.getWidth();
-                 case 4: return a.getHeight();
+                 case 3: return a.getBounds().getWidth();
+                 case 4: return a.getBounds().getHeight();
              }
              return false;
          } else
@@ -111,8 +111,8 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
                  case 0: a.setName((String)value);
                  case 1: a.setTopLeftX((Double)value);
                  case 2: a.setTopLeftY((Double)value);
-                 case 3: a.setWidth((Double)value);
-                 case 4: a.setHeight((Double)value);
+//                 case 3: a.setWidth((Double)value);
+//                 case 4: a.setHeight((Double)value);
              }
              fireTableCellUpdated(rowIndex,colIndex);
          }

@@ -74,7 +74,11 @@ import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.FlatteningPathIterator;
+import java.awt.geom.GeneralPath;
 import java.awt.geom.Path2D;
+import java.awt.geom.PathIterator;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.io.BufferedReader;
@@ -683,7 +687,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                         final JScrollPane scrollPane = new JScrollPane(list);
                         scrollPane.setPreferredSize(new Dimension(250, 80));
                         scrollPane.setAlignmentX(LEFT_ALIGNMENT);
-                        //scrollPane.add(list);
+                        //scrollPane.add(allPoints);
                         JPanel listPanel = new JPanel();
                         listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.PAGE_AXIS));
                         listPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -701,7 +705,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                                 do {
                                     activeProcs=new ArrayList<String>();
                                     Enumeration<DefaultMutableTreeNode> en=node.preorderEnumeration();
-                                    //get list of active processors
+                                    //get allPoints of active processors
                                     while (en.hasMoreElements()) {
                                         DataProcessor dp=(DataProcessor)en.nextElement().getUserObject();
                                         if (//!(dp instanceof ExtDataProcessor) ||
@@ -744,7 +748,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                                         procNames[i]+=".";
                                     }
                                 }
-                                //update list with active processor names
+                                //update allPoints with active processor names
                                 list.setListData(procNames);
                             }
 
@@ -762,7 +766,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                             public void actionPerformed(ActionEvent e) {
                                 abortButton.setEnabled(false);
                                 Enumeration<DefaultMutableTreeNode> en=node.preorderEnumeration();
-                                //get list of active processors
+                                //get allPoints of active processors
                                 while (en.hasMoreElements()) {
                                     DataProcessor dp=(DataProcessor)en.nextElement().getUserObject();
                                     dp.requestStop();
@@ -1105,15 +1109,15 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     public void mergeAreaSelectionChanged(List<SampleArea> mergingAreas) {
        if (mergingAreas!=null & mergingAreas.size()>1) {
             double minX=mergingAreas.get(0).getTopLeftX();
-            double maxX=minX+mergingAreas.get(0).getWidth();
+            double maxX=minX+mergingAreas.get(0).getBounds().getWidth();
             double minY=mergingAreas.get(0).getTopLeftY();
-            double maxY=minY+mergingAreas.get(0).getHeight();
+            double maxY=minY+mergingAreas.get(0).getBounds().getHeight();
             double z=0;
             for (SampleArea area:mergingAreas) {
                 minX=Math.min(minX, area.getTopLeftX());
                 minY=Math.min(minY, area.getTopLeftY());
-                maxX=Math.max(maxX, area.getTopLeftX()+area.getWidth());
-                maxY=Math.max(maxY, area.getTopLeftY()+area.getHeight());
+                maxX=Math.max(maxX, area.getTopLeftX()+area.getBounds().getWidth());
+                maxY=Math.max(maxY, area.getTopLeftY()+area.getBounds().getHeight());
             }
             setMergeAreasBounds(new Rectangle2D.Double(minX,minY,maxX-minX,maxY-minY));
        } else
@@ -1144,63 +1148,70 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             List<SampleArea> layoutAreas=acqLayout.getAreaArray();
             SampleArea mergedArea=null;
             if (lastMergeOption.equals("Encompassing Rectangle")) {
-                double minX=mergingAreas.get(0).getTopLeftX();
-                double maxX=minX+mergingAreas.get(0).getWidth();
-                double minY=mergingAreas.get(0).getTopLeftY();
-                double maxY=minY+mergingAreas.get(0).getHeight();
+                double minX=mergingAreas.get(0).getBounds2D().getMinX();
+                double maxX=mergingAreas.get(0).getBounds2D().getMaxX();
+                double minY=mergingAreas.get(0).getBounds2D().getMinY();
+                double maxY=mergingAreas.get(0).getBounds2D().getMaxY();
                 for (SampleArea area:mergingAreas) {
-                    minX=Math.min(minX, area.getTopLeftX());
-                    minY=Math.min(minY, area.getTopLeftY());
-                    maxX=Math.max(maxX, area.getTopLeftX()+area.getWidth());
-                    maxY=Math.max(maxY, area.getTopLeftY()+area.getHeight());
+                    minX=Math.min(minX, area.getBounds2D().getMinX());
+                    minY=Math.min(minY, area.getBounds2D().getMinY());
+                    maxX=Math.max(maxX, area.getBounds2D().getMaxX());
+                    maxY=Math.max(maxY, area.getBounds2D().getMaxY());
                 }
-                mergedArea=new RectArea(createNewAreaName(),acqLayout.createUniqueAreaId(),minX, minY, 0, maxX-minX, maxY-minY, false, "");
+                mergedArea=new RectArea(createNewAreaName(),acqLayout.createUniqueAreaId(),(minX+maxX)/2, (minY+maxY)/2, 0, maxX-minX, maxY-minY, false, "");
             } else if (lastMergeOption.equals("Convex Hull")) {
-                Path2D poly=new Path2D.Double();
-                ImageProcessor ip=new ByteProcessor(100,100);
                 List<Point2D> allPoints=new ArrayList<Point2D>();
-                double minX=0;
-                double maxX=0;
-                double minY=0;
-                double maxY=0;
-                int iterat=0;
-                //get point list and find minX and minY (used as origin coordinates fro new polygon)
-                for (SampleArea a:mergingAreas) {
-                    List<Point2D> points=a.getOutlinePoints();
-                    for (Point2D p:points) {
-                        if (iterat==0) {
-                            minX=p.getX();
-                            maxX=minX;
-                            minY=p.getY();
-                            maxY=minY;
-                        } else {
-                            minX=Math.min(minX, p.getX());
-                            minY=Math.min(minY, p.getY());
-                            maxX=Math.max(maxX, p.getX());
-                            maxY=Math.max(maxY, p.getY());
+                for (SampleArea area:mergingAreas) {
+                    //flatten curved segments, scale flatteness parameter according to area's size
+                    PathIterator pi=new FlatteningPathIterator(area.getPathIterator(null),Math.max(area.getBounds2D().getWidth(),area.getBounds2D().getHeight())/500);
+                    while (!pi.isDone()) {
+                        double[] coords=new double[6];
+                        int type=pi.currentSegment(coords);
+                        if (type!=PathIterator.SEG_CLOSE) {
+                            allPoints.add(new Point2D.Double(coords[0], coords[1]));
                         }
-                        allPoints.add(p);
-                        iterat++;
+                        pi.next();
                     }
                 }
-                //populate x and y point array
-                float[] x=new float[allPoints.size()];
-                float[] y=new float[allPoints.size()];
+                IJ.log(this.getClass().getName()+": mergeAreas (convext hull) with "+Integer.toString(allPoints.size())+" input vertices");
+                float[] allX=new float[allPoints.size()];
+                float[] allY=new float[allPoints.size()];
+                //populate x and y coordinate array
                 int i=0;
-                for (Point2D p:allPoints) {
-                    x[i]=(float)(p.getX()-minX);
-                    y[i]=(float)(p.getY()-minY);
+                for (Point2D point:allPoints) {
+                    allX[i]=(float)point.getX();
+                    allY[i]=(float)point.getY();
+                    IJ.log("allX["+Integer.toString(i)+"]: "+Float.toString(allX[i])+", allY["+Integer.toString(i)+"]: "+Float.toString(allY[i]));
                     i++;
                 }
                 //create convex hull ROI
-                PolygonRoi roi=new PolygonRoi(x,y,Roi.POLYGON);
+                PolygonRoi roi=new PolygonRoi(allX,allY,Roi.POLYGON);
                 Polygon convexHull=roi.getConvexHull();
-                //create point list for PolygonArea
+                //create all verices for PolygonArea
+                GeneralPath polygon=new GeneralPath();
+                IJ.log(Boolean.toString(convexHull==null));
+                IJ.log(Boolean.toString(convexHull.xpoints==null));
+                IJ.log(Boolean.toString(convexHull.ypoints==null));
+                polygon.moveTo(convexHull.xpoints[0], convexHull.ypoints[0]);
+                for (i=1; i<convexHull.xpoints.length; i++) {
+                    polygon.lineTo(convexHull.xpoints[i],convexHull.ypoints[i]);
+                }
+                polygon.closePath();
+                IJ.log(this.getClass().getName()+": mergeAreas (convex hull) with "+Integer.toString(allPoints.size())+" input vertices; new polygon with "+Integer.toString(convexHull.xpoints.length)+" vertices");
+                Rectangle2D bounds=polygon.getBounds2D();
                 List<Point2D> pList=new ArrayList<Point2D>();
                 for (i=0; i<convexHull.npoints; i++) {
-                    pList.add(new Point2D.Double(convexHull.xpoints[i],convexHull.ypoints[i]));
+                    pList.add(new Point2D.Double(convexHull.xpoints[i]-bounds.getCenterX(),convexHull.ypoints[i]-bounds.getCenterY()));
                 }
-                mergedArea=new PolygonArea(createNewAreaName(), acqLayout.createUniqueAreaId(), minX, minY, 0, pList, false, "");
+                mergedArea=new PolygonArea(
+                        createNewAreaName(), 
+                        acqLayout.createUniqueAreaId(), 
+                        bounds.getCenterX(), 
+                        bounds.getCenterY(), 
+                        0, 
+                        pList, 
+                        false, 
+                        "");
             }
             layoutAreas.removeAll(mergingAreas);
             layoutAreas.add(mergedArea);
@@ -4758,7 +4769,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             markEndScreenPos = new Point(evt.getX(), evt.getY());
             Point2D.Double markStartPos = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(markStartScreenPos);
             Point2D.Double markEndPos = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(markEndScreenPos);
-            List<SampleArea> al=null;//will hold list of all affected areas
+            List<SampleArea> al=null;//will hold allPoints of all affected areas
             if (!identicalPoints(markStartScreenPos, markEndScreenPos)) { 
                 // drag and relase to mark group of areas
                 if (selectMode) {
@@ -5421,7 +5432,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             double tileHeight = currentAcqSetting.getTileHeight_UM();
             try {
                 Vec3d lCoord = acqLayout.convertStageToLayoutPos(sX, sY, sZ);
-                SampleArea a = new RectArea(createNewAreaName(), acqLayout.createUniqueAreaId(), lCoord.x - tileWidth / 2, lCoord.y - tileHeight / 2, lCoord.z, tileWidth, tileHeight, false, "");
+                SampleArea a = new RectArea(createNewAreaName(), acqLayout.createUniqueAreaId(), lCoord.x, lCoord.y, lCoord.z, tileWidth, tileHeight, false, "");
                 areas.add(a);
                 initializeAreaTable();
                 //            AreaTableModel atm=(AreaTableModel)areaTable.getModel();
@@ -6166,7 +6177,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                         className = className.replace('/', '.');
                         try {
                             Class<?> clazz=Class.forName(className);
-                            //only add DataProcessor and not abstract classes to list
+                            //only add DataProcessor and not abstract classes to allPoints
                             if (DataProcessor.class.isAssignableFrom(clazz) && !Modifier.isAbstract(clazz.getModifiers())) {
                                 classes.add(className);
                             }
@@ -8690,7 +8701,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private void initializeAreaTable() {
         if (acqLayout != null) {
             List<SampleArea> l=acqLayout.getAreaArray();
-            //remove existing rowsorter which will cause null pointer exception when calling getColumnClass on row 0 in empty area list tablemodel
+            //remove existing rowsorter which will cause null pointer exception when calling getColumnClass on row 0 in empty area allPoints tablemodel
             areaTable.setRowSorter(null);
             areaTable.setModel(new AreaTableModel(l));
         } else {
@@ -8902,7 +8913,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private void moveToAreaDefaultPos(SampleArea area) {
         if (area != null) {
             try {
-                Vec3d stage = acqLayout.convertLayoutToStagePos(area.getDefaultXYPos().getX(),area.getDefaultXYPos().getY(),area.getRelativeZPos());
+                Vec3d stage = acqLayout.convertLayoutToStagePos(area.getAbsDefaultXYPos().getX(),area.getAbsDefaultXYPos().getY(),area.getRelativeZPos());
                 String xyStageName = core.getXYStageDevice();
                 String zStageName = core.getFocusDevice();
                 core.waitForDevice(zStageName);

@@ -448,4 +448,17 @@ public class Utils {
             }
         }        
     }
+    
+    //returns rad
+    public static double getRotation(AffineTransform at) {
+        return Math.atan2(at.getShearY(), at.getScaleY());
+    }
+    
+    //expects rad
+    public static AffineTransform createRotationAffineTrans(double rad) {
+        AffineTransform at=new AffineTransform();
+        at.rotate(rad);
+        return at;
+    }
+
 }

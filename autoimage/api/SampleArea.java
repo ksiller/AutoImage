@@ -9,6 +9,8 @@ import java.awt.Rectangle;
 import java.awt.Shape;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.GeneralPath;
+import java.awt.geom.NoninvertibleTransformException;
+import java.awt.geom.Path2D;
 import java.awt.geom.PathIterator;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
@@ -38,9 +40,8 @@ public abstract class SampleArea implements Shape {
     public static final String TAG_TOP_LEFT_Y = "TOP_LEFT_Y";
     public static final String TAG_CENTER_X = "CENTER_X";
     public static final String TAG_CENTER_Y = "CENTER_Y";
-    public static final String TAG_WIDTH = "WIDTH";
-    public static final String TAG_HEIGHT = "HEIGHT";
-    public static final String TAG_RING_WIDTH = "RING_WIDTH";
+    public static final String TAG_BOUNDS_WIDTH = "BOUNDS_WIDTH";   
+    public static final String TAG_BOUNDS_HEIGHT = "BOUNDS_HEIGHT";   
     public static final String TAG_AFFINETRANSFORM = "AFFINE_TRANSFORM";//used to realize SampleArea rotation in layout
     public static final String TAG_REL_POS_Z = "REL_POS_Z";
     public static final String TAG_SELECTED = "SELECTED";
@@ -65,16 +66,16 @@ public abstract class SampleArea implements Shape {
     protected int tilingStatus;
     protected int id; //unique identifier, reflects order of addition 
     protected int index; //index in arraylist of selected areas; required for metadata annotation 
-    protected double topLeftX; //in um
-    protected double topLeftY; //in um
-    protected Point2D centerXYPos;
-    protected Point2D defaultXYPos;
+//    protected double topLeftX; //in um before affine transform
+//    protected double topLeftY; //in um before affine transform
+    protected Point2D centerXYPos; //center cooridnates (in um) of shape in layout
+    protected Point2D relDefaultXYPos; //coordinates (in um) realtive to center before affineTrans
     protected double relativeZPos; //in um relative to flat layout bottom
-    protected double width; //in um
-    protected double height; //in um
+//    protected double width; //in um before affine transform
+//    protected double height; //in um before affine transform
     protected AffineTransform affineTrans;
-    protected Shape shape;
-    protected GeneralPath generalPath;
+    protected Path2D shape;//centered on (0/0) coordinate, before application of affineTrans
+    protected GeneralPath generalPath;//created from shape, applied affineTrans, translated to centerXYPos
     protected boolean selectedForAcq;
     protected boolean selectedForMerge;
     protected String comment;
@@ -92,24 +93,25 @@ public abstract class SampleArea implements Shape {
 
            
     public SampleArea() {
-        this("NewArea", -1, 0,0,0,0,0,false,"");
+        this("NewArea", -1, 0,0,0,false,"");
     }
     
     public SampleArea(String n) { //expects name identifier
-        this(n, -1, 0,0,0,0,0,false,"");
+        this(n, -1, 0,0,0,false,"");
     }
     
     //expects layout coordinates in phys dim
-    public SampleArea(String n, int id, double ox, double oy, double oz, double w, double h, boolean s, String anot) {
+    public SampleArea(String n, int id, double cx, double cy, double oz, boolean selForAcq, String anot) {
         name=n;
         this.id=id;
         index=-1;
-        topLeftX=ox;
-        topLeftY=oy;
+        centerXYPos=new Point2D.Double(cx,cy);
+//        topLeftX=ox;
+//        topLeftY=oy;
         relativeZPos=oz;
-        width=w;
-        height=h;
-        selectedForAcq=s;
+//        width=w;
+//        height=h;
+        selectedForAcq=selForAcq;
         comment=anot;
         acquiring=false;
         tilePosList=null;
@@ -117,9 +119,10 @@ public abstract class SampleArea implements Shape {
         unknownTileNum=true;
         noOfClusters=0;
         affineTrans=new AffineTransform();
-        calcCenterAndDefaultPos();
         createShape();
+        setRelDefaultPos();
         createGeneralPath();
+//        calcCenterAndDefaultPos();
     }
 
     private static String[] ColAlphabetFactory() {
@@ -399,18 +402,18 @@ public abstract class SampleArea implements Shape {
         int yTiles;
         double startx;
         double starty;
-        
+        Rectangle2D shapeBounds=generalPath.getBounds2D();
         if (insideOnly) {
-            xTiles=(int)Math.floor((width-fovBounds.getWidth())/tileOffset.getX())+1;
-            yTiles=(int)Math.floor((height-fovBounds.getHeight())/tileOffset.getY())+1;
+            xTiles=(int)Math.floor((shapeBounds.getWidth()-fovBounds.getWidth())/tileOffset.getX())+1;
+            yTiles=(int)Math.floor((shapeBounds.getHeight()-fovBounds.getHeight())/tileOffset.getY())+1;
         } else {
 //            xTiles=(int)Math.ceil(width/tileOffsetX);
 //            yTiles=(int)Math.ceil(height/tileOffsetY);
-            xTiles=(int)Math.ceil((width-fovBounds.getWidth())/tileOffset.getX())+1;
-            yTiles=(int)Math.ceil((height-fovBounds.getHeight())/tileOffset.getY())+1;
+            xTiles=(int)Math.ceil((shapeBounds.getWidth()-fovBounds.getWidth())/tileOffset.getX())+1;
+            yTiles=(int)Math.ceil((shapeBounds.getHeight()-fovBounds.getHeight())/tileOffset.getY())+1;
         }
-        startx=fovBounds.getWidth()/2+(topLeftX-((fovBounds.getWidth()+(xTiles-1)*tileOffset.getX()-width)/2));//*physToPixelRatio;
-        starty=fovBounds.getHeight()/2+(topLeftY-((fovBounds.getHeight()+(yTiles-1)*tileOffset.getY()-height)/2));//*physToPixelRatio;
+        startx=fovBounds.getWidth()/2+(getTopLeftX()-((fovBounds.getWidth()+(xTiles-1)*tileOffset.getX()-shapeBounds.getWidth())/2));//*physToPixelRatio;
+        starty=fovBounds.getHeight()/2+(getTopLeftY()-((fovBounds.getHeight()+(yTiles-1)*tileOffset.getY()-shapeBounds.getHeight())/2));//*physToPixelRatio;
         if (xTiles==0) xTiles=1;
         if (yTiles==0) yTiles=1;
         double x;
@@ -571,13 +574,14 @@ public abstract class SampleArea implements Shape {
             w=fovBounds.getWidth();
             h=fovBounds.getHeight();
         }
+        Rectangle2D shapeBounds=generalPath.getBounds2D();
         do {
             tilePosList = new ArrayList<Tile>(size);
             noOfClusters=0;
             int attempts=0;
             while (!Thread.currentThread().isInterrupted() && noOfClusters < tSetting.getMaxSites() && attempts < MAX_TILING_ATTEMPTS) {// && !abortTileCalc) {
-                double x=topLeftX+Math.random()*width;
-                double y=topLeftY+Math.random()*height;
+                double x=getTopLeftX()+Math.random()*shapeBounds.getWidth();
+                double y=getTopLeftY()+Math.random()*shapeBounds.getWidth();
                 if (acceptTilePos(x,y,w,h,tSetting.isInsideOnly())) {
                     if (tSetting.isCluster() && (tSetting.getNrClusterTileX()>1 || tSetting.getNrClusterTileY()>1)) {
                         if (createCluster(noOfClusters,x,y,fovX,fovY, tSetting) == TILING_OK) {
@@ -610,10 +614,11 @@ public abstract class SampleArea implements Shape {
         if (tSetting.isCluster())
             tiles=tiles*tSetting.getNrClusterTileX()*tSetting.getNrClusterTileY();
         tilePosList = new ArrayList<Tile>(tiles);
-        
-        if (centerXYPos==null || defaultXYPos==null) {
+
+// should not be necessary, double check        
+/*        if (centerXYPos==null || relDefaultXYPos==null) {
             calcCenterAndDefaultPos();
-        }
+        }*/
         tilingStatus=addTilesAroundSeed(0,centerXYPos.getX(), centerXYPos.getY(), fovX, fovY, tSetting);
         unknownTileNum=tilingStatus==TILING_UNKNOWN_NUMBER;
         noOfClusters=tilingStatus == TILING_OK ? 1 : 0;
@@ -730,56 +735,102 @@ public abstract class SampleArea implements Shape {
         return hash;
     }
     
-    public double getTopLeftX() {
-        return topLeftX;
-    } 
+    public void setCenter(double x, double y) {
+        centerXYPos=new Point2D.Double(x,y);
+        //don't need to update shape but need to generate new GeneralPath and update default pos
+        createGeneralPath();        
+//        calcCenterAndDefaultPos();
+    }
     
     public void setTopLeft(double x, double y) {
-        topLeftX=x;
-        topLeftY=y;
-        calcCenterAndDefaultPos();
-        createShape();
+        double deltax=x-getTopLeftX();
+        double deltay=y-getTopLeftY();
+        centerXYPos=new Point2D.Double(centerXYPos.getX()+deltax,centerXYPos.getY()+deltay);
+        //don't need to update shape but need to generate new GeneralPath and update default pos
         createGeneralPath();
+//        setDefaultPos();
 //        calculateCenterPos();
 //        calculateDefaultPos();
     }
     
+    /**
+     * 
+     * @param x layout coordinate in um
+     * updates centerXYPos and recalculates generalPath
+     */
     public void setTopLeftX(double x) {
-        topLeftX=x;
-        calcCenterAndDefaultPos();
-        createShape();
+        double deltax=x-getTopLeftX();
+        centerXYPos=new Point2D.Double(centerXYPos.getX()+deltax,centerXYPos.getY());
+        //don't need to update shape but need to generate new GeneralPath and update default pos
         createGeneralPath();
+//        setDefaultPos();
 //        calculateCenterPos();
 //        calculateDefaultPos();
     }
     
+    /**
+     * 
+     * @param y layout coordinate in um
+     * updates centerXYPos and recalculates generalPath
+     */
     public void setTopLeftY(double y) {
-        topLeftY=y;
-        calcCenterAndDefaultPos();
-        createShape();
+        double deltay=y-getTopLeftY();
+        centerXYPos=new Point2D.Double(centerXYPos.getX(),centerXYPos.getY()+deltay);
+        //don't need to update shape but need to generate new GeneralPath and update default pos
         createGeneralPath();
-//        calculateCenterPos();
-//        calculateDefaultPos();
+//        setDefaultPos();
     }
     
-    public double getTopLeftY() {
-        return topLeftY;
+    /**
+     * 
+     * @return x coordinate of top left corner of this bounding rectangle in layout coordinates (um)
+     */
+    public double getTopLeftX() {
+//        Rectangle2D bounds=generalPath.getBounds2D();
+//        return (centerXYPos.getX()-bounds.getWidth()/2);
+        return generalPath.getBounds2D().getX();
     } 
     
+    /**
+     * 
+     * @return y coordinate of top left corner of this bounding rectangle in layout coordinates (um)
+     */
+    public double getTopLeftY() {
+//        Rectangle2D bounds=generalPath.getBounds2D();
+//        return (centerXYPos.getY()-bounds.getHeight()/2);
+        return generalPath.getBounds2D().getY();
+    } 
+    
+    /**
+     * 
+     * @return center position of this in layout coordinates (um)
+     */
     public Point2D getCenterXYPos() {
-        if (centerXYPos==null) {
-            calcCenterAndDefaultPos();
-//            calculateCenterPos();
-        }
         return centerXYPos;
     }
     
-    public Point2D getDefaultXYPos() {
-        if (defaultXYPos==null) {
-            calcCenterAndDefaultPos();
-//            calculateDefaultPos();
-        }
-        return defaultXYPos;
+    /**
+     * 
+     * @return default position (in um) of this in relative shape coordinates (centered at origin(0/) and without affineTrans
+     */
+    public Point2D getRelDefaultXYPos() {
+        return relDefaultXYPos;
+    }
+    
+    /**
+     * 
+     * Applies affineTrans to relative default position and translates it to the centerXYPos
+     * @return default position in layout coordinates (in um)
+     */
+    public Point2D getAbsDefaultXYPos() {
+        //apply affineTrans, i.e. rotate
+        Point2D absDefaultXYPos=new Point2D.Double();
+        affineTrans.transform(relDefaultXYPos, absDefaultXYPos);
+        //transate to absolute layout position
+        absDefaultXYPos.setLocation(new Point2D.Double(
+                centerXYPos.getX()+absDefaultXYPos.getX(),
+                centerXYPos.getY()+absDefaultXYPos.getY()));
+        return absDefaultXYPos;
     }
     
     public double getRelativeZPos() {
@@ -789,40 +840,23 @@ public abstract class SampleArea implements Shape {
     public void setRelativeZPos(double z) {
         relativeZPos=z;
     }
- 
-    public double getWidth() {
-        return width;
-    } 
-    
-    public void setWidth(double value) {
-        width=value;
-        calcCenterAndDefaultPos();
-        createShape();
-        createGeneralPath();
-//        calculateCenterPos();
-//        calculateDefaultPos();
-    }
-    
-    public double getHeight() {
-        return height;
-    } 
-    
-    public void setHeight(double value) {
-        height=value;
-        calcCenterAndDefaultPos();
-        createShape();
-        createGeneralPath();
-//        calculateCenterPos();
-//        calculateDefaultPos();
-    }
-    
+
+    /**
+     * Sets this.affineTrans and applies it to recalculate this.generalPath 
+     * @param at AffineTransform that is applied to origin-centered (0/0) shape to rotate/scale/shear shape. 
+     * The at must not define the translation of this.shape to create this.generalPath. 
+     * The translation vector is defined separately by centerXYPos.
+     */
     public void setAffineTransform(AffineTransform at) {
         affineTrans=at;
-        calcCenterAndDefaultPos();
-        createShape();
+        //don't need to update shape/dafaltXYPos but need to generate new GeneralPath
         createGeneralPath();
     }
     
+    /**
+     * 
+     * @return The AffineTransform (this.affineTrans) that is applied to origin-centered this.shape 
+     */
     public AffineTransform getAffineTransform() {
         return affineTrans;
     }
@@ -944,10 +978,11 @@ public abstract class SampleArea implements Shape {
         SampleArea area=(SampleArea) clazz.newInstance();
         area.name=obj.getString(TAG_NAME);
         area.id=obj.getInt(TAG_ID);
-        area.width=obj.getDouble(TAG_WIDTH);
-        area.height=obj.getDouble(TAG_HEIGHT);
-        area.topLeftX=obj.getDouble(TAG_TOP_LEFT_X);
-        area.topLeftY=obj.getDouble(TAG_TOP_LEFT_Y);
+//        area.width=obj.getDouble(TAG_WIDTH);
+//        area.height=obj.getDouble(TAG_HEIGHT);
+//        area.topLeftX=obj.getDouble(TAG_TOP_LEFT_X);
+//        area.topLeftY=obj.getDouble(TAG_TOP_LEFT_Y);
+        area.centerXYPos=new Point2D.Double(obj.getDouble(TAG_CENTER_X), obj.getDouble(TAG_CENTER_Y));
         area.relativeZPos=obj.getDouble(TAG_REL_POS_Z);
         area.selectedForAcq=obj.getBoolean(TAG_SELECTED);
         area.comment=obj.getString(TAG_COMMENT);
@@ -960,9 +995,10 @@ public abstract class SampleArea implements Shape {
         //read in additional properties that are not part of SampleArea definition
         area.initializeFromJSONObject(obj);
         //create shape and generalPath objects
-        area.calcCenterAndDefaultPos();
         area.createShape();
+        area.setRelDefaultPos();
         area.createGeneralPath();
+//        area.calcCenterAndDefaultPos();
         return area;
     }
     
@@ -972,10 +1008,12 @@ public abstract class SampleArea implements Shape {
         obj.put(TAG_CLASS,this.getClass().getName());
         obj.put(TAG_NAME,name);
         obj.put(TAG_ID,id);
-        obj.put(TAG_WIDTH,width);
-        obj.put(TAG_HEIGHT,height);
-        obj.put(TAG_TOP_LEFT_X,topLeftX);
-        obj.put(TAG_TOP_LEFT_Y,topLeftY);
+//        obj.put(TAG_WIDTH,width);
+//        obj.put(TAG_HEIGHT,height);
+//        obj.put(TAG_TOP_LEFT_X,topLeftX);
+//        obj.put(TAG_TOP_LEFT_Y,topLeftY);
+        obj.put(TAG_CENTER_X, centerXYPos.getX());
+        obj.put(TAG_CENTER_Y,centerXYPos.getY());
         obj.put(TAG_REL_POS_Z,relativeZPos);
         obj.put(TAG_SELECTED,selectedForAcq);
         obj.put(TAG_COMMENT,comment);
@@ -1020,73 +1058,26 @@ public abstract class SampleArea implements Shape {
             return a1tiles.compareTo(a2tiles);
         }
     };
-        
+    
+    /**
+     * 
+     * @param at AffineTransform to be applied to this.generalPath object. 
+     * @return a PathIterator after applying the AffineTransform to this.generalPath object
+     */
     @Override
     public PathIterator getPathIterator(AffineTransform at) {
-        return shape.getPathIterator(at);
+        return generalPath.getPathIterator(at);
     }
     
     @Override
     public PathIterator getPathIterator(AffineTransform at, double d) {
-        return shape.getPathIterator(at, d);
-    }
-    
-    @Override
-    public boolean contains(Point2D p) {
-        return shape.contains(p);
-    }
-    
-    @Override
-    public boolean contains(double x, double y) {
-        return shape.contains(x,y);
-    }
-    
-    @Override
-    public boolean contains(Rectangle2D r) {
-        return shape.contains(r);
-    }
-    
-    @Override
-    public boolean contains(double x, double y, double w, double h) {
-        return shape.contains(x,y,w,h);
-    }
-    
-    @Override
-    public boolean intersects(Rectangle2D r) {
-        return shape.intersects(r);
-    }
-    
-    @Override
-    public boolean intersects(double x, double y, double w, double h) {
-        return shape.intersects(x,y,w,h);
-    }
-    
-    @Override
-    public Rectangle getBounds() {
-        return shape.getBounds();
-    }
-    
-    @Override
-    public Rectangle2D getBounds2D() {
-        return shape.getBounds2D();
+        return generalPath.getPathIterator(at, d);
     }
     
     protected void createGeneralPath() {
-        if (shape!=null) {
-            generalPath=new GeneralPath();
-            generalPath.append(shape.getPathIterator(affineTrans),false); 
-            //generalPath.closePath();
-            PathIterator pi=generalPath.getPathIterator(affineTrans);
-            IJ.log(this.name+" ("+this.getClass().getName());
-            while (!pi.isDone()) {
-                double[] coords=new double[6];
-                int type=pi.currentSegment(coords);
-                IJ.log("   Type:"+type);
-                for (double d:coords) {
-                    IJ.log("       coord:"+Double.toString(d));
-                }
-                pi.next();
-            }
+        if (shape!=null && centerXYPos!=null) {
+            generalPath=new GeneralPath(shape);
+            generalPath.transform(getShapeToPathTransform());
         }
     }
     
@@ -1094,7 +1085,152 @@ public abstract class SampleArea implements Shape {
         return generalPath;
     }
 
-            
+/*    
+    public boolean isInArea(double x, double y) {//checks of coordinate is inside area
+        return generalPath.contains(x,y);
+//        return ((x>=topLeftX) & (x<topLeftX+width) & (y>=topLeftY) & (y<topLeftY+height));
+    }
+*/
+    public boolean isFovInsideArea(double x, double y, double fovX, double fovY) {//checks of coordinate is inside area
+        return generalPath.contains(x-fovX/2,y-fovY/2,fovX,fovY);
+//        Rectangle2D.Double area = new Rectangle2D.Double(topLeftX,topLeftY,width,height);
+//        return area.contains(x-fovX/2,y-fovY/2,fovX,fovY);
+    }
+
+    public boolean doesFovTouchArea(double x, double y, double fovX, double fovY) {//checks of coordinate is inside area
+        return generalPath.intersects(x-fovX/2,y-fovY/2,fovX,fovY);
+//        Rectangle2D.Double area = new Rectangle2D.Double(topLeftX,topLeftY,width,height);
+//        return area.intersects(x-fovX/2,y-fovY/2,fovX,fovY);
+    }
+
+    public boolean isInsideRect(Rectangle2D r) { //checks if entire area is inside rectangle
+        return r.contains(this.getBounds2D());
+//        return ((topLeftX>=r.getX()) && (topLeftX+width<=r.getX()+r.getWidth()) && (topLeftY>=r.getY()) && (topLeftY+height<=r.getY()+r.getHeight()));
+    } 
+
+    @Override
+    public boolean contains(Point2D p) {
+        return generalPath.contains(p);
+    }
+    
+    @Override
+    public boolean contains(double x, double y) {
+        return generalPath.contains(x,y);
+    }
+    
+    @Override
+    public boolean contains(Rectangle2D r) {
+        return generalPath.contains(r);
+    }
+    
+    @Override
+    public boolean contains(double x, double y, double w, double h) {
+        return generalPath.contains(x,y,w,h);
+    }
+    
+    @Override
+    public boolean intersects(Rectangle2D r) {
+        return generalPath.intersects(r);
+    }
+    
+    @Override
+    public boolean intersects(double x, double y, double w, double h) {
+        return generalPath.intersects(x,y,w,h);
+    }
+    
+    @Override
+    public Rectangle getBounds() {
+        return generalPath.getBounds();
+    }
+    
+    @Override
+    public Rectangle2D getBounds2D() {
+        return generalPath.getBounds2D();
+    }
+        
+
+    /**
+     * 
+     * @return AffineTransform that describes application of this.affineTrans (used to rotate/scale/shear this.shape at origin (0/))) followed by translation from origin (0/0) to centerXYPos 
+     */
+    protected AffineTransform getShapeToPathTransform() {
+        if (centerXYPos==null) {
+            return null;
+        }
+        //1. apply affineTrans
+        //2. translate to centerXYPos
+        //result'(p) = result(at(p))
+        AffineTransform at=new AffineTransform(affineTrans);
+        AffineTransform result = new AffineTransform();
+        result.translate(centerXYPos.getX(), centerXYPos.getY());
+        result.concatenate(at);
+        return result;
+    }
+    
+    /**
+     * 
+     * @return AffineTransform that describes translation from centerXYPos of origin (0/0) followed by inverse of this.affineTrans 
+     */
+    protected AffineTransform getPathToShapeTransform() throws NoninvertibleTransformException {
+        if (centerXYPos==null) {
+            return null;
+        }
+        AffineTransform result=new AffineTransform(affineTrans.createInverse());
+        AffineTransform at = new AffineTransform();
+        at.translate(-centerXYPos.getX(), -centerXYPos.getY());
+        result.concatenate(at);
+        return result;
+    }
+
+/*    
+    protected List<Point2D> getPathPoints(Path2D path) {
+        if (path==null) {
+            return null;
+        } 
+        List<Point2D> list=new ArrayList<Point2D>();
+        PathIterator pi=path.getPathIterator(null);
+        while (!pi.isDone()) {
+            double[] coords=new double[6];
+            int type=pi.currentSegment(coords);
+            if (type!=PathIterator.SEG_CLOSE) {
+                list.add(path.getCurrentPoint());
+            }    
+            pi.next();
+        }
+        if (list.size()>1) {
+            list.remove(list.size()-1);
+        }
+        return list;        
+    }*/
+    
+    /**
+     * 
+     * @return List<Point2D> containing the outline points defining this.generalPath object. The points reflect layout coordinates in um
+     */
+    /*public List<Point2D> getGeneralPathPoints() {
+        return getPathPoints(generalPath);
+    }
+
+    public List<Point2D> getRelShapePoints() {
+        return getPathPoints(shape);
+    }*/
+
+    /**
+     * 
+     * @return PathIterator this.shape object, with its center at (0/0) and without application of this.affineTrans. 
+     * The points are  in um.
+     */
+    public PathIterator getShapePathIterator() {
+        if (shape==null) {
+            return null;
+        } 
+        return shape.getPathIterator(null);
+    }
+    
+    protected void setRelDefaultPos() {
+        relDefaultXYPos=new Point2D.Double(0,0);
+    }
+
     /**
      * Used to convert JSONObject to SampleArea, 
      * derived classes should overwrite this to save fields that are not part of SampleArea class
@@ -1113,21 +1249,17 @@ public abstract class SampleArea implements Shape {
 
     public abstract String getShapeType();
     
-    public abstract List<Point2D> getOutlinePoints();
-                
-    protected abstract void calcCenterAndDefaultPos();
-    
+//    public abstract List<Point2D> getAbsOutlinePoints();
+                    
     protected abstract void createShape();
-            
-    public abstract boolean isInArea(double x, double y);
-
-    //redundant with contains?
-    public abstract boolean isFovInsideArea(double centerX, double centerY, double fovWidth, double fovHeight);
     
-    //redundant with intersect?
-    public abstract boolean doesFovTouchArea(double centerX, double centerY, double fovWidth, double fovHeight);
+    /**
+     * sets the default position (in um) relative to the shape's geometric center (before affineTrans is applied)
+     * for example: relDefaultXYPos=new Point2D.Double(0,0) would set the default position to the shape's center
+     * 
+     * call getAbsDefaultPos() to get the absolute default position in layout coordinates (in um)
+     */
 
-    public abstract boolean isInsideRect(Rectangle2D r);
     
     /**
      * creates new instance and deep copy of this object

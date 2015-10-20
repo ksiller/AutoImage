@@ -1,18 +1,12 @@
 package autoimage.area;
 
-import autoimage.api.SampleArea;
-import autoimage.Tile;
 import autoimage.Utils;
-import ij.IJ;
+import autoimage.api.SampleArea;
 import java.awt.GridLayout;
-import java.awt.geom.AffineTransform;
-import java.awt.geom.Ellipse2D;
-import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.util.ArrayList;
 import javax.swing.BorderFactory;
 import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
@@ -21,86 +15,73 @@ import javax.swing.JPanel;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-
 /**
  *
  * @author Karsten Siller
  */
-public class DonutArea extends TwoAxesArea {
+public abstract class TwoAxesArea extends SampleArea{
     
-    public static final String TAG_RING_WIDTH = "RING_WIDTH";
+    public static final String TAG_WIDTH = "WIDTH";
+    public static final String TAG_HEIGHT = "HEIGHT";
+    
+    protected double width;//this is along the x-axis when not rotateted, it remains unchanged when rotating (unlike getBounds.getWidth())
+    protected double height;//this is along the y-axis when not rotateted, it remains unchanged when rotating (unlike getBounds.getHeight())
 
-    private double ringWidth;
-    
-    public DonutArea() {
+    public TwoAxesArea() {
         super();
-        setRingWidth(0);
+        setWidthAndHeight(0,0);
     }
     
-    public DonutArea(String n) { //expects name identifier
+    public TwoAxesArea(String n) { //expects name identifier
         super(n);
-        setRingWidth(0);
+        setWidthAndHeight(0,0);
     }
+       
+    public TwoAxesArea(String n, int id, double ox, double oy, double oz, double w, double h, boolean selForAcq, String anot) {
+        super(n,id,ox,oy,oz,selForAcq,anot);
+        setWidthAndHeight(w,h);
+    }
+           
+    public double getWidth() {
+        return width;
+    } 
     
-    public DonutArea(String n, int id, double ox, double oy, double oz, double w, double h, double ringWidth, boolean selForAcq, String anot) {
-        super(n,id,ox,oy,oz,w,h,selForAcq,anot);
-        setRingWidth(ringWidth);
-    }
-        
-    public void setRingWidth(double rw) {
-        ringWidth=rw;
+    public void setWidth(double value) {
+        width=value;
         createShape();
         setRelDefaultPos();
         createGeneralPath();
     }
     
-    public double getRingWidth() {
-        return ringWidth;
+    public double getHeight() {
+        return height;
+    } 
+    
+    public void setHeight(double value) {
+        height=value;
+        createShape();
+        setRelDefaultPos();
+        createGeneralPath();
     }
     
+    public void setWidthAndHeight(double w, double h) {
+        width=w;
+        height=h;
+        createShape();
+        setRelDefaultPos();
+        createGeneralPath();
+    }    
+
     @Override
-    public String getShapeType() {
-        return "Donut";
-    }
-        
-    @Override
-    public void initializeFromJSONObject(JSONObject obj) throws JSONException {
-        super.initializeFromJSONObject(obj);
-        if (obj!=null)
-            ringWidth=obj.getDouble(TAG_RING_WIDTH);
-        else
-            ringWidth=1;
+    protected void initializeFromJSONObject(JSONObject obj) throws JSONException {
+        this.width=obj.getDouble(TAG_WIDTH);
+        this.height=obj.getDouble(TAG_HEIGHT);
     }
 
     @Override
     protected void addFieldsToJSONObject(JSONObject obj) throws JSONException {
-        super.addFieldsToJSONObject(obj);
-        if (obj!=null)
-            obj.put(TAG_RING_WIDTH,ringWidth);
-    }
-
-    @Override
-    public SampleArea duplicate() {
-        DonutArea newArea = new DonutArea(this.getName());
-        newArea.setId(this.getId());
-//        newArea.setTopLeftX(this.topLeftX);
-//        newArea.setTopLeftY(this.topLeftY);
-        newArea.centerXYPos=new Point2D.Double(this.getCenterXYPos().getX(), this.getCenterXYPos().getY());
-        newArea.setRelativeZPos(this.relativeZPos);
-        newArea.width=this.width;
-        newArea.height=this.height;
-        newArea.affineTrans=new AffineTransform(this.affineTrans);
-        newArea.setSelectedForAcq(isSelectedForAcq());
-        newArea.setSelectedForMerge(isSelectedForMerge());
-        newArea.setComment(this.comment);
-        newArea.setAcquiring(this.acquiring);
-        newArea.tilePosList=new ArrayList<Tile>(this.getTilePositions());
-        newArea.ringWidth=this.ringWidth;
-        newArea.setUnknownTileNum(this.hasUnknownTileNum());
-        newArea.createShape();
-        newArea.setRelDefaultPos();
-        newArea.createGeneralPath();
-        return newArea;
+        obj.put(TAG_WIDTH,width);
+        obj.put(TAG_HEIGHT,height);
     }
 
     @Override
@@ -122,7 +103,7 @@ public class DonutArea extends TwoAxesArea {
         optionPanel.add(l);
         JFormattedTextField zField = new JFormattedTextField();
         zField.setColumns(10);
-        zField.setValue(new Double(relativeZPos / 1000));
+        zField.setValue(new Double(relativeZPos/1000));
         optionPanel.add(zField);
              
         l=new JLabel("Origin X (mm):",JLabel.RIGHT);
@@ -130,7 +111,7 @@ public class DonutArea extends TwoAxesArea {
         optionPanel.add(l);
         final JFormattedTextField topLeftXField = new JFormattedTextField();
         topLeftXField.setColumns(10);
-        topLeftXField.setValue(new Double(getTopLeftX() / 1000));
+        topLeftXField.setValue(new Double(this.getTopLeftX()/1000));
         optionPanel.add(topLeftXField);
         
         l=new JLabel("Origin Y (mm):",JLabel.RIGHT);
@@ -138,7 +119,7 @@ public class DonutArea extends TwoAxesArea {
         optionPanel.add(l);
         final JFormattedTextField topLeftYField = new JFormattedTextField();
         topLeftYField.setColumns(10);
-        topLeftYField.setValue(new Double(getTopLeftY() / 1000));
+        topLeftYField.setValue(new Double(this.getTopLeftY())/1000);
         optionPanel.add(topLeftYField);
         
         l=new JLabel("Center X (mm):",JLabel.RIGHT);
@@ -146,7 +127,7 @@ public class DonutArea extends TwoAxesArea {
         optionPanel.add(l);
         final JFormattedTextField centerXField = new JFormattedTextField();
         centerXField.setColumns(10);
-        centerXField.setValue(new Double(getCenterXYPos().getX() / 1000));
+        centerXField.setValue(new Double(getCenterXYPos().getX()/1000));
         optionPanel.add(centerXField);
 
         l=new JLabel("Center Y (mm):",JLabel.RIGHT);
@@ -154,7 +135,7 @@ public class DonutArea extends TwoAxesArea {
         optionPanel.add(l);
         final JFormattedTextField centerYField = new JFormattedTextField();
         centerYField.setColumns(10);
-        centerYField.setValue(new Double(getCenterXYPos().getY() / 1000));
+        centerYField.setValue(new Double(getCenterXYPos().getY()/1000));
         optionPanel.add(centerYField);
 
         l=new JLabel("Width (mm):",JLabel.RIGHT);
@@ -162,7 +143,7 @@ public class DonutArea extends TwoAxesArea {
         optionPanel.add(l);
         final JFormattedTextField widthField = new JFormattedTextField();
         widthField.setColumns(10);
-        widthField.setValue(new Double(width / 1000));
+        widthField.setValue(new Double(width)/1000);
         optionPanel.add(widthField);
 
         l=new JLabel("Height (mm):",JLabel.RIGHT);
@@ -170,7 +151,7 @@ public class DonutArea extends TwoAxesArea {
         optionPanel.add(l);
         final JFormattedTextField heightField = new JFormattedTextField();
         heightField.setColumns(10);
-        heightField.setValue(new Double(height / 1000));
+        heightField.setValue(new Double(height)/1000);
         optionPanel.add(heightField);
         
         l=new JLabel("Rotation (degree):",JLabel.RIGHT);
@@ -181,23 +162,15 @@ public class DonutArea extends TwoAxesArea {
         rotationField.setValue(new Double(Utils.getRotation(affineTrans))/Math.PI*180);
         optionPanel.add(rotationField);
         
-        l=new JLabel("Ringwidth (mm):",JLabel.RIGHT);
-        l.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
-        optionPanel.add(l);
-        final JFormattedTextField ringwidthField = new JFormattedTextField();
-        ringwidthField.setColumns(10);
-        ringwidthField.setValue(new Double(ringWidth / 1000));
-        optionPanel.add(ringwidthField);
-        
         topLeftXField.addPropertyChangeListener("value",new PropertyChangeListener() {
 
             @Override
             public void propertyChange(PropertyChangeEvent evt) {
                 if (evt.getSource() == topLeftXField) {
-                    double newValue = ((Number)topLeftXField.getValue()).doubleValue() * 1000;
+                    double newValue = ((Number)topLeftXField.getValue()).doubleValue()*1000;
                     if (newValue != getTopLeftX()) {
                         setTopLeftX(newValue);
-                        centerXField.setValue(new Double(getCenterXYPos().getX() / 1000));
+                        centerXField.setValue(new Double(getCenterXYPos().getX()/1000));
                     }
                 }
             }
@@ -208,11 +181,11 @@ public class DonutArea extends TwoAxesArea {
             @Override
             public void propertyChange(PropertyChangeEvent evt) {
                 if (evt.getSource() == centerXField) {
-                    double newValue = ((Number)centerXField.getValue()).doubleValue() * 1000;
+                    double newValue = ((Number)centerXField.getValue()).doubleValue()*1000;
                     if (newValue != getCenterXYPos().getX()) {
 //                        setTopLeftX(newValue-width/2);
                         setCenter(newValue,centerXYPos.getY());
-                        topLeftXField.setValue(new Double(getTopLeftX() / 1000));
+                        topLeftXField.setValue(new Double(getTopLeftX()/1000));
                     }
                 }
             }
@@ -223,10 +196,10 @@ public class DonutArea extends TwoAxesArea {
             @Override
             public void propertyChange(PropertyChangeEvent evt) {
                 if (evt.getSource() == topLeftYField) {
-                    double newValue = ((Number)topLeftYField.getValue()).doubleValue() * 1000;
+                    double newValue = ((Number)topLeftYField.getValue()).doubleValue()*1000;
                     if (newValue != getTopLeftY()) {
                         setTopLeftY(newValue);//recalculates center pos
-                        centerYField.setValue(new Double(getCenterXYPos().getY() / 1000));
+                        centerYField.setValue(new Double(getCenterXYPos().getY()/1000));
                     }
                 }
             }
@@ -237,11 +210,11 @@ public class DonutArea extends TwoAxesArea {
             @Override
             public void propertyChange(PropertyChangeEvent evt) {
                 if (evt.getSource() == centerYField) {
-                    double newValue = ((Number)centerYField.getValue()).doubleValue() * 1000;
+                    double newValue = ((Number)centerYField.getValue()).doubleValue()*1000;
                     if (newValue != getCenterXYPos().getY()) {
 //                        setTopLeftY(newValue-height/2);
                         setCenter(centerXYPos.getX(),newValue);
-                        topLeftYField.setValue(new Double(getTopLeftY() / 1000));
+                        topLeftYField.setValue(new Double(getTopLeftY())/1000);
                     }
                 }
             }
@@ -252,9 +225,10 @@ public class DonutArea extends TwoAxesArea {
             @Override
             public void propertyChange(PropertyChangeEvent evt) {
                 if (evt.getSource() == widthField) {
-                    double newValue = ((Number)widthField.getValue()).doubleValue() * 1000;
+                    double newValue = ((Number)widthField.getValue()).doubleValue()*1000;
                     if (newValue != width) {
                         setWidth(newValue);
+//                        centerXField.setValue(new Double(getCenterXYPos().getX()/1000));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
                     }
@@ -267,29 +241,17 @@ public class DonutArea extends TwoAxesArea {
             @Override
             public void propertyChange(PropertyChangeEvent evt) {
                 if (evt.getSource() == heightField) {
-                    double newValue = ((Number)heightField.getValue()).doubleValue() * 1000;
+                    double newValue = ((Number)heightField.getValue()).doubleValue()*1000;
                     if (newValue != height) {
                         setHeight(newValue);
+//                        centerYField.setValue(new Double(getCenterXYPos().getY()/1000));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
                     }
                 }
             }
         });
-        
-        ringwidthField.addPropertyChangeListener("value",new PropertyChangeListener() {
-
-            @Override
-            public void propertyChange(PropertyChangeEvent evt) {
-                if (evt.getSource() == ringwidthField) {
-                    double newValue = ((Number)ringwidthField.getValue()).doubleValue() * 1000;
-                    if (newValue != ringWidth) {
-                        setRingWidth(newValue);
-                    }
-                }
-            }
-        });
-        
+          
         rotationField.addPropertyChangeListener("value",new PropertyChangeListener() {
 
             @Override
@@ -305,8 +267,8 @@ public class DonutArea extends TwoAxesArea {
                     }
                 }
             }
-        });        
-                
+        });
+        
         int result;
         do {
             result = JOptionPane.showConfirmDialog(null, optionPanel, 
@@ -315,49 +277,24 @@ public class DonutArea extends TwoAxesArea {
                 JOptionPane.showMessageDialog(null,"The area does not fit into the layout.");
             }
         } while (result == JOptionPane.OK_OPTION && !isInsideRect(layoutBounds));
-        
+
         if (result == JOptionPane.CANCEL_OPTION) {
             return null;
         } else {
             setName((String)nameField.getValue());
+//            setTopLeft(((Number)topLeftXField.getValue()).doubleValue()*1000, ((Number)topLeftYField.getValue()).doubleValue()*1000);
             centerXYPos=new Point2D.Double(
                     ((Number)centerXField.getValue()).doubleValue()*1000, 
                     ((Number)centerYField.getValue()).doubleValue()*1000);
-            width=((Number)widthField.getValue()).doubleValue()*1000;
-            height=((Number)heightField.getValue()).doubleValue()*1000;
-            //center pos will be set automatically
-            setRelativeZPos(((Number)zField.getValue()).doubleValue()*1000);            
-            setRingWidth(((Number)ringwidthField.getValue()).doubleValue()*1000);
+            //shape and generalPath will be recalculated automatically
+            setWidthAndHeight(
+                    ((Number)widthField.getValue()).doubleValue()*1000,
+                    ((Number)heightField.getValue()).doubleValue()*1000);
+            setRelativeZPos(((Number)zField.getValue()).doubleValue()*1000);
             return this;
-        }
-            
-    }
-
-    @Override
-    public int supportedLayouts() {
-        return SampleArea.SUPPORT_CUSTOM_LAYOUT;
-    }
-
-    @Override
-    protected void createShape() {
-        java.awt.geom.Area donut = new java.awt.geom.Area(new Ellipse2D.Double(
-                -width/2, 
-                -height/2, 
-                width, 
-                height));
-        java.awt.geom.Area hole = new java.awt.geom.Area(new Ellipse2D.Double(
-                -width/2+ringWidth, 
-                -height/2+ringWidth, 
-                width-2*ringWidth, 
-                height-2*ringWidth));
-        donut.subtract(hole);
-        shape=new Path2D.Double(donut);
-        IJ.log(shape.getBounds2D().toString());
-    }
-
-    @Override
-    protected void setRelDefaultPos() {
-        relDefaultXYPos=new Point2D.Double(0,-height/2+ringWidth/2);
+        }            
     }
     
 }
+
+
