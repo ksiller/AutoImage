@@ -786,9 +786,7 @@ public abstract class SampleArea implements Shape {
      * @return x coordinate of top left corner of this bounding rectangle in layout coordinates (um)
      */
     public double getTopLeftX() {
-//        Rectangle2D bounds=generalPath.getBounds2D();
-//        return (centerXYPos.getX()-bounds.getWidth()/2);
-        return generalPath.getBounds2D().getX();
+        return generalPath.getBounds2D().getMinX();
     } 
     
     /**
@@ -796,9 +794,7 @@ public abstract class SampleArea implements Shape {
      * @return y coordinate of top left corner of this bounding rectangle in layout coordinates (um)
      */
     public double getTopLeftY() {
-//        Rectangle2D bounds=generalPath.getBounds2D();
-//        return (centerXYPos.getY()-bounds.getHeight()/2);
-        return generalPath.getBounds2D().getY();
+        return generalPath.getBounds2D().getMinY();
     } 
     
     /**
@@ -833,10 +829,18 @@ public abstract class SampleArea implements Shape {
         return absDefaultXYPos;
     }
     
+    /**
+     * 
+     * @return this.relativeZPos (area's z-position relative to layout's reference plane  
+     */
     public double getRelativeZPos() {
         return relativeZPos;
     }
     
+    /**
+     * Sets the area's relative z-position
+     * @param z the z-position (in um) of this area relative to the layout's reference plane. In a simple 2D flat layout, all areas have a relative z-position of 0. 
+     */
     public void setRelativeZPos(double z) {
         relativeZPos=z;
     }
@@ -861,12 +865,20 @@ public abstract class SampleArea implements Shape {
         return affineTrans;
     }
     
+    /**
+     * 
+     * @param b If true, this area will be considered for acquisition.
+     */
     public void setSelectedForAcq(boolean b) {
         selectedForAcq=b;
         if (!b) 
             tilingStatus=TILING_OK;
     }
     
+    /**
+     * 
+     * @return True, if the area is selected for acquisition (regardless of the number of tiles placed in the area); otherwise False is returned.
+     */
     public boolean isSelectedForAcq() {
         return selectedForAcq;
     } 
@@ -875,32 +887,70 @@ public abstract class SampleArea implements Shape {
         selectedForMerge=b;
     }
     
+    /**
+     * 
+     * @return 
+     */
     public boolean isSelectedForMerge() {
         return selectedForMerge;
     }
     
+    /**
+     * 
+     * @return the area's label
+     */
     public String getName() {
         return name;
     }
 
+    /**
+     * 
+     * @param n String identifier that is used as name label for the area. Note, each area needs to have a unique name
+     */
     public void setName(String n) {
         name=n;
     }
             
+    /**
+     * 
+     * @return String with the area annotation
+     */
     public String getComment() {
         return comment;
     }
 
+    /**
+     * Used to annotate area
+     * @param c String describing the area
+     */
     public void setComment(String c) {
         comment=c;
     }
-    
+
+    /**
+     * 
+     * @return The number of tiles placed in the area. Returns 0 if the area's tilePosList is null. 
+     */
     public int getTileNumber() {
         if (tilePosList!=null)
             return tilePosList.size();
         else return 0;
     }
     
+    public double getShapeBoundsDiagonale() {
+        if (shape!=null) {
+            Rectangle2D bounds=shape.getBounds2D();
+            return Math.sqrt(bounds.getWidth()*bounds.getWidth() + bounds.getHeight()*bounds.getHeight());
+        } else {
+            return -1;
+        }
+    }
+    /**
+     * 
+     * @param tileName This is a unique String identifier automatically created when the area's calcTilePosition method is run. 
+     * Here, tileName is parsed to extract area, cluster, and site info that is added as additional metadata to the image files.
+     * @return JSONObject containing new fields describing the tile's area, cluster, and site info. 
+     */
     public JSONObject createSiteInfo(String tileName) {
         JSONObject info=new JSONObject();
         try {
@@ -908,12 +958,9 @@ public abstract class SampleArea implements Shape {
             info.put(ExtImageTags.AREA_INDEX,index);
             info.put(ExtImageTags.CLUSTERS_IN_AREA,noOfClusters);
             info.put(ExtImageTags.SITES_IN_AREA,tilePosList.size());
-//            if (tileName.contains("Cluster")) {
-                int startIndex=tileName.indexOf("Cluster")+7;
-                int endIndex=tileName.indexOf("Site")-1;
-                info.put(ExtImageTags.CLUSTER_INDEX, Long.parseLong(tileName.substring(startIndex,endIndex)));
-//            } else
-//                info.put(ExtImageTags.CLUSTER_INDEX, "-1");
+            int startIndex=tileName.indexOf("Cluster")+7;
+            int endIndex=tileName.indexOf("Site")-1;
+            info.put(ExtImageTags.CLUSTER_INDEX, Long.parseLong(tileName.substring(startIndex,endIndex)));
             startIndex=tileName.indexOf("Site")+4;
             info.put(ExtImageTags.SITE_INDEX, Long.parseLong(tileName.substring(startIndex)));
             info.put(ExtImageTags.AREA_COMMENT, comment);
@@ -923,6 +970,15 @@ public abstract class SampleArea implements Shape {
         return info;
     }
     
+    /**
+     * Used to convert this area's tile position list into stage positions used by Micro-Managers MDA acquisition
+     * @param pl PositionList that will collect physical stage positions. Note, for a given MDA acquisition, all areas share the same position list, therefore pl should only be instantiated here if it is null. Otherwise stage positions created by other areas will be lost.
+     * @param posInfoL For each area's tile position, new metadata tags are created (see createSiteInfo) that describe the area, cluster, and site associated with each tile.
+     * @param xyStageLabel String label of the x-y stage device
+     * @param zStageLabel String label of the z-stage device
+     * @param aLayout The Layout that manages this area. It is needed to retrieve the AffineTransfrom function that converts layout to stage coordinates
+     * @return A Micro-Manager compatible stage position list
+     */
     public PositionList addTilePositions(PositionList pl, ArrayList<JSONObject> posInfoL, String xyStageLabel, String zStageLabel, IAcqLayout aLayout) {
         if (pl==null)
             pl=new PositionList();
@@ -948,6 +1004,10 @@ public abstract class SampleArea implements Shape {
         return pl;
     }
     
+    /**
+     * 
+     * @return Current number of tiles placed in this area
+     */
     public List<Tile> getTilePositions() {
         return tilePosList;
     }
@@ -956,14 +1016,32 @@ public abstract class SampleArea implements Shape {
         return String.format(TILE_NAME_PADDING, index);
     }
     
-    public boolean acceptTilePos(double x, double y, double fovX, double fovY, boolean insideOnly) {
+    /**
+     * 
+     * @param x X-coordinate of tile's center in layout coordinates (um)
+     * @param y Y-coordinate of tile's center (fov) in layout coordinates (um)
+     * @param width Width of tile in layout coordinates (um)
+     * @param height Height of tile in layout coordinates (um)
+     * @param insideOnly If insideOnly is true (see area's TilingSetting object), the tile has to be completely contained inside the area to be accepted. 
+     * If not, the tile only needs to intersect the area. 
+     * @return true if the tile position should be accepted
+     */
+    public boolean acceptTilePos(double x, double y, double width, double height, boolean insideOnly) {
         if (insideOnly)
-            return isFovInsideArea(x,y,fovX,fovY);
+            return isRectInsideArea(x,y,width,height);
         else
-            return doesFovTouchArea(x,y,fovX,fovY);
+            return doesRectTouchArea(x,y,width,height);
     }
 
-    //used to initialize SampleArea from layout file
+    /**
+     * Creates an instance of SampleArea (or derived class) from JSONObject (e.g. read from experiment or layout file)
+     * @param obj JSONObject containing all relevant class fields (e.g. created by toJSONObject method)
+     * @return initialized instance of SampleArea (or derived class). The instance is created via dynamic class loading using the class name stored in the JSONObject 
+     * @throws JSONException
+     * @throws ClassNotFoundException
+     * @throws InstantiationException
+     * @throws IllegalAccessException 
+     */
     public final static SampleArea createFromJSONObject(JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         String className=obj.getString(TAG_CLASS);
         Class clazz=null;
@@ -978,10 +1056,6 @@ public abstract class SampleArea implements Shape {
         SampleArea area=(SampleArea) clazz.newInstance();
         area.name=obj.getString(TAG_NAME);
         area.id=obj.getInt(TAG_ID);
-//        area.width=obj.getDouble(TAG_WIDTH);
-//        area.height=obj.getDouble(TAG_HEIGHT);
-//        area.topLeftX=obj.getDouble(TAG_TOP_LEFT_X);
-//        area.topLeftY=obj.getDouble(TAG_TOP_LEFT_Y);
         area.centerXYPos=new Point2D.Double(obj.getDouble(TAG_CENTER_X), obj.getDouble(TAG_CENTER_Y));
         area.relativeZPos=obj.getDouble(TAG_REL_POS_Z);
         area.selectedForAcq=obj.getBoolean(TAG_SELECTED);
@@ -998,20 +1072,20 @@ public abstract class SampleArea implements Shape {
         area.createShape();
         area.setRelDefaultPos();
         area.createGeneralPath();
-//        area.calcCenterAndDefaultPos();
         return area;
     }
     
-    //used to create JSONObject descriptionm of SampleArea to write to Layout file
+    /**
+     * Converts class fields into JSONObject entries.
+     * Classes extending this class need to overwrite the addFieldsToJSONObject method to add fields that are not part of this class.
+     * @return JSONObject with entries for all relevant class fields
+     * @throws JSONException 
+     */
     public final JSONObject toJSONObject() throws JSONException {
         JSONObject obj=new JSONObject();
         obj.put(TAG_CLASS,this.getClass().getName());
         obj.put(TAG_NAME,name);
         obj.put(TAG_ID,id);
-//        obj.put(TAG_WIDTH,width);
-//        obj.put(TAG_HEIGHT,height);
-//        obj.put(TAG_TOP_LEFT_X,topLeftX);
-//        obj.put(TAG_TOP_LEFT_Y,topLeftY);
         obj.put(TAG_CENTER_X, centerXYPos.getX());
         obj.put(TAG_CENTER_Y,centerXYPos.getY());
         obj.put(TAG_REL_POS_Z,relativeZPos);
@@ -1026,8 +1100,10 @@ public abstract class SampleArea implements Shape {
         addFieldsToJSONObject(obj);
         return obj;
     }
-    
-    //used to sort areas by name
+
+    /**
+     * Used to compare areas by name
+     */
     public static Comparator<String> NameComparator = new Comparator<String>() {
 
         @Override
@@ -1037,8 +1113,10 @@ public abstract class SampleArea implements Shape {
             return a1Name.compareTo(a2Name);
         }
     };
-        
-    //used to sort areas by # of tiles
+      
+    /**
+     * Used to sort areas by # of tiles
+     */
     public static Comparator<String> TileNumComparator = new Comparator<String>() {
 
         @Override
@@ -1085,27 +1163,16 @@ public abstract class SampleArea implements Shape {
         return generalPath;
     }
 
-/*    
-    public boolean isInArea(double x, double y) {//checks of coordinate is inside area
-        return generalPath.contains(x,y);
-//        return ((x>=topLeftX) & (x<topLeftX+width) & (y>=topLeftY) & (y<topLeftY+height));
-    }
-*/
-    public boolean isFovInsideArea(double x, double y, double fovX, double fovY) {//checks of coordinate is inside area
+    public boolean isRectInsideArea(double x, double y, double fovX, double fovY) {//checks of coordinate is inside area
         return generalPath.contains(x-fovX/2,y-fovY/2,fovX,fovY);
-//        Rectangle2D.Double area = new Rectangle2D.Double(topLeftX,topLeftY,width,height);
-//        return area.contains(x-fovX/2,y-fovY/2,fovX,fovY);
     }
 
-    public boolean doesFovTouchArea(double x, double y, double fovX, double fovY) {//checks of coordinate is inside area
+    public boolean doesRectTouchArea(double x, double y, double fovX, double fovY) {//checks of coordinate is inside area
         return generalPath.intersects(x-fovX/2,y-fovY/2,fovX,fovY);
-//        Rectangle2D.Double area = new Rectangle2D.Double(topLeftX,topLeftY,width,height);
-//        return area.intersects(x-fovX/2,y-fovY/2,fovX,fovY);
     }
 
     public boolean isInsideRect(Rectangle2D r) { //checks if entire area is inside rectangle
         return r.contains(this.getBounds2D());
-//        return ((topLeftX>=r.getX()) && (topLeftX+width<=r.getX()+r.getWidth()) && (topLeftY>=r.getY()) && (topLeftY+height<=r.getY()+r.getHeight()));
     } 
 
     @Override

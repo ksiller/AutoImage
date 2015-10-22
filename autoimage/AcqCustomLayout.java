@@ -805,7 +805,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
 /*        int i=0;
         int index=-1;
         while ((index==-1) && (i<areas.size())) {
-            if (areas.get(i).doesFovTouchArea(lx,ly, fovX, fovY))
+            if (areas.get(i).doesRectTouchArea(lx,ly, fovX, fovY))
                 index=i;
             i++;
         }
@@ -814,7 +814,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
         else
             return null;*/
         for (SampleArea area:areas) {
-            if (area.doesFovTouchArea(lx, ly, fovX, fovY)) {
+            if (area.doesRectTouchArea(lx, ly, fovX, fovY)) {
                 return area;
             }
         }
@@ -834,7 +834,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
             Point2D xy=convertStageToLayoutPos_XY(new Point2D.Double(stageX, stageY));
             boolean found=false;
             while ((index==-1) && (i<areas.size())) {
-                if (areas.get(i).doesFovTouchArea(xy.getX(),xy.getY(),fovX,fovY))
+                if (areas.get(i).doesRectTouchArea(xy.getX(),xy.getY(),fovX,fovY))
                     index=i;
                 i++;
             }
@@ -890,7 +890,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     }
 
     @Override
-    public ArrayList<SampleArea> getAllAreasInsideRect(Rectangle2D.Double r) {
+    public ArrayList<SampleArea> getAllAreasInsideRect(Rectangle2D r) {
         ArrayList<SampleArea> a = new ArrayList<SampleArea>(areas.size());
         for (SampleArea area : areas) {
             if (area.isInsideRect(r)) {
@@ -901,7 +901,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     }
     
     @Override
-    public ArrayList<SampleArea> getUnselectedAreasInsideRect(Rectangle2D.Double r) {
+    public ArrayList<SampleArea> getUnselectedAreasInsideRect(Rectangle2D r) {
         ArrayList<SampleArea> al = new ArrayList<SampleArea>(areas.size());
         for (SampleArea area:areas) {
             if (!area.isSelectedForAcq() && area.isInsideRect(r))
@@ -911,7 +911,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     }
         
     @Override
-    public ArrayList<SampleArea> getSelectedAreasInsideRect(Rectangle2D.Double r) {
+    public ArrayList<SampleArea> getSelectedAreasInsideRect(Rectangle2D r) {
         ArrayList<SampleArea> al = new ArrayList<SampleArea>(areas.size());
         for (SampleArea area:areas) {
             if (area.isSelectedForAcq() && area.isInsideRect(r))

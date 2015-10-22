@@ -84,7 +84,7 @@ public interface IAcqLayout {
 
     void deselectAllLandmarks();
 
-    ArrayList<SampleArea> getAllAreasInsideRect(Rectangle2D.Double r);
+    ArrayList<SampleArea> getAllAreasInsideRect(Rectangle2D r);
 
     ArrayList<SampleArea> getAllAreasTouching(double x, double y);
 
@@ -157,7 +157,7 @@ public interface IAcqLayout {
 
     Vec3d getNormalVector();
 
-    ArrayList<SampleArea> getSelectedAreasInsideRect(Rectangle2D.Double r);
+    ArrayList<SampleArea> getSelectedAreasInsideRect(Rectangle2D r);
 
     ArrayList<SampleArea> getSelectedAreasTouching(double x, double y);
 
@@ -180,7 +180,7 @@ public interface IAcqLayout {
 
     long getTotalTileNumber();
 
-    ArrayList<SampleArea> getUnselectedAreasInsideRect(Rectangle2D.Double r);
+    ArrayList<SampleArea> getUnselectedAreasInsideRect(Rectangle2D r);
 
     ArrayList<SampleArea> getUnselectedAreasTouching(double x, double y);
 

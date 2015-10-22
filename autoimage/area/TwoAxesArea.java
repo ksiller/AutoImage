@@ -2,6 +2,8 @@ package autoimage.area;
 
 import autoimage.Utils;
 import autoimage.api.SampleArea;
+import autoimage.gui.PreviewPanel;
+import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
@@ -162,6 +164,13 @@ public abstract class TwoAxesArea extends SampleArea{
         rotationField.setValue(new Double(Utils.getRotation(affineTrans))/Math.PI*180);
         optionPanel.add(rotationField);
         
+        final PreviewPanel previewPanel = new PreviewPanel(generalPath, getShapeBoundsDiagonale());
+        previewPanel.setPreferredSize(new Dimension (160,160));
+        
+        JPanel allPanels=new JPanel();
+        allPanels.add(optionPanel);
+        allPanels.add(previewPanel);
+        
         topLeftXField.addPropertyChangeListener("value",new PropertyChangeListener() {
 
             @Override
@@ -231,6 +240,7 @@ public abstract class TwoAxesArea extends SampleArea{
 //                        centerXField.setValue(new Double(getCenterXYPos().getX()/1000));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
                     }
                 }
             }
@@ -247,6 +257,7 @@ public abstract class TwoAxesArea extends SampleArea{
 //                        centerYField.setValue(new Double(getCenterXYPos().getY()/1000));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
                     }
                 }
             }
@@ -264,6 +275,7 @@ public abstract class TwoAxesArea extends SampleArea{
                         setAffineTransform(Utils.createRotationAffineTrans(newValue));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
                     }
                 }
             }
@@ -271,7 +283,7 @@ public abstract class TwoAxesArea extends SampleArea{
         
         int result;
         do {
-            result = JOptionPane.showConfirmDialog(null, optionPanel, 
+            result = JOptionPane.showConfirmDialog(null, allPanels, 
                 getShapeType()+": Configuration", JOptionPane.OK_CANCEL_OPTION);
             if (result == JOptionPane.OK_OPTION && !isInsideRect(layoutBounds)) {
                 JOptionPane.showMessageDialog(null,"The area does not fit into the layout.");

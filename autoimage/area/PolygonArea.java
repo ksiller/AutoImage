@@ -4,9 +4,15 @@ import autoimage.api.SampleArea;
 import autoimage.Tile;
 import autoimage.Utils;
 import autoimage.gui.NumberTableCellRenderer;
-import ij.IJ;
+import autoimage.gui.PreviewPanel;
+//import ij.IJ;
+import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.GridLayout;
+import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.geom.AffineTransform;
@@ -173,7 +179,6 @@ public class PolygonArea extends SampleArea {
                         pointList.get(rowIndex).setLocation(rel);
                     } catch (NoninvertibleTransformException ex) {
                         Logger.getLogger(PolygonArea.class.getName()).log(Level.SEVERE, null, ex);
-                        IJ.log(this.getClass().getName()+": Problem with AffineTransform");
                     }
                 }
                 fireTableCellUpdated(rowIndex, colIndex);
@@ -559,6 +564,9 @@ public class PolygonArea extends SampleArea {
         final JTable pointTable = new JTable(new PointTableModel(this,points));
         pointTable.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
         
+        final PreviewPanel previewPanel = new PreviewPanel(generalPath, getShapeBoundsDiagonale());
+        previewPanel.setPreferredSize(new Dimension (160,160));
+
         final JRadioButton absoluteButton = new JRadioButton("Absolute");
         absoluteButton.setActionCommand("absolute");
         absoluteButton.addActionListener(new ActionListener() {
@@ -567,6 +575,7 @@ public class PolygonArea extends SampleArea {
             public void actionPerformed(ActionEvent e) {
                 PointTableModel model=(PointTableModel)pointTable.getModel();
                 model.enableAbsolute(true);
+                previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
             }
         });
 
@@ -578,6 +587,7 @@ public class PolygonArea extends SampleArea {
             public void actionPerformed(ActionEvent e) {
                 PointTableModel model=(PointTableModel)pointTable.getModel();
                 model.enableAbsolute(false);
+                previewPanel.setPath(shape, getShapeBoundsDiagonale(), true);
             }
         });
 
@@ -600,22 +610,16 @@ public class PolygonArea extends SampleArea {
 
             @Override
             public void tableChanged(TableModelEvent evt) {
-                IJ.log("tableChanged: "+evt.toString());
                 if (points!=null) { // {&& points.size() > 0) {
                     if ((evt.getColumn() == 0 || evt.getColumn() == 1)) {
-                        IJ.log("     columnChanged");
                         PointTableModel model=(PointTableModel)pointTable.getModel();
                         createShape();
                         centerShape();
-//                        Point2D centerOffset=centerPath(shape);
-//                        affineTrans.transform(centerOffset, centerOffset);
-//                        setCenter(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());        
                         setRelDefaultPos();
                         createGeneralPath();
 //                        model.setData(points,true);
                         model.updateAllRows();
                     } else {
-                        IJ.log("     other changes:" + evt.getColumn());
                     }
                     topLeftXField.setValue(new Double(getTopLeftX() / 1000));
                     topLeftYField.setValue(new Double(getTopLeftY() / 1000));
@@ -623,6 +627,11 @@ public class PolygonArea extends SampleArea {
                     centerYField.setValue(new Double(getCenterXYPos().getY() / 1000));
                     widthField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getWidth() / 1000));
                     heightField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getHeight() / 1000));
+                    if (absoluteButton.isSelected()) {
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                    } else {
+                        previewPanel.setPath(shape, getShapeBoundsDiagonale(), true);
+                    }
                 }
             }
         });
@@ -641,6 +650,9 @@ public class PolygonArea extends SampleArea {
                         centerXField.setValue(new Double(getCenterXYPos().getX() / 1000));
 //                        model.setData(points,true);
                         model.updateAllRows();
+                        if (absoluteButton.isSelected()) {
+                            previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                        }
                     }
                 }
             }
@@ -658,6 +670,9 @@ public class PolygonArea extends SampleArea {
                         centerYField.setText(getCenterXYPos()==null ? "?" : NUMBER_FORMAT.format(getCenterXYPos().getY() / 1000));
 //                        model.setData(points,true);
                         model.updateAllRows();
+                        if (absoluteButton.isSelected()) {
+                            previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                        }
                     }
                 }
             }
@@ -675,6 +690,9 @@ public class PolygonArea extends SampleArea {
                         topLeftXField.setValue(new Double(getTopLeftX() / 1000));
 //                        model.setData(points,true);
                         model.updateAllRows();
+                        if (absoluteButton.isSelected()) {
+                            previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                        }
                     }
                 }
             }
@@ -692,6 +710,9 @@ public class PolygonArea extends SampleArea {
                         topLeftYField.setText(NUMBER_FORMAT.format(getTopLeftY() / 1000));
 //                        model.setData(points,true);
                         model.updateAllRows();
+                        if (absoluteButton.isSelected()) {
+                            previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                        }
                     }
                 }
             }
@@ -711,6 +732,9 @@ public class PolygonArea extends SampleArea {
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
                         model.updateAllRows();
+                        if (absoluteButton.isSelected()) {
+                            previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                        }
                     }
                 }
             }
@@ -719,8 +743,11 @@ public class PolygonArea extends SampleArea {
         SpringLayout springLayout = new SpringLayout();
         JPanel tablePanel=new JPanel();
         tablePanel.setLayout(springLayout);
-        tablePanel.setPreferredSize(new Dimension(160,250));
+        tablePanel.setPreferredSize(new Dimension(400,250));
+        
+               
         JScrollPane scrollPane=new JScrollPane(pointTable);
+        tablePanel.add(previewPanel);
         tablePanel.add(scrollPane);
 
         JButton newButton = new JButton(new ImageIcon(getClass().getResource("/autoimage/resources/add2.png")));
@@ -740,9 +767,13 @@ public class PolygonArea extends SampleArea {
 //                setCenter(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());        
                 setRelDefaultPos();
                 createGeneralPath();
-                IJ.log("points.size: "+Integer.toString(points.size()));
 //                    model.setData(points,true);
                 model.updateAllRows();
+                if (absoluteButton.isSelected()) {
+                    previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                } else {
+                    previewPanel.setPath(shape, getShapeBoundsDiagonale(), true);                        
+                }
             }
         });
         newButton.setToolTipText("Create new vertex point");
@@ -752,13 +783,18 @@ public class PolygonArea extends SampleArea {
         final int buttonHeight = 22;      
         springLayout.putConstraint(SpringLayout.NORTH, newButton, northConstraint, SpringLayout.NORTH, tablePanel);     
         springLayout.putConstraint(SpringLayout.SOUTH, newButton, northConstraint+=buttonHeight, SpringLayout.NORTH, tablePanel);
-        springLayout.putConstraint(SpringLayout.EAST, newButton, -6, SpringLayout.EAST, tablePanel);
-        springLayout.putConstraint(SpringLayout.WEST, newButton, -28, SpringLayout.EAST, tablePanel);
+        springLayout.putConstraint(SpringLayout.EAST, newButton, -0, SpringLayout.EAST, tablePanel);
+        springLayout.putConstraint(SpringLayout.WEST, newButton, -22, SpringLayout.EAST, tablePanel);
+
+        springLayout.putConstraint(SpringLayout.NORTH, previewPanel, 12, SpringLayout.NORTH, tablePanel);     
+        springLayout.putConstraint(SpringLayout.SOUTH, previewPanel, 0, SpringLayout.SOUTH, tablePanel);
+        springLayout.putConstraint(SpringLayout.EAST, previewPanel, tablePanel.getPreferredSize().height-12, SpringLayout.WEST, tablePanel);
+        springLayout.putConstraint(SpringLayout.WEST, previewPanel, 0, SpringLayout.WEST, tablePanel);
 
         springLayout.putConstraint(SpringLayout.NORTH, scrollPane, 0, SpringLayout.NORTH, newButton);
-        springLayout.putConstraint(SpringLayout.SOUTH, scrollPane, -12, SpringLayout.SOUTH, tablePanel);
+        springLayout.putConstraint(SpringLayout.SOUTH, scrollPane, 0, SpringLayout.SOUTH, tablePanel);
         springLayout.putConstraint(SpringLayout.EAST, scrollPane, -6, SpringLayout.WEST, newButton);
-        springLayout.putConstraint(SpringLayout.WEST, scrollPane, 6, SpringLayout.WEST, tablePanel);
+        springLayout.putConstraint(SpringLayout.WEST, scrollPane, 6, SpringLayout.EAST, previewPanel);
 
         final JButton removeButton = new JButton(new ImageIcon(getClass().getResource("/autoimage/resources/delete.png")));
         removeButton.addActionListener(new ActionListener() {
@@ -782,6 +818,11 @@ public class PolygonArea extends SampleArea {
                     createGeneralPath();
                     model.setData(points,true);
 //                    model.updateAllRows();
+                    if (absoluteButton.isSelected()) {
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                    } else {
+                        previewPanel.setPath(shape, getShapeBoundsDiagonale(), true);                        
+                    }
                 } else {
                     JOptionPane.showMessageDialog(null, "Select at least one vertex point.");
                 }
@@ -824,6 +865,11 @@ public class PolygonArea extends SampleArea {
 //                    model.setData(points,true);
                     model.updateAllRows();
                     pointTable.setRowSelectionInterval(newSelRowInView, newSelRowInView + selRows.length - 1);
+                    if (absoluteButton.isSelected()) {
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                    } else {
+                        previewPanel.setPath(shape, getShapeBoundsDiagonale(), true);                        
+                    }
                 } 
             }
         });
@@ -863,6 +909,11 @@ public class PolygonArea extends SampleArea {
                     createGeneralPath();
 //                    model.setData(points,true);
                     model.updateAllRows();
+                    if (absoluteButton.isSelected()) {
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                    } else {
+                        previewPanel.setPath(shape, getShapeBoundsDiagonale(), true);                        
+                    }
                     pointTable.setRowSelectionInterval(newSelRowInView, newSelRowInView + selRows.length - 1);
                 }
             }
@@ -981,14 +1032,12 @@ public class PolygonArea extends SampleArea {
     @Override
     protected void createShape() {
         if (points!=null && !points.isEmpty()) {
-            IJ.log(Integer.toString(points.size())+" points");
             //create polygon
             shape=createPolygonFromPoints(points);
             //just to make sure, recenter shape and adjust centerXYPos accordingly
 //            Point2D centerOffset=centerPath(shape);
 //            setCenter(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());        
         } else {
-            IJ.log("no points");
             shape=new Path2D.Double();
         }
     }  

@@ -3,7 +3,9 @@ package autoimage.area;
 import autoimage.api.SampleArea;
 import autoimage.Tile;
 import autoimage.Utils;
+import autoimage.gui.PreviewPanel;
 import ij.IJ;
+import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Ellipse2D;
@@ -83,8 +85,6 @@ public class DonutArea extends TwoAxesArea {
     public SampleArea duplicate() {
         DonutArea newArea = new DonutArea(this.getName());
         newArea.setId(this.getId());
-//        newArea.setTopLeftX(this.topLeftX);
-//        newArea.setTopLeftY(this.topLeftY);
         newArea.centerXYPos=new Point2D.Double(this.getCenterXYPos().getX(), this.getCenterXYPos().getY());
         newArea.setRelativeZPos(this.relativeZPos);
         newArea.width=this.width;
@@ -189,6 +189,13 @@ public class DonutArea extends TwoAxesArea {
         ringwidthField.setValue(new Double(ringWidth / 1000));
         optionPanel.add(ringwidthField);
         
+        final PreviewPanel previewPanel = new PreviewPanel(generalPath, getShapeBoundsDiagonale());
+        previewPanel.setPreferredSize(new Dimension (160,160));
+        
+        JPanel allPanels=new JPanel();
+        allPanels.add(optionPanel);
+        allPanels.add(previewPanel);
+        
         topLeftXField.addPropertyChangeListener("value",new PropertyChangeListener() {
 
             @Override
@@ -257,6 +264,7 @@ public class DonutArea extends TwoAxesArea {
                         setWidth(newValue);
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
                     }
                 }
             }
@@ -272,6 +280,7 @@ public class DonutArea extends TwoAxesArea {
                         setHeight(newValue);
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
                     }
                 }
             }
@@ -285,6 +294,7 @@ public class DonutArea extends TwoAxesArea {
                     double newValue = ((Number)ringwidthField.getValue()).doubleValue() * 1000;
                     if (newValue != ringWidth) {
                         setRingWidth(newValue);
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
                     }
                 }
             }
@@ -302,6 +312,7 @@ public class DonutArea extends TwoAxesArea {
                         setAffineTransform(Utils.createRotationAffineTrans(newValue));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
                     }
                 }
             }
@@ -309,7 +320,7 @@ public class DonutArea extends TwoAxesArea {
                 
         int result;
         do {
-            result = JOptionPane.showConfirmDialog(null, optionPanel, 
+            result = JOptionPane.showConfirmDialog(null, allPanels, 
                 getShapeType()+": Configuration", JOptionPane.OK_CANCEL_OPTION);
             if (result == JOptionPane.OK_OPTION && !isInsideRect(layoutBounds)) {
                 JOptionPane.showMessageDialog(null,"The area does not fit into the layout.");

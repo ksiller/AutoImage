@@ -9,6 +9,8 @@ import ij.IJ;
 import ij.ImagePlus;
 import ij.measure.Calibration;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.Path2D;
+import java.awt.geom.PathIterator;
 import java.awt.geom.Point2D;
 import java.io.File;
 import java.io.FileInputStream;
@@ -69,6 +71,34 @@ public class Utils {
           //     storageProcNode.add(RGBProcNode);
 
         return infoProcNode;//root;
+    }
+
+    public static List<Point2D> getMoveToPoints(Path2D path) {
+        if (path==null) {
+            return null;
+        }
+        PathIterator pi=path.getPathIterator(null);
+        List<Point2D> points=new ArrayList<Point2D>();
+        while (!pi.isDone()) {
+            double coords[]=new double[6];
+            int type=pi.currentSegment(coords);
+            if (type==PathIterator.SEG_MOVETO) {
+                points.add(new Point2D.Double(coords[0],coords[1]));
+            }
+            pi.next();
+        }
+        return points;
+    }
+
+    public static Path2D createRectanglePath(Point2D start, Point2D end) {
+        Path2D path=new Path2D.Double();
+        path.moveTo(start.getX(), start.getY());
+        path.lineTo(start.getX(), end.getY());
+        path.lineTo(end.getX(), end.getY());
+        path.lineTo(end.getX(),start.getY());
+        path.lineTo(start.getX(), start.getY());
+        path.closePath();
+        return path;
     }
     
     private DefaultMutableTreeNode copyNode(DefaultMutableTreeNode OriginNode){

@@ -29,6 +29,7 @@ import java.awt.Stroke;
 import java.awt.Toolkit;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.GeneralPath;
+import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.util.List;
@@ -495,6 +496,28 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         } else
             g.drawLine(anchorMousePos.x,anchorMousePos.y,anchorMousePos.x,anchorMousePos.y);
         prevMousePos = mp;
+    }
+    
+    public void updateSelectionPath(Path2D selPath, boolean redraw) {
+        if (selPath!=null) {
+            IJ.log("selPat="+selPath.getBounds2D().toString());
+            Graphics2D g = (Graphics2D) getGraphics();
+            AffineTransform at=g.getTransform();
+            Path2D path=new Path2D.Double(selPath);
+            g.scale(zoom*scale, zoom*scale);
+            selPath.transform(at);
+            g.setXORMode(getBackground());
+            g.draw(selPath);        
+            if (redraw) {
+    //            g.setXORMode(getBackground());
+                g.setPaintMode();  
+            } else {
+    //            g.drawLine(anchorMousePos.x,anchorMousePos.y,anchorMousePos.x,anchorMousePos.y);
+            }    
+            g.setTransform(at);
+        } else {
+            IJ.log("selPat=null");
+        }
     }
     
     public void drawFovAtCurrentStagePos(Graphics2D g2d) {
