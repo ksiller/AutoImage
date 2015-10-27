@@ -108,7 +108,8 @@ import javax.swing.table.AbstractTableModel;
                 area = areas.get(rowIndex);
                 switch (colIndex) {
                     case 0: {
-                        area.setSelectedForAcq((Boolean) value);
+                        IJ.log("AreaTableModel.setValueAt:"+rowIndex+", "+Boolean.toString((Boolean)value));
+                        area.setSelectedForAcq(new Boolean((Boolean) value));
                         fireTableCellUpdated(rowIndex, colIndex);
 //                        fireTableCellUpdated(rowIndex, 3);
                         updateTileCell(rowIndex);

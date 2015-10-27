@@ -29,6 +29,7 @@ import autoimage.area.PolygonArea;
 import autoimage.area.RectArea;
 import autoimage.api.SampleArea;
 import autoimage.api.IAcqLayout;
+import autoimage.area.CompoundArea;
 import autoimage.tools.LayoutPlateManagerDlg;
 import autoimage.tools.LayoutManagerDlg;
 import autoimage.tools.ZOffsetDlg;
@@ -68,7 +69,6 @@ import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.ItemEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
@@ -264,9 +264,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private boolean newPolygonMode;
     private boolean newRectangleMode;
     private Path2D selectionPath=null;
-    private boolean marking; //true in selectMode and annotationMode when left mouse button pressed and dragging
-    private Point markStartScreenPos; //screen pos when left mouse button pressed
-    private Point markEndScreenPos; //screeen pos when left mouse button released; dragging: markStartScreenPos != markEndScreenPos 
     private boolean isLeftMouseButton;
     private boolean isRightMouseButton;
     private boolean isAcquiring = false;
@@ -1131,10 +1128,10 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     @Override
     public void mergeAreas(List<SampleArea> mergingAreas) {
         if (mergingAreas!=null & mergingAreas.size()>1) {
-            String[] options=new String [2];
+            String[] options=new String [3];
             options[0]="Encompassing Rectangle";
             options[1]="Convex Hull";
-            //options[2]="Polygon";
+            options[2]="Compound Area";
             boolean selectionMade=false;
             while (!selectionMade) {
                 String selOption = (String)JOptionPane.showInputDialog(this, "Merge Area Options:", "Merging Areas",JOptionPane.PLAIN_MESSAGE,null,options,lastMergeOption);
@@ -1216,6 +1213,22 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                         pList, 
                         false, 
                         "");
+            } else if (lastMergeOption.equals("Compound Area")) {
+                for (SampleArea area:mergingAreas) {
+                    area.setId(-1);   
+                    area.setSelectedForAcq(false);
+                }
+                mergedArea=new CompoundArea(
+                        createNewAreaName(), 
+                        acqLayout.createUniqueAreaId(), 
+                        0, 
+                        0, 
+                        0, 
+                        mergingAreas,
+                        CompoundArea.COMBINED_OR,
+                        false, 
+                        "");
+                IJ.log(mergedArea.getBounds2D().toString());
             }
             layoutAreas.removeAll(mergingAreas);
             layoutAreas.add(mergedArea);
@@ -4776,11 +4789,16 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     }//GEN-LAST:event_acqLayoutPanelMouseMoved
 
     private void acqLayoutPanelMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_acqLayoutPanelMousePressed
+        Point2D layoutCoord = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(new Point(evt.getX(), evt.getY()));
         if (selectMode || commentMode || mergeAreasMode) {
-            marking = true;
+            if (selectionPath==null) {
+                selectionPath=new Path2D.Double();
+                selectionPath.moveTo(layoutCoord.getX(),layoutCoord.getY());
+            } 
+            
+/*            marking = true;
             markStartScreenPos = new Point(evt.getX(), evt.getY());
-//            IJ.log("MousePressed: "+Integer.toString(markStartScreenPos.x)+", "+Integer.toString(markStartScreenPos.y));
-            ((LayoutPanel) acqLayoutPanel).setAnchorMousePos(markStartScreenPos);
+            ((LayoutPanel) acqLayoutPanel).setAnchorMousePos(markStartScreenPos);*/
             if (SwingUtilities.isLeftMouseButton(evt)) {
                 isLeftMouseButton = true;
                 isRightMouseButton = false;
@@ -4791,13 +4809,11 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 //                    IJ.log("Right MousePressed");  
             }
         } else if (newRectangleMode) {   
-            Point2D layoutCoord = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(new Point(evt.getX(), evt.getY()));
             if (selectionPath==null) {
                 selectionPath=new Path2D.Double();
                 selectionPath.moveTo(layoutCoord.getX(),layoutCoord.getY());
             } 
         } else if (newPolygonMode) {    
-            Point2D layoutCoord = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(new Point(evt.getX(), evt.getY()));
             if (evt.getClickCount() == 1) {
                 if (selectionPath==null) {
                     selectionPath=new Path2D.Double();
@@ -4851,8 +4867,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 
     }
 
-    private boolean identicalPoints(Point p1, Point p2) {
-        return (p1.x == p2.x && p1.y == p2.y);
+    private boolean identicalPoints(Point2D p1, Point2D p2) {
+        return (p1.getX() == p2.getX() && p1.getY() == p2.getY());
     }
 
     private void acqLayoutPanelMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_acqLayoutPanelMouseReleased
@@ -4883,101 +4899,96 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                acqLayoutPanel.repaint();
             }
             selectionPath=null;                
-        } else if ((marking & selectMode) || (marking & mergeAreasMode) || (marking & commentMode)) {
-            markEndScreenPos = new Point(evt.getX(), evt.getY());
-            Point2D markStartPos = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(markStartScreenPos);
-            Point2D markEndPos = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(markEndScreenPos);
-            List<SampleArea> al=null;//will hold allPoints of all affected areas
-            if (!identicalPoints(markStartScreenPos, markEndScreenPos)) { 
-                // drag and relase to mark group of areas
-                if (selectMode) {
-                    if (isLeftMouseButton)
-                        al = acqLayout.getUnselectedAreasInsideRect(createRectangle2D(markStartPos, markEndPos));
-                    else if (isRightMouseButton)
-                        al = acqLayout.getSelectedAreasInsideRect(createRectangle2D(markStartPos, markEndPos));
-                } else if (mergeAreasMode || commentMode) {
-                    al = acqLayout.getAllAreasInsideRect(createRectangle2D(markStartPos, markEndPos));
-                }
-            } else { //single click
-                if (selectMode) {
-                    if (isLeftMouseButton)
-                        al = acqLayout.getUnselectedAreasTouching(markEndPos.getX(), markEndPos.getY());
-                    else if (isRightMouseButton)
-                        al = acqLayout.getSelectedAreasTouching(markEndPos.getX(), markEndPos.getY());
-                } else if (mergeAreasMode || commentMode) {
-                    al = acqLayout.getAllAreasTouching(markEndPos.getX(), markEndPos.getY());
-                }
-            }
-            AreaTableModel atm = (AreaTableModel) areaTable.getModel();
-            if (selectMode && al!=null) {
-                retilingAllowed = false;
-                for (SampleArea area : al) {
-                    int id = area.getId();
-                    for (int j = 0; j < atm.getRowCount(); j++) {
-                        int idInRow = atm.getRowData(j).getId();
-                        if (idInRow == id) {
-                            if (isLeftMouseButton) {
-                                atm.setValueAt(true, j, 0);
-                            } else if (isRightMouseButton) {
-                                atm.setValueAt(false, j, 0);
-                            }
-                        }
+        } else if (selectionPath!=null && (selectMode || mergeAreasMode || commentMode)) {
+            List<Point2D> pList=Utils.getMoveToPoints(selectionPath);
+            if (pList!=null && !pList.isEmpty()) {
+                Point2D startPoint=pList.get(0);
+                Point2D endPoint=((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(new Point(evt.getX(), evt.getY()));
+                Rectangle2D rect=this.createRectangle2D(startPoint, endPoint);
+                
+                List<SampleArea> al=null;//will hold allPoints of all affected areas
+                if (!identicalPoints(startPoint, endPoint)) { 
+                    // drag and relase to mark group of areas
+                    if (selectMode) {
+                        if (isLeftMouseButton)
+                            al = acqLayout.getUnselectedAreasInsideRect(createRectangle2D(startPoint, endPoint));
+                        else if (isRightMouseButton)
+                            al = acqLayout.getSelectedAreasInsideRect(createRectangle2D(startPoint, endPoint));
+                    } else if (mergeAreasMode || commentMode) {
+                        al = acqLayout.getAllAreasInsideRect(createRectangle2D(startPoint, endPoint));
+                    }
+                } else { //single click
+                    if (selectMode) {
+                        if (isLeftMouseButton)
+                            al = acqLayout.getUnselectedAreasTouching(endPoint.getX(), endPoint.getY());
+                        else if (isRightMouseButton)
+                            al = acqLayout.getSelectedAreasTouching(endPoint.getX(), endPoint.getY());
+                    } else if (mergeAreasMode || commentMode) {
+                        al = acqLayout.getAllAreasTouching(endPoint.getX(), endPoint.getY());
                     }
                 }
-                retilingAllowed = true;
-                if (isLeftMouseButton) {
-                    calcTilePositions(al, currentAcqSetting, SELECTING_AREA);
-                    //updateAcqLayoutPanel is called automatically
-                } else {
-                    updateTotalTileNumber();
-                    updateAcqLayoutPanel();
-                }
-            } else if (mergeAreasMode) {
-                for (SampleArea a : al) {
-                    a.setSelectedForMerge(true);
-                }
-                if (mergeAreasDialog != null) {
-                    mergeAreasDialog.addAreas(al);
-                }
-            } else if (commentMode && isLeftMouseButton && al.size() > 0) {
-                GenericDialog gd = new GenericDialog("Change Comment");
-                gd.addStringField("New Comment:", "");
-                gd.showDialog();
-                if (!gd.wasCanceled()) {
-                    String annot = gd.getNextString();
+                AreaTableModel atm = (AreaTableModel) areaTable.getModel();
+                if (selectMode && al!=null) {
+                    retilingAllowed = false;
                     for (SampleArea area : al) {
-/*                        int id = area.getId();
+                        int id = area.getId();
                         for (int j = 0; j < atm.getRowCount(); j++) {
-                            int idInRow = (Integer) atm.getValueAt(j, 1);
+                            int idInRow = atm.getRowData(j).getId();
                             if (idInRow == id) {
                                 if (isLeftMouseButton) {
-                                    atm.setValueAt(annot, j, 4);
+                                    atm.setValueAt(true, j, 0);
+                                } else if (isRightMouseButton) {
+                                    atm.setValueAt(false, j, 0);
                                 }
                             }
-                        }*/
-                        area.setComment(annot);
+                        }
+                        area.setSelectedForAcq(isLeftMouseButton);
                     }
+                    retilingAllowed = true;
+                    if (isLeftMouseButton) {
+                        calcTilePositions(al, currentAcqSetting, SELECTING_AREA);
+                        //updateAcqLayoutPanel is called automatically
+                    } else {//isRightMouseButton: only deselect areas, no need to calculate tiles
+                        updateTotalTileNumber();
+                        updateAcqLayoutPanel();
+                    }
+                } else if (mergeAreasMode) {
+                    for (SampleArea area : al) {
+                        area.setSelectedForMerge(true);
+                    }
+                    if (mergeAreasDialog != null) {
+                        mergeAreasDialog.addAreas(al);
+                    }
+                } else if (commentMode && isLeftMouseButton && al.size() > 0) {
+                    GenericDialog gd = new GenericDialog("Change Comment");
+                    gd.addStringField("New Comment:", "");
+                    gd.showDialog();
+                    if (!gd.wasCanceled()) {
+                        String annot = gd.getNextString();
+                        for (SampleArea area : al) {
+                            area.setComment(annot);
+                        }
+                    }
+                    commentButton.requestFocus();
                 }
-                commentButton.requestFocus();
+                ((LayoutPanel) acqLayoutPanel).updateSelectionPath(selectionPath, true);
             }
-            ((LayoutPanel) acqLayoutPanel).updateSelRect(markEndScreenPos, false);
+            selectionPath=null;
         }
-        marking = false;
+/*        marking = false;*/
     }//GEN-LAST:event_acqLayoutPanelMouseReleased
 
     private void acqLayoutPanelMouseDragged(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_acqLayoutPanelMouseDragged
         double coordX = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(evt.getX());
         double coordY = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(evt.getY());
-        if (selectMode || mergeAreasMode || commentMode) {
-            String xStr = String.format("%1$,.2f", coordX);
-            String yStr = String.format("%1$,.2f", coordY);
-            cursorLabel.setText("Layout: " + xStr + ": " + yStr);
-            ((LayoutPanel) acqLayoutPanel).updateSelRect(new Point(evt.getX(), evt.getY()), true);
-        } else if (newPolygonMode) {
+        String xStr = String.format("%1$,.2f", coordX);
+        String yStr = String.format("%1$,.2f", coordY);
+        cursorLabel.setText("Layout: " + xStr + ": " + yStr);
+        if (newPolygonMode) {
             ((LayoutPanel) acqLayoutPanel).updateSelectionPath(selectionPath, true);
             selectionPath.lineTo(coordX,coordY);
             ((LayoutPanel) acqLayoutPanel).updateSelectionPath(selectionPath, true);
-        } else if (newRectangleMode) {
+        } else if (newRectangleMode || selectMode || mergeAreasMode || commentMode) {
             List<Point2D> pList=Utils.getMoveToPoints(selectionPath);
             if (pList!=null && !pList.isEmpty()) {
                 ((LayoutPanel) acqLayoutPanel).updateSelectionPath(selectionPath, true);
@@ -9070,7 +9081,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             totalTilesLabel.setText(Long.toString(Math.abs(tiles)) + (tiles < 0 ? " (Error)" : ""));
             layoutScrollPane.getViewport().revalidate();
             layoutScrollPane.getViewport().repaint();
-
         }
     }
 

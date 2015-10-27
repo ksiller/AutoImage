@@ -33,7 +33,7 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
     private JTable areaTable;
     private IAcqLayout acqLayout;
     private final List<IMergeAreaListener> listeners;
-    private ExecutorService listenerExecutor;
+//    private ExecutorService listenerExecutor;
 
    //implementation of TableModelListener
     @Override
@@ -142,7 +142,7 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
    public MergeAreasDlg(AcqFrame aFrame, IAcqLayout al, ScriptInterface gui) {
       super(aFrame);
       listeners=new ArrayList<IMergeAreaListener>();
-      listenerExecutor = Executors.newFixedThreadPool(1);
+//      listenerExecutor = Executors.newFixedThreadPool(1);
       addWindowListener(new WindowAdapter() {
          @Override
          public void windowClosing(WindowEvent arg0) {

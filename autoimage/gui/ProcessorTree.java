@@ -200,9 +200,9 @@ public class ProcessorTree<E> {
 
    
    /**
-    * Sets up the DataProcessor<TaggedImage> sequence
+    * Sets up the DataProcessor sequence.
     * @param inputQueue
-    * @param imageProcessors
+    * @param imageProcessorTree
     * @return 
     */
    public static BlockingQueue<TaggedImage> runImage(BlockingQueue<TaggedImage> inputQueue,DefaultMutableTreeNode imageProcessorTree) {

@@ -264,7 +264,8 @@ public class DonutArea extends TwoAxesArea {
                         setWidth(newValue);
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
-                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+                        previewPanel.repaint();
                     }
                 }
             }
@@ -280,7 +281,8 @@ public class DonutArea extends TwoAxesArea {
                         setHeight(newValue);
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
-                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+                        previewPanel.repaint();
                     }
                 }
             }
@@ -294,7 +296,8 @@ public class DonutArea extends TwoAxesArea {
                     double newValue = ((Number)ringwidthField.getValue()).doubleValue() * 1000;
                     if (newValue != ringWidth) {
                         setRingWidth(newValue);
-                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+                        previewPanel.repaint();
                     }
                 }
             }
@@ -309,10 +312,12 @@ public class DonutArea extends TwoAxesArea {
                     //convert to rad
                     newValue=newValue/180*Math.PI;
                     if (newValue != Utils.getRotation(affineTrans)) {
-                        setAffineTransform(Utils.createRotationAffineTrans(newValue));
+//                        setAffineTransform(Utils.createRotationAffineTrans(newValue));
+                        setAffineTransform(AffineTransform.getRotateInstance(newValue));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
-                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+                        previewPanel.repaint();
                     }
                 }
             }

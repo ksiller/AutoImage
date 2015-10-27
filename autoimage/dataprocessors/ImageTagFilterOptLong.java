@@ -3,7 +3,7 @@ package autoimage.dataprocessors;
 import java.util.List;
 
 /**
- * Class that specifically handles filtering of Long values from a List<Long>
+ * Class that specifically handles filtering of Long values from a List of Long
  * 
  * @author Karsten Siller
  * @param <E> element type in BlockingQueue (e.g. TaggedImage or File)

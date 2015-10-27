@@ -7,12 +7,18 @@ import autoimage.api.SampleArea;
 import autoimage.Utils;
 import autoimage.api.IAcqLayout;
 import autoimage.area.CompoundArea;
+import static autoimage.area.CompoundArea.COMBINED_AND;
+import static autoimage.area.CompoundArea.COMBINED_NOT;
+import static autoimage.area.CompoundArea.COMBINED_OR;
+import static autoimage.area.CompoundArea.COMBINED_XOR;
+import autoimage.area.CompoundArea;
 import autoimage.area.EllipseArea;
 import autoimage.area.PolygonArea;
 import autoimage.area.RectArea;
 import autoimage.gui.NumberTableCellRenderer;
 import ij.IJ;
 import ij.Prefs;
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
@@ -68,20 +74,6 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
                 al = new ArrayList<SampleArea>();
             }
             this.areas = al;
-            
-            List<SampleArea> a=new ArrayList<SampleArea>();
-            a.add(new RectArea("R1",0,4000,2000,0,3000,1000,false,""));
-            a.get(0).setAffineTransform(Utils.createRotationAffineTrans(Math.PI*10/180));
-            a.add(new RectArea("R2",1,5000,3000,0,3000,1000,false,""));
-            List<SampleArea> s=new ArrayList<SampleArea>();
-            s.add(new EllipseArea("E1",2,4500,2500,0,500,500,false,""));
-            s.add(new RectArea("R3",2,5000,2700,0,800,500,false,""));
-//            CompoundArea c=new CompoundArea("Compound 1", -1, 0,0,0,a,s,false,"");
-            CompoundArea c=new CompoundArea("Compound 1", -1, 10000,5000,0,a,s,false,"");
-            //c.setAffineTransform(Utils.createRotationAffineTrans(Math.PI*10/180));
-            this.areas.add(c);
-            
-            
             if (updateView) {
                 fireTableDataChanged();
             }
@@ -247,12 +239,6 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         String jarFileStr=locationStr.substring(locationStr.indexOf("file:")+5,locationStr.length()-2);
         //replace forward slash with OS specific path separator
         jarFileStr.replace("/",File.pathSeparator);
-        
-//        IJ.log("location.getFile: "+location.getFile());
-//        IJ.log("location.getPath: "+location.getPath());
-//        IJ.log("locationStr: "+locationStr);
-//        IJ.log("jarFileStr: "+jarFileStr);
-
         URLClassLoader classLoader;
         JarFile jarFile;
         try {
@@ -279,9 +265,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
                     IJ.log(clazz.getName());
                     //only add non-abstract SampleArea classes that support custom layouts
                     if (SampleArea.class.isAssignableFrom(clazz) && !Modifier.isAbstract(clazz.getModifiers())) {
-                        IJ.log("    before creating new instance");
                         SampleArea area=(SampleArea)clazz.newInstance();
-                        IJ.log("    after creating new instance");
                         if ((area.supportedLayouts() & SampleArea.SUPPORT_CUSTOM_LAYOUT) == SampleArea.SUPPORT_CUSTOM_LAYOUT) {
                             availableAreaClasses.put(area.getShapeType(), className);
                         }   
@@ -311,8 +295,6 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         } catch (IOException ex) {
             Logger.getLogger(this.getClass().getName()).log(Level.SEVERE, null, ex);
         }
-
-
     }
     /**
      * This method is called from within the constructor to initialize the form.

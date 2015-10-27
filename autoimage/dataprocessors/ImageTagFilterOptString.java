@@ -3,7 +3,7 @@ package autoimage.dataprocessors;
 import java.util.List;
 
 /**
- * Class that specifically handles filtering of String values from a defined List<String>
+ * Class that specifically handles filtering of String values from a defined List of String
  * 
  * @author Karsten Siller
  * @param <E> element type in BlockingQueue (e.g. TaggedImage or File)

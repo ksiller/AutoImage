@@ -5,6 +5,7 @@ import autoimage.api.SampleArea;
 import autoimage.gui.PreviewPanel;
 import java.awt.Dimension;
 import java.awt.GridLayout;
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.beans.PropertyChangeEvent;
@@ -240,7 +241,8 @@ public abstract class TwoAxesArea extends SampleArea{
 //                        centerXField.setValue(new Double(getCenterXYPos().getX()/1000));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
-                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+                        previewPanel.repaint();
                     }
                 }
             }
@@ -257,7 +259,8 @@ public abstract class TwoAxesArea extends SampleArea{
 //                        centerYField.setValue(new Double(getCenterXYPos().getY()/1000));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
-                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+                        previewPanel.repaint();
                     }
                 }
             }
@@ -272,10 +275,12 @@ public abstract class TwoAxesArea extends SampleArea{
                     //convert to rad
                     newValue=newValue/180*Math.PI;
                     if (newValue != Utils.getRotation(affineTrans)) {
-                        setAffineTransform(Utils.createRotationAffineTrans(newValue));
+//                        setAffineTransform(Utils.createRotationAffineTrans(newValue));
+                        setAffineTransform(AffineTransform.getRotateInstance(newValue));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
-                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale(), true);
+                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+                        previewPanel.repaint();
                     }
                 }
             }

@@ -180,7 +180,7 @@ public class ExtDataProcessor<E> extends DataProcessor<E>{
     }
     
     /**
-     * called immediately before "run()" --> use to initialize processor's fields before each run
+     * Called immediately before "run()". Used to initialize processor's fields before each run
      *
      */ 
     protected void initialize() {}

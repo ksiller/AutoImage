@@ -106,11 +106,7 @@ public abstract class SampleArea implements Shape {
         this.id=id;
         index=-1;
         centerXYPos=new Point2D.Double(cx,cy);
-//        topLeftX=ox;
-//        topLeftY=oy;
         relativeZPos=oz;
-//        width=w;
-//        height=h;
         selectedForAcq=selForAcq;
         comment=anot;
         acquiring=false;
@@ -122,7 +118,6 @@ public abstract class SampleArea implements Shape {
         createShape();
         setRelDefaultPos();
         createGeneralPath();
-//        calcCenterAndDefaultPos();
     }
 
     private static String[] ColAlphabetFactory() {

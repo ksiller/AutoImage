@@ -1,7 +1,7 @@
 package autoimage;
 
 import autoimage.api.ExtImageTags;
-import autoimage.api.RefArea;
+import autoimage.api.SampleArea;
 import autoimage.gui.ProcessorTree;
 import autoimage.dataprocessors.ExtDataProcessor;
 import autoimage.dataprocessors.SiteInfoUpdater;
@@ -15,9 +15,11 @@ import java.awt.geom.Point2D;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Modifier;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
@@ -26,6 +28,8 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.JOptionPane;
@@ -46,10 +50,176 @@ import org.micromanager.utils.ReportingUtils;
  * @author Karsten
  */
 public class Utils {
+
+    /**
+     * Rotates a point around the origin (0/0).
+     * @param point Point to be rotated.
+     * @param rad Rotation angle in rad.
+     * @return Rotated point. The original point object remains unaltered.
+     */
+    public static Point2D rotatePoint(Point2D point, double rad) {
+        double x = (Math.cos(rad) * (point.getX()) - Math.sin(rad) * (point.getY()));
+        double y = (Math.sin(rad) * (point.getX()) + Math.cos(rad) * (point.getY()));
+        return new Point2D.Double(x,y);
+    }
+
+    /**
+     * Rotates a point around an anchor point.
+     * @param point Point to be rotated.
+     * @param anchor Anchor point around which the rotation occurs. (0/0) results in rotation around the origin.
+     * @param rad Rotation angle in rad.
+     * @return Rotated point. The original point object remains unaltered.
+     */
+    public static Point2D rotatePoint(Point2D point, Point2D anchor, double rad) {
+        double x = (int)(anchor.getX() + Math.cos(rad) * (point.getX() - anchor.getX()) - Math.sin(rad) * (point.getY() - anchor.getY()));
+        double y = (int)(anchor.getY() + Math.sin(rad) * (point.getX() - anchor.getX()) + Math.cos(rad) * (point.getY() - anchor.getY()));
+        return new Point2D.Double(x,y);
+/*        
+        Point2D rotPoint=new Point2D.Double(point.getX(),point.getY());
+        AffineTransform at=new AffineTransform();
+        at.translate(anchor.getX(), anchor.getY());
+        at.rotate(rad);
+        at.translate(-anchor.getX(), -anchor.getY());
+        at.transform(point, rotPoint);
+        return rotPoint;*/
+    }
     
+    /**
+     * Extracts the rotation component for an AffineTransform object
+     * @param at AffineTransform for which the rotation component is to be determined
+     * @return Rotation angle in rad
+     */
+    public static double getRotation(AffineTransform at) {
+        return Math.atan2(at.getShearY(), at.getScaleY());
+    }
+    
+    /**
+     * Parses a Path2D object for all segments for which type==PathIterator.SEG_MOVETO (path start points)
+     * @param path The Path2D object that will be parsed for MOVETO segments 
+     * @return List of all 2D coordinates specified as SEG_MOVETO segments (=starting points). Returns null if th path object is null. Returns an empty list if no "move-to"segments are found.
+     * Note a Path may contain multiple subpaths each with its own SEG_MOVETO segment
+     */
+    public static List<Point2D> getMoveToPoints(Path2D path) {
+        if (path==null) {
+            return null;
+        }
+        PathIterator pi=path.getPathIterator(null);
+        List<Point2D> points=new ArrayList<Point2D>();
+        while (!pi.isDone()) {
+            double coords[]=new double[6];
+            int type=pi.currentSegment(coords);
+            if (type==PathIterator.SEG_MOVETO) {
+                points.add(new Point2D.Double(coords[0],coords[1]));
+            }
+            pi.next();
+        }
+        return points;
+    }
+
+    /**
+     * Creates a rectangular Path2D object defined by two points corresponding to opposite corners.
+     * Note reversing start and end points does not affect the rectangle's shape, but does reverse the path direction along the rectangles outline 
+     * @param start 2D point defining starting corner of rectangle
+     * @param opposite 2D point defining rectangle corner opposite of start point
+     * @return Path2D object of the rectangle specified by start and end points
+     */
+    public static Path2D createRectanglePath(Point2D start, Point2D opposite) {
+        Path2D path=new Path2D.Double();
+        path.moveTo(start.getX(), start.getY());
+        path.lineTo(start.getX(), opposite.getY());
+        path.lineTo(opposite.getX(), opposite.getY());
+        path.lineTo(opposite.getX(),start.getY());
+        path.lineTo(start.getX(), start.getY());
+        path.closePath();
+        return path;
+    }
+    
+    /**
+     * Measures angle between two 2D vectors
+     * @param v1 2D vector; coordinates are interpreted as endpoints of vector originating at (0/0)
+     * @param v2 2D vector; coordinates are interpreted as endpoints of vector originating at (0/0)
+     * @return angle (in rad) between the vectors v1 and v2
+     */
+    public static double angle2D_Rad(Point2D.Double v1, Point2D.Double v2) {
+        return Math.acos((v1.x*v2.x + v1.y*v2.y) / (Math.sqrt(v1.x*v1.x + v1.y*v1.y)*Math.sqrt(v2.x*v2.x + v2.y*v2.y)));
+    }
+       
+    /**
+     * Calculates the AffineTransform that best fits the mapping of an array of 2D source points to an array of 2D destination points.
+     * @param src array of Point2D defining source points
+     * @param dst array of Point2D defining source points
+     * @return AffineTransform that best fits src-to-dst point mapping
+     * @throws Exception 
+     */
+    public static AffineTransform calcAffTransform(Point2D[] src, Point2D[] dst) throws Exception {
+        if (src == null || dst == null || src.length != dst.length || src.length==0)
+            throw new Exception("calcAffTransform: illegal arguments.");
+        AffineTransform at=null;
+        //single point: translation
+        if (src.length == 1) {
+            at = new AffineTransform();
+            at.translate(dst[0].getX() - src[0].getX(), dst[0].getY() - src[0].getY());
+        }
+        //two points: translation, scale, rotation
+        if (src.length == 2) {
+            double dx=-(src[1].getY()-src[0].getY());
+            double dy=src[1].getX()-src[0].getX();
+            Point2D src2=new Point2D.Double(src[0].getX()+dx,src[0].getY()+dy);
+            dx=-(dst[1].getY()-dst[0].getY());
+            dy=(dst[1].getX()-dst[0].getX());
+            Point2D dst2=new Point2D.Double(dst[0].getX()+dx,dst[0].getY()+dy);
+            Array2DRowRealMatrix x = new Array2DRowRealMatrix(new double[][] {
+            { src[0].getX(), src[1].getX(), src2.getX() }, { src[0].getY(), src[1].getY(), src2.getY() },{ 1, 1, 1 } });
+            Array2DRowRealMatrix y = new Array2DRowRealMatrix(new double[][] {
+            { dst[0].getX(), dst[1].getX(), dst2.getX() }, { dst[0].getY(), dst[1].getY(), dst2.getY() },{ 0, 0, 0 } });
+            double determinant=new LUDecompositionImpl(x).getDeterminant();
+            RealMatrix inv_x=new LUDecompositionImpl(x).getSolver().getInverse();
+            double[][] matrix = y.multiply(inv_x).getData();
+            at = new AffineTransform(new double[] { matrix[0][0], matrix[1][0], matrix[0][1], matrix[1][1], matrix[0][2], matrix[1][2] });
+//            IJ.log("angle: "+angleRad/Math.PI*180+", scale: "+scale+", translate: "+(dst[0].x-src[0].x)+"/"+(dst[0].y-src[0].y));
+            IJ.log("1mod. "+at.toString());
+            IJ.log("1mod. angle: "+Math.atan2(at.getShearY(), at.getScaleY())/Math.PI*180);
+        }
+        //three points: translation, scale, rotation, shear
+        if (src.length > 2) {
+            Array2DRowRealMatrix x = new Array2DRowRealMatrix(new double[][] {
+            { src[0].getX(), src[1].getX(), src[2].getX() }, { src[0].getY(), src[1].getY(), src[2].getY() },{ 1, 1, 1 } });
+            Array2DRowRealMatrix y = new Array2DRowRealMatrix(new double[][] {
+            { dst[0].getX(), dst[1].getX(), dst[2].getX() }, { dst[0].getY(), dst[1].getY(), dst[2].getY() },{ 0, 0, 0 } });
+            double determinant=new LUDecompositionImpl(x).getDeterminant();
+            RealMatrix inv_x=new LUDecompositionImpl(x).getSolver().getInverse();
+            double[][] matrix = y.multiply(inv_x).getData();
+            at = new AffineTransform(new double[] { matrix[0][0], matrix[1][0], matrix[0][1], matrix[1][1], matrix[0][2], matrix[1][2] });
+        }
+        return at;
+    }
+    
+    
+    
+    
+    private DefaultMutableTreeNode copyNode(DefaultMutableTreeNode OriginNode){
+        DefaultMutableTreeNode Copy = new DefaultMutableTreeNode(OriginNode.toString());
+        if(OriginNode.isLeaf()){
+            return Copy;
+        }else{
+            int cc = OriginNode.getChildCount();
+            for(int i=0;i<cc;i++){
+                Copy.add(copyNode((DefaultMutableTreeNode)OriginNode.getChildAt(i)));
+            }
+            return Copy;
+        }
+    }
 
     
-    
+    private static String getString(ByteBuffer buffer) {
+        try {
+            return new String(buffer.array(), "UTF-8");
+        } catch (UnsupportedEncodingException ex) {
+            ReportingUtils.logError(ex);
+            return "";
+        }
+    }
+     
     
     public static DefaultMutableTreeNode createDefaultImageProcTree() {
 //        DefaultMutableTreeNode root=new DefaultMutableTreeNode(new ExtDataProcessor(ProcessorTree.PROC_NAME_ACQ_ENG));
@@ -72,59 +242,6 @@ public class Utils {
 
         return infoProcNode;//root;
     }
-
-    public static List<Point2D> getMoveToPoints(Path2D path) {
-        if (path==null) {
-            return null;
-        }
-        PathIterator pi=path.getPathIterator(null);
-        List<Point2D> points=new ArrayList<Point2D>();
-        while (!pi.isDone()) {
-            double coords[]=new double[6];
-            int type=pi.currentSegment(coords);
-            if (type==PathIterator.SEG_MOVETO) {
-                points.add(new Point2D.Double(coords[0],coords[1]));
-            }
-            pi.next();
-        }
-        return points;
-    }
-
-    public static Path2D createRectanglePath(Point2D start, Point2D end) {
-        Path2D path=new Path2D.Double();
-        path.moveTo(start.getX(), start.getY());
-        path.lineTo(start.getX(), end.getY());
-        path.lineTo(end.getX(), end.getY());
-        path.lineTo(end.getX(),start.getY());
-        path.lineTo(start.getX(), start.getY());
-        path.closePath();
-        return path;
-    }
-    
-    private DefaultMutableTreeNode copyNode(DefaultMutableTreeNode OriginNode){
-        DefaultMutableTreeNode Copy = new DefaultMutableTreeNode(OriginNode.toString());
-        if(OriginNode.isLeaf()){
-            return Copy;
-        }else{
-            int cc = OriginNode.getChildCount();
-            for(int i=0;i<cc;i++){
-                Copy.add(copyNode((DefaultMutableTreeNode)OriginNode.getChildAt(i)));
-            }
-            return Copy;
-        }
-    }
-
-    
-    private static String getString(ByteBuffer buffer) {
-      try {
-         return new String(buffer.array(), "UTF-8");
-      } catch (UnsupportedEncodingException ex) {
-         ReportingUtils.logError(ex);
-         return "";
-      }
-   }
-    
-    
     
     
     public static boolean isDescendantOfImageStorageNode(DefaultMutableTreeNode root, DefaultMutableTreeNode node) {
@@ -299,55 +416,6 @@ public class Utils {
         return node;
     }
     
-    //expects two 2D vectors
-    public static double angle2D_Rad(Point2D.Double v1, Point2D.Double v2) {
-        return Math.acos((v1.x*v2.x + v1.y*v2.y) / (Math.sqrt(v1.x*v1.x + v1.y*v1.y)*Math.sqrt(v2.x*v2.x + v2.y*v2.y)));
-    }
-       
-    
-    public static AffineTransform calcAffTransform(Point2D.Double[] src, Point2D.Double[] dst) throws Exception {
-        if (src == null || dst == null || src.length != dst.length || src.length==0)
-            throw new Exception("calcAffTransform: illegal arguments.");
-        AffineTransform at=null;
-        //single point: translation
-        if (src.length == 1) {
-            at = new AffineTransform();
-            at.translate(dst[0].x - src[0].x, dst[0].y - src[0].y);
-        }
-        //two points: translation, scale, rotation
-        if (src.length == 2) {
-            double dx=-(src[1].getY()-src[0].getY());
-            double dy=src[1].getX()-src[0].getX();
-            Point2D src2=new Point2D.Double(src[0].getX()+dx,src[0].getY()+dy);
-            dx=-(dst[1].getY()-dst[0].getY());
-            dy=(dst[1].getX()-dst[0].getX());
-            Point2D dst2=new Point2D.Double(dst[0].getX()+dx,dst[0].getY()+dy);
-            Array2DRowRealMatrix x = new Array2DRowRealMatrix(new double[][] {
-            { src[0].getX(), src[1].getX(), src2.getX() }, { src[0].getY(), src[1].getY(), src2.getY() },{ 1, 1, 1 } });
-            Array2DRowRealMatrix y = new Array2DRowRealMatrix(new double[][] {
-            { dst[0].getX(), dst[1].getX(), dst2.getX() }, { dst[0].getY(), dst[1].getY(), dst2.getY() },{ 0, 0, 0 } });
-            double determinant=new LUDecompositionImpl(x).getDeterminant();
-            RealMatrix inv_x=new LUDecompositionImpl(x).getSolver().getInverse();
-            double[][] matrix = y.multiply(inv_x).getData();
-            at = new AffineTransform(new double[] { matrix[0][0], matrix[1][0], matrix[0][1], matrix[1][1], matrix[0][2], matrix[1][2] });
-//            IJ.log("angle: "+angleRad/Math.PI*180+", scale: "+scale+", translate: "+(dst[0].x-src[0].x)+"/"+(dst[0].y-src[0].y));
-            IJ.log("1mod. "+at.toString());
-            IJ.log("1mod. angle: "+Math.atan2(at.getShearY(), at.getScaleY())/Math.PI*180);
-        }
-        //three points: translation, scale, rotation, shear
-        if (src.length > 2) {
-            Array2DRowRealMatrix x = new Array2DRowRealMatrix(new double[][] {
-            { src[0].getX(), src[1].getX(), src[2].getX() }, { src[0].getY(), src[1].getY(), src[2].getY() },{ 1, 1, 1 } });
-            Array2DRowRealMatrix y = new Array2DRowRealMatrix(new double[][] {
-            { dst[0].getX(), dst[1].getX(), dst[2].getX() }, { dst[0].getY(), dst[1].getY(), dst[2].getY() },{ 0, 0, 0 } });
-            double determinant=new LUDecompositionImpl(x).getDeterminant();
-            RealMatrix inv_x=new LUDecompositionImpl(x).getSolver().getInverse();
-            double[][] matrix = y.multiply(inv_x).getData();
-            at = new AffineTransform(new double[] { matrix[0][0], matrix[1][0], matrix[0][1], matrix[1][1], matrix[0][2], matrix[1][2] });
-        }
-        return at;
-    }
-    
     public static double MedianDouble(List<Double> values){
         Collections.sort(values); 
         if (values.size() % 2 == 1)
@@ -361,19 +429,9 @@ public class Utils {
         return x!=x;
     }
     
-    public static Point2D rotatePoint(Point2D point, double rad) {
-        double x = (Math.cos(rad) * (point.getX()) - Math.sin(rad) * (point.getY()));
-        double y = (Math.sin(rad) * (point.getX()) + Math.cos(rad) * (point.getY()));
-        return new Point2D.Double(x,y);
-    }
 
-    public static Point2D rotatePoint(Point2D point, Point2D anchor, double rad) {
-        double x = (int)(anchor.getX() + Math.cos(rad) * (point.getX() - anchor.getX()) - Math.sin(rad) * (point.getY() - anchor.getY()));
-        double y = (int)(anchor.getY() + Math.sin(rad) * (point.getX() - anchor.getX()) + Math.cos(rad) * (point.getY() - anchor.getY()));
-        return new Point2D.Double(x,y);
-    }
-    
-    public static double distance(Point2D l1start, Point2D l1end, Point2D l2start, Point2D l2end) {
+/*    
+    public static double lineDistance(Point2D l1start, Point2D l1end, Point2D l2start, Point2D l2end) {
         double dist=0;
         double m1=0;
         double m2=0;
@@ -399,96 +457,74 @@ public class Utils {
         }    
         return dist;
     }
-    
+*/    
     
     public static String getExtension(File f) {
         return f.getName().substring(f.getName().lastIndexOf("."));
     }
     
-    public void leastSquareFitFor3DPlane(List<RefArea> refPoints) {
-        //convert into coordinate arrays
-        double x[] = new double[refPoints.size()];
-        double y[] = new double[refPoints.size()];
-        double z[] = new double[refPoints.size()];
-        double xm=0;//avarage x
-        double ym=0;//average y
-        double zm=0;//average z
+    public static Map<String,String> getAvailableAreaClasses() throws IOException {
+        Class clazz = SampleArea.class;
+        URL location = clazz.getResource('/'+clazz.getName().replace('.', '/')+".class");
+        String locationStr=location.toString().substring(0, location.toString().indexOf(".jar!")+6);
+        String jarFileStr=locationStr.substring(locationStr.indexOf("file:")+5,locationStr.length()-2);
+        //replace forward slash with OS specific path separator
+        jarFileStr.replace("/",File.pathSeparator);
+        URLClassLoader classLoader;
+        JarFile jarFile;
+        jarFile = new JarFile(jarFileStr);
+        Enumeration e = jarFile.entries();
+
+        URL[] urls = { new URL(locationStr) };
+        classLoader = URLClassLoader.newInstance(urls,
+            //    this.getClass().getClassLoader());
+        SampleArea.class.getClassLoader());
+
         int i=0;
-        for (RefArea ra:refPoints) {
-            x[i]=ra.getStageCoordX();
-            y[i]=ra.getStageCoordY();
-            z[i]=ra.getStageCoordZ()-ra.getLayoutCoordZ();
-            xm+=x[i];
-            ym+=y[i];
-            zm+=z[i];
-            i++;
-        }
-        xm/=refPoints.size();
-        ym/=refPoints.size();
-        zm/=refPoints.size();
-        //subtract mean to avoid illdefined equations down the line
-        for (i=0; i< x.length; i++) {
-            x[i]=x[i]-xm;
-            y[i]=y[i]-ym;
-            z[i]=z[i]-zm;
-        }
-        //create matrix
-        double m[][] = new double[3][3];
-        m[0][0]=0;
-        for (i=0; i<x.length; i++) {
-            m[0][0]+=x[i]*x[i];
-            m[0][1]+=x[i]*y[i];
-            m[0][2]+=x[i];
-            m[1][0]+=x[i]*y[i];
-            m[1][1]+=y[i]*y[i];
-            m[1][2]+=y[i];
-            m[2][0]+=x[i];
-            m[2][1]+=y[i];
-        }
-        m[2][2]=1;
-        
-        double n[] = new double[3];
-        for (i=0; i<x.length; i++) {
-            n[0]+=x[i]*z[i];
-            n[1]+=y[i]*z[i];
-            n[2]+=z[i];
-        }
-    }    
-    
-    public static void writeJSONObjectToFile(String filename, JSONObject obj) {
-        FileWriter fw=null;
-        try {
-            fw = new FileWriter(new File(filename));
-            if (obj!=null) {
-                fw.write(obj.toString(4));
+        Map<String, String> availableAreaClasses = new HashMap<String,String>();
+        while (e.hasMoreElements()) {
+            JarEntry je = (JarEntry) e.nextElement();
+            if(je.isDirectory() || !je.getName().endsWith(".class")){
+                continue;
             }
-        } catch (JSONException ex) {
-            JOptionPane.showMessageDialog(null,"Error parsing Acquisition Layout as JSONObject.");
-            Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IOException ex) {
-            JOptionPane.showMessageDialog(null,"Error saving Acquisition Layout as JSONObject.");
-            Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
-        } finally {
-            if (fw!=null) {
-                try {
-                    fw.close();
-                } catch (IOException ex) {
-                    Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
+             // -6 to remove ".class"
+            String className = je.getName().substring(0,je.getName().length()-6);
+            className = className.replace('/', '.');
+            try {
+                clazz=Class.forName(className);
+                IJ.log(clazz.getName());
+                //only add non-abstract SampleArea classes that support custom layouts
+                if (SampleArea.class.isAssignableFrom(clazz) && !Modifier.isAbstract(clazz.getModifiers())) {
+                    SampleArea area=(SampleArea)clazz.newInstance();
+                    if ((area.supportedLayouts() & SampleArea.SUPPORT_CUSTOM_LAYOUT) == SampleArea.SUPPORT_CUSTOM_LAYOUT) {
+                        availableAreaClasses.put(area.getShapeType(), className);
+                    }   
                 }
-            }
-        }        
+            } catch (ClassNotFoundException ex) {
+                Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (InstantiationException ex) {
+                Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (IllegalAccessException ex) {
+                Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (Exception ex) {
+                //catch all other exceptions so we can continue with remaining class definitions
+                Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
+                IJ.log(ex.toString());
+                for (StackTraceElement s:ex.getStackTrace()) {
+                    IJ.log(s.getClassName()+", "+s.getMethodName()+", "+s.getLineNumber());
+                }
+            }                       
+        }
+        return availableAreaClasses; 
     }
+
     
-    //returns rad
-    public static double getRotation(AffineTransform at) {
-        return Math.atan2(at.getShearY(), at.getScaleY());
-    }
-    
+/*    
     //expects rad
     public static AffineTransform createRotationAffineTrans(double rad) {
         AffineTransform at=new AffineTransform();
         at.rotate(rad);
         return at;
     }
-
+*/
 }
