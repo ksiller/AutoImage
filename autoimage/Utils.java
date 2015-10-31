@@ -1,7 +1,7 @@
 package autoimage;
 
 import autoimage.api.ExtImageTags;
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import autoimage.gui.ProcessorTree;
 import autoimage.dataprocessors.ExtDataProcessor;
 import autoimage.dataprocessors.SiteInfoUpdater;
@@ -9,6 +9,7 @@ import ij.IJ;
 import ij.ImagePlus;
 import ij.measure.Calibration;
 import java.awt.geom.AffineTransform;
+import java.awt.geom.Ellipse2D;
 import java.awt.geom.Path2D;
 import java.awt.geom.PathIterator;
 import java.awt.geom.Point2D;
@@ -133,7 +134,7 @@ public class Utils {
         path.closePath();
         return path;
     }
-    
+        
     /**
      * Measures angle between two 2D vectors
      * @param v1 2D vector; coordinates are interpreted as endpoints of vector originating at (0/0)
@@ -464,7 +465,7 @@ public class Utils {
     }
     
     public static Map<String,String> getAvailableAreaClasses() throws IOException {
-        Class clazz = SampleArea.class;
+        Class clazz = BasicArea.class;
         URL location = clazz.getResource('/'+clazz.getName().replace('.', '/')+".class");
         String locationStr=location.toString().substring(0, location.toString().indexOf(".jar!")+6);
         String jarFileStr=locationStr.substring(locationStr.indexOf("file:")+5,locationStr.length()-2);
@@ -478,7 +479,7 @@ public class Utils {
         URL[] urls = { new URL(locationStr) };
         classLoader = URLClassLoader.newInstance(urls,
             //    this.getClass().getClassLoader());
-        SampleArea.class.getClassLoader());
+BasicArea.class.getClassLoader());
 
         int i=0;
         Map<String, String> availableAreaClasses = new HashMap<String,String>();
@@ -493,10 +494,10 @@ public class Utils {
             try {
                 clazz=Class.forName(className);
                 IJ.log(clazz.getName());
-                //only add non-abstract SampleArea classes that support custom layouts
-                if (SampleArea.class.isAssignableFrom(clazz) && !Modifier.isAbstract(clazz.getModifiers())) {
-                    SampleArea area=(SampleArea)clazz.newInstance();
-                    if ((area.supportedLayouts() & SampleArea.SUPPORT_CUSTOM_LAYOUT) == SampleArea.SUPPORT_CUSTOM_LAYOUT) {
+                //only add non-abstract BasicArea classes that support custom layouts
+                if (BasicArea.class.isAssignableFrom(clazz) && !Modifier.isAbstract(clazz.getModifiers())) {
+                    BasicArea area=(BasicArea)clazz.newInstance();
+                    if ((area.supportedLayouts() & BasicArea.SUPPORT_CUSTOM_LAYOUT) == BasicArea.SUPPORT_CUSTOM_LAYOUT) {
                         availableAreaClasses.put(area.getShapeType(), className);
                     }   
                 }

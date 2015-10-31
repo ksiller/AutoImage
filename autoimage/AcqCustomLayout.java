@@ -3,7 +3,7 @@ package autoimage;
 import autoimage.api.TilingSetting;
 import autoimage.api.RefArea;
 import autoimage.gui.AcqFrame;
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import ij.IJ;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.NoninvertibleTransformException;
@@ -58,7 +58,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     
     private double escapeZPos; //z-stage is moved to this position when moving xystage to avoid collision with plate
 
-    private List<SampleArea> areas;
+    private List<BasicArea> areas;
     private List<RefArea> landmarks;
     private ThreadPoolExecutor tilingExecutor;
     private boolean tilingAborted=false;
@@ -131,7 +131,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     @Override
     public void initializeFromJSONObject(JSONObject obj, File f) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         landmarks=new ArrayList<RefArea>();
-        areas=new ArrayList<SampleArea>();
+        areas=new ArrayList<BasicArea>();
         version=obj.getString(TAG_VERSION);
         name=obj.getString(TAG_NAME);
         width=obj.getDouble(TAG_LAYOUT_WIDTH);
@@ -139,10 +139,10 @@ public class AcqCustomLayout extends AcqBasicLayout {
         height=obj.getDouble(TAG_LAYOUT_HEIGHT);
         bottomMaterial=obj.getString(TAG_LAYOUT_BOTTOM_MATERIAL);
         bottomThickness=obj.getDouble(TAG_LAYOUT_BOTTOM_THICKNESS);
-        JSONArray areaArray=obj.getJSONArray(SampleArea.TAG_AREA_ARRAY);
+        JSONArray areaArray=obj.getJSONArray(BasicArea.TAG_AREA_ARRAY);
         for (int i=0;i<areaArray.length(); i++) {
             JSONObject areaObj=areaArray.getJSONObject(i);
-            SampleArea area=SampleArea.createFromJSONObject(areaObj);
+            BasicArea area=BasicArea.createFromJSONObject(areaObj);
             areas.add(area);
         }
         JSONArray landmarkArray=obj.getJSONArray(RefArea.TAG_LANDMARK_ARRAY);
@@ -168,10 +168,10 @@ public class AcqCustomLayout extends AcqBasicLayout {
         obj.put(TAG_LAYOUT_BOTTOM_MATERIAL,bottomMaterial);
         obj.put(TAG_LAYOUT_BOTTOM_THICKNESS,bottomThickness);
         JSONArray areaArray=new JSONArray();
-        for (SampleArea a:areas) {
+        for (BasicArea a:areas) {
             areaArray.put(a.toJSONObject());
         }
-        obj.put(SampleArea.TAG_AREA_ARRAY,areaArray);
+        obj.put(BasicArea.TAG_AREA_ARRAY,areaArray);
         JSONArray landmarkArray=new JSONArray();
         for (RefArea refa:landmarks) {
             landmarkArray.put(refa.toJSONObject());
@@ -189,7 +189,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     @Override
     public boolean hasGaps(FieldOfView fov, double tileOverlap) {
         Rectangle2D fovROI=fov.getROI_Pixel(1);
-        Point2D tileOffset=SampleArea.calculateTileOffset(fovROI.getWidth(), fovROI.getHeight(), tileOverlap);
+        Point2D tileOffset=BasicArea.calculateTileOffset(fovROI.getWidth(), fovROI.getHeight(), tileOverlap);
         AffineTransform rot=new AffineTransform();
         rot.rotate(fov.getFieldRotation()-getStageToLayoutRot(),fovROI.getWidth()/2,fovROI.getHeight()/2);
         AffineTransform tOrigin=new AffineTransform();
@@ -253,7 +253,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
         while (highOverlap-lowOverlap > accuracy) {
             newOverlap=(highOverlap-lowOverlap)/2+lowOverlap;
 
-            Point2D tileOffset=SampleArea.calculateTileOffset(fovROI.getWidth(), fovROI.getHeight(), newOverlap);
+            Point2D tileOffset=BasicArea.calculateTileOffset(fovROI.getWidth(), fovROI.getHeight(), newOverlap);
             double centerX=tileOffset.getX()/2;
             double centerY=tileOffset.getY()/2;
 
@@ -603,7 +603,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     }
     
     @Override
-    public double getStagePosX(SampleArea a, int tileIndex) {
+    public double getStagePosX(BasicArea a, int tileIndex) {
         if (a!=null && landmarks!=null && landmarks.size()>0) 
             return landmarks.get(0).getStageCoordX()-landmarks.get(0).getLayoutCoordX()+a.getCenterXYPos().getX();
         else
@@ -611,7 +611,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     }
     
     @Override
-    public double getStagePosY(SampleArea a, int tileIndex) {
+    public double getStagePosY(BasicArea a, int tileIndex) {
         if (a!=null && landmarks!=null && landmarks.size()>0) 
             return landmarks.get(0).getStageCoordY()-landmarks.get(0).getLayoutCoordY()+a.getCenterXYPos().getY();
         else
@@ -689,17 +689,17 @@ public class AcqCustomLayout extends AcqBasicLayout {
     }
     
     @Override
-    public List<SampleArea> getAreaArray() {
+    public List<BasicArea> getAreaArray() {
         return areas;
     }
 
     @Override
-    public void setAreaArray(List<SampleArea> al) {
+    public void setAreaArray(List<BasicArea> al) {
         areas=al;
     }
     
     @Override
-    public SampleArea getAreaByIndex(int index) {
+    public BasicArea getAreaByIndex(int index) {
         if (index>=0 & areas!=null & index<areas.size())
             return areas.get(index);
         else
@@ -707,10 +707,10 @@ public class AcqCustomLayout extends AcqBasicLayout {
     }
     
     @Override
-    public SampleArea getAreaByName(String name) {
+    public BasicArea getAreaByName(String name) {
         if (name==null)
             return null;
-        for (SampleArea a:areas) {
+        for (BasicArea a:areas) {
             if (a.getName().equals(name))
                 return a;
         }
@@ -718,20 +718,20 @@ public class AcqCustomLayout extends AcqBasicLayout {
     }
     
     @Override
-    public SampleArea getAreaByLayoutPos(double lx, double ly) {
-        for (SampleArea a:areas) {
+    public BasicArea getAreaByLayoutPos(double lx, double ly) {
+        for (BasicArea a:areas) {
             if (a.contains(lx,ly))
                 return a;
         }
         return null;
     }
     
-    //areas are loaded with sequential IDs, starting with 1 --> SampleArea with id is most likey to be in areas.get(id-1). If not, the entire AreaArray is searched for the ID
+    //areas are loaded with sequential IDs, starting with 1 --> BasicArea with id is most likey to be in areas.get(id-1). If not, the entire AreaArray is searched for the ID
     @Override
-    public SampleArea getAreaById(int id) {
+    public BasicArea getAreaById(int id) {
         if ((id < 1 || id > areas.size()) || id!=areas.get(id-1).getId()) {
             int index=-1;
-            for (SampleArea area : areas) {
+            for (BasicArea area : areas) {
                 if (id == area.getId()) {
                     return area;
                 } 
@@ -746,7 +746,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     }
     
     @Override
-    public void addArea(SampleArea a) {
+    public void addArea(BasicArea a) {
         if (a.getName().equals("")) {
             a.setName("Area "+Integer.toString(areas.size()+1));
         }
@@ -763,7 +763,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     @Override
     public int getNoOfSelectedAreas() {
         int sel=0;
-        for (SampleArea area : areas) {
+        for (BasicArea area : areas) {
             if (area.isSelectedForAcq()) {
                 sel++;
             }
@@ -774,7 +774,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     @Override
     public int getNoOfSelectedClusters() {
         int sel=0;
-        for (SampleArea area : areas) {
+        for (BasicArea area : areas) {
             if (area.isSelectedForAcq()) {
                 sel=area.getNoOfClusters()+sel;
             }
@@ -785,7 +785,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
 
     //returns null if layout coordinate is not inside any area
     @Override
-    public SampleArea getFirstContainingArea(double lx, double ly) {
+    public BasicArea getFirstContainingArea(double lx, double ly) {
         int i=0;
         int index=-1;
         while ((index==-1) && (i<areas.size())) {
@@ -801,7 +801,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
 
     //returns null if fov surrounding layout coordinate does not touch any area
     @Override
-    public SampleArea getFirstTouchingArea(double lx, double ly, double fovX, double fovY) {
+    public BasicArea getFirstTouchingArea(double lx, double ly, double fovX, double fovY) {
 /*        int i=0;
         int index=-1;
         while ((index==-1) && (i<areas.size())) {
@@ -813,7 +813,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
             return areas.get(index);
         else
             return null;*/
-        for (SampleArea area:areas) {
+        for (BasicArea area:areas) {
             if (area.doesRectTouchArea(lx, ly, fovX, fovY)) {
                 return area;
             }
@@ -824,7 +824,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     
     //parameters are absolute stage positions
     @Override
-    public SampleArea getFirstContainingAreaAbs(double stageX, double stageY, double fovX, double fovY) {
+    public BasicArea getFirstContainingAreaAbs(double stageX, double stageY, double fovX, double fovY) {
         int i=0;
         int index=-1;
         RefArea lm=getLandmark(0);
@@ -859,9 +859,9 @@ public class AcqCustomLayout extends AcqBasicLayout {
     
     
     @Override
-    public ArrayList<SampleArea> getAllAreasTouching(double x, double y) {
-        ArrayList<SampleArea> list = new ArrayList<SampleArea>(areas.size());
-        for (SampleArea area : areas) {
+    public ArrayList<BasicArea> getAllAreasTouching(double x, double y) {
+        ArrayList<BasicArea> list = new ArrayList<BasicArea>(areas.size());
+        for (BasicArea area : areas) {
             if (area.contains(x, y)) {
                 list.add(area);    
             }
@@ -870,9 +870,9 @@ public class AcqCustomLayout extends AcqBasicLayout {
     }
 
     @Override
-    public ArrayList<SampleArea> getUnselectedAreasTouching(double x, double y) {
-        ArrayList<SampleArea> list = new ArrayList<SampleArea>(areas.size());
-        for (SampleArea area:areas) {
+    public ArrayList<BasicArea> getUnselectedAreasTouching(double x, double y) {
+        ArrayList<BasicArea> list = new ArrayList<BasicArea>(areas.size());
+        for (BasicArea area:areas) {
             if (!area.isSelectedForAcq() && area.contains(x,y))
                 list.add(area);    
         }
@@ -880,9 +880,9 @@ public class AcqCustomLayout extends AcqBasicLayout {
     }
 
     @Override
-    public ArrayList<SampleArea> getSelectedAreasTouching(double x, double y) {
-        ArrayList<SampleArea> list = new ArrayList<SampleArea>(areas.size());
-        for (SampleArea area:areas) {
+    public ArrayList<BasicArea> getSelectedAreasTouching(double x, double y) {
+        ArrayList<BasicArea> list = new ArrayList<BasicArea>(areas.size());
+        for (BasicArea area:areas) {
             if (area.isSelectedForAcq() && area.contains(x,y))
                 list.add(area);    
         }
@@ -890,9 +890,9 @@ public class AcqCustomLayout extends AcqBasicLayout {
     }
 
     @Override
-    public ArrayList<SampleArea> getAllAreasInsideRect(Rectangle2D r) {
-        ArrayList<SampleArea> a = new ArrayList<SampleArea>(areas.size());
-        for (SampleArea area : areas) {
+    public ArrayList<BasicArea> getAllAreasInsideRect(Rectangle2D r) {
+        ArrayList<BasicArea> a = new ArrayList<BasicArea>(areas.size());
+        for (BasicArea area : areas) {
             if (area.isInsideRect(r)) {
                 a.add(area);    
             }
@@ -901,9 +901,9 @@ public class AcqCustomLayout extends AcqBasicLayout {
     }
     
     @Override
-    public ArrayList<SampleArea> getUnselectedAreasInsideRect(Rectangle2D r) {
-        ArrayList<SampleArea> al = new ArrayList<SampleArea>(areas.size());
-        for (SampleArea area:areas) {
+    public ArrayList<BasicArea> getUnselectedAreasInsideRect(Rectangle2D r) {
+        ArrayList<BasicArea> al = new ArrayList<BasicArea>(areas.size());
+        for (BasicArea area:areas) {
             if (!area.isSelectedForAcq() && area.isInsideRect(r))
                 al.add(area);    
         }
@@ -911,9 +911,9 @@ public class AcqCustomLayout extends AcqBasicLayout {
     }
         
     @Override
-    public ArrayList<SampleArea> getSelectedAreasInsideRect(Rectangle2D r) {
-        ArrayList<SampleArea> al = new ArrayList<SampleArea>(areas.size());
-        for (SampleArea area:areas) {
+    public ArrayList<BasicArea> getSelectedAreasInsideRect(Rectangle2D r) {
+        ArrayList<BasicArea> al = new ArrayList<BasicArea>(areas.size());
+        for (BasicArea area:areas) {
             if (area.isSelectedForAcq() && area.isInsideRect(r))
                 al.add(area);    
         }
@@ -927,7 +927,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
         height=1000; //physical dim in um
         bottomMaterial="Glass";
         bottomThickness=170; //in um
-        areas = new ArrayList<SampleArea>();
+        areas = new ArrayList<BasicArea>();
         landmarks=new ArrayList<RefArea>();
         name="not selected";
         file = new File("","not selected");
@@ -939,29 +939,29 @@ public class AcqCustomLayout extends AcqBasicLayout {
     
 
     private void writeSingleTile(XMLStreamWriter xtw, Tile t) throws XMLStreamException {
-        XMLUtils.wStartElement(xtw, SampleArea.TAG_TILE);
-            XMLUtils.writeLine(xtw, SampleArea.TAG_NAME, t.name);
-            XMLUtils.writeLine(xtw, SampleArea.TAG_CENTER_X, java.lang.Double.toString(t.centerX));
-            XMLUtils.writeLine(xtw, SampleArea.TAG_CENTER_Y, java.lang.Double.toString(t.centerY));
-            XMLUtils.writeLine(xtw, SampleArea.TAG_REL_POS_Z, java.lang.Double.toString(t.zPos));
+        XMLUtils.wStartElement(xtw, BasicArea.TAG_TILE);
+            XMLUtils.writeLine(xtw, BasicArea.TAG_NAME, t.name);
+            XMLUtils.writeLine(xtw, BasicArea.TAG_CENTER_X, java.lang.Double.toString(t.centerX));
+            XMLUtils.writeLine(xtw, BasicArea.TAG_CENTER_Y, java.lang.Double.toString(t.centerY));
+            XMLUtils.writeLine(xtw, BasicArea.TAG_REL_POS_Z, java.lang.Double.toString(t.zPos));
             XMLUtils.writeLine(xtw, Tile.TAG_IS_ABSOLUTE, java.lang.Boolean.toString(t.isAbsolute));
         XMLUtils.wEndElement(xtw);
     }
 
     
     @Override
-    public void writeSingleArea(XMLStreamWriter xtw, SampleArea a, TilingSetting setting) throws XMLStreamException {
-        XMLUtils.wStartElement(xtw, SampleArea.TAG_AREA);
-            XMLUtils.writeLine(xtw, SampleArea.TAG_CLASS, a.getClass().getName());
-            XMLUtils.writeLine(xtw, SampleArea.TAG_NAME, a.getName());
-            XMLUtils.writeLine(xtw, SampleArea.TAG_TOP_LEFT_X, java.lang.Double.toString(a.getTopLeftX()));
-            XMLUtils.writeLine(xtw, SampleArea.TAG_TOP_LEFT_Y, java.lang.Double.toString(a.getTopLeftY()));
-            XMLUtils.writeLine(xtw, SampleArea.TAG_CENTER_X, java.lang.Double.toString(a.getCenterXYPos().getX()));
-            XMLUtils.writeLine(xtw, SampleArea.TAG_CENTER_Y, java.lang.Double.toString(a.getCenterXYPos().getY()));
-            XMLUtils.writeLine(xtw, SampleArea.TAG_BOUNDS_WIDTH, java.lang.Double.toString(a.getBounds().getWidth()));
-            XMLUtils.writeLine(xtw, SampleArea.TAG_BOUNDS_HEIGHT, java.lang.Double.toString(a.getBounds().getHeight()));
-            XMLUtils.writeLine(xtw, SampleArea.TAG_REL_POS_Z, java.lang.Double.toString(a.getRelativeZPos()));
-            XMLUtils.writeLine(xtw, SampleArea.TAG_COMMENT, a.getComment());
+    public void writeSingleArea(XMLStreamWriter xtw, BasicArea a, TilingSetting setting) throws XMLStreamException {
+        XMLUtils.wStartElement(xtw, BasicArea.TAG_AREA);
+            XMLUtils.writeLine(xtw, BasicArea.TAG_CLASS, a.getClass().getName());
+            XMLUtils.writeLine(xtw, BasicArea.TAG_NAME, a.getName());
+            XMLUtils.writeLine(xtw, BasicArea.TAG_TOP_LEFT_X, java.lang.Double.toString(a.getTopLeftX()));
+            XMLUtils.writeLine(xtw, BasicArea.TAG_TOP_LEFT_Y, java.lang.Double.toString(a.getTopLeftY()));
+            XMLUtils.writeLine(xtw, BasicArea.TAG_CENTER_X, java.lang.Double.toString(a.getCenterXYPos().getX()));
+            XMLUtils.writeLine(xtw, BasicArea.TAG_CENTER_Y, java.lang.Double.toString(a.getCenterXYPos().getY()));
+            XMLUtils.writeLine(xtw, BasicArea.TAG_BOUNDS_WIDTH, java.lang.Double.toString(a.getBounds().getWidth()));
+            XMLUtils.writeLine(xtw, BasicArea.TAG_BOUNDS_HEIGHT, java.lang.Double.toString(a.getBounds().getHeight()));
+            XMLUtils.writeLine(xtw, BasicArea.TAG_REL_POS_Z, java.lang.Double.toString(a.getRelativeZPos()));
+            XMLUtils.writeLine(xtw, BasicArea.TAG_COMMENT, a.getComment());
             List<Tile> tl=a.getTilePositions();
             if (tl!=null) {
                 if (setting.getMode()==TilingSetting.Mode.FULL || !setting.isCluster()) {
@@ -986,13 +986,13 @@ public class AcqCustomLayout extends AcqBasicLayout {
                         relZPos=relZPos/tilesPerCluster;
                         x=x/tilesPerCluster;
                         y=y/tilesPerCluster;
-//                        SampleArea.Tile tile=a.createTile("Site"+Integer.toString(i),x,y,zPos);
+//                        BasicArea.Tile tile=a.createTile("Site"+Integer.toString(i),x,y,zPos);
                         //write Cluster info
-                        XMLUtils.wStartElement(xtw, SampleArea.TAG_CLUSTER);
-                            XMLUtils.writeLine(xtw, SampleArea.TAG_NAME, "Cluster"+java.lang.Integer.toString(i+1));
-                            XMLUtils.writeLine(xtw, SampleArea.TAG_CENTER_X, java.lang.Double.toString(x));
-                            XMLUtils.writeLine(xtw, SampleArea.TAG_CENTER_Y, java.lang.Double.toString(y));
-                            XMLUtils.writeLine(xtw, SampleArea.TAG_REL_POS_Z, java.lang.Double.toString(relZPos));
+                        XMLUtils.wStartElement(xtw, BasicArea.TAG_CLUSTER);
+                            XMLUtils.writeLine(xtw, BasicArea.TAG_NAME, "Cluster"+java.lang.Integer.toString(i+1));
+                            XMLUtils.writeLine(xtw, BasicArea.TAG_CENTER_X, java.lang.Double.toString(x));
+                            XMLUtils.writeLine(xtw, BasicArea.TAG_CENTER_Y, java.lang.Double.toString(y));
+                            XMLUtils.writeLine(xtw, BasicArea.TAG_REL_POS_Z, java.lang.Double.toString(relZPos));
                             //write individual Tile info
                             for (int j=0;j<tilesPerCluster; j++) {
                                 writeSingleTile(xtw,tl.get(i*tilesPerCluster+j));
@@ -1028,7 +1028,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
                             XMLUtils.writeLine(xtw, Tile.TAG_UNITS, "um");
                         XMLUtils.wEndElement(xtw);
                     
-                    for (SampleArea a:areas) {
+                    for (BasicArea a:areas) {
                         if (a.isSelectedForAcq())
                             writeSingleArea(xtw, a, setting);
                     }
@@ -1063,12 +1063,12 @@ public class AcqCustomLayout extends AcqBasicLayout {
                 if (event == XMLStreamReader.START_ELEMENT || event == XMLStreamReader.END_ELEMENT) {
                     local=xrt.getLocalName();
                 }
-                if (xrt.getEventType()==XMLStreamReader.END_ELEMENT && local.equals(SampleArea.TAG_AREA)) {
+                if (xrt.getEventType()==XMLStreamReader.END_ELEMENT && local.equals(BasicArea.TAG_AREA)) {
                     break;
                 } else if (event == XMLStreamReader.START_ELEMENT) {
-                    if (local.equals(SampleArea.TAG_NAME)) {
+                    if (local.equals(BasicArea.TAG_NAME)) {
                         areaName=xrt.getElementText()+"-";
-                    } else if (local.equals(SampleArea.TAG_CLUSTER)) { //read cluster
+                    } else if (local.equals(BasicArea.TAG_CLUSTER)) { //read cluster
                         tileList=new ArrayList<Tile>();
                         while (xrt.hasNext()) {
                             xrt.next();
@@ -1076,31 +1076,31 @@ public class AcqCustomLayout extends AcqBasicLayout {
                             if (event == XMLStreamReader.START_ELEMENT || event == XMLStreamReader.END_ELEMENT) {
                                 local=xrt.getLocalName();
                             }
-                            if (event==XMLStreamReader.END_ELEMENT && local.equals(SampleArea.TAG_CLUSTER)) {
+                            if (event==XMLStreamReader.END_ELEMENT && local.equals(BasicArea.TAG_CLUSTER)) {
                                 clusterName="";
                                 groupList.add(tileList);
                                 tileList=null; //st to null so that tileList does not get added again at end of parsing
                                 break;
                             } else if (event == XMLStreamReader.START_ELEMENT) {
-                                if (local.equals(SampleArea.TAG_NAME)) {
+                                if (local.equals(BasicArea.TAG_NAME)) {
                                     clusterName=xrt.getElementText()+"-";
-                                } else if (local.equals(SampleArea.TAG_TILE)) { //read tile
+                                } else if (local.equals(BasicArea.TAG_TILE)) { //read tile
                                     while (xrt.hasNext()) {
                                         xrt.next();
                                         event=xrt.getEventType();
                                         if (event == XMLStreamReader.START_ELEMENT || event == XMLStreamReader.END_ELEMENT) {
                                             local=xrt.getLocalName();
                                         }
-                                        if (event==XMLStreamReader.END_ELEMENT && local.equals(SampleArea.TAG_TILE))
+                                        if (event==XMLStreamReader.END_ELEMENT && local.equals(BasicArea.TAG_TILE))
                                                 break;
                                         else if (event == XMLStreamReader.START_ELEMENT) {
-                                            if (local.equals(SampleArea.TAG_NAME)) {
+                                            if (local.equals(BasicArea.TAG_NAME)) {
                                                 tileName=xrt.getElementText();
-                                            } else if (local.equals(SampleArea.TAG_CENTER_X)) {
+                                            } else if (local.equals(BasicArea.TAG_CENTER_X)) {
                                                 centerX=Double.parseDouble(xrt.getElementText());
-                                            } else if (local.equals(SampleArea.TAG_CENTER_Y)) {
+                                            } else if (local.equals(BasicArea.TAG_CENTER_Y)) {
                                                 centerY=Double.parseDouble(xrt.getElementText());
-                                            } else if (local.equals(SampleArea.TAG_REL_POS_Z)) {
+                                            } else if (local.equals(BasicArea.TAG_REL_POS_Z)) {
                                                 relZ=Double.parseDouble(xrt.getElementText());
                                             }    
                                         
@@ -1110,23 +1110,23 @@ public class AcqCustomLayout extends AcqBasicLayout {
                                 }
                             }    
                         }   
-                    } else if (event == XMLStreamReader.START_ELEMENT && local.equals(SampleArea.TAG_TILE)) { //read tile
+                    } else if (event == XMLStreamReader.START_ELEMENT && local.equals(BasicArea.TAG_TILE)) { //read tile
                         while (xrt.hasNext()) {
                             xrt.next();
                             event=xrt.getEventType();
                             if (event == XMLStreamReader.START_ELEMENT || event == XMLStreamReader.END_ELEMENT) {
                                 local=xrt.getLocalName();
                             }
-                            if (event==XMLStreamReader.END_ELEMENT && local.equals(SampleArea.TAG_TILE)) {
+                            if (event==XMLStreamReader.END_ELEMENT && local.equals(BasicArea.TAG_TILE)) {
                                 break;
                             } else if (event == XMLStreamReader.START_ELEMENT) {
-                                if (local.equals(SampleArea.TAG_NAME)) {
+                                if (local.equals(BasicArea.TAG_NAME)) {
                                         tileName=xrt.getElementText();
-                                } else if (local.equals(SampleArea.TAG_CENTER_X)) {
+                                } else if (local.equals(BasicArea.TAG_CENTER_X)) {
                                         centerX=Double.parseDouble(xrt.getElementText());
-                                } else if (local.equals(SampleArea.TAG_CENTER_Y)) {
+                                } else if (local.equals(BasicArea.TAG_CENTER_Y)) {
                                         centerY=Double.parseDouble(xrt.getElementText());
-                                } else if (local.equals(SampleArea.TAG_REL_POS_Z)) {
+                                } else if (local.equals(BasicArea.TAG_REL_POS_Z)) {
                                         relZ=Double.parseDouble(xrt.getElementText());
                                 }  
                             }  
@@ -1154,7 +1154,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
                         String s=xrt.getLocalName();
                         if (s.equals(TAG_TILE_SEED_FILE)) {
                                 
-                        } else if (s.equals(SampleArea.TAG_AREA)) {
+                        } else if (s.equals(BasicArea.TAG_AREA)) {
                             readTileCoordsForArea(xrt,list);
                         }    
                     }
@@ -1233,27 +1233,27 @@ public class AcqCustomLayout extends AcqBasicLayout {
     
     @Override
     public Comparator getAreaNameComparator() {
-        return SampleArea.NameComparator;
+        return BasicArea.NameComparator;
     }
 
     @Override
     public Comparator getTileNumberComparator() {
-        return SampleArea.TileNumComparator;
+        return BasicArea.TileNumComparator;
     }
     
     @Override
     public long getTotalTileNumber() {
         long totalTiles=0;
         boolean error=false;
-        for (SampleArea a:areas) {
+        for (BasicArea a:areas) {
             if (a.isSelectedForAcq())
                 totalTiles=totalTiles+a.getTileNumber();
-            error=error || (a.getTilingStatus()==SampleArea.TILING_ERROR);
+            error=error || (a.getTilingStatus()==BasicArea.TILING_ERROR);
         }    
         return (!error ? totalTiles : -totalTiles);
     }
     
-    public List<Future<Integer>> calculateTiles(List<SampleArea> areasToTile, final DoxelManager dManager, final double fovWidth_UM, final double fovHeight_UM, final TilingSetting tSetting) {
+    public List<Future<Integer>> calculateTiles(List<BasicArea> areasToTile, final DoxelManager dManager, final double fovWidth_UM, final double fovHeight_UM, final TilingSetting tSetting) {
         IJ.log("AcqLayout.calculateTiles...started");
         tilingAborted=false;
         ThreadFactory threadFactory = Executors.defaultThreadFactory();
@@ -1266,9 +1266,9 @@ public class AcqCustomLayout extends AcqBasicLayout {
         if (areasToTile==null) {
             areasToTile=areas;
         }
-        for (SampleArea area : areasToTile) {
+        for (BasicArea area : areasToTile) {
             if (area.isSelectedForAcq()) {
-                final SampleArea a = area;
+                final BasicArea a = area;
                 resultList.add(tilingExecutor.submit(new Callable<Integer>() { //returns number of tiles as Future<Integer>
                     @Override
                     public Integer call() {
@@ -1326,7 +1326,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
         if (tilingExecutor != null && !tilingExecutor.isTerminated()) {
             tilingAborted=true;
 //            IJ.log("AcqFrame.cancelThreadButtonActionPerformed");
-            for (SampleArea a : areas) {
+            for (BasicArea a : areas) {
                 a.setUnknownTileNum(true);
             }
             tilingExecutor.shutdownNow();

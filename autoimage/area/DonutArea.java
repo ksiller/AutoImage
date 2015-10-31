@@ -1,6 +1,6 @@
 package autoimage.area;
 
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import autoimage.Tile;
 import autoimage.Utils;
 import autoimage.gui.PreviewPanel;
@@ -82,7 +82,7 @@ public class DonutArea extends TwoAxesArea {
     }
 
     @Override
-    public SampleArea duplicate() {
+    public BasicArea duplicate() {
         DonutArea newArea = new DonutArea(this.getName());
         newArea.setId(this.getId());
         newArea.centerXYPos=new Point2D.Double(this.getCenterXYPos().getX(), this.getCenterXYPos().getY());
@@ -104,7 +104,7 @@ public class DonutArea extends TwoAxesArea {
     }
 
     @Override
-    public SampleArea showConfigDialog(Rectangle2D layoutBounds) {
+    public BasicArea showConfigDialog(Rectangle2D layoutBounds) {
         JPanel optionPanel = new JPanel();
         GridLayout layout = new GridLayout(0,4);
         optionPanel.setLayout(layout);
@@ -312,8 +312,8 @@ public class DonutArea extends TwoAxesArea {
                     //convert to rad
                     newValue=newValue/180*Math.PI;
                     if (newValue != Utils.getRotation(affineTrans)) {
-//                        setAffineTransform(Utils.createRotationAffineTrans(newValue));
-                        setAffineTransform(AffineTransform.getRotateInstance(newValue));
+                        //using (0/0) as anchor since translation to centerXYPos is dealt with independently
+                        setAffineTransform(AffineTransform.getRotateInstance(newValue,0,0));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
                         previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
@@ -351,7 +351,7 @@ public class DonutArea extends TwoAxesArea {
 
     @Override
     public int supportedLayouts() {
-        return SampleArea.SUPPORT_CUSTOM_LAYOUT;
+        return BasicArea.SUPPORT_CUSTOM_LAYOUT;
     }
 
     @Override

@@ -5,7 +5,7 @@ import autoimage.api.IStageMonitorListener;
 import autoimage.api.RefArea;
 import autoimage.Vec3d;
 import autoimage.api.IAcqLayout;
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 //import ij.IJ;
 import java.awt.event.WindowEvent;
 import java.awt.geom.AffineTransform;
@@ -470,7 +470,7 @@ public class RefPointListDlg extends javax.swing.JDialog implements IStageMonito
                 
                 
                 //move to listener?
-                SampleArea.setStageToLayoutRot(angle);
+                BasicArea.setStageToLayoutRot(angle);
                 RefArea.setStageToLayoutRot(angle);
                 
                 

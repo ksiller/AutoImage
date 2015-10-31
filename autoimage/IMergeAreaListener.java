@@ -1,6 +1,6 @@
 package autoimage;
 
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import java.util.List;
 
 /**
@@ -9,6 +9,6 @@ import java.util.List;
  */
 public interface IMergeAreaListener {
     
-    public void mergeAreaSelectionChanged(List<SampleArea> areas);
-    public void mergeAreas(List<SampleArea> areas);
+    public void mergeAreaSelectionChanged(List<BasicArea> areas);
+    public void mergeAreas(List<BasicArea> areas);
 }

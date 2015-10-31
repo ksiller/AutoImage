@@ -1,7 +1,7 @@
 package autoimage.area;
 
 import autoimage.Utils;
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import autoimage.gui.PreviewPanel;
 import java.awt.Dimension;
 import java.awt.GridLayout;
@@ -22,7 +22,7 @@ import org.json.JSONObject;
  *
  * @author Karsten Siller
  */
-public abstract class TwoAxesArea extends SampleArea{
+public abstract class TwoAxesArea extends BasicArea{
     
     public static final String TAG_WIDTH = "WIDTH";
     public static final String TAG_HEIGHT = "HEIGHT";
@@ -88,7 +88,7 @@ public abstract class TwoAxesArea extends SampleArea{
     }
 
     @Override
-    public SampleArea showConfigDialog(Rectangle2D layoutBounds) {
+    public BasicArea showConfigDialog(Rectangle2D layoutBounds) {
         JPanel optionPanel = new JPanel();
         GridLayout layout = new GridLayout(0,4);
         optionPanel.setLayout(layout);
@@ -275,8 +275,8 @@ public abstract class TwoAxesArea extends SampleArea{
                     //convert to rad
                     newValue=newValue/180*Math.PI;
                     if (newValue != Utils.getRotation(affineTrans)) {
-//                        setAffineTransform(Utils.createRotationAffineTrans(newValue));
-                        setAffineTransform(AffineTransform.getRotateInstance(newValue));
+                        //using (0/0) as anchor since translation to centerXYPos is dealt with independently
+                        setAffineTransform(AffineTransform.getRotateInstance(newValue, 0, 0));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
                         previewPanel.setPath(generalPath, getShapeBoundsDiagonale());

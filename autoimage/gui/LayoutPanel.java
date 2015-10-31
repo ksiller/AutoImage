@@ -8,7 +8,7 @@ import autoimage.api.RefArea;
 import autoimage.api.TilingSetting;
 import autoimage.Vec3d;
 import autoimage.api.IAcqLayout;
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import ij.IJ;
 import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
@@ -321,7 +321,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
                 g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.25f));
                 double cameraRot=cAcqSetting.getFieldOfView().getFieldRotation();
                 for (int i=0; i<areas.size(); i++) {
-                    SampleArea a=acqLayout.getAreaArray().get(i);
+                    BasicArea a=acqLayout.getAreaArray().get(i);
                     if (a.isSelectedForAcq() && a.getTilePositions()!=null) {
 //                        a.drawTiles(g2d, tileWidth, tileHeight,tSetting);
                         for (Tile t : a.getTilePositions()) {
@@ -350,7 +350,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
 //        IJ.log("LayoutPanel.drawTileGridForAllAreas: end");
     }
 
-    protected Color getFillColor(SampleArea area, boolean showRelZPos) {
+    protected Color getFillColor(BasicArea area, boolean showRelZPos) {
         Color color=COLOR_UNSELECTED_AREA;
         if (area.isAcquiring()) {
             color=COLOR_ACQUIRING_AREA;
@@ -369,7 +369,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         return color;
     }
 
-    protected Color getBorderColor(SampleArea area) {
+    protected Color getBorderColor(BasicArea area) {
         if (area.isSelectedForMerge())
             return COLOR_MERGE_AREA_BORDER;
         else {
@@ -380,7 +380,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         }   
     }
     
-    private void drawAreaLabel(Graphics2D g2d, Font font, SampleArea area) {
+    private void drawAreaLabel(Graphics2D g2d, Font font, BasicArea area) {
         g2d.setColor(COLOR_AREA_LABEL);
         g2d.setFont(font);
         FontMetrics fm=g2d.getFontMetrics(font);
@@ -392,9 +392,9 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     private void drawAllAreas(Graphics2D g2d, Font font) {
 //        IJ.log("LayoutPanel.drawAllAreas");
         if (acqLayout!=null) {
-            List<SampleArea> areas=acqLayout.getAreaArray();
+            List<BasicArea> areas=acqLayout.getAreaArray();
             if (cAcqSetting!=null) {
-                for (SampleArea area:areas) {
+                for (BasicArea area:areas) {
                     g2d.setColor(getFillColor(area,showZProfile));
 //                    GeneralPath shape=area.getGeneralPath();
                     g2d.fill(area);
@@ -402,7 +402,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
                     g2d.draw(area); 
                 }
                 if (showAreaLabels) {
-                    for (SampleArea a:areas) {
+                    for (BasicArea a:areas) {
                         drawAreaLabel(g2d, font, a);
                     }
                 }
@@ -498,9 +498,9 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         prevMousePos = mp;
     }
     
-    public void updateSelectionPath(Path2D selPath, boolean redraw) {
-        if (selPath!=null) {
-            IJ.log("selPat="+selPath.getBounds2D().toString());
+    public void updateSelectionPath(SelectionPath selection) {
+        if (selection!=null && selection.getPath()!=null) {
+            Path2D selPath=selection.getPath();
             Graphics2D g = (Graphics2D) getGraphics();
             AffineTransform at=g.getTransform();
             Path2D path=new Path2D.Double(selPath);
@@ -508,15 +508,8 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
             selPath.transform(at);
             g.setXORMode(getBackground());
             g.draw(selPath);        
-            if (redraw) {
-    //            g.setXORMode(getBackground());
-                g.setPaintMode();  
-            } else {
-    //            g.drawLine(anchorMousePos.x,anchorMousePos.y,anchorMousePos.x,anchorMousePos.y);
-            }    
+            g.setPaintMode();  
             g.setTransform(at);
-        } else {
-            IJ.log("selPat=null");
         }
     }
     
@@ -704,8 +697,8 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
 //        Color oldColor=g2d.getColor();
 //        Stroke oldStroke=g2d.getStroke();
 
-        //ensure that SampleArea and RefArea work with current layout rotation value
-        SampleArea.setStageToLayoutRot(acqLayout.getStageToLayoutRot());
+        //ensure that BasicArea and RefArea work with current layout rotation value
+        BasicArea.setStageToLayoutRot(acqLayout.getStageToLayoutRot());
         RefArea.setStageToLayoutRot(acqLayout.getStageToLayoutRot());
 
         //bounding rectangle of panel;

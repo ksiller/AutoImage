@@ -1,6 +1,6 @@
 package autoimage.gui;
 
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import ij.IJ;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
@@ -15,17 +15,17 @@ import javax.swing.table.AbstractTableModel;
     public class AreaTableModel extends AbstractTableModel {
 
         public final String[] COLUMN_NAMES = new String[]{"", "Area Id", "Area Name", "Tiles", "Comment"};
-        private List<SampleArea> areas;
+        private List<BasicArea> areas;
         private boolean areaRenamingAllowed = true;
 
-        public AreaTableModel(List<SampleArea> al) {
+        public AreaTableModel(List<BasicArea> al) {
             super();
             setData(al,true);
         }
 
-        public void setData(List<SampleArea> al, boolean updateView) {
+        public void setData(List<BasicArea> al, boolean updateView) {
             if (al == null) {
-                al = new ArrayList<SampleArea>();
+                al = new ArrayList<BasicArea>();
             }
             this.areas = al;
             if (updateView) {
@@ -33,7 +33,7 @@ import javax.swing.table.AbstractTableModel;
             }
         }
 
-        public List<SampleArea> getAreaList() {
+        public List<BasicArea> getAreaList() {
             return areas;
         }
 
@@ -64,7 +64,7 @@ import javax.swing.table.AbstractTableModel;
 
         @Override
         public Object getValueAt(int rowIndex, int colIndex) {
-            SampleArea a;
+            BasicArea a;
             if (areas != null & rowIndex < areas.size()) {
                 a = areas.get(rowIndex);
                 if (colIndex == 0) {
@@ -77,8 +77,8 @@ import javax.swing.table.AbstractTableModel;
                     DecimalFormat df = new DecimalFormat("###,###,##0");
                     if (a.isSelectedForAcq()) {
                         switch (a.getTilingStatus()) {
-                            case SampleArea.TILING_ERROR: return df.format(a.getTileNumber()) + " (Error)";
-                            case SampleArea.TILING_UNKNOWN_NUMBER: return "???";    
+                            case BasicArea.TILING_ERROR: return df.format(a.getTileNumber()) + " (Error)";
+                            case BasicArea.TILING_UNKNOWN_NUMBER: return "???";    
                             default:return df.format(a.getTileNumber());
                         }
                     } else {
@@ -103,7 +103,7 @@ import javax.swing.table.AbstractTableModel;
 
         @Override
         public void setValueAt(Object value, int rowIndex, int colIndex) {
-            SampleArea area;
+            BasicArea area;
             if (areas != null & rowIndex < areas.size()) {
                 area = areas.get(rowIndex);
                 switch (colIndex) {
@@ -130,12 +130,12 @@ import javax.swing.table.AbstractTableModel;
         }
 
         public void addRow(Object value) {
-            SampleArea a = (SampleArea) value;
+            BasicArea a = (BasicArea) value;
             areas.add(a);
             fireTableRowsInserted(getRowCount(), getRowCount());
         }
 
-        public SampleArea getRowData(int rowIdx) {
+        public BasicArea getRowData(int rowIdx) {
             if (rowIdx >= 0 && rowIdx < areas.size()) {
                 return areas.get(rowIdx);
             } else {
@@ -149,7 +149,7 @@ import javax.swing.table.AbstractTableModel;
         */
         public void rowDown(int[] rowIdx, int lastPlusOneIndex) {
             //create copy 
-            SampleArea temp=areas.get(lastPlusOneIndex);
+            BasicArea temp=areas.get(lastPlusOneIndex);
             //move last entry in selection
             areas.set(lastPlusOneIndex, areas.get(rowIdx[rowIdx.length-1]));
             //iterate for the rest
@@ -167,7 +167,7 @@ import javax.swing.table.AbstractTableModel;
         */
         public void rowUp(int[] rowIdx, int firstMinusOneIndex) {
             //create copy 
-            SampleArea temp=areas.get(firstMinusOneIndex);
+            BasicArea temp=areas.get(firstMinusOneIndex);
             //move last first entry in selection
             areas.set(firstMinusOneIndex, areas.get(rowIdx[0]));
             //iterate for the rest
@@ -195,7 +195,7 @@ import javax.swing.table.AbstractTableModel;
             areaRenamingAllowed=renamingAllowed;
         }
 
-        public void setRowData(int rowIdx, SampleArea area) {
+        public void setRowData(int rowIdx, BasicArea area) {
             areas.set(rowIdx, area);
             fireTableRowsUpdated(rowIdx,rowIdx);
         }

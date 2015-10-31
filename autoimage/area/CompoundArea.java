@@ -2,11 +2,10 @@ package autoimage.area;
 
 import autoimage.Tile;
 import autoimage.Utils;
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import autoimage.gui.NumberTableCellRenderer;
 import autoimage.gui.PreviewPanel;
 import autoimage.tools.LayoutManagerDlg;
-import ij.IJ;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridLayout;
@@ -38,7 +37,6 @@ import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JToggleButton;
@@ -57,7 +55,7 @@ import org.json.JSONObject;
  *
  * @author Karsten Siller
  */
-public class CompoundArea extends SampleArea {
+public class CompoundArea extends BasicArea {
     
     public final static String TAG_COMBINATION_MODE = "COMBINATION_MODE";
     private final static DecimalFormat NUMBER_FORMAT = new DecimalFormat("###,###,##0.000");
@@ -67,7 +65,7 @@ public class CompoundArea extends SampleArea {
     public final static int COMBINED_NOT = 3;
     public final static int COMBINED_XOR = 4;
     
-    private List<SampleArea> areas;
+    private List<BasicArea> areas;
     private int combinationMode;
     private static Map<String, String> availableAreaClasses=null;
     private String lastAreaType;
@@ -75,16 +73,21 @@ public class CompoundArea extends SampleArea {
     private class AreaTableModel extends AbstractTableModel {
 
         public final String[] COLUMN_NAMES = new String[]{"Shape Name", "Type", "Center (mm)", "Width (mm)", "Height (mm)"};
-        private List<SampleArea> areas;
+        private List<BasicArea> areas;
 
-        public AreaTableModel(List<SampleArea> al) {
+        public AreaTableModel(List<BasicArea> al) {
             super();
             setData(al,false);
         }
 
-        public void setData(List<SampleArea> al, boolean updateView) {
+        /**
+         * 
+         * @param al
+         * @param updateView 
+         */
+        public void setData(List<BasicArea> al, boolean updateView) {
             if (al == null) {
-                al = new ArrayList<SampleArea>();
+                al = new ArrayList<BasicArea>();
             }
             this.areas = al;
             if (updateView) {
@@ -92,7 +95,11 @@ public class CompoundArea extends SampleArea {
             }
         }
 
-        public List<SampleArea> getAreaList() {
+        /**
+         * 
+         * @return List of all areas in table model
+         */
+        public List<BasicArea> getAreaList() {
             return areas;
         }
         
@@ -118,18 +125,36 @@ public class CompoundArea extends SampleArea {
 
         @Override
         public Object getValueAt(int rowIndex, int colIndex) {
-            SampleArea a;
+            BasicArea a;
             if (areas != null & rowIndex < areas.size()) {
                 a = areas.get(rowIndex);
                 switch (colIndex) {
-                    case 0: return a.getName();
-                    case 1: return a.getShapeType();
-                    case 2: {//center
-                                DecimalFormat df = new DecimalFormat("###,###,##0.000");
-                                return df.format((getCenterXYPos().getX()+a.getCenterXYPos().getX())/1000)+" / "+df.format((getCenterXYPos().getY()+a.getCenterXYPos().getY())/1000);
-                            } 
-                    case 3: return a.getBounds2D().getWidth()/1000;
-                    case 4: return a.getBounds2D().getHeight()/1000;
+                    case 0: 
+                        return a.getName();
+                    case 1: 
+                        return a.getShapeType();
+                    case 2: 
+                        /* display subarea's center position in layout coordinates
+                           get subarea's center position and apply this compound area's 
+                           shape-to-path transform 
+                        */
+                        Point2D absCenter = new Point2D.Double();
+                        getShapeToPathTransform().transform(a.getCenterXYPos(), absCenter);
+                        return NUMBER_FORMAT.format(absCenter.getX()/1000)+" / "+NUMBER_FORMAT.format(absCenter.getY()/1000);
+                    case 3: 
+                        /* display subarea's width in layout dimensions;
+                           takes into account this compiund area's affine transform (e.g. rotation)  
+                        */
+                        Path2D absArea=new Path2D.Double(a);
+                        absArea.transform(getShapeToPathTransform());
+                        return absArea.getBounds2D().getWidth()/1000;
+                    case 4: 
+                        /* display subarea's height in layout dimensions;
+                           takes into account this compiund area's affine transform (e.g. rotation)  
+                        */
+                        absArea=new Path2D.Double(a);
+                        absArea.transform(getShapeToPathTransform());
+                        return absArea.getBounds2D().getHeight()/1000;
                     default: return null;
                 }
             } else {
@@ -139,12 +164,13 @@ public class CompoundArea extends SampleArea {
 
         @Override
         public boolean isCellEditable(int rowIndex, int colIndex) {
+            //only able to edit subarea name in table
             return (colIndex == 1);
         }
 
         @Override
         public void setValueAt(Object value, int rowIndex, int colIndex) {
-            SampleArea area;
+            BasicArea area;
             if (areas != null & rowIndex < areas.size()) {
                 area = areas.get(rowIndex);
                 switch (colIndex) {
@@ -157,26 +183,35 @@ public class CompoundArea extends SampleArea {
             }
         }
 
-        public void addRow(Object value) {
-            SampleArea a = (SampleArea) value;
-            areas.add(a);
+        /**
+         * Adds an area to the table model
+         * @param area BasicArea object to be added to table
+         */
+        public void addRow(BasicArea area) {
+            areas.add(area);
             fireTableRowsInserted(getRowCount(), getRowCount());
         }
 
-        public SampleArea getRowData(int rowIdx) {
-            if (rowIdx >= 0 && rowIdx < areas.size()) {
+        /**
+         * Retrieves the area places in a specified row in the table model.
+         * @param rowIdx row index in table model
+         * @return BasicaArea object in the row [rowIdx], returns null if table model is empty or roIdx is out of bounds
+         */
+        public BasicArea getRowData(int rowIdx) {
+            if (areas!=null && rowIdx >= 0 && rowIdx < areas.size()) {
                 return areas.get(rowIdx);
             } else {
                 return null;
             }
         }
 
-        /*
-        @Param rowIdx: array of indices in model
-        @Param lastPlusIndex: model rowindex that corresponds to 1 below selection in view
-        */
+        /** 
+         * Moves a group of rows down by one row in the table model.
+         * @Param rowIdx: array of indices in model
+         * @Param lastPlusIndex: model row index that corresponds to one below selection in view
+         */
         public int rowsDown(int[] rowIdx, int lastPlusOneIndex) {
-            SampleArea temp=areas.get(lastPlusOneIndex);
+            BasicArea temp=areas.get(lastPlusOneIndex);
             //move last entry in selection down one
             areas.set(lastPlusOneIndex, areas.get(rowIdx[rowIdx.length-1]));
             for (int i=rowIdx.length-1; i>0; i--) {
@@ -187,12 +222,13 @@ public class CompoundArea extends SampleArea {
             return 0;
         }
 
-        /*
-        @Param rowIdx: array of indices in model
-        @Param firstMinusOneIndex: model rowindex that corresponds to 1 below selection in view
-        */
+        /**
+         * Moves a group of rows up by one row in the table model.
+         * @Param rowIdx: array of indices in model
+         * @Param firstMinusOneIndex: model row index that corresponds to one above selection in view
+         */
         public int rowsUp(int[] rowIdx, int firstMinusOneIndex) {
-            SampleArea temp=areas.get(firstMinusOneIndex);
+            BasicArea temp=areas.get(firstMinusOneIndex);
             //move first entry in selection up one
             areas.set(firstMinusOneIndex, areas.get(rowIdx[0]));
             for (int i=0; i<rowIdx.length-1; i++) {
@@ -205,7 +241,7 @@ public class CompoundArea extends SampleArea {
 
         public void removeRow(Object element) {
             for (int i = 0; i < areas.size(); i++) {
-                if (((SampleArea) element).getId() == areas.get(i).getId()) {
+                if (((BasicArea) element).getId() == areas.get(i).getId()) {
                     areas.remove(i);
                     fireTableRowsDeleted(i, i);
                 }
@@ -219,13 +255,24 @@ public class CompoundArea extends SampleArea {
             fireTableRowsDeleted(rowIdx[0], rowIdx[rowIdx.length - 1]);
         }
 
-        private void setRowData(int rowIdx, SampleArea area) {
+        /**
+         * Replaces the area found at row [rowIdx] in table model with rarea
+         * @param rowIdx
+         * @param area 
+         */
+        private void setRowData(int rowIdx, BasicArea rarea) {
             if (rowIdx >=0 && rowIdx < areas.size()) { 
-                areas.set(rowIdx, area);
+                areas.set(rowIdx, rarea);
                 fireTableRowsUpdated(rowIdx,rowIdx);
             }    
         }
 
+        /**
+         * Convenience method to force update of all rows and notification of TableModelListeners
+         */
+        private void updateAllRows() {
+            fireTableRowsUpdated(0, getRowCount()-1);
+        }
 
     }
     // end AreaTableModel
@@ -236,10 +283,10 @@ public class CompoundArea extends SampleArea {
     }
     
     public CompoundArea(String n) { //expects name identifier
-        this(n, -1, 0,0,0,new ArrayList<SampleArea>(),COMBINED_OR,false,"");
+        this(n, -1, 0,0,0,new ArrayList<BasicArea>(),COMBINED_OR,false,"");
     }
     
-    public CompoundArea(String n, int id, double ox, double oy, double oz, List<SampleArea> a, int mode, boolean selForAcq, String anot) {
+    public CompoundArea(String n, int id, double ox, double oy, double oz, List<BasicArea> a, int mode, boolean selForAcq, String anot) {
         super(n,id,ox,oy,oz,selForAcq,anot);
         areas = a;
         combinationMode=mode;
@@ -251,11 +298,11 @@ public class CompoundArea extends SampleArea {
 
     @Override
     protected void initializeFromJSONObject(JSONObject obj) throws JSONException {
-        areas = new ArrayList<SampleArea> ();
+        areas = new ArrayList<BasicArea> ();
         JSONArray areaArray=obj.getJSONArray(TAG_AREA_ARRAY);
         for (int i=0; i<areaArray.length(); i++) {
             try {
-                areas.add(SampleArea.createFromJSONObject(areaArray.getJSONObject(i)));
+                areas.add(BasicArea.createFromJSONObject(areaArray.getJSONObject(i)));
             } catch (ClassNotFoundException ex) {
                 Logger.getLogger(CompoundArea.class.getName()).log(Level.SEVERE, null, ex);
             } catch (InstantiationException ex) {
@@ -270,7 +317,7 @@ public class CompoundArea extends SampleArea {
     @Override
     protected void addFieldsToJSONObject(JSONObject obj) throws JSONException {
         JSONArray areaArray=new JSONArray();
-        for (SampleArea area:areas) {
+        for (BasicArea area:areas) {
             areaArray.put(area.toJSONObject());
         }
         obj.put(TAG_AREA_ARRAY, areaArray);
@@ -284,7 +331,7 @@ public class CompoundArea extends SampleArea {
     }
 
     @Override
-    public SampleArea duplicate() {
+    public BasicArea duplicate() {
         CompoundArea newArea = new CompoundArea(this.getName());
         newArea.setId(this.getId());
         newArea.centerXYPos=new Point2D.Double(this.getCenterXYPos().getX(), this.getCenterXYPos().getY());
@@ -296,8 +343,8 @@ public class CompoundArea extends SampleArea {
         newArea.setAcquiring(this.acquiring);
         newArea.tilePosList=new ArrayList<Tile>(this.getTilePositions());
         newArea.setUnknownTileNum(this.hasUnknownTileNum());
-        newArea.areas = new ArrayList<SampleArea>();
-        for (SampleArea area:this.areas) {
+        newArea.areas = new ArrayList<BasicArea>();
+        for (BasicArea area:this.areas) {
             newArea.areas.add(area.duplicate());
         }
         newArea.combinationMode=this.combinationMode;
@@ -308,58 +355,68 @@ public class CompoundArea extends SampleArea {
         return newArea;    
     }
 
-    public void addArea(SampleArea area) {
+    /**
+     * Adds area to the list of areas managed by this compound area. Creates a new list of the current list is null.
+     * @param area 
+     */
+    public void addArea(BasicArea area) {
         if (areas==null) {
-            areas = new ArrayList<SampleArea>();
+            areas = new ArrayList<BasicArea>();
         }
         areas.add(area);
     }
     
-    public boolean removeAreaToAdd(SampleArea area) {
+    /**
+     * Removes an area from areas list
+     * @param area BasicArea object to be removed
+     * @return true if area was found and removed, false if area list is empty or area was not removed.
+     */
+    public boolean removeArea(BasicArea area) {
         if (areas==null) {
             return false;
         }
         return areas.remove(area);
     }
     
+    /**
+     * Calculates the bounds of this.shape and translates it so that this.shape's center is placed at the origin (0/0)
+     */
     protected void centerShape() {
-/*        IJ.log("centerShape-begin");
-        IJ.log("    shape.geBounds "+shape.getBounds2D().toString());
-        IJ.log("    shape.getCenter "+Double.toString(shape.getBounds2D().getCenterX())+"/"+Double.toString(shape.getBounds2D().getCenterY()));*/
         double cx=shape.getBounds2D().getCenterX();
         double cy=shape.getBounds2D().getCenterY();
         //if properly centered, cx and cy should be 0
         //if not we translate created shape to origin        
-        for (SampleArea area:areas) {
-//            IJ.log("        "+area.getName()+" before center shape: "+area.getCenterXYPos().toString());
+        Point2D translationVec = new Point2D.Double(-cx,-cy);// shape translation vector
+        //apply the affineTrans to shape translation vector
+        affineTrans.transform(translationVec, translationVec);
+        //update all areas in this compound area
+        for (BasicArea area:areas) {
             area.setCenter(area.getCenterXYPos().getX()-cx, area.getCenterXYPos().getY()-cy);
-//            IJ.log("        "+area.getName()+" after center shape: "+area.getCenterXYPos().toString());
+/*            //apply inverted adjusted translation vector
+            area.setCenter(area.getCenterXYPos().getX()+translationVec.getX(), area.getCenterXYPos().getY()+translationVec.getY());*/
         }
+        //translate shape
         AffineTransform at=new AffineTransform();
         at.translate(-cx, -cy);
         shape.transform(at);
-        //need to update centerXYPos to ensure that the generalPath positioning remains unchanged
-        Point2D centerOffset = new Point2D.Double(-cx,-cy);// shape translation vector
-        //apply the affineTrans to shape shape translation vector
-        affineTrans.transform(centerOffset, centerOffset);
-        //apply inverted translation vector
-//        setCenter(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());
-        centerXYPos=new Point2D.Double(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());
-/*        IJ.log("    centerXYPos "+centerXYPos.toString());
-        IJ.log("    shape.geBounds "+shape.getBounds2D().toString());
-        IJ.log("    shape.getCenter "+Double.toString(shape.getBounds2D().getCenterX())+"/"+Double.toString(shape.getBounds2D().getCenterY()));
-        IJ.log("centerShape-end");*/
+        //update centerXYPos to ensure that the generalPath positioning remains unchanged
+        //apply inverted adjusted translation vector
+        centerXYPos=new Point2D.Double(centerXYPos.getX()-translationVec.getX(),centerXYPos.getY()-translationVec.getY());
     }
     
+    /**
+     * Updates and forces repaint of a PreviewPanel object based on currently calculated this.generalPath and selected subarea in subarea table.
+     * @param shapeTable JTable object that contains list of all subareas
+     * @param previewPanel The PreviewPanel object to be updated
+     */
     private void updatePreviewPanel(JTable shapeTable, PreviewPanel previewPanel) {
         int[] rows=shapeTable.getSelectedRows();
         previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
         for (int row:rows) {
-            SampleArea area=areas.get(shapeTable.convertRowIndexToModel(row));
+            row=Math.min(shapeTable.convertRowIndexToModel(row), shapeTable.getRowCount()-1);
+            BasicArea area=areas.get(shapeTable.convertRowIndexToModel(row));
             Path2D selPath=new Path2D.Double(area.getGeneralPath());
-            AffineTransform at=AffineTransform.getTranslateInstance(getCenterXYPos().getX(), getCenterXYPos().getY());
-            at.concatenate(affineTrans);
-            selPath.transform(at);
+            selPath.transform(getShapeToPathTransform());
             previewPanel.addPath(selPath,Color.RED,null);
         }
         previewPanel.repaint();
@@ -367,7 +424,7 @@ public class CompoundArea extends SampleArea {
     
     
     @Override
-    public SampleArea showConfigDialog(final Rectangle2D layoutBounds) {
+    public BasicArea showConfigDialog(final Rectangle2D layoutBounds) {
         if (availableAreaClasses==null) {
             try {
                 availableAreaClasses=Utils.getAvailableAreaClasses();
@@ -457,41 +514,8 @@ public class CompoundArea extends SampleArea {
         
         JPanel modePanel = new JPanel();
         JLabel label = new JLabel("Shape combination mode:");
-        JToggleButton andButton=new JToggleButton("And");
-        andButton.addActionListener(new ActionListener() {
-
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                combinationMode=COMBINED_AND;
-                createShape();
-                centerShape();
-                createGeneralPath();
-//                topLeftXField.setValue(getTopLeftX());
-//                topLeftYField.setValue(getTopLeftY());
-                widthField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getWidth()/ 1000));
-                heightField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getHeight()/ 1000));
-                updatePreviewPanel(shapeTable,previewPanel);
-            }
-            
-        });
-        JToggleButton orButton=new JToggleButton("Or");
-        orButton.addActionListener(new ActionListener() {
-
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                combinationMode=COMBINED_OR;
-                createShape();
-                centerShape();
-                createGeneralPath();
-//                topLeftXField.setValue(getTopLeftX());
-//                topLeftYField.setValue(getTopLeftY());
-                widthField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getWidth()/ 1000));
-                heightField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getHeight()/ 1000));
-                updatePreviewPanel(shapeTable,previewPanel);
-            }
-            
-        });
-        JToggleButton xorButton=new JToggleButton("Xor");
+        JToggleButton xorButton=new JToggleButton("Exclusive Or");
+        xorButton.setIcon(new ImageIcon(getClass().getResource("/autoimage/resources/Combined_Xor.png")));
         xorButton.addActionListener(new ActionListener() {
 
             @Override
@@ -500,15 +524,61 @@ public class CompoundArea extends SampleArea {
                 createShape();
                 centerShape();
                 createGeneralPath();
-//                topLeftXField.setValue(getTopLeftX());
-//                topLeftYField.setValue(getTopLeftY());
+                centerXField.setValue(new Double(centerXYPos.getX()) / 1000);
+                centerYField.setValue(new Double(centerXYPos.getY()) / 1000);
+                topLeftXField.setValue(new Double(getTopLeftX()) / 1000);
+                topLeftYField.setValue(new Double(getTopLeftY()) / 1000);
                 widthField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getWidth()/ 1000));
                 heightField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getHeight()/ 1000));
                 updatePreviewPanel(shapeTable,previewPanel);
             }
             
         });
-        JToggleButton notButton=new JToggleButton("Not");
+        JToggleButton andButton=new JToggleButton("Intersect");
+        andButton.setIcon(new ImageIcon(getClass().getResource("/autoimage/resources/Combined_And.png")));
+        andButton.setPreferredSize(xorButton.getPreferredSize());
+        andButton.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                combinationMode=COMBINED_AND;
+                createShape();
+                centerShape();
+                createGeneralPath();
+                centerXField.setValue(new Double(centerXYPos.getX()) / 1000);
+                centerYField.setValue(new Double(centerXYPos.getY()) / 1000);
+                topLeftXField.setValue(new Double(getTopLeftX()) / 1000);
+                topLeftYField.setValue(new Double(getTopLeftY()) / 1000);
+                widthField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getWidth()/ 1000));
+                heightField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getHeight()/ 1000));
+                updatePreviewPanel(shapeTable,previewPanel);
+            }
+            
+        });
+        JToggleButton orButton=new JToggleButton("Combine");
+        orButton.setIcon(new ImageIcon(getClass().getResource("/autoimage/resources/Combined_Or.png")));
+        orButton.setPreferredSize(xorButton.getPreferredSize());
+        orButton.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                combinationMode=COMBINED_OR;
+                createShape();
+                centerShape();
+                createGeneralPath();
+                centerXField.setValue(new Double(centerXYPos.getX()) / 1000);
+                centerYField.setValue(new Double(centerXYPos.getY()) / 1000);
+                topLeftXField.setValue(new Double(getTopLeftX()) / 1000);
+                topLeftYField.setValue(new Double(getTopLeftY()) / 1000);
+                widthField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getWidth()/ 1000));
+                heightField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getHeight()/ 1000));
+                updatePreviewPanel(shapeTable,previewPanel);
+            }
+            
+        });
+        JToggleButton notButton=new JToggleButton("Exclude");
+        notButton.setIcon(new ImageIcon(getClass().getResource("/autoimage/resources/Combined_Not.png")));
+        notButton.setPreferredSize(xorButton.getPreferredSize());
         notButton.addActionListener(new ActionListener() {
 
             @Override
@@ -517,8 +587,10 @@ public class CompoundArea extends SampleArea {
                 createShape();
                 centerShape();
                 createGeneralPath();
-//                topLeftXField.setValue(getTopLeftX());
-//                topLeftYField.setValue(getTopLeftY());
+                centerXField.setValue(new Double(centerXYPos.getX()) / 1000);
+                centerYField.setValue(new Double(centerXYPos.getY()) / 1000);
+                topLeftXField.setValue(new Double(getTopLeftX()) / 1000);
+                topLeftYField.setValue(new Double(getTopLeftY()) / 1000);
                 widthField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getWidth()/ 1000));
                 heightField.setText(NUMBER_FORMAT.format(generalPath.getBounds2D().getHeight()/ 1000));
                 updatePreviewPanel(shapeTable,previewPanel);
@@ -565,15 +637,11 @@ public class CompoundArea extends SampleArea {
             @Override
             public void tableChanged(TableModelEvent evt) {
                 if (areas!=null) { // {&& points.size() > 0) {
-                    if ((evt.getColumn() == 0 || evt.getColumn() == 1)) {
-                        AreaTableModel model=(AreaTableModel)shapeTable.getModel();
-                        createShape();
-                        centerShape();
-                        setRelDefaultPos();
-                        createGeneralPath();
-//                        model.updateAllRows();
-                    } else {
-                    }
+                    AreaTableModel model=(AreaTableModel)shapeTable.getModel();
+                    createShape();
+                    centerShape();
+                    setRelDefaultPos();
+                    createGeneralPath();
                     topLeftXField.setValue(new Double(getTopLeftX() / 1000));
                     topLeftYField.setValue(new Double(getTopLeftY() / 1000));
                     centerXField.setValue(new Double(getCenterXYPos().getX() / 1000));
@@ -591,15 +659,11 @@ public class CompoundArea extends SampleArea {
             public void propertyChange(PropertyChangeEvent evt) {
                 if ((areas!=null && areas.size() > 0) && ((Double)evt.getNewValue() != (Double)evt.getOldValue())) {
                     AreaTableModel model=(AreaTableModel)shapeTable.getModel();
-//                    double dx=((Double)evt.getNewValue() * 1000)-getTopLeftX();
                     double newValue = ((Number)topLeftXField.getValue()).doubleValue()*1000;
                     if (newValue != getTopLeftX()) {
                         setTopLeftX(newValue);//recalculates center pos
-                        //centerXField.setValue(new Double(getCenterXYPos().getY()/1000));
                         centerXField.setValue(new Double(getCenterXYPos().getX() / 1000));
-//                        model.setData(points,true);
-//                        model.updateAllRows();
-                        updatePreviewPanel(shapeTable, previewPanel);
+                        model.updateAllRows();
                     }
                 }
             }
@@ -615,8 +679,7 @@ public class CompoundArea extends SampleArea {
                         AreaTableModel model=(AreaTableModel)shapeTable.getModel();
                         setTopLeftY(newValue);//recalculates centerXYPos and generalPath
                         centerYField.setText(getCenterXYPos()==null ? "?" : NUMBER_FORMAT.format(getCenterXYPos().getY() / 1000));
-//                        model.updateAllRows();
-//                        updatePreviewPanel(shapeTable, previewPanel);
+                        model.updateAllRows();
                     }
                 }
             }
@@ -632,8 +695,7 @@ public class CompoundArea extends SampleArea {
                         AreaTableModel model=(AreaTableModel)shapeTable.getModel();
                         setCenter(newValue, centerXYPos.getY());//recalculates generalPath
                         topLeftXField.setValue(new Double(getTopLeftX() / 1000));
-//                        model.setData(points,true);
-//                        model.updateAllRows();
+                        model.updateAllRows();
                     }
                 }
             }
@@ -649,8 +711,7 @@ public class CompoundArea extends SampleArea {
                         AreaTableModel model=(AreaTableModel)shapeTable.getModel();
                         setCenter(centerXYPos.getX(),newValue);//recalculates generalPath
                         topLeftYField.setText(NUMBER_FORMAT.format(getTopLeftY() / 1000));
-//                        model.setData(points,true);
-//                        model.updateAllRows();
+                        model.updateAllRows();
                     }
                 }
             }
@@ -666,12 +727,11 @@ public class CompoundArea extends SampleArea {
                     newValue=newValue/180*Math.PI;
                     if (newValue != Utils.getRotation(affineTrans)) {
                         AreaTableModel model=(AreaTableModel)shapeTable.getModel();
-//                        setAffineTransform(Utils.createRotationAffineTrans(newValue));
-                        setAffineTransform(AffineTransform.getRotateInstance(newValue));
+                        //using (0/0) as anchor since translation to centerXYPos is dealt with independently
+                        setAffineTransform(AffineTransform.getRotateInstance(newValue,0,0));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
-//                        model.updateAllRows();
-                        updatePreviewPanel(shapeTable, previewPanel);
+                        model.updateAllRows();
                     }
                 }
             }
@@ -714,25 +774,22 @@ public class CompoundArea extends SampleArea {
                     Class clazz;
                     try {
                         clazz = Class.forName(availableAreaClasses.get(selectedType));
-                        SampleArea newArea=((SampleArea)clazz.newInstance());
-                        IJ.log(layoutBounds.toString());
+                        BasicArea newArea=((BasicArea)clazz.newInstance());
                         //initialize new area with centerXYPos of this compound shape --> user effectively will work with more intuitive absolute layout coordinate system
-                        newArea.setCenter(newArea.getCenterXYPos().getX()+centerXYPos.getX(),newArea.getCenterXYPos().getY()+centerXYPos.getY());
+                        newArea.setCenter(centerXYPos.getX(),centerXYPos.getY());
                         newArea=newArea.showConfigDialog(layoutBounds);
                         if (newArea!=null) {
                             AreaTableModel model=(AreaTableModel)shapeTable.getModel();
-        //                    newArea.setId(startUpLayout.createUniqueAreaId());
                             //translate new area's centerXYPos to express it as relative coordinate to this compound area's centerXYPos
-                            newArea.setCenter(newArea.getCenterXYPos().getX()-centerXYPos.getX(),newArea.getCenterXYPos().getY()-centerXYPos.getY());
+                            newArea.setCenter(-centerXYPos.getX(),-centerXYPos.getY());
                             newArea.setId(-1);
                             model.addRow(newArea);
                             shapeTable.changeSelection(shapeTable.getRowCount()-1,shapeTable.getRowCount(),false,false);
-                            createShape();
-                            centerShape();
-                            setRelDefaultPos();
-                            createGeneralPath();
+//                            createShape();
+//                            centerShape();
+//                            setRelDefaultPos();
+//                            createGeneralPath();
             //                model.updateAllRows();
-                            updatePreviewPanel(shapeTable, previewPanel);
                             lastAreaType=selectedType;
                         }
                     } catch (ClassNotFoundException ex) {
@@ -781,12 +838,7 @@ public class CompoundArea extends SampleArea {
                     }
                     AreaTableModel model=(AreaTableModel)shapeTable.getModel();
                     model.removeRows(rowsInModel);
-                    createShape();
-                    centerShape();
-                    setRelDefaultPos();
-                    createGeneralPath();
-//                    model.setData(points,true);
-                    updatePreviewPanel(shapeTable, previewPanel);
+//                    updatePreviewPanel(shapeTable, previewPanel);
                 } else {
                     JOptionPane.showMessageDialog(null, "Select at least one shape.");
                 }
@@ -810,19 +862,27 @@ public class CompoundArea extends SampleArea {
                 int index=shapeTable.getSelectedRow();
                 AreaTableModel model=(AreaTableModel)shapeTable.getModel();
                 int rowInModel=shapeTable.convertRowIndexToModel(index);
-                SampleArea area=model.getRowData(rowInModel);
+                BasicArea area=model.getRowData(rowInModel);
                 try {
-                    SampleArea areaCopy=SampleArea.createFromJSONObject(area.toJSONObject());
+                    BasicArea areaCopy=BasicArea.createFromJSONObject(area.toJSONObject());
                     //pass copy, so area can remain unchanged if user clicks 'Cancel'
                     //translate area with centerXYPos vector of this compound shape --> user effectively will work with more intuitive absolute layout coordinate system
-                    areaCopy.setCenter(areaCopy.getCenterXYPos().getX()+centerXYPos.getX(),areaCopy.getCenterXYPos().getY()+centerXYPos.getY());
+                    Point2D absCenter=new Point2D.Double();
+                    getShapeToPathTransform().transform(areaCopy.getCenterXYPos(), absCenter);
+                    areaCopy.setCenter(absCenter.getX(),absCenter.getY());
                     AffineTransform cat=new AffineTransform(areaCopy.getAffineTransform());
                     cat.concatenate(affineTrans);
                     areaCopy.setAffineTransform(cat);
-                    SampleArea modArea=areaCopy.showConfigDialog(layoutBounds);
+                    BasicArea modArea=areaCopy.showConfigDialog(layoutBounds);
                     if (modArea!=null) {// user clicked OK in dialog
                         //translate new area's centerXYPos to express it as relative coordinate to this compound area's centerXYPos
-                        modArea.setCenter(modArea.getCenterXYPos().getX()-centerXYPos.getX(),modArea.getCenterXYPos().getY()-centerXYPos.getY());
+                        Point2D relCenter=new Point2D.Double();
+                        try {
+                            getPathToShapeTransform().transform(modArea.getCenterXYPos(),relCenter);
+                            modArea.setCenter(relCenter.getX(), relCenter.getY());
+                        } catch (NoninvertibleTransformException ex) {
+                            Logger.getLogger(CompoundArea.class.getName()).log(Level.SEVERE, null, ex);
+                        }
                         cat=modArea.getAffineTransform();
                         try {
                             cat.concatenate(affineTrans.createInverse());
@@ -831,13 +891,6 @@ public class CompoundArea extends SampleArea {
                         }
                         modArea.setAffineTransform(cat);
                         model.setRowData(rowInModel,modArea);
-//                        startUpLayout.setModified(true);
-                        createShape();
-                        centerShape();
-                        setRelDefaultPos();
-                        createGeneralPath();
-            //                model.updateAllRows();
-                        updatePreviewPanel(shapeTable, previewPanel);
                     }            
                 } catch (JSONException ex) {
                     Logger.getLogger(LayoutManagerDlg.class.getName()).log(Level.SEVERE, null, ex);
@@ -877,13 +930,7 @@ public class CompoundArea extends SampleArea {
                     }
                     AreaTableModel model=(AreaTableModel)shapeTable.getModel();
                     model.rowsUp(selRows, firstMinusOneIndex);
-                    createShape();
-                    centerShape();
-                    setRelDefaultPos();
-                    createGeneralPath();
-//                    model.updateAllRows();
                     shapeTable.setRowSelectionInterval(newSelRowInView, newSelRowInView + selRows.length - 1);
-                    updatePreviewPanel(shapeTable, previewPanel);
                 } 
             }
         });
@@ -914,13 +961,7 @@ public class CompoundArea extends SampleArea {
                     }
                     AreaTableModel model=(AreaTableModel)shapeTable.getModel();
                     model.rowsDown(selRows, lastPlusOneIndex);
-                    createShape();
-                    centerShape();
-                    setRelDefaultPos();
-                    createGeneralPath();
-//                    model.updateAllRows();
                     shapeTable.setRowSelectionInterval(newSelRowInView, newSelRowInView + selRows.length - 1);
-                    updatePreviewPanel(shapeTable, previewPanel);
                 }
             }
         });
@@ -971,7 +1012,7 @@ public class CompoundArea extends SampleArea {
 
     @Override
     public int supportedLayouts() {
-        return SampleArea.SUPPORT_CUSTOM_LAYOUT;
+        return BasicArea.SUPPORT_CUSTOM_LAYOUT;
     }
 
     @Override
@@ -981,7 +1022,7 @@ public class CompoundArea extends SampleArea {
             return;
         }
         java.awt.geom.Area combinedArea = null; 
-        for (SampleArea area:areas) {
+        for (BasicArea area:areas) {
             if (combinedArea==null) {
                 combinedArea=new java.awt.geom.Area(area);
             } else {
@@ -1010,7 +1051,7 @@ public class CompoundArea extends SampleArea {
             return 0;
         }
         Path2D p=new Path2D.Double();
-        for (SampleArea a:areas) {
+        for (BasicArea a:areas) {
             p.append(a, false);
         }
         Point2D point=new Point2D.Double(0,0);

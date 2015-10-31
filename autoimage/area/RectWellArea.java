@@ -1,6 +1,6 @@
 package autoimage.area;
 
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import java.util.Comparator;
 
 /**
@@ -66,7 +66,7 @@ public class RectWellArea extends RectArea {
     
     @Override
     public int supportedLayouts() {
-        return SampleArea.SUPPORT_WELLPLATE_LAYOUT;
+        return BasicArea.SUPPORT_WELLPLATE_LAYOUT;
     }
 
     

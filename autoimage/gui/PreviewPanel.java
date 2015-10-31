@@ -74,8 +74,10 @@ public class PreviewPanel extends JPanel {
         g2d.setColor(Color.black);
         g2d.fill(new Rectangle(0,0,this.getWidth(),this.getHeight()));
         g2d.setColor(Color.yellow);
-        g2d.drawLine((int)(this.getWidth()/2), 0, (int)(this.getWidth()/2), (int)this.getHeight());
-        g2d.drawLine(0, (int)(this.getHeight()/2), (int)this.getWidth(), (int)(this.getHeight()/2));
+        g2d.drawLine((int)(this.getWidth()/2), 0, (int)(this.getWidth()/2), border);
+        g2d.drawLine((int)(this.getWidth()/2), (int)this.getHeight(), (int)(this.getWidth()/2), (int)this.getHeight()-border);
+        g2d.drawLine(0, (int)(this.getHeight()/2), border, (int)(this.getHeight()/2));
+        g2d.drawLine((int)this.getWidth()-border, (int)(this.getHeight()/2), (int)this.getWidth(), (int)(this.getHeight()/2));
         if (this.paths!=null && !this.paths.isEmpty()) {
             //create a copy to ensure that original path is not modifie by transforms in paintComponent method
             int index=0;

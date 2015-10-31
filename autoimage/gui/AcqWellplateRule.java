@@ -2,7 +2,7 @@ package autoimage.gui;
 
 import autoimage.IRuleListener;
 import autoimage.gui.AcqCustomRule;
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Font;
@@ -22,8 +22,8 @@ public class AcqWellplateRule extends AcqCustomRule {
     protected double wellDistance;//between wells in um
     protected int items;//i.e. columns or rows in plate
     
-    private String[] colAlphabet = SampleArea.PLATE_COL_ALPHABET;
-    private String[] rowAlphabet = SampleArea.PLATE_ROW_ALPHABET;
+    private String[] colAlphabet = BasicArea.PLATE_COL_ALPHABET;
+    private String[] rowAlphabet = BasicArea.PLATE_ROW_ALPHABET;
     
     public AcqWellplateRule(int orientation) {
         super(orientation);

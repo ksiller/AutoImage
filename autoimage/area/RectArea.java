@@ -1,6 +1,6 @@
 package autoimage.area;
 
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import autoimage.Tile;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Path2D;
@@ -32,7 +32,7 @@ public class RectArea extends TwoAxesArea{
     }
  
     @Override
-    public SampleArea duplicate() {
+    public BasicArea duplicate() {
         RectArea newArea = new RectArea(this.getName());
         newArea.setId(this.getId());
 //        newArea.setTopLeftX(this.topLeftX);
@@ -56,7 +56,7 @@ public class RectArea extends TwoAxesArea{
 
     @Override
     public int supportedLayouts() {
-        return SampleArea.SUPPORT_CUSTOM_LAYOUT;
+        return BasicArea.SUPPORT_CUSTOM_LAYOUT;
     }
 
     @Override

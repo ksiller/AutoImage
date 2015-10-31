@@ -1,6 +1,6 @@
 package autoimage;
 
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 
 /**
  *
@@ -8,7 +8,7 @@ import autoimage.api.SampleArea;
  */
 public interface RetilingListener {
     
-    public void areaRetiled(SampleArea a);
+    public void areaRetiled(BasicArea a);
     public void retilingAborted();
     public void retilingFinished();
 }

@@ -3,7 +3,7 @@ package autoimage;
 import autoimage.api.RefArea;
 import autoimage.area.RectWellArea;
 import autoimage.area.EllipseWellArea;
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import java.io.File;
 import java.util.Comparator;
 import org.json.JSONException;
@@ -69,11 +69,11 @@ public class AcqWellplateLayout extends AcqCustomLayout {
                     row=i;
                 else 
                     row=rows-i-1;
-                if (row>=SampleArea.PLATE_ROW_ALPHABET.length)
+                if (row>=BasicArea.PLATE_ROW_ALPHABET.length)
                     wellName=Integer.toString(id);
                 else
-                    wellName=SampleArea.PLATE_ROW_ALPHABET[row]+Integer.toString(column+1);
-                SampleArea a=null;
+                    wellName=BasicArea.PLATE_ROW_ALPHABET[row]+Integer.toString(column+1);
+                BasicArea a=null;
                 if (wellShape.equals("Square"))
                     a = new RectWellArea(wellName, id, oX+wellDistance*column, oY+wellDistance*row,0,wellDiameter,wellDiameter,false,"");
                 else if (wellShape.equals("Round"))

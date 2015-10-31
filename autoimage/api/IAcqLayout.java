@@ -55,7 +55,7 @@ public interface IAcqLayout {
 
     void initializeFromJSONObject(JSONObject obj, File file) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException;
     
-    void addArea(SampleArea a);
+    void addArea(BasicArea a);
 
     void addLandmark(RefArea lm);
 
@@ -84,22 +84,22 @@ public interface IAcqLayout {
 
     void deselectAllLandmarks();
 
-    ArrayList<SampleArea> getAllAreasInsideRect(Rectangle2D r);
+    ArrayList<BasicArea> getAllAreasInsideRect(Rectangle2D r);
 
-    ArrayList<SampleArea> getAllAreasTouching(double x, double y);
+    ArrayList<BasicArea> getAllAreasTouching(double x, double y);
 
     int[] getAllContainingAreaIndices(double x, double y);
 
-    List<SampleArea> getAreaArray();
+    List<BasicArea> getAreaArray();
 
-    //areas are loaded with sequential IDs, starting with 1 --> SampleArea with id is most likey to be in areas.get(id-1). If not, the entire AreaArray is searched for the ID
-    SampleArea getAreaById(int id);
+    //areas are loaded with sequential IDs, starting with 1 --> BasicArea with id is most likey to be in areas.get(id-1). If not, the entire AreaArray is searched for the ID
+    BasicArea getAreaById(int id);
 
-    SampleArea getAreaByIndex(int index);
+    BasicArea getAreaByIndex(int index);
 
-    SampleArea getAreaByLayoutPos(double lx, double ly);
+    BasicArea getAreaByLayoutPos(double lx, double ly);
 
-    SampleArea getAreaByName(String name);
+    BasicArea getAreaByName(String name);
 
     Comparator getAreaNameComparator();
 
@@ -123,13 +123,13 @@ public interface IAcqLayout {
     File getFile();
 
     //returns null if layout coordinate is not inside any area
-    SampleArea getFirstContainingArea(double lx, double ly);
+    BasicArea getFirstContainingArea(double lx, double ly);
 
     //parameters are absolute stage positions
-    SampleArea getFirstContainingAreaAbs(double stageX, double stageY, double fovX, double fovY);
+    BasicArea getFirstContainingAreaAbs(double stageX, double stageY, double fovX, double fovY);
 
     //returns null if fov surrounding layout coordinate does not touch any area
-    SampleArea getFirstTouchingArea(double lx, double ly, double fovX, double fovY);
+    BasicArea getFirstTouchingArea(double lx, double ly, double fovX, double fovY);
 
     double getHeight();
 
@@ -157,13 +157,13 @@ public interface IAcqLayout {
 
     Vec3d getNormalVector();
 
-    ArrayList<SampleArea> getSelectedAreasInsideRect(Rectangle2D r);
+    ArrayList<BasicArea> getSelectedAreasInsideRect(Rectangle2D r);
 
-    ArrayList<SampleArea> getSelectedAreasTouching(double x, double y);
+    ArrayList<BasicArea> getSelectedAreasTouching(double x, double y);
 
-    double getStagePosX(SampleArea a, int tileIndex);
+    double getStagePosX(BasicArea a, int tileIndex);
 
-    double getStagePosY(SampleArea a, int tileIndex);
+    double getStagePosY(BasicArea a, int tileIndex);
 
     //in radians
     double getStageToLayoutRot();
@@ -180,9 +180,9 @@ public interface IAcqLayout {
 
     long getTotalTileNumber();
 
-    ArrayList<SampleArea> getUnselectedAreasInsideRect(Rectangle2D r);
+    ArrayList<BasicArea> getUnselectedAreasInsideRect(Rectangle2D r);
 
-    ArrayList<SampleArea> getUnselectedAreasTouching(double x, double y);
+    ArrayList<BasicArea> getUnselectedAreasTouching(double x, double y);
 
     double getWidth();
 
@@ -213,7 +213,7 @@ public interface IAcqLayout {
 
     void saveTileCoordsToXMLFile(String fname, TilingSetting setting, double tileW, double tileH, double pixSize);
 
-    void setAreaArray(List<SampleArea> al);
+    void setAreaArray(List<BasicArea> al);
 
     void setBottomMaterial(String material);
 
@@ -237,9 +237,9 @@ public interface IAcqLayout {
 
     JSONObject toJSONObject() throws JSONException;
 
-    void writeSingleArea(XMLStreamWriter xtw, SampleArea a, TilingSetting setting) throws XMLStreamException;
+    void writeSingleArea(XMLStreamWriter xtw, BasicArea a, TilingSetting setting) throws XMLStreamException;
     
-    public List<Future<Integer>> calculateTiles(List<SampleArea> areasToTile, final DoxelManager dManager, final double fovWidth_UM, final double fovHeight_UM, final TilingSetting tSetting);
+    public List<Future<Integer>> calculateTiles(List<BasicArea> areasToTile, final DoxelManager dManager, final double fovWidth_UM, final double fovHeight_UM, final TilingSetting tSetting);
     
     public int getTilingStatus();
     

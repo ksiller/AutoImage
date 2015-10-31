@@ -3,7 +3,7 @@ package autoimage.gui;
 //import autoimage.AcqCustomLayout;
 import autoimage.IMergeAreaListener;
 import autoimage.api.IAcqLayout;
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import ij.IJ;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -54,17 +54,17 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
             "Width",
             "Height"
       };
-      private List<SampleArea> areas;
+      private List<BasicArea> areas;
 
-      public void setData(List<SampleArea> areas) {
+      public void setData(List<BasicArea> areas) {
          this.areas = areas;
       }
 
-      public List<SampleArea> getAreaList() {
+      public List<BasicArea> getAreaList() {
          return areas;
       }
 
-      public SampleArea getArea(int row) {
+      public BasicArea getArea(int row) {
           return areas.get(row);
       }
       
@@ -82,7 +82,7 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
       }
       @Override
       public Object getValueAt(int rowIndex, int colIndex) {
-         SampleArea a;
+         BasicArea a;
          if (areas!=null & rowIndex < areas.size()) {
              a = areas.get(rowIndex);
              switch (colIndex) {
@@ -104,7 +104,7 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
       
       @Override
       public void setValueAt(Object value, int rowIndex, int colIndex) {
-         SampleArea a;
+         BasicArea a;
          if (areas!=null & rowIndex < areas.size()) {
              a = areas.get(rowIndex);
              switch (colIndex) {
@@ -132,7 +132,7 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
       }
 
       public void addRow(Object value) {
-          SampleArea a=(SampleArea)value;
+          BasicArea a=(BasicArea)value;
           areas.add(a);
           fireTableRowsInserted(getRowCount()-1,getRowCount()-1);
       }
@@ -166,7 +166,7 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
       areaTable.getTableHeader().setReorderingAllowed(false);
       areaTable.setFont(new Font("Arial", Font.PLAIN, 10));
       AreaTableModel model = new AreaTableModel();
-      model.setData(new ArrayList<SampleArea>());
+      model.setData(new ArrayList<BasicArea>());
       areaTable.setModel(model);
       model.addTableModelListener(this);
       areaTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
@@ -220,9 +220,9 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
         mergeButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                List<SampleArea> selectedAreas=((AreaTableModel)areaTable.getModel()).getAreaList();
-                final List<SampleArea> mergingAreas=new ArrayList<SampleArea>(selectedAreas.size());
-                for (SampleArea area:selectedAreas)
+                List<BasicArea> selectedAreas=((AreaTableModel)areaTable.getModel()).getAreaList();
+                final List<BasicArea> mergingAreas=new ArrayList<BasicArea>(selectedAreas.size());
+                for (BasicArea area:selectedAreas)
                     mergingAreas.add(area);
                 synchronized (listeners) {
 	            for (final IMergeAreaListener l : listeners) {
@@ -261,13 +261,13 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
         acqLayout=acqL;
     }    
    
-    public void addAreas(List<SampleArea> additionalAreaList) {
+    public void addAreas(List<BasicArea> additionalAreaList) {
         if (additionalAreaList!=null) {
             AreaTableModel atm = (AreaTableModel)areaTable.getModel();
-            List<SampleArea> areas=atm.getAreaList();
-            for (SampleArea additionalArea : additionalAreaList) {
+            List<BasicArea> areas=atm.getAreaList();
+            for (BasicArea additionalArea : additionalAreaList) {
                 boolean unique=true;
-                for (SampleArea area : areas) {
+                for (BasicArea area : areas) {
                     if (additionalArea.getId() == area.getId()) {
                         unique=false;
                         break;
@@ -289,10 +289,10 @@ public class MergeAreasDlg extends javax.swing.JDialog implements TableModelList
     public void removeAreas() {
         int[] rows=areaTable.getSelectedRows();
         if (rows.length>0) {
-            List<SampleArea> layoutAreas=acqLayout.getAreaArray();
+            List<BasicArea> layoutAreas=acqLayout.getAreaArray();
             AreaTableModel atm=(AreaTableModel)areaTable.getModel();
             for (int i=rows[rows.length-1]; i>=rows[0]; i--) {
-                SampleArea a=atm.getArea(i);
+                BasicArea a=atm.getArea(i);
                 acqLayout.getAreaById(a.getId()).setSelectedForMerge(false);
                 atm.removeRow(i);
             }    

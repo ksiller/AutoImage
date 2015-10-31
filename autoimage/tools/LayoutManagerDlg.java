@@ -3,7 +3,7 @@ package autoimage.tools;
 import autoimage.AcqBasicLayout;
 import autoimage.AcqCustomLayout;
 import autoimage.AcqWellplateLayout;
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import autoimage.Utils;
 import autoimage.api.IAcqLayout;
 import autoimage.area.CompoundArea;
@@ -62,16 +62,16 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         private class AreaTableModel extends AbstractTableModel {
 
         public final String[] COLUMN_NAMES = new String[]{"Area Id", "Area Name", "Type", "Center (mm)", "Width (mm)", "Height (mm)", "Relative Z (mm)"};
-        private List<SampleArea> areas;
+        private List<BasicArea> areas;
 
-        public AreaTableModel(List<SampleArea> al) {
+        public AreaTableModel(List<BasicArea> al) {
             super();
             setData(al,false);
         }
 
-        public void setData(List<SampleArea> al, boolean updateView) {
+        public void setData(List<BasicArea> al, boolean updateView) {
             if (al == null) {
-                al = new ArrayList<SampleArea>();
+                al = new ArrayList<BasicArea>();
             }
             this.areas = al;
             if (updateView) {
@@ -79,7 +79,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
             }
         }
 
-        public List<SampleArea> getAreaList() {
+        public List<BasicArea> getAreaList() {
             return areas;
         }
         
@@ -105,7 +105,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
 
         @Override
         public Object getValueAt(int rowIndex, int colIndex) {
-            SampleArea a;
+            BasicArea a;
             if (areas != null & rowIndex < areas.size()) {
                 a = areas.get(rowIndex);
                 switch (colIndex) {
@@ -133,7 +133,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
 
         @Override
         public void setValueAt(Object value, int rowIndex, int colIndex) {
-            SampleArea area;
+            BasicArea area;
             if (areas != null & rowIndex < areas.size()) {
                 area = areas.get(rowIndex);
                 switch (colIndex) {
@@ -147,12 +147,12 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         }
 
         public void addRow(Object value) {
-            SampleArea a = (SampleArea) value;
+            BasicArea a = (BasicArea) value;
             areas.add(a);
             fireTableRowsInserted(getRowCount(), getRowCount());
         }
 
-        public SampleArea getRowData(int rowIdx) {
+        public BasicArea getRowData(int rowIdx) {
             if (rowIdx >= 0 && rowIdx < areas.size()) {
                 return areas.get(rowIdx);
             } else {
@@ -165,7 +165,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         @Param lastPlusIndex: model rowindex that corresponds to 1 below selection in view
         */
         public int rowDown(int[] rowIdx, int lastPlusOneIndex) {
-            SampleArea temp=areas.get(lastPlusOneIndex);
+            BasicArea temp=areas.get(lastPlusOneIndex);
             //move last entry in selection down one
             areas.set(lastPlusOneIndex, areas.get(rowIdx[rowIdx.length-1]));
             for (int i=rowIdx.length-1; i>0; i--) {
@@ -181,7 +181,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         @Param firstMinusOneIndex: model rowindex that corresponds to 1 below selection in view
         */
         public int rowUp(int[] rowIdx, int firstMinusOneIndex) {
-            SampleArea temp=areas.get(firstMinusOneIndex);
+            BasicArea temp=areas.get(firstMinusOneIndex);
             //move first entry in selection up one
             areas.set(firstMinusOneIndex, areas.get(rowIdx[0]));
             for (int i=0; i<rowIdx.length-1; i++) {
@@ -194,7 +194,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
 
         public void removeRow(Object element) {
             for (int i = 0; i < areas.size(); i++) {
-                if (((SampleArea) element).getId() == areas.get(i).getId()) {
+                if (((BasicArea) element).getId() == areas.get(i).getId()) {
                     areas.remove(i);
                     fireTableRowsDeleted(i, i);
                 }
@@ -208,7 +208,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
             fireTableRowsDeleted(rowIdx[0], rowIdx[rowIdx.length - 1]);
         }
 
-        private void setRowData(int rowIdx, SampleArea area) {
+        private void setRowData(int rowIdx, BasicArea area) {
             if (rowIdx >=0 && rowIdx < areas.size()) { 
                 areas.set(rowIdx, area);
                 fireTableRowsUpdated(rowIdx,rowIdx);
@@ -233,7 +233,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
     }
 
     private void loadAvailableAreaClasses() {
-        Class clazz = SampleArea.class;
+        Class clazz = BasicArea.class;
         URL location = clazz.getResource('/'+clazz.getName().replace('.', '/')+".class");
         String locationStr=location.toString().substring(0, location.toString().indexOf(".jar!")+6);
         String jarFileStr=locationStr.substring(locationStr.indexOf("file:")+5,locationStr.length()-2);
@@ -248,7 +248,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
             URL[] urls = { new URL(locationStr) };
             classLoader = URLClassLoader.newInstance(urls,
                 //    this.getClass().getClassLoader());
-            SampleArea.class.getClassLoader());
+BasicArea.class.getClassLoader());
 
             int i=0;
             availableAreaClasses=new HashMap<String,String>();
@@ -263,10 +263,10 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
                 try {
                     clazz=Class.forName(className);
                     IJ.log(clazz.getName());
-                    //only add non-abstract SampleArea classes that support custom layouts
-                    if (SampleArea.class.isAssignableFrom(clazz) && !Modifier.isAbstract(clazz.getModifiers())) {
-                        SampleArea area=(SampleArea)clazz.newInstance();
-                        if ((area.supportedLayouts() & SampleArea.SUPPORT_CUSTOM_LAYOUT) == SampleArea.SUPPORT_CUSTOM_LAYOUT) {
+                    //only add non-abstract BasicArea classes that support custom layouts
+                    if (BasicArea.class.isAssignableFrom(clazz) && !Modifier.isAbstract(clazz.getModifiers())) {
+                        BasicArea area=(BasicArea)clazz.newInstance();
+                        if ((area.supportedLayouts() & BasicArea.SUPPORT_CUSTOM_LAYOUT) == BasicArea.SUPPORT_CUSTOM_LAYOUT) {
                             availableAreaClasses.put(area.getShapeType(), className);
                         }   
                     }
@@ -756,7 +756,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
     }//GEN-LAST:event_newButtonActionPerformed
 
     private void removeAreaButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_removeAreaButtonActionPerformed
-        List<SampleArea> areas = startUpLayout.getAreaArray();
+        List<BasicArea> areas = startUpLayout.getAreaArray();
         if (areas.size() > 0) {
             int[] rows = areaTable.getSelectedRows();
             if (rows.length > 0) {
@@ -816,11 +816,11 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
         int index=areaTable.getSelectedRow();
         AreaTableModel model=(AreaTableModel)areaTable.getModel();
         int rowInModel=areaTable.convertRowIndexToModel(index);
-        SampleArea area=model.getRowData(rowInModel);
+        BasicArea area=model.getRowData(rowInModel);
         try {
-            SampleArea areaCopy=SampleArea.createFromJSONObject(area.toJSONObject());
+            BasicArea areaCopy=BasicArea.createFromJSONObject(area.toJSONObject());
             //pass copy, so area can remain unchanged if user clicks 'Cancel'
-            SampleArea modArea=areaCopy.showConfigDialog(new Rectangle2D.Double(0,0,startUpLayout.getWidth(), startUpLayout.getLength()));
+            BasicArea modArea=areaCopy.showConfigDialog(new Rectangle2D.Double(0,0,startUpLayout.getWidth(), startUpLayout.getLength()));
             if (modArea!=null) {// user clicked OK in dialog
                 model.setRowData(rowInModel,modArea);
                 startUpLayout.setModified(true);
@@ -860,7 +860,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
             Class clazz;
             try {
                 clazz = Class.forName(availableAreaClasses.get(selectedType));
-                SampleArea newArea=((SampleArea)clazz.newInstance());
+                BasicArea newArea=((BasicArea)clazz.newInstance());
                 newArea=newArea.showConfigDialog(new Rectangle2D.Double(0,0,startUpLayout.getWidth(), startUpLayout.getLength()));
                 if (newArea!=null) {
                     AreaTableModel model=(AreaTableModel)areaTable.getModel();

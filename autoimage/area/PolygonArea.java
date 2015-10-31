@@ -1,6 +1,6 @@
 package autoimage.area;
 
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import autoimage.Tile;
 import autoimage.Utils;
 import autoimage.gui.NumberTableCellRenderer;
@@ -55,7 +55,7 @@ import org.json.JSONObject;
  *
  * @author Karsten
  */
-public class PolygonArea extends SampleArea {
+public class PolygonArea extends BasicArea {
 
     private List<Point2D> points;
 //    private Path2D polygon;
@@ -434,7 +434,7 @@ public class PolygonArea extends SampleArea {
     }
 
     @Override
-    public SampleArea duplicate() {
+    public BasicArea duplicate() {
         PolygonArea newArea = new PolygonArea(this.getName());
 //        newArea.shape=this.getShapeLabel();
         newArea.setId(this.getId());
@@ -513,9 +513,10 @@ public class PolygonArea extends SampleArea {
                         radius,
                         radius));
                 if (((PointTableModel)vertexTable.getModel()).isAbsolute()) {
-                    AffineTransform at=AffineTransform.getTranslateInstance(getCenterXYPos().getX(), getCenterXYPos().getY());
+/*                    AffineTransform at=AffineTransform.getTranslateInstance(getCenterXYPos().getX(), getCenterXYPos().getY());
                     at.concatenate(affineTrans);
-                    selPath.transform(at);
+                    selPath.transform(at);*/
+                    selPath.transform(this.getShapeToPathTransform());
                 }
                 previewPanel.addPath(selPath,Color.RED,Color.RED);
             }
@@ -526,7 +527,7 @@ public class PolygonArea extends SampleArea {
     
     
     @Override
-    public SampleArea showConfigDialog(Rectangle2D layoutBounds) {
+    public BasicArea showConfigDialog(Rectangle2D layoutBounds) {
         JPanel optionPanel = new JPanel();
         GridLayout layout = new GridLayout(0,4);
         optionPanel.setLayout(layout);
@@ -758,7 +759,8 @@ public class PolygonArea extends SampleArea {
                     newValue=newValue/180*Math.PI;
                     if (newValue != Utils.getRotation(affineTrans)) {
                         PointTableModel model=(PointTableModel)pointTable.getModel();
-                        setAffineTransform(AffineTransform.getRotateInstance(newValue));
+                        //using (0/0) as anchor since translation to centerXYPos is dealt with independently
+                        setAffineTransform(AffineTransform.getRotateInstance(newValue,0,0));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
                         model.updateAllRows();
@@ -1008,22 +1010,25 @@ public class PolygonArea extends SampleArea {
     }*/
     
     protected void centerShape() {
+        if (shape==null || points==null) {
+            return;
+        }
         double cx=shape.getBounds2D().getCenterX();
         double cy=shape.getBounds2D().getCenterY();
-        //if properly centered, cx and cy should be 0
-        //if not we translate created shape to origin
+        //if properly centered, cx and cy are 0,
+        //if not we center of shape needs to be translated to origin
         AffineTransform at=new AffineTransform();
         at.translate(-cx, -cy);
         shape.transform(at);
+        //update vertex points
         for (Point2D p:points) {
             p.setLocation(p.getX()-cx, p.getY()-cy);
         }
-        //need to update offsetXYPos to ensure that the generalPath positioning remains unchanged
+        //need to update centerXYPos to ensure that the generalPath positioning remains unchanged
         Point2D centerOffset = new Point2D.Double(-cx,-cy);// shape translation vector
         //apply the affineTrans to shape shape translation vector
         affineTrans.transform(centerOffset, centerOffset);
-        //apply inverted translation vector
-//        setCenter(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());
+        //apply inverted adjusted translation vector
         centerXYPos=new Point2D.Double(centerXYPos.getX()-centerOffset.getX(),centerXYPos.getY()-centerOffset.getY());
     }
     /**
@@ -1044,7 +1049,7 @@ public class PolygonArea extends SampleArea {
     
     @Override
     public int supportedLayouts() {
-        return SampleArea.SUPPORT_CUSTOM_LAYOUT;
+        return BasicArea.SUPPORT_CUSTOM_LAYOUT;
     }
         
 }

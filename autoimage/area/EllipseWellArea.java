@@ -1,6 +1,6 @@
 package autoimage.area;
 
-import autoimage.api.SampleArea;
+import autoimage.api.BasicArea;
 import java.util.Comparator;
 
 /**
@@ -28,10 +28,10 @@ public class EllipseWellArea extends EllipseArea {
         return "Circular Well";
     }
     
-    public static Comparator<SampleArea> NameComparator = new Comparator<SampleArea>() {
+    public static Comparator<BasicArea> NameComparator = new Comparator<BasicArea>() {
 
         @Override
-	public int compare(SampleArea a1, SampleArea a2) {
+	public int compare(BasicArea a1, BasicArea a2) {
             String a1Name = a1.getName().toUpperCase();
             String a2Name = a2.getName().toUpperCase();
             int i=0;
@@ -66,7 +66,7 @@ public class EllipseWellArea extends EllipseArea {
 
     @Override
     public int supportedLayouts() {
-        return SampleArea.SUPPORT_WELLPLATE_LAYOUT;
+        return BasicArea.SUPPORT_WELLPLATE_LAYOUT;
     }
 
     
