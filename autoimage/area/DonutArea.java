@@ -3,7 +3,7 @@ package autoimage.area;
 import autoimage.api.BasicArea;
 import autoimage.Tile;
 import autoimage.Utils;
-import autoimage.gui.PreviewPanel;
+import autoimage.gui.AreaPreviewPanel;
 import ij.IJ;
 import java.awt.Dimension;
 import java.awt.GridLayout;
@@ -189,7 +189,7 @@ public class DonutArea extends TwoAxesArea {
         ringwidthField.setValue(new Double(ringWidth / 1000));
         optionPanel.add(ringwidthField);
         
-        final PreviewPanel previewPanel = new PreviewPanel(generalPath, getShapeBoundsDiagonale());
+        final AreaPreviewPanel previewPanel = new AreaPreviewPanel(generalPath, getShapeBoundsDiagonale());
         previewPanel.setPreferredSize(new Dimension (160,160));
         
         JPanel allPanels=new JPanel();
@@ -264,7 +264,7 @@ public class DonutArea extends TwoAxesArea {
                         setWidth(newValue);
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
-                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+                        previewPanel.setPath(generalPath, centerXYPos, getShapeBoundsDiagonale());
                         previewPanel.repaint();
                     }
                 }
@@ -281,7 +281,7 @@ public class DonutArea extends TwoAxesArea {
                         setHeight(newValue);
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
-                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+                        previewPanel.setPath(generalPath, centerXYPos, getShapeBoundsDiagonale());
                         previewPanel.repaint();
                     }
                 }
@@ -296,7 +296,7 @@ public class DonutArea extends TwoAxesArea {
                     double newValue = ((Number)ringwidthField.getValue()).doubleValue() * 1000;
                     if (newValue != ringWidth) {
                         setRingWidth(newValue);
-                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+                        previewPanel.setPath(generalPath, centerXYPos, getShapeBoundsDiagonale());
                         previewPanel.repaint();
                     }
                 }
@@ -316,7 +316,7 @@ public class DonutArea extends TwoAxesArea {
                         setAffineTransform(AffineTransform.getRotateInstance(newValue,0,0));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
-                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+                        previewPanel.setPath(generalPath, centerXYPos, getShapeBoundsDiagonale());
                         previewPanel.repaint();
                     }
                 }

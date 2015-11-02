@@ -1,11 +1,5 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package autoimage.gui;
 
-import ij.IJ;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -13,6 +7,7 @@ import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Path2D;
+import java.awt.geom.Point2D;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.JPanel;
@@ -21,29 +16,41 @@ import javax.swing.JPanel;
  *
  * @author Karsten Siller
  */
-public class PreviewPanel extends JPanel {
+public class AreaPreviewPanel extends JPanel {
 
-    protected List<Path2D> paths;
+    private List<Path2D> paths;
+    private Point2D center;
     private List<Color> colors;
     private List<Color> bgColors;
     private double pathDiagonale;
     
-    public PreviewPanel (Path2D path, double pathD) {
+    public AreaPreviewPanel (Path2D path, double pathD) {
         //create a copy to ensure that original path is not modifie by transforms in paintComponent method
         this.paths=new ArrayList<Path2D>();
+        this.center=new Point2D.Double(path.getBounds().getCenterX(),path.getBounds().getCenterY());
         this.paths.add(new Path2D.Double(path));
         this.pathDiagonale=pathD;
     }
     
     public void setPath(Path2D path, double pathD) {
         //create a copy to ensure that original path is not modifie by transforms in paintComponent method
-        this.setPath(path, Color.WHITE, Color.GRAY, pathD);
+        this.setPath(path, null, Color.WHITE, Color.GRAY, pathD);
     }
     
-    public void setPath(Path2D path, Color color, Color bgColor, double pathD) {
+    public void setPath(Path2D path, Point2D center, double pathD) {
+        //create a copy to ensure that original path is not modifie by transforms in paintComponent method
+        this.setPath(path, center, Color.WHITE, Color.GRAY, pathD);
+    }
+    
+    public void setPath(Path2D path, Point2D center, Color color, Color bgColor, double pathD) {
         //create a copy to ensure that original path is not modifie by transforms in paintComponent method
         paths=new ArrayList<Path2D>();
         paths.add(new Path2D.Double(path));
+        if (center!=null) {
+            this.center=center;
+        } else {
+            this.center=new Point2D.Double(path.getBounds().getCenterX(),path.getBounds().getCenterY());
+        }
         colors=new ArrayList<Color>();
         colors.add(color);
         bgColors=new ArrayList<Color>();
@@ -74,10 +81,10 @@ public class PreviewPanel extends JPanel {
         g2d.setColor(Color.black);
         g2d.fill(new Rectangle(0,0,this.getWidth(),this.getHeight()));
         g2d.setColor(Color.yellow);
-        g2d.drawLine((int)(this.getWidth()/2), 0, (int)(this.getWidth()/2), border);
-        g2d.drawLine((int)(this.getWidth()/2), (int)this.getHeight(), (int)(this.getWidth()/2), (int)this.getHeight()-border);
-        g2d.drawLine(0, (int)(this.getHeight()/2), border, (int)(this.getHeight()/2));
-        g2d.drawLine((int)this.getWidth()-border, (int)(this.getHeight()/2), (int)this.getWidth(), (int)(this.getHeight()/2));
+        g2d.drawLine((int)(this.getWidth()/2), 0, (int)(this.getWidth()/2), border/2);
+        g2d.drawLine((int)(this.getWidth()/2), (int)this.getHeight(), (int)(this.getWidth()/2), (int)this.getHeight()-border/2);
+        g2d.drawLine(0, (int)(this.getHeight()/2), border/2, (int)(this.getHeight()/2));
+        g2d.drawLine((int)this.getWidth()-border/2, (int)(this.getHeight()/2), (int)this.getWidth(), (int)(this.getHeight()/2));
         if (this.paths!=null && !this.paths.isEmpty()) {
             //create a copy to ensure that original path is not modifie by transforms in paintComponent method
             int index=0;
@@ -87,18 +94,15 @@ public class PreviewPanel extends JPanel {
             } else {
                 scale=Math.min((this.getWidth()-2*border)/paths.get(0).getBounds2D().getWidth(), (this.getHeight()-2*border)/paths.get(0).getBounds2D().getHeight());
             }
-            double translatex=paths.get(0).getBounds2D().getCenterX();
-            double translatey=paths.get(0).getBounds2D().getCenterY();
+//            double translatex=paths.get(0).getBounds2D().getCenterX();
+//            double translatey=paths.get(0).getBounds2D().getCenterY();
+            double translatex=center.getX();
+            double translatey=center.getY();
+            AffineTransform at=AffineTransform.getTranslateInstance(this.getWidth()/2,this.getHeight()/2);
+            at.concatenate(AffineTransform.getScaleInstance(scale, scale));
+            at.concatenate(AffineTransform.getTranslateInstance(-translatex, -translatey));
             for (Path2D p:paths) {
                 Path2D path=new Path2D.Double(p);
-                AffineTransform at=new AffineTransform();
-                at.translate(-translatex, -translatey);
-                path.transform(at);
-                at=new AffineTransform();
-                at.scale(scale,scale);
-                path.transform(at);
-                at=new AffineTransform();
-                at.translate(this.getWidth()/2,this.getHeight()/2);
                 path.transform(at);
                 if (bgColors!=null && index<bgColors.size()) {
                     if (bgColors.get(index)!=null) {

@@ -2,7 +2,7 @@ package autoimage.area;
 
 import autoimage.Utils;
 import autoimage.api.BasicArea;
-import autoimage.gui.PreviewPanel;
+import autoimage.gui.AreaPreviewPanel;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.geom.AffineTransform;
@@ -165,7 +165,7 @@ public abstract class TwoAxesArea extends BasicArea{
         rotationField.setValue(new Double(Utils.getRotation(affineTrans))/Math.PI*180);
         optionPanel.add(rotationField);
         
-        final PreviewPanel previewPanel = new PreviewPanel(generalPath, getShapeBoundsDiagonale());
+        final AreaPreviewPanel previewPanel = new AreaPreviewPanel(generalPath, getShapeBoundsDiagonale());
         previewPanel.setPreferredSize(new Dimension (160,160));
         
         JPanel allPanels=new JPanel();
@@ -241,7 +241,7 @@ public abstract class TwoAxesArea extends BasicArea{
 //                        centerXField.setValue(new Double(getCenterXYPos().getX()/1000));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
-                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+                        previewPanel.setPath(generalPath, centerXYPos, getShapeBoundsDiagonale());
                         previewPanel.repaint();
                     }
                 }
@@ -259,7 +259,7 @@ public abstract class TwoAxesArea extends BasicArea{
 //                        centerYField.setValue(new Double(getCenterXYPos().getY()/1000));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
-                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+                        previewPanel.setPath(generalPath, centerXYPos, getShapeBoundsDiagonale());
                         previewPanel.repaint();
                     }
                 }
@@ -279,7 +279,7 @@ public abstract class TwoAxesArea extends BasicArea{
                         setAffineTransform(AffineTransform.getRotateInstance(newValue, 0, 0));
                         topLeftXField.setValue(new Double(getTopLeftX()/1000));
                         topLeftYField.setValue(new Double(getTopLeftY()/1000));
-                        previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+                        previewPanel.setPath(generalPath, centerXYPos, getShapeBoundsDiagonale());
                         previewPanel.repaint();
                     }
                 }

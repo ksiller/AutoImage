@@ -4,7 +4,7 @@ import autoimage.api.BasicArea;
 import autoimage.Tile;
 import autoimage.Utils;
 import autoimage.gui.NumberTableCellRenderer;
-import autoimage.gui.PreviewPanel;
+import autoimage.gui.AreaPreviewPanel;
 import ij.IJ;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -58,7 +58,6 @@ import org.json.JSONObject;
 public class PolygonArea extends BasicArea {
 
     private List<Point2D> points;
-//    private Path2D polygon;
     
     protected final static String TAG_POINT_ARRAY = "POINT_ARRAY";
     protected final static String TAG_COORD_X = "COORD_X";
@@ -492,10 +491,10 @@ public class PolygonArea extends BasicArea {
         return list;
     }
 */    
-    private void updatePreviewPanel(JTable vertexTable, PreviewPanel previewPanel) {
+    private void updatePreviewPanel(JTable vertexTable, AreaPreviewPanel previewPanel) {
         IJ.log("updatePreviewPanel begin");
         if (((PointTableModel)vertexTable.getModel()).isAbsolute()) {
-            previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+            previewPanel.setPath(generalPath, centerXYPos, getShapeBoundsDiagonale());
         } else {
             previewPanel.setPath(shape, getShapeBoundsDiagonale());
         }
@@ -603,7 +602,7 @@ public class PolygonArea extends BasicArea {
         final JTable pointTable = new JTable(new PointTableModel(this,points));
         pointTable.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
         
-        final PreviewPanel previewPanel = new PreviewPanel(generalPath, getShapeBoundsDiagonale());
+        final AreaPreviewPanel previewPanel = new AreaPreviewPanel(generalPath, getShapeBoundsDiagonale());
         previewPanel.setPreferredSize(new Dimension (160,160));
 
         final JRadioButton absoluteButton = new JRadioButton("Absolute");

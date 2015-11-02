@@ -61,9 +61,10 @@ public abstract class BasicArea implements Shape {
     protected static double cameraRot = FieldOfView.ROTATION_UNKNOWN;//in radians relative to x-y stagePos axis, NOT layout
     protected static double stageToLayoutRot = 0; //in radians
     protected static boolean optimizedForCameraRotation = true;
-    protected List<Tile> tilePosList;//has absolute layout positions in um
-    protected int tileNumber;
-    protected int tilingStatus;
+    protected volatile List<Tile> tilePosList;//has absolute layout positions in um
+    protected volatile int tilingStatus;
+    private volatile boolean unknownTileNum; //is set when tilingmode is "runtime" or "file", or pixel tiles is not calibrated
+    private volatile int noOfClusters;
     protected int id; //unique identifier, reflects order of addition 
     protected int index; //index in arraylist of selected areas; required for metadata annotation 
     protected Point2D centerXYPos; //center cooridnates (in um) of shape in layout
@@ -76,8 +77,6 @@ public abstract class BasicArea implements Shape {
     protected boolean selectedForMerge;
     protected String comment;
     protected boolean acquiring;
-    private boolean unknownTileNum; //is set when tilingmode is "runtime" or "file", or pixel tiles is not calibrated
-    private int noOfClusters;
     
     public static final String[] PLATE_ROW_ALPHABET={"A","B","C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF"};
     public static final String[] PLATE_COL_ALPHABET=ColAlphabetFactory();
@@ -235,7 +234,7 @@ public abstract class BasicArea implements Shape {
      * 
      * @param b 
      */
-    public void setUnknownTileNum(boolean b) {
+    public synchronized void setUnknownTileNum(boolean b) {
         unknownTileNum=b;
     }
     
@@ -737,7 +736,7 @@ public abstract class BasicArea implements Shape {
     }
     
     
-    private synchronized int addTilesAroundSeed(int clusterNr,double seedX, double seedY, double fovX, double fovY, TilingSetting tSetting) {
+    private int addTilesAroundSeed(int clusterNr,double seedX, double seedY, double fovX, double fovY, TilingSetting tSetting) {
         Point2D tileOffset=BasicArea.calculateTileOffset(fovX, fovY, tSetting.getTileOverlap());
         Rectangle2D fovBounds=getFovBounds(fovX, fovY);
         double w;
@@ -1081,7 +1080,7 @@ public abstract class BasicArea implements Shape {
      * 
      * @return The number of tiles placed in the area. Returns 0 if the area's tilePosList is null. 
      */
-    public int getTileNumber() {
+    public synchronized int getTileNumber() {
         if (tilePosList!=null)
             return tilePosList.size();
         else return 0;
@@ -1137,7 +1136,7 @@ public abstract class BasicArea implements Shape {
      * @param aLayout The Layout that manages this area. It is needed to retrieve the AffineTransfrom function that converts layout to stage coordinates
      * @return A Micro-Manager compatible stage position list
      */
-    public PositionList addTilePositions(PositionList pl, ArrayList<JSONObject> posInfoL, String xyStageLabel, String zStageLabel, IAcqLayout aLayout) {
+    public synchronized PositionList addTilePositions(PositionList pl, ArrayList<JSONObject> posInfoL, String xyStageLabel, String zStageLabel, IAcqLayout aLayout) {
         if (pl==null)
             pl=new PositionList();
         for (Tile tile:tilePosList) {
@@ -1167,7 +1166,7 @@ public abstract class BasicArea implements Shape {
      * 
      * @return Current number of tiles placed in this area
      */
-    public List<Tile> getTilePositions() {
+    public synchronized List<Tile> getTilePositions() {
         return tilePosList;
     }
 

@@ -4,7 +4,7 @@ import autoimage.Tile;
 import autoimage.Utils;
 import autoimage.api.BasicArea;
 import autoimage.gui.NumberTableCellRenderer;
-import autoimage.gui.PreviewPanel;
+import autoimage.gui.AreaPreviewPanel;
 import autoimage.tools.LayoutManagerDlg;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -405,13 +405,13 @@ public class CompoundArea extends BasicArea {
     }
     
     /**
-     * Updates and forces repaint of a PreviewPanel object based on currently calculated this.generalPath and selected subarea in subarea table.
+     * Updates and forces repaint of a AreaPreviewPanel object based on currently calculated this.generalPath and selected subarea in subarea table.
      * @param shapeTable JTable object that contains list of all subareas
-     * @param previewPanel The PreviewPanel object to be updated
+     * @param previewPanel The AreaPreviewPanel object to be updated
      */
-    private void updatePreviewPanel(JTable shapeTable, PreviewPanel previewPanel) {
+    private void updatePreviewPanel(JTable shapeTable, AreaPreviewPanel previewPanel) {
         int[] rows=shapeTable.getSelectedRows();
-        previewPanel.setPath(generalPath, getShapeBoundsDiagonale());
+        previewPanel.setPath(generalPath, centerXYPos, getShapeBoundsDiagonale());
         for (int row:rows) {
             row=Math.min(shapeTable.convertRowIndexToModel(row), shapeTable.getRowCount()-1);
             BasicArea area=areas.get(shapeTable.convertRowIndexToModel(row));
@@ -509,7 +509,7 @@ public class CompoundArea extends BasicArea {
         final JTable shapeTable = new JTable(new AreaTableModel(areas));
         shapeTable.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
         
-        final PreviewPanel previewPanel = new PreviewPanel(generalPath, getShapeBoundsDiagonale());
+        final AreaPreviewPanel previewPanel = new AreaPreviewPanel(generalPath, getShapeBoundsDiagonale());
         previewPanel.setPreferredSize(new Dimension (160,160));
         
         JPanel modePanel = new JPanel();
