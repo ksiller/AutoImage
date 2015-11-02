@@ -54,8 +54,8 @@ public class AcqWellplateLayout extends AcqCustomLayout {
         wellDepth=configuration.wellDepth;
         wellDiameter=configuration.wellDiameter;
         wellDistance=configuration.wellDistance;
-        double oX=(double)configuration.distLeftEdgeToA1-configuration.wellDiameter/2;
-        double oY=(double)configuration.distTopEdgeToA1-configuration.wellDiameter/2;
+        double oX=(double)configuration.distLeftEdgeToA1;//-configuration.wellDiameter/2;
+        double oY=(double)configuration.distTopEdgeToA1;//-configuration.wellDiameter/2;
         initializeAreaList(columns*rows);
         int id=1;
         String wellName;
@@ -84,9 +84,9 @@ public class AcqWellplateLayout extends AcqCustomLayout {
             }    
         }
                  
-        addLandmark(new RefArea("Landmark 1",0,0,0,oX+wellDiameter/2,oY+wellDiameter/2,0,512,512,"landmark_1.tif")); //expects stage then layout coords
-        addLandmark(new RefArea("Landmark 2",(columns-1)*wellDistance,0,0,oX+wellDiameter/2+(columns-1)*wellDistance,oY+wellDiameter/2,0,512,512,"landmark_2.tif")); //expects stage then layout coords
-        addLandmark(new RefArea("Landmark 3",0,(rows-1)*wellDistance,0,oX+wellDiameter/2,oY+wellDiameter/2+(rows-1)*wellDistance,0,512,512,"landmark_3.tif")); //expects stage then layout coords
+        addLandmark(new RefArea("Landmark 1",0,0,0,oX,oY,0,512,512,"landmark_1.tif")); //expects stage then layout coords
+        addLandmark(new RefArea("Landmark 2",(columns-1)*wellDistance,0,0,oX+(columns-1)*wellDistance,oY,0,512,512,"landmark_2.tif")); //expects stage then layout coords
+        addLandmark(new RefArea("Landmark 3",0,(rows-1)*wellDistance,0,oX,oY+(rows-1)*wellDistance,0,512,512,"landmark_3.tif")); //expects stage then layout coords
     }
     
     @Override

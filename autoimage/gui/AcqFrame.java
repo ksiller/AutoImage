@@ -1555,12 +1555,10 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         layoutScrollPane.setRowHeaderView(layoutRowHeader);
         layoutRowHeader.addListener((LayoutScrollPane)layoutScrollPane);
         layoutColumnHeader.addListener((LayoutScrollPane)layoutScrollPane);
-        JLabel cornerLabel=new JLabel("mm");
-        cornerLabel.setFont(new Font("Arial", Font.PLAIN, 12));
-        JPanel cornerPanel=new JPanel();
-        cornerPanel.add(cornerLabel);
-        layoutScrollPane.setCorner(JScrollPane.UPPER_LEFT_CORNER, cornerPanel);
-        
+//        JLabel cornerLabel=new JLabel(acqLayout instanceof AcqWellplateLayout ? "Well":"mm");
+//        cornerLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+//        layoutScrollPane.setCorner(JScrollPane.UPPER_LEFT_CORNER, cornerLabel);
+                
         acqModePane.setTabComponentAt(1, createAfPaneTab());
         acqModePane.setTabComponentAt(2, createZStackPaneTab());
         acqModePane.setTabComponentAt(3, createTimelapsePaneTab());
@@ -1756,7 +1754,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         //load last settings
         expSettingsFile = new File(Prefs.getHomeDir(),"LastExpSettings.txt");
         loadExpSettings(expSettingsFile, true);
-
+        
         //format acgSettingTable
         acqSettingTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         acqSettingTable.getSelectionModel().setSelectionInterval(0, 0);
@@ -5458,6 +5456,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 
                 newAreaButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
                 newRectangleButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
+                newEllipseButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
                 newPolygonButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
                 removeAreaButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaRemovalAllowed());
                 mergeAreasButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaMergingAllowed());
@@ -5482,8 +5481,10 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 calcTilePositions(null, currentAcqSetting, ADJUSTING_SETTINGS);
                 Rectangle r = layoutScrollPane.getViewportBorderBounds();                
                 ((LayoutPanel) acqLayoutPanel).calculateScale(r.width, r.height);
-                
+
+                JLabel cornerLabel;
                 if (acqLayout instanceof AcqWellplateLayout) {
+                    cornerLabel=new JLabel("Well");
                     layoutColumnHeader = new AcqWellplateRule(SwingConstants.HORIZONTAL);
                     layoutRowHeader = new AcqWellplateRule(SwingConstants.VERTICAL);
                     AcqWellplateLayout plate=(AcqWellplateLayout)acqLayout;
@@ -5494,9 +5495,12 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                     ((AcqWellplateRule)layoutRowHeader).setWellDistance(plate.getWellDistance());
                     ((AcqWellplateRule)layoutRowHeader).setNoOfItems(plate.getRows());
                 } else {
+                    cornerLabel=new JLabel("mm");
                     layoutColumnHeader = new AcqCustomRule(SwingConstants.HORIZONTAL);
                     layoutRowHeader = new AcqCustomRule(SwingConstants.VERTICAL);
                 }
+                cornerLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+                layoutScrollPane.setCorner(JScrollPane.UPPER_LEFT_CORNER, cornerLabel);
                 layoutScrollPane.setColumnHeaderView(layoutColumnHeader);
                 layoutScrollPane.setRowHeaderView(layoutRowHeader);
                 layoutRowHeader.addListener((LayoutScrollPane)layoutScrollPane);
@@ -8683,6 +8687,9 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 layoutColumnHeader = new AcqCustomRule(SwingConstants.HORIZONTAL);
                 layoutRowHeader = new AcqCustomRule(SwingConstants.VERTICAL);
             }
+            JLabel cornerLabel = new JLabel(acqLayout instanceof AcqWellplateLayout ? "Well":"mm");
+            cornerLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+            layoutScrollPane.setCorner(JScrollPane.UPPER_LEFT_CORNER, cornerLabel);
             layoutScrollPane.setColumnHeaderView(layoutColumnHeader);
             layoutScrollPane.setRowHeaderView(layoutRowHeader);
             layoutColumnHeader.addListener((LayoutScrollPane)layoutScrollPane);                

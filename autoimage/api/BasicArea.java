@@ -36,8 +36,8 @@ public abstract class BasicArea implements Shape {
     public static final String TAG_NAME = "NAME";
     public static final String TAG_ID="ID";
     public static final String TAG_COMMENT = "COMMENT";
-    public static final String TAG_TOP_LEFT_X = "TOP_LEFT_X";
-    public static final String TAG_TOP_LEFT_Y = "TOP_LEFT_Y";
+//    public static final String TAG_TOP_LEFT_X = "TOP_LEFT_X";
+//    public static final String TAG_TOP_LEFT_Y = "TOP_LEFT_Y";
     public static final String TAG_CENTER_X = "CENTER_X";
     public static final String TAG_CENTER_Y = "CENTER_Y";
     public static final String TAG_BOUNDS_WIDTH = "BOUNDS_WIDTH";   

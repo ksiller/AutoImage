@@ -33,10 +33,10 @@ public interface IAcqLayout {
     public final static String TAG_LAYOUT = "LAYOUT";
     public final static String TAG_LAYOUT_BOTTOM_MATERIAL = "BOTTOM_MATERIAL";
     public final static String TAG_LAYOUT_BOTTOM_THICKNESS = "BOTTOM_THICKNESS";
-    public final static String TAG_LAYOUT_COORD_X = "LAYOUT_COORD_X";
-    public final static String TAG_LAYOUT_COORD_Y = "LAYOUT_COORD_Y";
-    public final static String TAG_LAYOUT_COORD_Z = "LAYOUT_COORD_Z";
-    //    public static final String TAG_REF_IMAGE_FILE="REF_IMAGE_FILE";
+//    public final static String TAG_LAYOUT_COORD_X = "LAYOUT_COORD_X";
+//    public final static String TAG_LAYOUT_COORD_Y = "LAYOUT_COORD_Y";
+//    public final static String TAG_LAYOUT_COORD_Z = "LAYOUT_COORD_Z";
+//    public static final String TAG_REF_IMAGE_FILE="REF_IMAGE_FILE";
     public final static String TAG_LAYOUT_HEIGHT = "LAYOUT_HEIGHT";
     public final static String TAG_LAYOUT_LENGTH = "LAYOUT_LENGTH";
     public final static String TAG_LAYOUT_WIDTH = "LAYOUT_WIDTH";

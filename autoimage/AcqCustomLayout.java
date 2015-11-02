@@ -954,8 +954,8 @@ public class AcqCustomLayout extends AcqBasicLayout {
         XMLUtils.wStartElement(xtw, BasicArea.TAG_AREA);
             XMLUtils.writeLine(xtw, BasicArea.TAG_CLASS, a.getClass().getName());
             XMLUtils.writeLine(xtw, BasicArea.TAG_NAME, a.getName());
-            XMLUtils.writeLine(xtw, BasicArea.TAG_TOP_LEFT_X, java.lang.Double.toString(a.getTopLeftX()));
-            XMLUtils.writeLine(xtw, BasicArea.TAG_TOP_LEFT_Y, java.lang.Double.toString(a.getTopLeftY()));
+//            XMLUtils.writeLine(xtw, BasicArea.TAG_TOP_LEFT_X, java.lang.Double.toString(a.getTopLeftX()));
+//            XMLUtils.writeLine(xtw, BasicArea.TAG_TOP_LEFT_Y, java.lang.Double.toString(a.getTopLeftY()));
             XMLUtils.writeLine(xtw, BasicArea.TAG_CENTER_X, java.lang.Double.toString(a.getCenterXYPos().getX()));
             XMLUtils.writeLine(xtw, BasicArea.TAG_CENTER_Y, java.lang.Double.toString(a.getCenterXYPos().getY()));
             XMLUtils.writeLine(xtw, BasicArea.TAG_BOUNDS_WIDTH, java.lang.Double.toString(a.getBounds().getWidth()));
