@@ -2,6 +2,7 @@ package autoimage.dataprocessors;
 
 import autoimage.api.ExtImageTags;
 import autoimage.FieldOfView;
+import autoimage.ImgUtils;
 import autoimage.MMCoreUtils;
 import autoimage.Utils;
 import ij.IJ;
@@ -191,7 +192,7 @@ public class StitchCluster extends GroupProcessor<File> {
                         String sourceImagePath=group.elements.get(0).getParent();
                         sourceImagePath=new File (sourceImagePath).getParent();
                         try {
-                            JSONObject meta=MMCoreUtils.parseMetadataFromFile(group.elements.get(0));
+                            JSONObject meta=ImgUtils.parseMetadataFromFile(group.elements.get(0));
                             JSONObject summary=meta.getJSONObject(MMTags.Root.SUMMARY);
                             double cameraRot=summary.getDouble(ExtImageTags.DETECTOR_ROTATION);
                             String prefix = meta.getString(ExtImageTags.AREA_NAME);
@@ -250,7 +251,7 @@ public class StitchCluster extends GroupProcessor<File> {
                                         break;
 
                                     IJ.log("    "+Integer.toString(i)+": "+e.getAbsolutePath());
-                                    meta=MMCoreUtils.parseMetadataFromFile(e);
+                                    meta=ImgUtils.parseMetadataFromFile(e);
                                     //need to convert from um into pixel coords if using grid stitching plugin
                                     Long sliceIndex=meta.getLong(MMTags.Image.SLICE_INDEX);
                                     double xUM=meta.getDouble(MMTags.Image.XUM)/pixSize;
@@ -298,7 +299,7 @@ public class StitchCluster extends GroupProcessor<File> {
                                         yMax=yUM > yMax?yUM:yMax;
                                     }
                                     String path=e.getParent();
-                                  //  renameMetadataFile(path,"metadata.txt","metadata_backup");
+                                  //  renameMetadataFile(roiPath,"metadata.txt","metadata_backup");
                                     path=new File(path).getName();
                                     if (dim==2) {
                                         line = new File(path,e.getName()).getPath() + "; ; (" + Double.toString(xUM) + ", " + Double.toString(yUM) + ")\n";

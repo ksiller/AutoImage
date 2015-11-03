@@ -536,7 +536,7 @@
                                           <Group type="102" attributes="0">
                                               <Component id="tileSizeLabel" min="-2" pref="177" max="-2" attributes="0"/>
                                               <EmptySpace type="unrelated" max="-2" attributes="0"/>
-                                              <Component id="clearRoiButton" min="-2" pref="22" max="-2" attributes="0"/>
+                                              <Component id="refreshRoiButton" min="-2" pref="22" max="-2" attributes="0"/>
                                           </Group>
                                           <Group type="102" attributes="0">
                                               <Component id="jLabel34" min="-2" max="-2" attributes="0"/>
@@ -599,7 +599,7 @@
                               </Group>
                               <EmptySpace min="-2" pref="2" max="-2" attributes="0"/>
                               <Group type="103" groupAlignment="0" attributes="0">
-                                  <Component id="clearRoiButton" min="-2" pref="22" max="-2" attributes="0"/>
+                                  <Component id="refreshRoiButton" min="-2" pref="22" max="-2" attributes="0"/>
                                   <Group type="103" groupAlignment="3" attributes="0">
                                       <Component id="jLabel12" alignment="3" min="-2" max="-2" attributes="0"/>
                                       <Component id="pixelSizeLabel" alignment="3" min="-2" max="-2" attributes="0"/>
@@ -919,7 +919,7 @@
                         <Property name="text" type="java.lang.String" value="x"/>
                       </Properties>
                     </Component>
-                    <Component class="javax.swing.JButton" name="clearRoiButton">
+                    <Component class="javax.swing.JButton" name="refreshRoiButton">
                       <Properties>
                         <Property name="font" type="java.awt.Font" editor="org.netbeans.beaninfo.editors.FontEditor">
                           <Font name="Arial" size="10" style="0"/>
@@ -929,7 +929,7 @@
                         </Property>
                       </Properties>
                       <Events>
-                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="clearRoiButtonActionPerformed"/>
+                        <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="refreshRoiButtonActionPerformed"/>
                       </Events>
                     </Component>
                     <Component class="javax.swing.JButton" name="closeGapsButton">

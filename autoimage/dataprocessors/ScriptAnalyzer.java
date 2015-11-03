@@ -1,5 +1,6 @@
 package autoimage.dataprocessors;
 
+import autoimage.ImgUtils;
 import autoimage.api.ExtImageTags;
 import autoimage.api.ImageFileQueue;
 import autoimage.MMCoreUtils;
@@ -144,7 +145,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
             return filename;
         }
         try {
-            JSONObject meta=MMCoreUtils.parseMetadataFromFile(files.get(0));
+            JSONObject meta=ImgUtils.parseMetadataFromFile(files.get(0));
             String area = meta.getString(ExtImageTags.AREA_NAME);
             String cluster=Long.toString(meta.getLong(ExtImageTags.CLUSTER_INDEX));
             String site=Long.toString(meta.getLong(ExtImageTags.SITE_INDEX));

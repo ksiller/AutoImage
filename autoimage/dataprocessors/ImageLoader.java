@@ -1,5 +1,6 @@
 package autoimage.dataprocessors;
 
+import autoimage.ImgUtils;
 import autoimage.api.ExtImageTags;
 import autoimage.MMCoreUtils;
 import ij.IJ;
@@ -81,7 +82,7 @@ public class ImageLoader extends ExtDataProcessor<TaggedImage> {
                     ImagePlus imp=IJ.openImage(path.getAbsolutePath());
 //                    element=org.micromanager.utils.ImageUtils.makeTaggedImage(imp.getProcessor);
 //                    element.tags=new JSONObject(element.tags.toString());
-                    element=MMCoreUtils.createTaggedImage(imp, new JSONObject(element.tags.toString()));
+                    element=ImgUtils.createTaggedImage(imp, new JSONObject(element.tags.toString()));
                 } catch (JSONException ex) {
                     IJ.log(this.getClass().getName()+": "+ex.getMessage());
                     Logger.getLogger(ImageLoader.class.getName()).log(Level.SEVERE, null, ex);

@@ -1,5 +1,6 @@
 package autoimage.dataprocessors;
 
+import autoimage.ImgUtils;
 import autoimage.api.ImageFileQueue;
 import autoimage.MMCoreUtils;
 import ij.IJ;
@@ -167,7 +168,7 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
             try {
                 String newPrefix=new File(workDir).getName();
                 String newDir=new File(workDir).getParentFile().getAbsolutePath();
-                TaggedImage ti=MMCoreUtils.openAsTaggedImage(((File)element).getAbsolutePath());
+                TaggedImage ti=ImgUtils.openAsTaggedImage(((File)element).getAbsolutePath());
                 //update metadata
                 if (savesImageCopy) {
                     //this is the current default
@@ -197,7 +198,7 @@ public abstract class BranchedProcessor<E> extends ExtDataProcessor<E> {
             }
        } else if (element instanceof TaggedImage) {
             try {                
-                TaggedImage ti=MMCoreUtils.duplicateTaggedImage((TaggedImage)element);
+                TaggedImage ti=ImgUtils.duplicateTaggedImage((TaggedImage)element);
                 ti.tags=updateTagValue(ti.tags,null,null, true);
                 copy=(E)ti;
             } catch (JSONException ex) {

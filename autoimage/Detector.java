@@ -88,6 +88,10 @@ public class Detector  {
         setBinningOptions(bin);
     }
     
+    public String getLabel() {
+        return label;
+    }
+    
     private String[] parseBinningDesc(Map<String,Integer> binning) {
         if (binning!=null) {
             String[] b=new String[binning.size()];

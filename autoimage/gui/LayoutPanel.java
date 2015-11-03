@@ -25,6 +25,7 @@ import java.awt.LinearGradientPaint;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.Shape;
 import java.awt.Stroke;
 import java.awt.Toolkit;
 import java.awt.geom.AffineTransform;
@@ -521,15 +522,22 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         FieldOfView fov=cAcqSetting.getFieldOfView();
         AffineTransform oldTransform=g2d.getTransform();
 
-        Point2D fullChipOrigin=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(
+        Point2D fullChipCenter=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(
                 currentStagePos_X ,
                 currentStagePos_Y ));            
-        int x=(int)Math.round((fullChipOrigin.getX()- fov.getFullWidth_UM(objPixSize)/2));
-        int y=(int)Math.round((fullChipOrigin.getY()- fov.getFullHeight_UM(objPixSize)/2));
+/*        int x=(int)Math.round((fullChipCenter.getX()- fov.getFullWidth_UM(objPixSize)/2));
+        int y=(int)Math.round((fullChipCenter.getY()- fov.getFullHeight_UM(objPixSize)/2));
         int w=(int)Math.ceil(fov.getFullWidth_UM(objPixSize));
         int h=(int)Math.ceil(fov.getFullHeight_UM(objPixSize));
-
-        g2d.translate(x+w/2, y+h/2);
+*/
+        g2d.setColor(COLOR_FOV);
+        AffineTransform roiTrans=AffineTransform.getTranslateInstance(fullChipCenter.getX(),fullChipCenter.getY());
+        fov.createFullChipPath(objPixSize);
+        Shape roi=roiTrans.createTransformedShape(fov.getFullChipPath());
+        g2d.draw(roi);
+        
+        
+/*        g2d.translate(x+w/2, y+h/2);
         g2d.rotate(acqLayout.getStageToLayoutRot());
         if (fov.getFieldRotation() != FieldOfView.ROTATION_UNKNOWN) {
             g2d.rotate(-fov.getFieldRotation());
@@ -541,10 +549,10 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         Point2D offset_UM=fov.getRoiOffset_UM(objPixSize);
         Point2D roiOrigin=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(
                 currentStagePos_X ,
-                currentStagePos_Y ));
+                currentStagePos_Y ));*/
         Composite oldComposite=g2d.getComposite();
         g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,0.5f));
-        Point2D lpoint=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(currentStagePos_X- fov.getFullWidth_UM(objPixSize)/2 + offset_UM.getX()
+/*        Point2D lpoint=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(currentStagePos_X- fov.getFullWidth_UM(objPixSize)/2 + offset_UM.getX()
                 ,currentStagePos_Y- fov.getFullHeight_UM(objPixSize)/2 + offset_UM.getY()));
         x=(int)Math.round((roiOrigin.getX()- fov.getFullWidth_UM(objPixSize)/2 + offset_UM.getX()));
         y=(int)Math.round((roiOrigin.getY()- fov.getFullHeight_UM(objPixSize)/2 + offset_UM.getY()));
@@ -552,6 +560,11 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         h=(int)Math.ceil(fov.getRoiHeight_UM(objPixSize));
 
         g2d.fillRect(x,y,w,h);
+*/      
+        fov.createRoiPath(objPixSize);
+        roi=roiTrans.createTransformedShape(fov.getRoiPath());
+        g2d.fill(roi);
+
         g2d.setComposite(oldComposite);
         g2d.setTransform(oldTransform);
         g2d.setStroke(SOLID_STROKE);

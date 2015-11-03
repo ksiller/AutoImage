@@ -2,7 +2,12 @@ package autoimage;
 
 import ij.IJ;
 import java.awt.Rectangle;
+import java.awt.Shape;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.Path2D;
+import java.awt.geom.PathIterator;
 import java.awt.geom.Point2D;
+import java.awt.geom.Rectangle2D;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -10,7 +15,7 @@ import org.json.JSONObject;
  *
  * @author Karsten
  */
-public class FieldOfView {
+public class FieldOfView implements Shape {
     
 //    protected final static String TAG_FULL_WIDTH_PIXEL = "FOV_WIDTH_PIXEL";
 //    protected final static String TAG_FULL_HEIGHT_PIXEL = "FOV_HEIGHT_PIXEL";
@@ -23,18 +28,39 @@ public class FieldOfView {
     protected int fullChipWidth_Pixel;  //camera: full chip pixel x
     protected int fullChipHeight_Pixel; //camera: full chip pixel y
     protected double fieldRotation; //radians
-   // protected Rectangle roi_Pixel_bin;
+    protected AffineTransform fieldTransform;
+    protected Path2D roiPath;
+    protected Path2D fullChipPath;
     protected Rectangle unbinnedRoi_Pixel;
 
-        
-    public FieldOfView(int pixX, int pixY, double fieldRot) {
-        this(pixX,pixY,null,fieldRot);
+    /**
+     * 
+     * @param fullPixX number of pixels on detector along x-axis
+     * @param fullPixY number of pixels on detector along y-axis
+     * @param fieldRot rotation of detector field-of-view relative to stage x-y coordinate system
+     */    
+    public FieldOfView(int fullPixX, int fullPixY, double fieldRot) {
+        this(fullPixX,fullPixY,null,fieldRot);
     }
 
-    public FieldOfView(int pixX, int pixY) {
-        this(pixX, pixY, null, ROTATION_UNKNOWN);
+    
+    /**
+     * 
+     * @param fullPixX number of pixels on detector along x-axis
+     * @param fullPixY number of pixels on detector along y-axis 
+     */
+    public FieldOfView(int fullPixX, int fullPixY) {
+        this(fullPixX, fullPixY, null, ROTATION_UNKNOWN);
     }
     
+    
+    /**
+     * 
+     * @param fullPixX number of pixels on detector along x-axis
+     * @param fullPixY number of pixels on detector along y-axis
+     * @param unbinnedRoi_Pix roi definition of detector in pixel coordinates
+     * @param fieldRot rotation of detector field-of-view relative to stage x-y coordinate system
+     */
     public FieldOfView (int fullPixX, int fullPixY, Rectangle unbinnedRoi_Pix, double fieldRot) {
         fullChipWidth_Pixel=fullPixX;
         fullChipHeight_Pixel=fullPixY;
@@ -46,7 +72,12 @@ public class FieldOfView {
         }
     }
     
-    //loads Roi for field of view from file. 
+    
+    /**
+     * Loads Roi for field of view from file. 
+     * 
+     * @param fovObj JSONObject containing fov properties
+     */ 
     public FieldOfView(JSONObject fovObj) throws JSONException {
         this(0,0,0);
         int x=fovObj.getInt(TAG_ROI_X_PIXEL);
@@ -56,113 +87,182 @@ public class FieldOfView {
         unbinnedRoi_Pixel = new Rectangle(x,y,width,height);
     }
     
+    
+    /**
+     * Initializes a new FieldOfView object with values of an existing FieldOfView object
+     * @param fov the FieldOfView object that serves as template
+     */
     public FieldOfView (FieldOfView fov) {
-        this (fov.fullChipWidth_Pixel,fov.fullChipHeight_Pixel, fov.unbinnedRoi_Pixel, fov.fieldRotation);
+        this (fov.fullChipWidth_Pixel,
+                fov.fullChipHeight_Pixel, 
+                new Rectangle(fov.unbinnedRoi_Pixel), 
+                fov.fieldRotation);
     }
     
+    
+    /**
+     * Writes all relevant FieldOfView properties into a JSONObject
+     * @return JSONObject containing properties that describe this object  
+     * @throws JSONException 
+     */
     public JSONObject toJSONObject() throws JSONException {
         JSONObject fovObject = new JSONObject();
-        fovObject.put(TAG_ROI_X_PIXEL, unbinnedRoi_Pixel!=null ? unbinnedRoi_Pixel.x : 0);
-        fovObject.put(TAG_ROI_Y_PIXEL, unbinnedRoi_Pixel!=null ? unbinnedRoi_Pixel.y : 0);
-        fovObject.put(TAG_ROI_WIDTH_PIXEL, unbinnedRoi_Pixel!=null ? unbinnedRoi_Pixel.width : fullChipWidth_Pixel);
-        fovObject.put(TAG_ROI_HEIGHT_PIXEL, unbinnedRoi_Pixel!=null ? unbinnedRoi_Pixel.height : fullChipHeight_Pixel);
+        fovObject.put(TAG_ROI_X_PIXEL, unbinnedRoi_Pixel!=null ? unbinnedRoi_Pixel.getX() : 0);
+        fovObject.put(TAG_ROI_Y_PIXEL, unbinnedRoi_Pixel!=null ? unbinnedRoi_Pixel.getY() : 0);
+        fovObject.put(TAG_ROI_WIDTH_PIXEL, unbinnedRoi_Pixel!=null ? unbinnedRoi_Pixel.getWidth() : fullChipWidth_Pixel);
+        fovObject.put(TAG_ROI_HEIGHT_PIXEL, unbinnedRoi_Pixel!=null ? unbinnedRoi_Pixel.getHeight() : fullChipHeight_Pixel);
         return fovObject;
     }
     
+    
+    /**
+     * Returns this detector's rotation angle relative to x-y stage coordinate system
+     * @return rotation angle (in rad)
+     */
     public double getFieldRotation() {
         return fieldRotation;
     }
     
+    
+    /**
+     * sets this detector's rotation angle relative to to x-y stage coordinate system
+     * @param angle rotation angle (in rad)
+     */
     public void setFieldRotation(double angle) {
         fieldRotation=angle;
     }
 
+    
+    /**
+     * Converts the field-of-view x-axis dimension from pixel into microns.
+     * 
+     * @param objPixSize The pixel size, e.g. based on chosen objective
+     * @return Width of the full chip's field-of-view in micron 
+     */
     public double getFullWidth_UM(double objPixSize) {
         return fullChipWidth_Pixel*objPixSize;    
     }
 
     
+    /**
+     * Converts the field-of-view y-axis dimension from pixel into microns.
+     * 
+     * @param objPixSize The pixel size, e.g. based on chosen objective
+     * @return Width of the full chip's field-of-view in micron 
+     */
     public double getFullHeight_UM(double objPixSize) {
         return fullChipHeight_Pixel*objPixSize;    
     }
 
-    public void setFullWidth_Pixel(int pixX) {
-        fullChipWidth_Pixel=pixX;
+    
+    /** 
+     * Set the full width of the field-of-view in pixel dimension.
+     * 
+     * @param fullPixX number of pixels along x-axis
+     */
+    public void setFullWidth_Pixel(int fullPixX) {
+        fullChipWidth_Pixel=fullPixX;
         //ensure that roi width <= full width
-        if (unbinnedRoi_Pixel!=null)
-            unbinnedRoi_Pixel.width=Math.min(pixX, unbinnedRoi_Pixel.width);
+        if (unbinnedRoi_Pixel!=null) {
+            unbinnedRoi_Pixel.width=Math.min(fullPixX, unbinnedRoi_Pixel.width);
+        }    
     }
 
-    public void setFullHeight_Pixel(int pixY) {
-        fullChipHeight_Pixel=pixY;    
+    
+    /** 
+     * Set the full height of the field-of-view in pixel dimension.
+     * 
+     * @param fullPixY number of pixels along y-axis
+     */
+    public void setFullHeight_Pixel(int fullPixY) {
+        fullChipHeight_Pixel=fullPixY;    
          //ensure that roi height <= full height
-        if (unbinnedRoi_Pixel!=null)
-            unbinnedRoi_Pixel.height=Math.min(pixY, unbinnedRoi_Pixel.height);
+        if (unbinnedRoi_Pixel!=null) {
+            unbinnedRoi_Pixel.height=Math.min(fullPixY, unbinnedRoi_Pixel.height);
+        }    
     }
 
-    public void setFullSize_Pixel(int width, int height) {
-        setFullWidth_Pixel(width);
-        setFullHeight_Pixel(height);
+    
+    /** 
+     * Set the full width and height of the field-of-view in pixel dimension.
+     * 
+     * @param fullPixX number of pixels along x-axis
+     * @param fullPixY number of pixels along y-axis
+     */
+    public void setFullSize_Pixel(int fullPixX, int fullPixY) {
+        setFullWidth_Pixel(fullPixX);
+        setFullHeight_Pixel(fullPixY);
     }
     
     
+    /**
+     * Converts the current ROI width from pixel into microns.
+     * 
+     * @param objPixSize The pixel size, e.g. based on chosen objective
+     * @return Width of the ROI's in micron 
+     */    
     public double getRoiWidth_UM(double objPixSize) {
         if (unbinnedRoi_Pixel==null)
             return fullChipWidth_Pixel*objPixSize;
-        return Math.min(fullChipWidth_Pixel,unbinnedRoi_Pixel.width)*objPixSize;
+        return Math.min(fullChipWidth_Pixel,unbinnedRoi_Pixel.getWidth())*objPixSize;
     }
     
+    
+    /**
+     * Converts the current ROI width from pixel into microns.
+     * 
+     * @param objPixSize The pixel size, e.g. based on chosen objective
+     * @return Width of the ROI's in micron 
+     */    
     public double getRoiHeight_UM(double objPixSize) {
         if (unbinnedRoi_Pixel==null)
             return fullChipHeight_Pixel*objPixSize;
-        return Math.min(fullChipHeight_Pixel,unbinnedRoi_Pixel.height)*objPixSize;
+        return Math.min(fullChipHeight_Pixel,unbinnedRoi_Pixel.getHeight())*objPixSize;
     }
 
-    //roi in binned pixel dimensions as obtained by core.getROI()
-    //binning used to project to unbinned roi
-    public void setRoi_Pixel(Rectangle roi, int binning) {
-        if (roi==null) {
+    /**
+     * Sets the unbinned ROI for this field-of-view. 
+     * The binnedRoi rectangle corresponds to the Rectangle object obtained by core.getROI().  
+     * 
+     * @param binnedRoi Rectangle defining ROI in pixel coordinates after binning
+     * @param binning binning factor; set to 1 if this is an unbinned ROI
+     */
+    public void setRoi_Pixel(Rectangle binnedRoi, int binning) {
+        if (binnedRoi==null) {
             unbinnedRoi_Pixel=null;
             return;
         }
-        unbinnedRoi_Pixel.x=Math.min(roi.x*binning,fullChipWidth_Pixel-1);
-        unbinnedRoi_Pixel.y=Math.min(roi.y*binning,fullChipHeight_Pixel-1);
-        setRoiWidth_Pixel(roi.width,binning);
-        setRoiHeight_Pixel(roi.height,binning);
+        int x=(int)Math.min(binnedRoi.x*binning,fullChipWidth_Pixel-1);
+        int y=(int)Math.min(binnedRoi.y*binning,fullChipHeight_Pixel-1);
+        unbinnedRoi_Pixel=new Rectangle(
+            x,
+            y,
+            Math.min(fullChipWidth_Pixel-x,binnedRoi.width*binning),
+            Math.min(fullChipHeight_Pixel-y, binnedRoi.height*binning));
     }
   
-    //roiWidth in binned pixel as obtained by core.getROI()
-    //binning used to project to unbinned roi
-    public void setRoiWidth_Pixel(int roiWidth, int binning) {
-        if (roiWidth <= 0)
-            return;
-        if (unbinnedRoi_Pixel==null) {
-            unbinnedRoi_Pixel=new Rectangle(0,0,Math.min(fullChipWidth_Pixel,roiWidth*binning),fullChipHeight_Pixel);
-        } else
-            unbinnedRoi_Pixel.width=Math.min(fullChipWidth_Pixel-unbinnedRoi_Pixel.x,roiWidth*binning);
-    }
 
-    //roiHeight in binned pixel as obtained by core.getROI()
-    //binning used to project to unbinned roi
-    public void setRoiHeight_Pixel(int roiHeight, int binning) {
-        if (roiHeight <= 0)
-            return;
-        if (unbinnedRoi_Pixel==null)
-            unbinnedRoi_Pixel=new Rectangle(0,0,fullChipWidth_Pixel,Math.min(fullChipHeight_Pixel, roiHeight*binning));
-        else
-            unbinnedRoi_Pixel.height=Math.min(fullChipHeight_Pixel-unbinnedRoi_Pixel.y,roiHeight*binning);
-    }
-
+    /**
+     * Calculates the Roi rectangle (in pixel) for a particular binning condition.
+     * 
+     * @param binning the binning factor
+     * @return Rectangle in pixel dimension describing the roi with consideration of the passed binning factor
+     */
     public Rectangle getROI_Pixel(int binning) {
-        if (unbinnedRoi_Pixel == null)
+        if (unbinnedRoi_Pixel == null) {
             return null;
-        else
+        } else {
             return new Rectangle(unbinnedRoi_Pixel.x/binning,
                     unbinnedRoi_Pixel.y/binning,
                     unbinnedRoi_Pixel.width/binning,
                     unbinnedRoi_Pixel.height/binning);
+        }    
     }
     
+    
+    /**
+     * Retains the current roi width and height but translates the roi's origin (top left corner) such that the is centered. 
+     */
     public void centerRoi() {
         if (unbinnedRoi_Pixel==null)
             return;
@@ -170,11 +270,18 @@ public class FieldOfView {
         unbinnedRoi_Pixel.y=(int)Math.round(((double)fullChipHeight_Pixel - unbinnedRoi_Pixel.height)/2);
     }
     
+    /**
+     * 
+     * @return True if no roi is set or the roi's width and height equal width and height of this full size field-of-view  
+     */
     public boolean isFullSize() {
         return (unbinnedRoi_Pixel==null || (unbinnedRoi_Pixel.width == fullChipWidth_Pixel && unbinnedRoi_Pixel.height == fullChipHeight_Pixel));
     }
     
     
+    /**
+     * Sets the roi such that its width and height corresponds to this full size field-of-view
+     */
     public void clearROI() {
         unbinnedRoi_Pixel=new Rectangle(0,0,fullChipWidth_Pixel,fullChipHeight_Pixel);
     }
@@ -188,5 +295,94 @@ public class FieldOfView {
         }
     }
     
+    public boolean isCentered() {
+        if (isFullSize()) {
+            return true;
+        }
+        return ((2*unbinnedRoi_Pixel.x+unbinnedRoi_Pixel.width == fullChipWidth_Pixel) 
+            && (2*unbinnedRoi_Pixel.y+unbinnedRoi_Pixel.height == fullChipHeight_Pixel)); 
+    }
     
+    public void createRoiPath(double objPixSize) {
+        //translate roi to center
+        AffineTransform at=AffineTransform.getScaleInstance(objPixSize, objPixSize);
+        if (fieldRotation != ROTATION_UNKNOWN) {
+//            at.concatenate(AffineTransform.getTranslateInstance(fullChipWidth_Pixel/2, fullChipHeight_Pixel/2));
+            at.concatenate(AffineTransform.getRotateInstance(-fieldRotation));
+        }
+        at.concatenate(AffineTransform.getTranslateInstance(-fullChipWidth_Pixel/2, -fullChipHeight_Pixel/2));
+        roiPath=new Path2D.Double(at.createTransformedShape(unbinnedRoi_Pixel));
+    }
+
+    public void createFullChipPath(double objPixSize) {
+        //translate roi to center
+        AffineTransform at=AffineTransform.getScaleInstance(objPixSize, objPixSize);
+        if (fieldRotation != ROTATION_UNKNOWN) {
+//            at.concatenate(AffineTransform.getTranslateInstance(fullChipWidth_Pixel/2, fullChipHeight_Pixel/2));
+            at.concatenate(AffineTransform.getRotateInstance(-fieldRotation));
+        }
+        fullChipPath=new Path2D.Double(at.createTransformedShape(new Rectangle2D.Double(
+                -fullChipWidth_Pixel/2, 
+                -fullChipHeight_Pixel/2,
+                fullChipWidth_Pixel, 
+                fullChipHeight_Pixel)));
+    }
+
+    @Override
+    public Rectangle getBounds() {
+        return roiPath.getBounds();
+    }
+
+    @Override
+    public Rectangle2D getBounds2D() {
+        return roiPath.getBounds2D();
+    }
+
+    @Override
+    public boolean contains(double x, double y) {
+        return roiPath.contains(x, y);
+    }
+
+    @Override
+    public boolean contains(Point2D p) {
+        return roiPath.contains(p);
+    }
+
+    @Override
+    public boolean intersects(double x, double y, double w, double h) {
+        return roiPath.intersects(x, y, w, h);
+    }
+
+    @Override
+    public boolean intersects(Rectangle2D r) {
+        return roiPath.intersects(r);
+    }
+
+    @Override
+    public boolean contains(double x, double y, double w, double h) {
+        return roiPath.contains(x, y, w, h);
+    }
+
+    @Override
+    public boolean contains(Rectangle2D r) {
+        return roiPath.contains(r);
+    }
+
+    @Override
+    public PathIterator getPathIterator(AffineTransform at) {
+        return roiPath.getPathIterator(at);
+    }
+
+    @Override
+    public PathIterator getPathIterator(AffineTransform at, double flatness) {
+        return roiPath.getPathIterator(at, flatness);
+    }
+    
+    public Path2D getRoiPath() {
+        return roiPath;
+    }
+
+    public Path2D getFullChipPath() {
+        return fullChipPath;
+    }
 }

@@ -1,9 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package autoimage.tools;
 
 import autoimage.FieldOfView;
@@ -22,6 +16,8 @@ import ij.process.ImageProcessor;
 import ij.process.ShortProcessor;
 import java.awt.Color;
 import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.geom.Point2D;
@@ -30,7 +26,9 @@ import java.beans.PropertyChangeListener;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -52,7 +50,8 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
 
     private CMMCore core;
     private final ScriptInterface gui;
-    private static String channelGroupStr ="";
+    private String lastMeasuredDetector;
+    private static String configGroupStr ="";
     private static String channelName = "";
     private static double exposure;
     private static double stageStepSize; // stage movement in um
@@ -60,7 +59,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
     private static boolean showImages=false;
     private boolean isMeasuring;
     private CameraRotationTask rotMeasureTask;
-    private Measurement measurement;//stores camera rotation(in rad) and pixelsize
+    private Map<String, Measurement> measurements;//stores camera rotation(in rad) and pixelsize
     
     private static int maxIterations=10;
     private static double toleratedAngleDisp=2;//degree
@@ -140,6 +139,8 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
     
     private class CameraRotationTask extends SwingWorker<Boolean,Object[]> {
 
+        private String detectorName="";
+        
         @Override
         protected Boolean doInBackground() {
             try {
@@ -198,7 +199,8 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     }    
                     //horizontal step along x-axis to right
                     core.setXYPosition(xyStageName, stagePos.getX(),stagePos.getY());
-                    imp1=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,MMCoreUtils.SCALE_NONE);
+                    imp1=MMCoreUtils.snapImagePlus(core, configGroupStr, channelName, exposure,0,MMCoreUtils.SCALE_NONE);
+                    detectorName=core.getCameraDevice();
                     if (imp1==null) {
                         return false;
                     }
@@ -220,7 +222,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                         return null;
                     }    
                     core.setXYPosition(xyStageName, stagePos.getX()+stageStepSize,stagePos.getY());
-                    imp2=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,MMCoreUtils.SCALE_NONE);
+                    imp2=MMCoreUtils.snapImagePlus(core, configGroupStr, channelName, exposure,0,MMCoreUtils.SCALE_NONE);
                     if (imp2==null) {
                         return false;
                     }                    
@@ -334,7 +336,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     }    
                    //vertical step along y-axis down
                     core.setXYPosition(xyStageName, stagePos.getX(),stagePos.getY());
-                    imp1=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,MMCoreUtils.SCALE_NONE);
+                    imp1=MMCoreUtils.snapImagePlus(core, configGroupStr, channelName, exposure,0,MMCoreUtils.SCALE_NONE);
                     if (imp1==null) {//ipArray1==null || ipArray1.length<1) {
                         return false;
                     }                    
@@ -356,7 +358,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                         return null;
                     }    
                     core.setXYPosition(xyStageName, stagePos.getX(),stagePos.getY()+stageStepSize);
-                    imp2=MMCoreUtils.snapImagePlus(core, channelGroupStr, channelName, exposure,0,MMCoreUtils.SCALE_NONE);
+                    imp2=MMCoreUtils.snapImagePlus(core, configGroupStr, channelName, exposure,0,MMCoreUtils.SCALE_NONE);
                     if (imp2==null) {
                         return false;
                     }                    
@@ -484,6 +486,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     vimp.getCanvas().zoomOut(0, 0);
                     vimp.getCanvas().zoomOut(0, 0);
                 }
+                lastMeasuredDetector=core.getCameraDevice();
             } catch (Exception ex) {
                 IJ.log(CameraRotDlg.class.getName()+": Exception - "+ex.getMessage());
                 isMeasuring=false;
@@ -499,7 +502,9 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     vimp.close();
                 if (himp!=null)
                     himp.close();
-                measurement=new Measurement(FieldOfView.ROTATION_UNKNOWN,-1);
+                if (!measurements.containsKey(detectorName)) {
+                    measurements.put(detectorName,new Measurement(FieldOfView.ROTATION_UNKNOWN,-1));
+                }
                 return false;
             }
             return true;
@@ -555,13 +560,14 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
             medianAngleLabel.setText(String.format("%1$,.1f",medianAngleH)+" (H); "+String.format("%1$,.1f",medianAngleV)+" (V)");
             
             String result="";
-            measurement = new Measurement();
+            //currently, we're ignoring pixel size
             double difference = Math.abs((medianAngleH - medianAngleV + 180) % 360) - 180;
             if (Math.abs(difference) > toleratedAngleDisp || Utils.isNaN(medianAngleH) || Utils.isNaN(medianAngleV)) {
+                CameraRotDlg.this.measurements.put(detectorName,new Measurement(FieldOfView.ROTATION_UNKNOWN, -1));
                 result="<html><p>Warning: Angles not defined or measured angles using horizontal and vertical stage displacement show more than "+toleratedAngleDisp+" degree disparity.</p></html>";
-                measurement.cameraAngle=FieldOfView.ROTATION_UNKNOWN;
             } else {
-                measurement.cameraAngle=((medianAngleH + medianAngleV) / 2)/180*Math.PI;
+                double angle=((medianAngleH + medianAngleV) / 2)/180*Math.PI;
+                CameraRotDlg.this.measurements.put(detectorName,new Measurement(angle,-1));
                 double cameraAngleDeg=(medianAngleH + medianAngleV) / 2;
                 if (cameraAngleDeg > 180) cameraAngleDeg=cameraAngleDeg-360;
                 result = "<html><p>Camera rotation angle: "+String.format("%1$,.1f",cameraAngleDeg)+" degree.</p></html>";
@@ -582,21 +588,40 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
     public CameraRotDlg(java.awt.Frame parent, final ScriptInterface gui, String chGroupStr, double stepSize, boolean modal) {
         super(parent, modal);
         initComponents();
+        lastMeasuredDetector="";
         resultTable.getTableHeader().setReorderingAllowed(false);
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        measurement=null;
+        measurements=new HashMap<String,Measurement>();
         rotMeasureTask=null;
         this.gui=gui;
         core=gui.getMMCore();
 
+        channelComboBox.addItemListener(new ItemListener(){
+            @Override
+            public void itemStateChanged(ItemEvent e) {
+                if (e.getStateChange() == ItemEvent.SELECTED) {
+                    IJ.log("itemchanged");
+                    channelName=(String)channelComboBox.getSelectedItem();
+                    configGroupStr=(String)configGroupComboBox.getSelectedItem();
+                    try {
+                        core.setConfig(configGroupStr, channelName);
+                        detectorLabel.setText(core.getCameraDevice());
+                    } catch (Exception ex) {
+                        Logger.getLogger(CameraRotDlg.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                }
+            }
+        });
+
         //load available config groups
-        channelGroupStr="";
-        configComboBox.removeAllItems();
+        configGroupStr="";
+        configGroupComboBox.removeAllItems();
         StrVector configs = core.getAvailableConfigGroups();
         for (int i = 0; i < configs.size(); i++) {
-            configComboBox.addItem(configs.get(i));
+            configGroupComboBox.addItem(configs.get(i));
         }
-        configComboBox.setSelectedItem(chGroupStr);   
+        configGroupComboBox.setSelectedItem(chGroupStr);  
+        
         setStageStepSize(stepSize);
         exposure=100;
         exposureField.setValue(exposure);
@@ -608,19 +633,6 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         clearList();
 
         addWindowListener(new WindowAdapter() {
-/*            @Override
-            public void windowClosing(WindowEvent e) {
-                IJ.log("CameraRotDlg.windowClosing");
-                if (resultTable.getRowCount() > 0) {
-                    int result=JOptionPane.showConfirmDialog(null, "Do you want to discard measurements?", "Camera Rotation Measurements", JOptionPane.YES_NO_OPTION);
-                    if (result==JOptionPane.NO_OPTION) {
-    //                    setVisible(false);
-                        return;                
-                    }
-                }
-                dispose();
-            }*/
-
             @Override
             public void windowActivated(WindowEvent e) {
                 liveModeChanged(gui.isLiveModeOn());
@@ -629,7 +641,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
     }
 
     public CameraRotDlg(java.awt.Frame parent, ScriptInterface gui, boolean modal) {
-        this(parent,gui,channelGroupStr,0, modal);
+        this(parent,gui,configGroupStr,0, modal);
     }
 
     
@@ -645,8 +657,8 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         cancelButton.addActionListener(listener);
     }
     
-    public Measurement getResult() {
-        return measurement;
+    public Map<String,Measurement> getResults() {
+        return measurements;
     }
     
     public void setStageStepSize(double stepSize) {
@@ -663,15 +675,18 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
     
     public void setChannelGroup(String groupName) {
         if (Arrays.asList(core.getAvailableConfigGroups().toArray()).contains(groupName)) {
-            channelGroupStr=groupName;
-            configComboBox.setSelectedItem(groupName);
+            configGroupStr=groupName;
+            configGroupComboBox.setSelectedItem(groupName);
         }
     }
     
-    private void setChannelList(List<String> chList) {
+    private void setChannelList(StrVector chList) {
         channelComboBox.removeAllItems();
-        for (String ch:chList)
-            channelComboBox.addItem(ch);
+        if (chList!=null) {
+            for (String ch:chList) {
+                channelComboBox.addItem(ch);
+            }    
+        }
     }
     /**
      * This method is called from within the constructor to initialize the form.
@@ -684,7 +699,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
 
         channelComboBox = new javax.swing.JComboBox();
         exposureField = new javax.swing.JFormattedTextField();
-        configComboBox = new javax.swing.JComboBox();
+        configGroupComboBox = new javax.swing.JComboBox();
         jLabel1 = new javax.swing.JLabel();
         jLabel2 = new javax.swing.JLabel();
         jLabel3 = new javax.swing.JLabel();
@@ -710,6 +725,8 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         progressBar = new javax.swing.JProgressBar();
         liveButton = new javax.swing.JButton();
         showImagesCB = new javax.swing.JCheckBox();
+        jLabel5 = new javax.swing.JLabel();
+        detectorLabel = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
         setTitle("Camera Rotation");
@@ -722,19 +739,19 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         exposureField.setText("jFormattedTextField1");
         exposureField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
 
-        configComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        configComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-        configComboBox.addActionListener(new java.awt.event.ActionListener() {
+        configGroupComboBox.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        configGroupComboBox.setModel(new javax.swing.DefaultComboBoxModel(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
+        configGroupComboBox.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                configComboBoxActionPerformed(evt);
+                configGroupComboBoxActionPerformed(evt);
             }
         });
 
         jLabel1.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel1.setText("Channel group:");
+        jLabel1.setText("Config Group:");
 
         jLabel2.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
-        jLabel2.setText("Channel:");
+        jLabel2.setText("Channel/Preset:");
 
         jLabel3.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         jLabel3.setText("Exposure (ms):");
@@ -891,6 +908,11 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
             }
         });
 
+        jLabel5.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        jLabel5.setText("Detector:");
+
+        detectorLabel.setText("---");
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
@@ -908,21 +930,20 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                                 .addComponent(channelComboBox, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                                .addComponent(configComboBox, javax.swing.GroupLayout.PREFERRED_SIZE, 195, javax.swing.GroupLayout.PREFERRED_SIZE))
+                                .addComponent(configGroupComboBox, javax.swing.GroupLayout.PREFERRED_SIZE, 195, javax.swing.GroupLayout.PREFERRED_SIZE))
                             .addComponent(stepSizeField, javax.swing.GroupLayout.PREFERRED_SIZE, 72, javax.swing.GroupLayout.PREFERRED_SIZE))
                         .addGap(18, 18, 18)
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING, false)
-                            .addGroup(layout.createSequentialGroup()
-                                .addComponent(jLabel3)
-                                .addGap(6, 6, 6)
-                                .addComponent(exposureField, javax.swing.GroupLayout.PREFERRED_SIZE, 53, javax.swing.GroupLayout.PREFERRED_SIZE))
-                            .addGroup(layout.createSequentialGroup()
-                                .addComponent(jLabel9)
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(iterationsComboBox, 0, 1, Short.MAX_VALUE)))
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(showImagesCB)
-                        .addGap(0, 0, Short.MAX_VALUE))
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jLabel5)
+                            .addComponent(jLabel3)
+                            .addComponent(jLabel9))
+                        .addGap(6, 6, 6)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(exposureField, javax.swing.GroupLayout.PREFERRED_SIZE, 53, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(detectorLabel)
+                            .addComponent(iterationsComboBox, 0, 1, Short.MAX_VALUE))
+                        .addGap(0, 0, 0)
+                        .addComponent(showImagesCB))
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                             .addComponent(rotationAngleTable, javax.swing.GroupLayout.DEFAULT_SIZE, 492, Short.MAX_VALUE)
@@ -941,8 +962,10 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
             .addGroup(layout.createSequentialGroup()
                 .addGap(12, 12, 12)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(configComboBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jLabel1))
+                    .addComponent(configGroupComboBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jLabel1)
+                    .addComponent(jLabel5)
+                    .addComponent(detectorLabel))
                 .addGap(6, 6, 6)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(exposureField, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -980,13 +1003,14 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
 
     private void measureButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_measureButtonActionPerformed
         if (isMeasuring && rotMeasureTask!=null) {
+            //request abort
             measureButton.setText("Measure");
             isMeasuring=false;
             rotMeasureTask.cancel(true);
             return;
         } else {
             channelName=(String)channelComboBox.getSelectedItem();
-            channelGroupStr=(String)configComboBox.getSelectedItem();
+            configGroupStr=(String)configGroupComboBox.getSelectedItem();
             iterations=(Integer)iterationsComboBox.getSelectedItem();
             stageStepSize=(Double)stepSizeField.getValue();
             try {
@@ -994,7 +1018,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                     JOptionPane.showMessageDialog(this, "No channel selected.");
                     return;
                 }
-                if (channelGroupStr == null) {
+                if (configGroupStr == null) {
                     JOptionPane.showMessageDialog(this, "No channel group selected.");
                     return;
                 }
@@ -1012,6 +1036,9 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
                 progressBar.setMaximum(iterations);
                 progressBar.setValue(0);
                 progressBar.setString("0/"+Integer.toString(iterations));
+                if (!lastMeasuredDetector.equals(core.getCameraDevice())) {
+                    this.clearList();
+                }
 
                 rotMeasureTask=new CameraRotationTask();
                 rotMeasureTask.addPropertyChangeListener(new PropertyChangeListener() {
@@ -1048,22 +1075,29 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         dispose();
     }//GEN-LAST:event_okButtonActionPerformed
 
-    private void configComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_configComboBoxActionPerformed
-        if (configComboBox.getSelectedItem() != null) {
-            channelGroupStr=(String)configComboBox.getSelectedItem();
-            String newChGroupStr=MMCoreUtils.loadAvailableChannelConfigs(null, core, channelGroupStr);
-            if (!channelGroupStr.equals(newChGroupStr)) {
-                configComboBox.removeAllItems();
+    private void configGroupComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_configGroupComboBoxActionPerformed
+        if (configGroupComboBox.getSelectedItem() != null) {
+            configGroupStr=(String)configGroupComboBox.getSelectedItem();
+            /* load available presets for the current config group.
+               If the config group does not exist, user can select valid one from
+               valid list. The newly selected config group is returned as String.
+               The available presets for the config group are stored in public static variable in MMCoreUtils 
+            */ 
+            String newGroupStr=MMCoreUtils.verifyAndSelectConfigGroup(null, core, configGroupStr);
+            if (!configGroupStr.equals(newGroupStr)) {
+                //reload all available config groups
+                configGroupComboBox.removeAllItems();
                 StrVector configs = core.getAvailableConfigGroups();
                 for (int i = 0; i < configs.size(); i++) {
-                    configComboBox.addItem(configs.get(i));
+                    configGroupComboBox.addItem(configs.get(i));
                 }        
-                configComboBox.setSelectedItem(newChGroupStr);
+                configGroupComboBox.setSelectedItem(newGroupStr);
             }
-            channelGroupStr=(String)configComboBox.getSelectedItem();
-            setChannelList(MMCoreUtils.availableChannelList);
+            configGroupStr=(String)configGroupComboBox.getSelectedItem();
+            StrVector presets=core.getAvailableConfigs(configGroupStr);
+            setChannelList(presets);
         }
-    }//GEN-LAST:event_configComboBoxActionPerformed
+    }//GEN-LAST:event_configGroupComboBoxActionPerformed
 
     private void clearList() {
         DefaultTableModel model=(DefaultTableModel)resultTable.getModel();
@@ -1089,14 +1123,14 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
             if (gui.isLiveModeOn()) {
                 JOptionPane.showMessageDialog(this, "Live mode is already running.", "Live Mode", JOptionPane.ERROR_MESSAGE);
             } else {
-                channelGroupStr=(String)configComboBox.getSelectedItem();
+                configGroupStr=(String)configGroupComboBox.getSelectedItem();
                 channelName=(String)channelComboBox.getSelectedItem();
                 try {
                     exposureField.commitEdit();
                     exposure=(Double)exposureField.getValue();
                     try {
                         core.setExposure(exposure);
-                        core.setConfig(channelGroupStr, channelName);
+                        core.setConfig(configGroupStr, channelName);
                         gui.refreshGUI();
                     } catch (Exception e) {
                     }
@@ -1140,13 +1174,15 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
     private javax.swing.JButton cancelButton;
     private javax.swing.JComboBox channelComboBox;
     private javax.swing.JButton clearButton;
-    private javax.swing.JComboBox configComboBox;
+    private javax.swing.JComboBox configGroupComboBox;
+    private javax.swing.JLabel detectorLabel;
     private javax.swing.JFormattedTextField exposureField;
     private javax.swing.JComboBox iterationsComboBox;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
+    private javax.swing.JLabel jLabel5;
     private javax.swing.JLabel jLabel7;
     private javax.swing.JLabel jLabel8;
     private javax.swing.JLabel jLabel9;

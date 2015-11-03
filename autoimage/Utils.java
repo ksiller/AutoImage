@@ -44,6 +44,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.micromanager.api.DataProcessor;
 import org.micromanager.api.MMTags;
+import org.micromanager.api.ScriptInterface;
+import org.micromanager.utils.MMScriptException;
 import org.micromanager.utils.ReportingUtils;
 
 /**
@@ -283,62 +285,6 @@ public class Utils {
         }
     }
 
-    public static String createPathForSite(File f, String workDir, boolean create) throws JSONException {
-        JSONObject meta=MMCoreUtils.parseMetadataFromFile(f);
-        if (meta==null)
-            return null;
-        String area = meta.getString(ExtImageTags.AREA_NAME);
-        String cluster=Long.toString(meta.getLong(ExtImageTags.CLUSTER_INDEX));
-        String site=Long.toString(meta.getLong(ExtImageTags.SITE_INDEX));
-        File path;
-        if (!cluster.equals("-1"))
-            path=new File(workDir,area+"-Cluster"+cluster+"-Site"+site);
-        else
-            path=new File(workDir,area+"-Site"+site);
-        if (!path.exists() && create) {
-            path.mkdirs(); 
-        }    
-        return path.getAbsolutePath();
-    }
- 
-    public static String getChannelName(File f) throws JSONException {
-        JSONObject meta=MMCoreUtils.parseMetadataFromFile(f);
-        if (meta==null)
-            return null;
-        return meta.getString(MMTags.Image.CHANNEL_NAME);
-    }
- 
- 
-    public static Map<String,List<File>> getChannelMap(List<File> list) throws JSONException {
-        Map<String,List<File>> map=new HashMap<String,List<File>>();
-        for (File f:list) {
-            String ch=Utils.getChannelName(f);
-            List<File> zList;
-            if (!map.containsKey(ch)) {
-                zList=new ArrayList<File>();
-                map.put(ch,zList);
-            } else {
-                zList=(List<File>)map.get(ch);
-            }
-            zList.add(f);
-        }
-        return map;
-    }
-    
-    
-    public static boolean calibrateImage(ImagePlus imp, JSONObject imageMeta) {
-        try {
-            double pixSize=imageMeta.getDouble("PixelSizeUm");
-            Calibration cal=imp.getCalibration();
-            cal.pixelWidth=pixSize;
-            cal.pixelHeight=pixSize;
-            imp.setCalibration(cal);
-            return true;
-        } catch (JSONException ex) {
-            Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
-            return false;
-        }
-    } 
     
     public static boolean imageStoragePresent(DefaultMutableTreeNode root) {
         Enumeration<DefaultMutableTreeNode> en = root.preorderEnumeration();
@@ -519,13 +465,51 @@ BasicArea.class.getClassLoader());
         return availableAreaClasses; 
     }
 
+        /* based on MMStudioFrame.versionLessThan
+       - changed split character from " " to "-"
+       - removed Error messages
+    */
+    public static boolean versionLessThan(ScriptInterface app, String version, String separator) throws MMScriptException {
+        try {
+            String[] v = app.getVersion().split(separator, 2);
+            String[] m = v[0].split("\\.", 3);
+            String[] v2 = version.split(separator, 2);
+            String[] m2 = v2[0].split("\\.", 3);
+            for (int i=0; i < 3; i++) {
+               if (Integer.parseInt(m[i]) < Integer.parseInt(m2[i])) {
+                  return true;
+               }
+               if (Integer.parseInt(m[i]) > Integer.parseInt(m2[i])) {
+                  return false;
+               }
+            }
+            if (v2.length < 2 || v2[1].equals("") )
+               return false;
+            if (v.length < 2 ) {
+               return true;
+            }
+            if (Integer.parseInt(v[1]) < Integer.parseInt(v2[1])) {
+               return false;
+            }
+            return true;
+        } catch (NumberFormatException ex) {
+            throw new MMScriptException ("Format of version String should be \"a.b.c\"");
+        }
+     } 
     
-/*    
-    //expects rad
-    public static AffineTransform createRotationAffineTrans(double rad) {
-        AffineTransform at=new AffineTransform();
-        at.rotate(rad);
-        return at;
+    public static byte[] convertIntToByteArray(int[] pixels) {
+        byte[] byteArray = null;
+        if (pixels instanceof int[]) {
+            //convert int[] to byte[] 
+            int[] intArray=(int[])pixels;
+            byteArray = new byte[intArray.length*4];
+            for (int i=0; i<intArray.length; ++i) {
+                byteArray[i*4 + 2] = (byte)(intArray[i] >> 16);
+                byteArray[i*4 + 1] = (byte)(intArray[i] >> 8);
+                byteArray[i*4] = (byte)(intArray[i]);
+            }
+        }
+        return byteArray;
     }
-*/
+    
 }

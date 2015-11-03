@@ -49,7 +49,7 @@ public class ExtTaggedImageSink {
                          ++imageCount;
                          imageCache_.putImage(image);
                          if (fileOutputQueue_!=null)
-                            fileOutputQueue_.put(MMCoreUtils.getImageAsFileObject(image));
+                            fileOutputQueue_.put(ImgUtils.getImageAsFileObject(image));
                      } else {
                          if (fileOutputQueue_!=null)
                             fileOutputQueue_.put(ImageFileQueue.POISON);

@@ -32,12 +32,11 @@ public class AcqSetting {
                                             "Position, Time, Z, Channel",
                                             "Position, Time, Channel, Z"};
     public static final int MAX_HOUR_INT = 999;
-    public static final int MAX_TILE_OVERLAP = 50;
-    public static final int MAX_MAG_FACTOR = 16;
+    public static final int MAX_TILE_OVERLAP = 50;//in percent
+//    public static final int MAX_MAG_FACTOR = 16;
     public static final int MAX_CLUSTER_X = 10;
     public static final int MAX_CLUSTER_Y = 10;
     public static final int MAX_SITES = 100000;
-    public static final int FILE_IO_OK = 0;
     
     public static final String TAG_ACQ_SETTING = "ACQUISITION_SETTING";
     public static final String TAG_ACQ_SETTING_ARRAY = "ACQ_SETTING_ARRAY";
@@ -47,12 +46,10 @@ public class AcqSetting {
     public static final String TAG_OBJ_GROUP_STR = "OBJECTIVE_GROUP_STR";
     public static final String TAG_CHANNEL_GROUP_STR = "CHANNEL_GROUP_STR";
     public static final String TAG_CHANNEL_SHUTTER_OPEN = "CHANNEL_SHUTTER_OPEN";
-    
-    
+       
     public static final String TAG_OBJ_LABEL = "OBJECTIVE_LABEL";
     public static final String TAG_BINNING = "BINNING";
     public static final String TAG_FIELD_OF_VIEW = "FIELD_OF_VIEW";
-//    public static final String TAG_DETECTOR = "DETECTOR";
     public static final String TAG_AUTOFOCUS = "AUTOFOCUS";
     public static final String TAG_AUTOFOCUS_SETTINGS = "AUTOFOCUS_SETTINGS";
     public static final String TAG_AUTOFOCUS_DEVICE_NAME = "AUTOFOCUS_DEVICE_NAME";
@@ -74,7 +71,7 @@ public class AcqSetting {
     public static final String TAG_START_TIME = "START_TIME";
     
     private String name;            //visible in GUI
-    private String objectiveDevStr="";
+    private String objectiveDevStr="";//label of objective turret device
     private String channelGroupStr; //visible in GUI
     private String objLabel;        //visible in GUI
     private double objPixSize;      //internal based on existing MM calibration
@@ -95,7 +92,7 @@ public class AcqSetting {
     private double zEnd;            //visible
     private double zStepSize;       //visible
     private int slices;             //visible
-    private boolean zShutterOpen;    //visible
+    private boolean zShutterOpen;   //visible
     
     private boolean timelapse;      //visible
     private int hours;              //internal for convenience
@@ -107,11 +104,10 @@ public class AcqSetting {
     private List<Channel> channels; //visible 
     private boolean chShutterOpen;  //visible
     private int acqOrder;           //visible
-    private List<Runnable> runnables;
-    private DefaultMutableTreeNode imageProcRoot;
+    private List<Runnable> runnables; //no used yet
+    private DefaultMutableTreeNode imageProcRoot; //stores image processing tree
     private ScheduledTime startTime;         //visible
-    private Calendar absoluteStart;
-    private long totalTiles;
+    private Calendar absoluteStart;   //internal
     
     
     public static class ScheduledTime {
@@ -173,15 +169,34 @@ public class AcqSetting {
     }
     
     
+    /**
+     * 
+     * @param n label for this acquisition setting
+     */
     public AcqSetting(String n) {
         this(n, null,"", -1d);
     }
 
+    /**
+     * 
+     * @param n label for this acquisition setting
+     * @param fov defines the current field-of-view (defined by camera chip size, camera roi); it's dimensions determine the current tile size
+     * @param objective label of the objective to be used (needs to correspond to a valid entry in the objective turret device group
+     * @param oPixSize pixel size of chosen objective, camera binning is assumed to be 1.
+     */
     public AcqSetting(String n, FieldOfView fov, String objective, double oPixSize) {
         this(n, fov, objective, oPixSize, "1", false);
     }
 
-//    public AcqSetting(String n, FieldOfView fov, String objective, double oPixSize, double bin, boolean autof) {
+    /**
+     * 
+     * @param n label for this acquisition setting
+     * @param fov defines the current field-of-view (defined by camera chip size, camera roi); it's dimensions determine the current tile size
+     * @param objective label of the objective to be used (needs to correspond to a valid entry in the objective turret device group
+     * @param oPixSize pixel size of chosen objective, camera binning is assumed to be 1.
+     * @param bin label that describes the binning value (appropriate values are defined by camera device adapter
+     * @param autof boolean value to enable or disable use of autofocus during acquisition.
+     */
     public AcqSetting(String n, FieldOfView fov, String objective, double oPixSize, String bin, boolean autof) {
         name=n;                     
         binningStr=bin;
@@ -213,7 +228,6 @@ public class AcqSetting {
         runnables=new ArrayList<Runnable>();
         imageProcRoot=Utils.createDefaultImageProcTree();
         tiling=new TilingSetting();
-        totalTiles=0;
         isModified=false;
         doxelManager = new DoxelManager(null, this);
         detector=null;
@@ -530,14 +544,14 @@ public class AcqSetting {
         return startTime;
     }
     
-    public void setTotalTiles(long tt) {
+/*    public void setTotalTiles(long tt) {
         totalTiles=tt;
     }
     
     public long getTotalTiles() {
         return totalTiles;
     }
-    
+*/    
     public void setName(String n) {
         name=n;
     }

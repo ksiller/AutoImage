@@ -1,5 +1,6 @@
 package autoimage.dataprocessors;
 
+import autoimage.ImgUtils;
 import autoimage.MMCoreUtils;
 import autoimage.Utils;
 import ij.IJ;
@@ -33,9 +34,9 @@ public class ImageStorage<E> extends BranchedProcessor<E> {
     protected List<E> processElement(E element) {
         JSONObject summary;
         try {
-            summary = MMCoreUtils.readMetadataSummary(element,true);
+            summary = ImgUtils.readMetadataSummary(element,true);
             if (element instanceof File) {
-                TaggedImage ti=MMCoreUtils.openAsTaggedImage(((File)element).getAbsolutePath());
+                TaggedImage ti=ImgUtils.openAsTaggedImage(((File)element).getAbsolutePath());
                 if (storage==null) {
                     summary.put(MMTags.Summary.DIRECTORY, new File(workDir).getParent());
                     summary.put(MMTags.Summary.PREFIX, new File(workDir).getName());

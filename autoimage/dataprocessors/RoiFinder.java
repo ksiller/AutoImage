@@ -1,5 +1,6 @@
 package autoimage.dataprocessors;
 
+import autoimage.ImgUtils;
 import autoimage.api.ExtImageTags;
 import autoimage.api.Doxel;
 import autoimage.api.IDoxelListener;
@@ -125,7 +126,7 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
     protected void processResults(List<File> files) {
         IJ.log(    "    Processed Results:"+script_+".");
         try {
-            JSONObject meta=MMCoreUtils.parseMetadataFromFile(files.get(0));
+            JSONObject meta=ImgUtils.parseMetadataFromFile(files.get(0));
             String positionName=meta.getString(MMTags.Image.POS_NAME);
             int imgWidth=meta.getInt(MMTags.Image.WIDTH);
             int imgHeight=meta.getInt(MMTags.Image.HEIGHT);

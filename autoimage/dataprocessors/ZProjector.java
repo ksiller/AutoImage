@@ -1,5 +1,6 @@
 package autoimage.dataprocessors;
 
+import autoimage.ImgUtils;
 import autoimage.api.ExtImageTags;
 import autoimage.MMCoreUtils;
 import autoimage.Utils;
@@ -132,7 +133,7 @@ public class ZProjector<E> extends GroupProcessor<E> {
     //                            if (image instanceof java.io.File) {
                                     File file=(File)image;
                                     imp=IJ.openImage(file.getAbsolutePath());
-                                    meta=MMCoreUtils.parseMetadataFromFile(file);
+                                    meta=ImgUtils.parseMetadataFromFile(file);
     //                            } 
                                     /*else if (image instanceof TaggedImage) {
                                     imp=Utils.createImagePlus((TaggedImage)image);
@@ -194,7 +195,7 @@ public class ZProjector<E> extends GroupProcessor<E> {
                             IJ.log("SINGLE FILE");
                             File file=(File)group.elements.get(0);
                             resultImp=IJ.openImage(file.getAbsolutePath());
-                            meta=MMCoreUtils.parseMetadataFromFile(file);
+                            meta=ImgUtils.parseMetadataFromFile(file);
                         }
                         IJ.save(resultImp,"/Users/Karsten/Desktop/proj.tif");
 
@@ -206,7 +207,7 @@ public class ZProjector<E> extends GroupProcessor<E> {
                         meta.put(MMTags.Root.SUMMARY, summary);
 
                         //create TaggedImage
-                        TaggedImage ti=MMCoreUtils.createTaggedImage(resultImp,meta);
+                        TaggedImage ti=ImgUtils.createTaggedImage(resultImp,meta);
 /*
                         if (group.elements.get(0) instanceof TaggedImage) {
                             results.add((E)ti);
@@ -246,11 +247,16 @@ public class ZProjector<E> extends GroupProcessor<E> {
         }
     }
     
-    //filters image elements based on user defined slice index parameters
+    /** 
+     * Filters image elements based on user defined slice index parameters.
+     * 
+     * @param element image object
+     * @return True if all slices are projected or element's slice index is within appropriate range defined by this.startSlice and this.endSlice
+     */
     @Override
     protected boolean acceptElement(E element) {
         try {
-            JSONObject meta=MMCoreUtils.parseMetadataFromFile((File)element);
+            JSONObject meta=ImgUtils.parseMetadataFromFile((File)element);
             long slice=meta.getLong(MMTags.Image.SLICE_INDEX);
             IJ.log(this.getClass().getName()+": current="+slice+", start="+startSlice+", end="+endSlice);
             if (allSlices || (slice >= startSlice && slice <=endSlice)) {
