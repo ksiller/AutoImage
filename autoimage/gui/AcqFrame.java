@@ -1,6 +1,5 @@
 package autoimage.gui;
 
-
 import autoimage.api.AcqSetting;
 import autoimage.api.BasicArea;
 import autoimage.api.Channel;
@@ -171,6 +170,7 @@ import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 import mmcorej.CMMCore;
 import mmcorej.Configuration;
+import mmcorej.PropertySetting;
 import mmcorej.StrVector;
 import mmcorej.TaggedImage;
 import org.json.JSONArray;
@@ -240,9 +240,9 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private String zStageLabel;
     private String xyStageLabel;
     private List<String> availableObjectives;
-    private Rectangle cameraROI;
-    private Detector currentDetector;
-    private List<Detector> detectors;
+    //private Rectangle cameraROI;
+//    private Detector currentDetector;
+//    private List<Detector> detectors;
     
     //Settings
     private File expSettingsFile;
@@ -779,13 +779,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private void setCameraRotation(Map<String, CameraRotDlg.Measurement> measurements) {
         double cameraAngle = FieldOfView.ROTATION_UNKNOWN;
         for (String detectorName:measurements.keySet()) {
-            Detector testedDetector=null;
-            for (Detector d:detectors) {
-                if (d.getLabel().equals(detectorName)) {
-                    testedDetector=d;
-                    break;
-                }
-            }
+            Detector testedDetector=MMCoreUtils.detectors.get(detectorName);
             if (testedDetector!=null) {
                 CameraRotDlg.Measurement measurement=measurements.get(detectorName);
                 cameraAngle=measurement.getCameraAngle();
@@ -809,14 +803,16 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 testedDetector.setFieldRotation(cameraAngle);
             }
         }
-        for (Detector d:detectors) {
-            IJ.log("Adjusted FOV Rotation: "+d.toString());
+        for (String dLabel:MMCoreUtils.detectors.keySet()) {
+            IJ.log(dLabel+" FOV Rotation: "+MMCoreUtils.detectors.get(dLabel).toString());
         }
         for (AcqSetting setting:acqSettings) {
-            setting.getFieldOfView().setFieldRotation(cameraAngle);
+            setting.getFieldOfView().setFieldRotation(setting.getDetector(0).getFieldRotation());
+//            setting.getFieldOfView().createFullChipPath(setting.getObjPixelSize());
+            setting.getFieldOfView().createRoiPath(setting.getObjPixelSize());
         }
-        BasicArea.setCameraRot(cameraAngle);
-        RefArea.setCameraRot(cameraAngle);
+//        BasicArea.setCameraRot(cameraAngle);
+//        RefArea.setCameraRot(cameraAngle);
 
         List<AcqSetting> settingsToUpdate=new ArrayList<AcqSetting>();
         List<Double> newTileOverlaps=new ArrayList<Double>();
@@ -855,32 +851,23 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 }
             }
         }
+        updateTileSize(currentAcqSetting);
         calcTilePositions(null, currentAcqSetting, ADJUSTING_SETTINGS);
     }
     
     private void showCameraRotDlg(boolean modal) {
-        double stepSize;
-        try {
-            //try to set step size to 50% of field of view --> 50% overlap
-            //will use objective set in MM not objective of currentAcqSetting
-            stepSize=Math.min(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel())*core.getPixelSizeUm()/2;
-        } catch (Exception ex) {
-            stepSize=100;
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-        }
 //        IJ.log("AcqFrame.liveModeMonitor: before open"+Integer.toString(liveModeMonitor.getNoOfListeners()));
         if (cameraRotDialog == null) {
             cameraRotDialog = new  CameraRotDlg(
                 this,
                 app,
                 currentAcqSetting.getChannelGroupStr(),
-                stepSize,
                 modal);
             cameraRotDialog.setIterations(5);
             cameraRotDialog.addWindowListener(this);
             //add as listener, so cameraRotDialog can be aware of pixel size changes
             app.addMMListener(cameraRotDialog);
-            //add as listener, so cameraRotDialog blocks measurments when system is in live mode
+            //add as listener, so cameraRotDialog blocks measurements when system is in live mode
             liveModeMonitor.addListener(cameraRotDialog);
             cameraRotDialog.addCancelButtonListener(new ActionListener() {
                 @Override
@@ -893,11 +880,10 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 //                            acqLayoutPanel.repaint();        
 
 //                        } else {
-//                            JOptionPane.showMessageDialog(null, "Camera rotation angle could not be determined.");
+//                            JOptionPane.showMessageDialog(null, "Camera rotStr angle could not be determined.");
                         } else {
                             cameraRotDialog.dispose();
                         }    
-                        IJ.log("AcqFrame: currentDetector.fieldRotation="+currentDetector.getFieldRotation());
                     } else {
                         cameraRotDialog.dispose();
                     }
@@ -916,8 +902,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 }
             });
         } else {
-            //dialog has been initialized, just need to to update stepSize
-            cameraRotDialog.setStageStepSize(stepSize);
+            //dialog has been initialized, no action required
         }
         cameraRotDialog.setVisible(true);
     }
@@ -1198,13 +1183,19 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         zStageLabel = core.getFocusDevice();
         xyStageLabel = core.getXYStageDevice();
         List<String> groupStrList=Arrays.asList(core.getAvailableConfigGroups().toArray());
-        //get currentCamera from core; readout chip size, binning (stored in currentDetector)
-        //param: null --> set fovRotation to FieldOfView.ROTATION_UNKNOWN
-        currentDetector=getCoreCameraSpecs(null); //detector pixel size
+        //get all loaded camera devices; currentCamera from core; readout chip size, binning (stored in currentDetector)
+        Detector currentDetector=MMCoreUtils.updateAvailableCameras(core);
+        String oldbin=(String)binningComboBox.getSelectedItem();
+        binningComboBox.setModel(new DefaultComboBoxModel(currentDetector.getBinningDescriptions()));
+        binningComboBox.setSelectedItem(oldbin);
         loadAvailableObjectiveLabels();
         
-        currentAcqSetting.getFieldOfView().setFullSize_Pixel(currentDetector.getFullWidth_Pixel(),currentDetector.getFullHeight_Pixel());
+//        currentAcqSetting.getFieldOfView().setFullSize_Pixel(currentDetector.getFullWidth_Pixel(),currentDetector.getFullHeight_Pixel());
+//        currentAcqSetting.getFieldOfView().setFullSize_Pixel(currentDetector.getUnbinnedRoi().width,currentDetector.getUnbinnedRoi().height);
+        currentAcqSetting.getFieldOfView().setRoi_Pixel(currentDetector.getUnbinnedRoi(),1);
         currentAcqSetting.getFieldOfView().setFieldRotation(currentDetector.getFieldRotation());
+//        currentAcqSetting.getFieldOfView().createFullChipPath(currentAcqSetting.getObjPixelSize());
+        currentAcqSetting.getFieldOfView().createRoiPath(currentAcqSetting.getObjPixelSize());
         if (currentAcqSetting.getChannelGroupStr() == null 
                 || !groupStrList.contains(currentAcqSetting.getChannelGroupStr())) {
             currentAcqSetting.setChannelGroupStr(MMCoreUtils.changeConfigGroupStr(this,core,"Channel",""));
@@ -1550,7 +1541,10 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 
         //get currentCamera from core; readout chip size, binning (stored in currentDetector)
         //param: null --> set fovRotation to FieldOfView.ROTATION_UNKNOWN
-        currentDetector=getCoreCameraSpecs(null); //detector pixel size
+        Detector currentDetector=MMCoreUtils.updateAvailableCameras(core); //detector pixel size
+        //update binning
+        binningComboBox.setModel(new DefaultComboBoxModel(currentDetector.getBinningDescriptions()));
+        
 
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
@@ -1813,13 +1807,14 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 saveLayout();
             }
         }
+/*
         //restore saved cameraROI
         try {
             core.setROI(cameraROI.x, cameraROI.y, cameraROI.width, cameraROI.height);
         } catch (Exception ex) {
             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
-
+*/
         savePreferences();
         saveExperimentSettings(new File(Prefs.getHomeDir(),"LastExpSettings.txt"));
     }
@@ -3939,7 +3934,10 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     public void tableChanged(TableModelEvent e) {
         int row = e.getFirstRow();
         int column = e.getColumn();
-        if (e.getSource() == areaTable.getModel() && (column == 0 || e.getColumn() == TableModelEvent.ALL_COLUMNS || e.getType() == TableModelEvent.DELETE || e.getType() == TableModelEvent.INSERT)) {
+        if (e.getSource() == areaTable.getModel() && (column == 0 
+                || column == TableModelEvent.ALL_COLUMNS 
+                || e.getType() == TableModelEvent.DELETE 
+                || e.getType() == TableModelEvent.INSERT)) {
             AreaTableModel atm = (AreaTableModel) areaTable.getModel();
             if (retilingAllowed && column == 0 && atm.getRowData(row).isSelectedForAcq()) {
                 calcSingleAreaTilePositions(atm.getRowData(row), currentAcqSetting, SELECTING_AREA);
@@ -3947,20 +3945,30 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 updateTotalTileNumber();
             }    
             updateAcqLayoutPanel();
-        } else if (e.getSource() == acqSettingTable.getModel() && (e.getColumn() == 0 
+        } else if (e.getSource() == channelTable.getModel()
+                && (column == 0 || column == TableModelEvent.ALL_COLUMNS)) {
+            List<Detector> detectors=MMCoreUtils.getActiveDetectors(core,currentAcqSetting.getChannelGroupStr(), currentAcqSetting.getChannelNames());
+            FieldOfView oldFov=currentAcqSetting.getFieldOfView();
+            currentAcqSetting.setDetectors(detectors);
+            updateTileSize(currentAcqSetting);
+            FieldOfView newFov=currentAcqSetting.getFieldOfView();
+            if (oldFov.getRoiWidth_UM(1) != newFov.getRoiWidth_UM(1) 
+                    || oldFov.getRoiHeight_UM(1) != newFov.getRoiHeight_UM(1)
+                    || oldFov.getFieldRotation() != newFov.getFieldRotation()) {
+                calcTilePositions(null, currentAcqSetting, ADJUSTING_SETTINGS);
+            }
+            
+        }/*else if (e.getSource() == acqSettingTable.getModel() && (column == 0 
                 || e.getColumn() == TableModelEvent.ALL_COLUMNS 
                 || e.getType() == TableModelEvent.DELETE 
                 || e.getType() == TableModelEvent.INSERT)) {
 //                || e.getType() == TableModelEvent.UPDATE)) {
             
             updatingAcqSettingTable=true;
-            updateProcessorTreeView(currentAcqSetting);
-            if (e.getType() == TableModelEvent.INSERT) {
-//                IJ.showMessage("insert");
-            }
-            initializeAutofocusPanel(currentAcqSetting);
+//            updateProcessorTreeView(currentAcqSetting);
+//            initializeAutofocusPanel(currentAcqSetting);
             updatingAcqSettingTable=false;
-        }
+        }*/ 
     }
 
     public void setLandmarkFound(boolean b) {
@@ -4074,6 +4082,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         
         newAreaButton.setEnabled(b && !acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
         newRectangleButton.setEnabled(b && !acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
+        newEllipseButton.setEnabled(b && !acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
         newPolygonButton.setEnabled(b && !acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
         removeAreaButton.setEnabled(b && !acqLayout.isEmpty() && acqLayout.isAreaRemovalAllowed());
         areaUpButton.setEnabled(b && !acqLayout.isEmpty());
@@ -4552,17 +4561,18 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         //camera ROI not supported yet. current ROI saved, cleared before acquisition start, and restored after autoimage closes 
         try {
             FieldOfView fov=currentAcqSetting.getFieldOfView();
+            /*
             cameraROI = core.getROI();
             if (cameraROI != null
                     && (cameraROI.width != fov.getROI_Pixel(currentAcqSetting.getBinningFactor()).width 
                     || cameraROI.height != fov.getROI_Pixel(currentAcqSetting.getBinningFactor()).height)) {
                 JOptionPane.showMessageDialog(this,"ROIs are not supported.\nUsing full camera chip.");
 //                core.clearROI();
-//                currentDetector=getCoreCameraSpecs(currentDetector.getFieldRotation());
+//                currentDetector=updateAvailableCameras(currentDetector.getFieldRotation());
                 for (AcqSetting setting:acqSettings) {
                     setting.getFieldOfView().clearROI();
                 }            
-            }
+            }*/
         } catch (Exception ex) {
             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -5305,9 +5315,11 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                         fieldRot=0;
                         for (AcqSetting setting:acqSettings) {
                             setting.getFieldOfView().setFieldRotation(fieldRot);
+//                            setting.getFieldOfView().createFullChipPath(setting.getObjPixelSize());
+                            setting.getFieldOfView().createRoiPath(setting.getObjPixelSize());
                         }
-                        BasicArea.setCameraRot(fieldRot);
-                        RefArea.setCameraRot(fieldRot);
+//                        BasicArea.setCameraRot(fieldRot);
+//                        RefArea.setCameraRot(fieldRot);
                         acqLayoutPanel.repaint();
 //                        break;
                     }
@@ -5406,7 +5418,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 //            acqLayout=new AcqCustomLayout();
             } else {
                 acqLayout=layout;
-                ((LayoutPanel) acqLayoutPanel).setAcquisitionLayout(acqLayout, getMaxFOV());
+                ((LayoutPanel) acqLayoutPanel).setAcquisitionLayout(acqLayout);
                 layoutFileLabel.setText(acqLayout.getName());
                 layoutFileLabel.setToolTipText("LOADED FROM: "+acqLayout.getFile().getAbsolutePath());
                 mostRecentArea = null;
@@ -5679,8 +5691,9 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     }
 
     private void addAcqSettingButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addAcqSettingButtonActionPerformed
-        AcqSetting setting = new AcqSetting(createAcqSettingName(), new FieldOfView(currentAcqSetting.getFieldOfView()), availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)), currentDetector.getBinningDesc(0), false);
-        setting.setDetector(currentDetector);
+        Detector currentDetector=MMCoreUtils.getCoreDetector(core);
+        AcqSetting setting = new AcqSetting(createAcqSettingName(), availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)), currentDetector.getBinningDesc(0), false);
+        setting.addDetector(currentDetector);
         setting.setObjectiveDevStr(currentAcqSetting.getObjectiveDevStr());
         //passes on copy of currentAcq.fieldOfView, including currentROI setting
 //        AcqSetting setting = new AcqSetting(createAcqSettingName(), new FieldOfView(currentAcqSetting.getFieldOfView()), availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)), false);
@@ -6176,7 +6189,15 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 String renamingMessage = "";
                 int counter=1;
                 for (AcqSetting setting:list) {
-                    setting.setDetector(currentDetector);
+                    List<Detector> activeDetectors=MMCoreUtils.getActiveDetectors(core,setting.getChannelGroupStr(), setting.getChannelNames());
+                    for (Detector d:activeDetectors) {
+                        Rectangle detRoi=d.getUnbinnedRoi();
+                        Rectangle roi=verifyRoi(setting);
+                        if (!detRoi.equals(roi)) {
+                            JOptionPane.showMessageDialog(this, "ROI conflict");
+                        }
+                    }
+                    setting.setDetectors(activeDetectors);
                     if (!objectiveDevStr.equals(setting.getObjectiveDevStr())) {
                         setting.setObjectiveDevStr(objectiveDevStr);
                     }
@@ -7068,6 +7089,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         if (currentAcqSetting != null) {
             currentAcqSetting.setBinning((String) binningComboBox.getSelectedItem());
             updatePixelSize(currentAcqSetting.getObjective());
+            updateTileSize(currentAcqSetting);
         }
     }//GEN-LAST:event_binningComboBoxActionPerformed
 
@@ -7111,7 +7133,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                             prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
                             currentAcqSetting.setObjective(selectedObjective, getObjPixelSize(selectedObjective));
                             //                        IJ.log("objectiveComboBoxActionPerformed. "+selectedObjective);
-                            updatePixelSize(selectedObjective); // calls updateFOVDimension, updateTileOverlap, updateTileSizeLabel
+                            updatePixelSize(selectedObjective); // calls updateFOVDimension, updateTileOverlap, updateTileSize
+                            updateTileSize(currentAcqSetting);
                             if (currentAcqSetting.getImagePixelSize() > 0 && retilingAllowed) {
                                 calcTilePositions(null, currentAcqSetting, ADJUSTING_SETTINGS);
                             } else if (currentAcqSetting.getImagePixelSize() <= 0) {
@@ -7191,6 +7214,39 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 
     }//GEN-LAST:event_zStackCenteredCheckBoxItemStateChanged
 
+    private Rectangle verifyRoi(AcqSetting setting) {
+        try {
+            Rectangle coreRoi=core.getROI();
+            Rectangle settingRoi=currentAcqSetting.getFieldOfView().getROI_Pixel(currentAcqSetting.getBinningFactor());
+            if (coreRoi.x!=settingRoi.x
+                    || coreRoi.y!=settingRoi.y
+                    || coreRoi.width!=settingRoi.width
+                    || coreRoi.height!=settingRoi.height) {
+                int result=JOptionPane.showConfirmDialog(this, 
+                        "ROI Mismatch!\n\n"
+                        + "Current ROI for device "+core.getCameraDevice()+": "
+                        + Integer.toString(coreRoi.x) +","
+                        + Integer.toString(coreRoi.y) +","
+                        + Integer.toString(coreRoi.width) +","
+                        + Integer.toString(coreRoi.height)                        
+                        + "\n"
+                        + "ROI in acquisition setting '" +currentAcqSetting.getName()+"': "
+                        + Integer.toString(settingRoi.x) +","
+                        + Integer.toString(settingRoi.y) +","
+                        + Integer.toString(settingRoi.width) +","
+                        + Integer.toString(settingRoi.height)
+                        + "\n\n"        
+                        + "Use ROI configured in sequence setting '"+currentAcqSetting.getName()+"?", "Camera ROI", JOptionPane.YES_NO_OPTION);
+                if (result==JOptionPane.YES_OPTION) {
+                    return settingRoi;
+                }
+            }
+            return null;
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+    
     private void liveButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_liveButtonActionPerformed
         if (liveButton.getText().equals("Live")) {
             if (app.isLiveModeOn()) {
@@ -7223,6 +7279,20 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 try {
                     core.setExposure(c.getExposure());
                     core.setConfig(currentAcqSetting.getChannelGroupStr(), c.getName());
+                    Rectangle roi=verifyRoi(currentAcqSetting);
+                    if (roi!=null) {
+                        //use roi defined in setting
+                        core.setROI(roi.x, roi.y, roi.width, roi.height);
+                    } else {
+                        //use core roi, update settings
+                        roi=core.getROI();
+                        Detector d=MMCoreUtils.getActiveDetector(core,currentAcqSetting.getChannelGroupStr(),c.getName());
+                        currentAcqSetting.getFieldOfView().setRoi_Pixel(roi, currentAcqSetting.getBinningFactor());
+                        d.setUnbinnedRoi(Utils.scaleRoi(roi,currentAcqSetting.getBinningFactor()));
+                        List<Detector> activeDetectors=MMCoreUtils.getActiveDetectors(core,currentAcqSetting.getChannelGroupStr(), currentAcqSetting.getChannelNames());
+                        currentAcqSetting.setDetectors(activeDetectors);
+                        updateTileSize(currentAcqSetting);
+                    }
                     app.refreshGUI();
                     //gui.setConfigChanged(true);
                 } catch (Exception e) {
@@ -7278,28 +7348,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             currentAcqSetting.setChannelGroupStr(chGroupStr);
             initializeChannelTable(currentAcqSetting);
         }
-//        if (chGroupStr!=null) {
-            //read out currentROI setting and update ROI in detector of current AcqSetting
-            FieldOfView fov=currentAcqSetting.getFieldOfView();
-            Rectangle snapROI=fov.getROI_Pixel(currentAcqSetting.getBinningFactor());
-            Rectangle coreROI=null;
-            boolean updatedROI=false;
-
-            try {
-                coreROI=core.getROI();
-                if (coreROI !=null
-                        && (coreROI.width != fov.getROI_Pixel(currentAcqSetting.getBinningFactor()).width 
-                        || coreROI.height != fov.getROI_Pixel(currentAcqSetting.getBinningFactor()).height)) {
-                    JOptionPane.showMessageDialog(this, "ROIs are not supported. Clearing ROI.");
-//                    core.clearROI();
-                    for (AcqSetting setting:acqSettings) {
-//                        setting.getFieldOfView().clearROI();
-                    }
-                }    
-            } catch (Exception ex) {
-                ReportingUtils.logError(ex);
-            }
-
             SwingUtilities.invokeLater(new Runnable () {
                 @Override
                 public void run() {
@@ -7330,6 +7378,20 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                             core.setPosition(zStageLabel, startZPos+ch.getZOffset());
                             core.setExposure(ch.getExposure());
                             core.setConfig(currentAcqSetting.getChannelGroupStr(), ch.getName());
+                            Rectangle roi=verifyRoi(currentAcqSetting);
+                            if (roi!=null) {
+                                //use roi defined in setting
+                                core.setROI(roi.x, roi.y, roi.width, roi.height);
+                            } else {
+                                //use core roi, update settings
+                                roi=core.getROI();
+                                List<Detector> activeDetectors=MMCoreUtils.getActiveDetectors(core,currentAcqSetting.getChannelGroupStr(), currentAcqSetting.getChannelNames());
+                                Detector d=MMCoreUtils.getActiveDetector(core,currentAcqSetting.getChannelGroupStr(),ch.getName());
+                                currentAcqSetting.getFieldOfView().setRoi_Pixel(roi, currentAcqSetting.getBinningFactor());
+                                d.setUnbinnedRoi(Utils.scaleRoi(roi,currentAcqSetting.getBinningFactor()));
+                                currentAcqSetting.setDetectors(activeDetectors);
+                                updateTileSize(currentAcqSetting);
+                            }
                             core.waitForConfig(currentAcqSetting.getChannelGroupStr(), ch.getName());
                             core.waitForDevice(zStageLabel);
                             app.snapAndAddImage(acqName, 0, i, 0,0);
@@ -7408,6 +7470,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         } else {
             if (availableChannels.length > 0) {
                 ctm.addRow(new Channel(availableChannels[0], 100, 0, Color.GRAY));
+//                getActiveDetectors(currentAcqSetting);
             } else {
                 JOptionPane.showMessageDialog(this,"No Channel configurations found.");
             }
@@ -7420,10 +7483,13 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 
     private void refreshRoiButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_refreshRoiButtonActionPerformed
         try {
-            currentDetector=getCoreCameraSpecs(currentDetector.getFieldRotation());
-            FieldOfView fov=currentAcqSetting.getFieldOfView();
-            cameraROI = core.getROI();
-/*            if (cameraROI != null
+            Detector currentDetector=MMCoreUtils.updateAvailableCameras(core);
+            String oldbin=(String)binningComboBox.getSelectedItem();
+            binningComboBox.setModel(new DefaultComboBoxModel(currentDetector.getBinningDescriptions()));
+            binningComboBox.setSelectedItem(oldbin);
+//            updateTileSize(currentAcqSetting, getActiveDetectors(currentAcqSetting));
+/*            cameraROI = core.getROI();
+            if (cameraROI != null
                         && (cameraROI.width != fov.getROI_Pixel(currentAcqSetting.getBinningFactor()).width 
                         || cameraROI.height != fov.getROI_Pixel(currentAcqSetting.getBinningFactor()).height)) {
                 JOptionPane.showMessageDialog(this,"ROIs are not supported.\nUsing full camera chip.");
@@ -7433,12 +7499,27 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
         //(currentDetector.getFieldRotation());
+/*
         for (AcqSetting setting:acqSettings) {
-            FieldOfView fov=new FieldOfView(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel(),currentDetector.getFieldRotation());
-            setting.setFieldOfView(fov);
-            setting.getFieldOfView().setRoi_Pixel(cameraROI, setting.getBinningFactor());
+            Detector activeDet;
+            if (!setting.getChannels().isEmpty()) {
+                activeDet=getActiveDetector(setting.getChannelGroupStr(),setting.getChannels().get(0).getName());
+            } else {
+                activeDet=getCoreDetector();
+            }
+            if (activeDet!=null) {
+                FieldOfView fov=new FieldOfView(
+                        activeDet.getFullWidth_Pixel(), 
+                        activeDet.getFullHeight_Pixel(),
+                        activeDet.getUnbinnedRoi(),
+                        activeDet.getFieldRotation());
+//                fov.setRoi_Pixel(activeDet.getUnbinnedRoi(), 1);
+                setting.setFieldOfView(fov);
+            }
 //            setting.getFieldOfView().clearROI();
-        }
+        }*/
+        List<Detector> activeDetectors=MMCoreUtils.getActiveDetectors(core,currentAcqSetting.getChannelGroupStr(), currentAcqSetting.getChannelNames());
+        currentAcqSetting.setDetectors(activeDetectors);
         if (currentAcqSetting.getImagePixelSize() > 0 && retilingAllowed) {
             calcTilePositions(null, currentAcqSetting, ADJUSTING_SETTINGS);
         } else if (currentAcqSetting.getImagePixelSize() <= 0) {
@@ -7450,6 +7531,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             acqLayoutPanel.repaint();
         }
         updatePixelSize(currentAcqSetting.getObjective());
+        updateTileSize(currentAcqSetting);
     }//GEN-LAST:event_refreshRoiButtonActionPerformed
 
     private void closeGapsButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_closeGapsButtonActionPerformed
@@ -7712,7 +7794,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         try {
             //read out core's current ROI setting and compare to fov (should be full size chip)
             FieldOfView fov=currentAcqSetting.getFieldOfView();
-            Rectangle coreROI=core.getROI();
+/*            Rectangle coreROI=core.getROI();
             if (coreROI !=null
                     && (coreROI.width != fov.getROI_Pixel(currentAcqSetting.getBinningFactor()).width
                     || coreROI.height != fov.getROI_Pixel(currentAcqSetting.getBinningFactor()).height)) {
@@ -7721,7 +7803,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 for (AcqSetting setting:acqSettings) {
                     setting.getFieldOfView().clearROI();
                 }
-            }
+            }*/
         } catch (Exception ex) {
             ReportingUtils.logError(ex);
         }
@@ -8401,18 +8483,21 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             try {
                 AcqSetting setting=new AcqSetting(acqSettingObj);
                 IJ.log("    Loading acquisition sequence # "+Integer.toString(i+1)+", name: "+setting.getName());
-                setting.getFieldOfView().setFullSize_Pixel(currentDetector.getFullWidth_Pixel(),currentDetector.getFullHeight_Pixel());
-                setting.getFieldOfView().setFieldRotation(currentDetector.getFieldRotation());
-                if (setting.getChannelGroupStr() == null 
-                        || !groupStr.contains(setting.getChannelGroupStr())) {
-                    setting.setChannelGroupStr(MMCoreUtils.changeConfigGroupStr(this,core,"Channel",""));
-                }        
                 if (!availableObjectives.contains(setting.getObjective())) {
                     JOptionPane.showMessageDialog(this, "Objective "+setting.getObjective()+" not found. Choosing alternative.");
                     setting.setObjective(availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)));
                 } else {
                     setting.setObjective(setting.getObjective(), getObjPixelSize(setting.getObjective()));
                 }
+                if (setting.getChannelGroupStr() == null 
+                        || !groupStr.contains(setting.getChannelGroupStr())) {
+                    setting.setChannelGroupStr(MMCoreUtils.changeConfigGroupStr(this,core,"Channel",""));
+                }        
+                setting.setDetectors(MMCoreUtils.getActiveDetectors(core, setting.getChannelGroupStr(), setting.getChannelNames()));
+/*                setting.getFieldOfView().setFullSize_Pixel(currentDetector.getFullWidth_Pixel(),currentDetector.getFullHeight_Pixel());
+                setting.getFieldOfView().setFieldRotation(currentDetector.getFieldRotation());
+                setting.getFieldOfView().createFullChipPath(setting.getObjPixelSize());
+                setting.getFieldOfView().createRoiPath(setting.getObjPixelSize());*/
                 settings.add(setting);
             } catch (ClassNotFoundException ex) {
                 IJ.log("Class not found, sequence #"+i);
@@ -8450,8 +8535,15 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 settings=loadAcquisitionSettings(expSettingsObj.getJSONArray(AcqSetting.TAG_ACQ_SETTING_ARRAY));
                 IJ.log("    "+settings.size()+ " acquisition setting(s) found and loaded.");
                 if (settings.size() == 0) {
-                    FieldOfView fov=new FieldOfView(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel(),currentDetector.getFieldRotation());
-                    AcqSetting setting = new AcqSetting("Seq_1", fov, availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)),currentDetector.getBinningDesc(0), false);
+//                    FieldOfView fov=new FieldOfView(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel(),currentDetector.getFieldRotation());
+                    List<Detector> activeDetectors=MMCoreUtils.getActiveDetectors(core, currentAcqSetting.getChannelGroupStr(), currentAcqSetting.getChannelNames());
+                    AcqSetting setting = new AcqSetting(
+                            "Seq_1",
+                            availableObjectives.get(0), 
+                            getObjPixelSize(availableObjectives.get(0)),
+                            activeDetectors.get(0).getBinningDesc(0), 
+                            false);
+                    setting.setDetectors(activeDetectors);
                     settings.add(setting);
                 }
             } catch (FileNotFoundException ex) {
@@ -8470,19 +8562,24 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     }
 
 
+    private String setBinning(AcqSetting setting, String binning) {
+        binningComboBox.setSelectedItem(binning);
+        if (!binning.equals((String)binningComboBox.getSelectedItem())) {
+            JOptionPane.showMessageDialog(this, "Setting: "+setting.getName()+"\n"
+                    + "Camera does not support binning mode: "+binning+".\n"
+                    + "Switching to binning mode: "+(String)binningComboBox.getSelectedItem()+".");
+            IJ.log("Failed to select "+binning+" binning mode. Switching to "+(String)binningComboBox.getSelectedItem()+" binning mode.");
+        }
+        setting.setBinning((String)binningComboBox.getSelectedItem());
+        return setting.getBinningDesc();
+    }
+    
     private void updateAcqSettingTab(AcqSetting setting) {
         retilingAllowed = false;
         
         //objective and binning
         objectiveComboBox.setSelectedItem(setting.getObjective());
-        binningComboBox.setSelectedItem(setting.getBinningDesc());
-        if (!setting.getBinningDesc().equals((String)binningComboBox.getSelectedItem())) {
-            JOptionPane.showMessageDialog(this, "Setting: "+setting.getName()+"\n"
-                    + "Camera does not support binning mode: "+setting.getBinningDesc()+".\n"
-                    + "Switching to binning mode: "+(String)binningComboBox.getSelectedItem()+".");
-            IJ.log("Failed to select "+setting.getBinningDesc()+" binning mode. Switching to "+(String)binningComboBox.getSelectedItem()+" binning mode.");
-        }
-        setting.setBinning((String)binningComboBox.getSelectedItem());
+        setBinning(setting, setting.getBinningDesc());
         
         //tiling
         tilingModeComboBox.setSelectedItem(setting.getTilingMode());
@@ -8600,8 +8697,15 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 IJ.log("    Acquisition settings could not be loaded. Initializing default acquisition settings.");
                 settings = new ArrayList<AcqSetting>();
 //                AcqSetting setting = new AcqSetting("Seq_1", cCameraPixX, cCameraPixY, availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)), Integer.parseInt(binningDesc[0]), false);
-                FieldOfView fov=new FieldOfView(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel(),currentDetector.getFieldRotation());
-                AcqSetting setting = new AcqSetting("Seq_1", fov, availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)),currentDetector.getBinningDesc(0), false);
+//                FieldOfView fov=new FieldOfView(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel(),currentDetector.getFieldRotation());
+                List<Detector> activeDetectors=MMCoreUtils.getActiveDetectors(core,currentAcqSetting.getChannelGroupStr(), currentAcqSetting.getChannelNames());
+                AcqSetting setting = new AcqSetting(
+                        "Seq_1", 
+                        availableObjectives.get(0), 
+                        getObjPixelSize(availableObjectives.get(0)),
+                        activeDetectors.get(0).getBinningDesc(0), 
+                        false);
+                setting.setDetectors(activeDetectors);
                 settings.add(setting);
                 expSettingsFile=new File(Prefs.getHomeDir(),"not found");
                 expSettingsFileLabel.setToolTipText("");    
@@ -8611,13 +8715,14 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         }
         IJ.log("    "+settings.size()+ " acquisition sequence(s) initialized.");
         acqLayout=layout;        
-        if (settings!=null) {
+//        if (settings!=null) {
             acqSettings=settings;
             for (AcqSetting setting:acqSettings) {
                 if (!objectiveDevStr.equals(setting.getObjectiveDevStr())) {
                     setting.setObjectiveDevStr(objectiveDevStr);
-                } 
-                setting.setDetector(currentDetector);
+                }
+                List<Detector> activeDetectors=MMCoreUtils.getActiveDetectors(core,setting.getChannelGroupStr(), setting.getChannelNames());
+                setting.setDetectors(activeDetectors);
             }
             currentAcqSetting=acqSettings.get(0);
          
@@ -8630,7 +8735,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             updateAcqSettingTab(currentAcqSetting);
             calculateTotalZDist(currentAcqSetting);
             calculateDuration(currentAcqSetting);
-        } 
+//        } 
         IJ.log("    GUI updated for sequence: "+currentAcqSetting.getName());
         //set active layout
         if (layout!=null) {
@@ -8641,7 +8746,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             removeAreaButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaRemovalAllowed());
             mergeAreasButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaMergingAllowed());
             mergeAreasButton.setToolTipText(!acqLayout.isEmpty() && acqLayout.isAreaMergingAllowed() ? "Merge areas" : "Areas cannot be merged in this layout");
-            ((LayoutPanel) acqLayoutPanel).setAcquisitionLayout(acqLayout, getMaxFOV());
+            ((LayoutPanel) acqLayoutPanel).setAcquisitionLayout(acqLayout);
             layoutFileLabel.setText(acqLayout.getName());
             if (acqLayout.isEmpty()) {
                 layoutFileLabel.setToolTipText("");
@@ -8720,7 +8825,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 selObjective = objectiveComboBox.getSelectedItem().toString();
             }
         }
-        updatePixelSize(selObjective); //calls updateFOVDimension, updateTileOverlap, updateTileSizeLabel 
+        updatePixelSize(selObjective); //calls updateFOVDimension, updateTileOverlap, updateTileSize 
+        updateTileSize(currentAcqSetting);
         retilingAllowed=true;    
         calcTilePositions(null, currentAcqSetting, SELECTING_AREA);
         IJ.log("Loading of experiment settings completed.");
@@ -8763,13 +8869,15 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         IJ.log("Objectives found for device "+objectiveDevStr+"(objectiveDevStr): "+obj);
     }
 
-    private double getMaxFOV() { //searches for largest pixel size calibration and multiplies it with horiz and vert detector pixel # (for objective with lowest mag)
+    private double getMaxFOV(Detector detector) { //searches for largest pixel size calibration and multiplies it with horiz and vert detector pixel # (for objective with lowest mag)
         double maxFOV = -1;
-        if (currentDetector != null && currentDetector.getFullWidth_Pixel() > 0 && currentDetector.getFullHeight_Pixel() > 0) {
+        int width=detector.getUnbinnedRoi().width;
+        int height=detector.getUnbinnedRoi().height;
+        if (detector != null && width > 0 && height > 0) {
             for (String objLabel:availableObjectives) {
                 double ps = getObjPixelSize(objLabel);
                 if (ps > 0) {
-                    maxFOV = Math.max(Math.max(ps * currentDetector.getFullWidth_Pixel(), ps * currentDetector.getFullHeight_Pixel()), maxFOV);
+                    maxFOV = Math.max(Math.max(ps * width, ps * height), maxFOV);
                 }
             }
         }
@@ -8779,14 +8887,14 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private void updatePixelSize(String objectiveLabel) {  //updates currentPixSize, FOV (tileSize) and their GUI labels
         if (currentAcqSetting != null) {
             currentAcqSetting.setObjective(objectiveLabel, getObjPixelSize(objectiveLabel));
-            double fovWidth = currentAcqSetting.getTileWidth_UM();
+/*            double fovWidth = currentAcqSetting.getTileWidth_UM();
             double fovHeight = currentAcqSetting.getTileHeight_UM();
-            double pixSize = currentAcqSetting.getImagePixelSize();//considers binning
             if ((fovWidth < 0) || (fovHeight < 0)) {
                 tileSizeLabel.setText(NOT_CALIBRATED);
             } else {
-                tileSizeLabel.setText(formatNumber("0.00", fovWidth) + "um x " + formatNumber("0.00", fovHeight) + "um");
-            }
+                tileSizeLabel.setText(formatNumber("0.00", fovWidth) + "x" + formatNumber("0.00", fovHeight) + " um");
+            }*/
+            double pixSize = currentAcqSetting.getImagePixelSize();//considers binning
             if (pixSize > 0) {
                 pixelSizeLabel.setText(Double.toString(pixSize) + " um");
             } else {
@@ -8865,25 +8973,24 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 
 
     boolean isInChannelList(String s, String[] list) {
-        boolean b = false;
-        if (list != null) {
+        if (list != null && s != null) {
             for (String listStr : list) {
-//               IJ.log("checking: "+s+" vs "+listStr);
                 if (s.toLowerCase().equals(listStr.toLowerCase())) {
-                    b = true;
+                    return true;
                 }
             }
         }
-        return b;
+        return false;
     }
 
     private boolean initializeChannelTable(AcqSetting setting) {
         boolean error = false;
         String groupStr=MMCoreUtils.verifyAndSelectConfigGroup(this,core,setting.getChannelGroupStr());
         error = groupStr==null;
-        String[] availableChannels=MMCoreUtils.getAvailableConfigs(core, groupStr!=null ? groupStr : "");
+        String[] availableChannels;
         if (groupStr!=null) {
             setting.setChannelGroupStr(groupStr);
+            availableChannels=MMCoreUtils.getAvailableConfigs(core, groupStr);
             //synchronize channel group with MMStudio; this is important so that the same channels are available in autofocus configuration dialog window
             try {
                 core.setChannelGroup(groupStr);
@@ -8894,11 +9001,20 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 
             //remove all channels that do not exist in this channel group
             ChannelTableModel model = (ChannelTableModel) channelTable.getModel();
+            String missingPresets="The following Channel configurations are not available in group '"+groupStr+"' and will be removed:\n\n";
+            List<Channel> toremove=new ArrayList<Channel>();
             for (int i = setting.getChannels().size() - 1; i >= 0; i--) {
-                if (!isInChannelList(setting.getChannels().get(i).getName(), availableChannels)) {
-                    JOptionPane.showMessageDialog(this, "'" + setting.getChannels().get(i).getName() + "' is not available in configuration '"+setting.getChannelGroupStr()+"'.");
-                    setting.getChannels().remove(i);
+                Channel ch=setting.getChannels().get(i);
+                if (!isInChannelList(ch.getName(), availableChannels)) {
+                    missingPresets+="    "+ch.getName()+"\n";
+                    toremove.add(ch);
                     error = true;
+                }
+            }
+            if (error) {
+                JOptionPane.showMessageDialog(this, missingPresets);
+                for (Channel ch:toremove) {
+                    setting.getChannels().remove(ch);
                 }
             }
         } else {
@@ -8918,6 +9034,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         colorColumn.setCellRenderer(new ColorRenderer(true));
         //since new table model was created, need to add listener again
         channelTable.getModel().addTableModelListener(this);
+        List<Detector> activeDetectors=MMCoreUtils.getActiveDetectors(core,setting.getChannelGroupStr(), setting.getChannelNames());
+        updateTileSize(setting);
         return !error;
     }
 
@@ -9051,101 +9169,71 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         areaTable.setRowSorter(sorter);
     }
 
-    //fovRotation: angle rad rotation of camera field of view relative to stage
-    //if fovRotation == null or currentDetector ==null --> set fovRotation to FieldOfView.ROTATION_UNKNOWN
-    private Detector getCoreCameraSpecs(Double fovRotation) {
-        IJ.log("Loading camera specification.");
-        Detector detector=null;
-        detectors=new ArrayList<Detector>();
-        String currentCamera=null;
-        Detector currentDetector=null;
-        try {
-            currentCamera = core.getCameraDevice();
-            String cameraDeviceLabel = core.getDeviceType(currentCamera).toString();
-            StrVector devices=core.getLoadedDevices();
-            for (String device:devices) {
-                if (core.getDeviceType(device).toString().equals(cameraDeviceLabel)) {
-                    StrVector props = core.getDevicePropertyNames(device);
-                    int currentBinning=1;
-                    int cCameraPixX=-1;
-                    int cCameraPixY=-1;
-                    int bitDepth=-1;
-                    String[] binningOptions= new String[]{};
-                    Map<String,Integer> binningMap=new HashMap<String,Integer>();
-                    for (String propsStr : props) {
-                        StrVector allowedVals = core.getAllowedPropertyValues(device, propsStr);
-                        if (propsStr.equals("OnCameraCCDXSize")) {
-                            cCameraPixX = Integer.parseInt(core.getProperty(device, propsStr));
-                        }
-                        else if (propsStr.equals("OnCameraCCDYSize")) {
-                            cCameraPixY = Integer.parseInt(core.getProperty(device, propsStr));
-                        }
-                        else if (propsStr.equals("Binning")) {
-                            binningOptions=allowedVals.toArray();
-                            Arrays.sort(binningOptions);
-                            String currentBinningStr=core.getProperty(device, propsStr);
-                            double pixSizes[] = new double[binningOptions.length];
-                            int i=0;
-                            double minPixSize=-1;
-                            for (String option:binningOptions) {
-                                core.setProperty(device, propsStr, option);
-                                pixSizes[i]=core.getPixelSizeUm();
-                                if (minPixSize==-1 || pixSizes[i] < minPixSize) {
-                                    minPixSize=pixSizes[i];
-                                }
-                                i++;
-                            }
-                            core.setProperty(device, propsStr, currentBinningStr);
-                            for (i=0; i<binningOptions.length; i++) {
-                                binningMap.put(binningOptions[i],(int)Math.round(pixSizes[i]/minPixSize));
-                            }
-                        }
-                        if (propsStr.equals("BitDepth")) {
-                            bitDepth = Integer.parseInt(core.getProperty(device, propsStr));
-                        }
-                    }
-                    if (cCameraPixX == -1 || cCameraPixY == -1) {//can't read OnCameraCCD chip size
-                        core.clearROI();
-                        core.snapImage();
-                        Object img=core.getImage();
-                        bitDepth = (int)core.getBytesPerPixel();                
-                        if (cCameraPixX==-1 || cCameraPixY==-1) {
-                            cCameraPixX = currentBinning * (int) core.getImageWidth();
-                            cCameraPixY = currentBinning * (int) core.getImageHeight();
-                        }
-                    }       
-        //            if (fovRotation == null || currentDetector==null) {
-                    if (fovRotation == null) {
-                        detector=new Detector(device, cCameraPixX, cCameraPixY, bitDepth, binningMap, FieldOfView.ROTATION_UNKNOWN);
-                        BasicArea.setCameraRot(FieldOfView.ROTATION_UNKNOWN);
-                        RefArea.setCameraRot(FieldOfView.ROTATION_UNKNOWN);
-                    } else {
-                        detector=new Detector(device, cCameraPixX, cCameraPixY, bitDepth, binningMap, fovRotation);                
-                    }
-                    if (device.equals(currentCamera)) {
-                        currentDetector=detector;
-                    }
-                    binningComboBox.setModel(new DefaultComboBoxModel(binningOptions));
-                    detectors.add(detector);
-                    IJ.log("        Camera specification loaded: "+detector.toString());
-                }
-            }
-        } catch (Exception ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            IJ.log("Error during loading of camera specifications: "+ex.toString());
-            JOptionPane.showMessageDialog(this, "Problem loading camera specification!"+ex.getMessage());
-        } finally {
-            //restore to original camera
-            if (currentCamera!=null) {
-                try {
-                    core.setCameraDevice(currentCamera);            
-                } catch (Exception e) {}
-            }            
+    private boolean updateTileSize(AcqSetting setting) {
+        List<Detector> activeDetectors=currentAcqSetting.getDetectors();
+        IJ.log("updateTileSizeLabel");
+        if (activeDetectors == null) {
+            return false;
         }
-        IJ.log("        Current detector: "+currentDetector.toString());
-        return currentDetector;
-    }
+        String tileinfo="";
+        int lastW=-1;
+        int lastH=-1;
+        int lastBitDepth=-1;
+        double lastRotation=FieldOfView.ROTATION_UNKNOWN;
+        boolean sizeMismatch=false;
+        for (Detector ad:activeDetectors) {
+            String wStr="";
+            String hStr="";
+            String rotStr="";
+            String bitStr="";
+            try {
+                Rectangle r=ad.getUnbinnedRoi();
+                IJ.log("updateTileSize: unbinnedROI="+r.toString());
+                if (lastW==-1)  {
+                    setting.getFieldOfView().setRoi_Pixel(r, 1);
+                }
+                int binning=setting.getBinningFactor();
+                int x=r.x/binning;
+                int y=r.y/binning;
+                int w=r.width/binning;
+                int h=r.height/binning;
+                wStr=Integer.toString(w);
+                hStr=Integer.toString(h);
+                int bitDepth=ad.getBitDepth();
+                bitStr=Integer.toString(ad.getBitDepth());
+                double rot=ad.getFieldRotation();
+                rotStr=rot != FieldOfView.ROTATION_UNKNOWN ? String.format("%1$,.1f", rot/Math.PI*180) : "?";
+                if ((lastW!=-1 && lastW!=w) || 
+                        (lastH!=-1 && lastH!=h) ||
+                        (bitDepth>1 && lastBitDepth>1 && lastBitDepth!=bitDepth) || 
+                        (lastRotation!=FieldOfView.ROTATION_UNKNOWN && rot!=FieldOfView.ROTATION_UNKNOWN && lastRotation!=rot)) {
+                    sizeMismatch=true;
+                }
+                lastW=w;
+                lastH=h;
+                lastBitDepth=bitDepth;
+                lastRotation=rot;
+            } catch (Exception ex) {
+                IJ.log(ex.toString());
+                ex.printStackTrace();
+                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            tileinfo+=(ad == null ? "": ad.getLabel())+": "+rotStr+"˚, "+wStr+"x"+hStr+" pix, " +bitStr+"bit<br>";
+        }        
+        tileSizeLabel.setForeground(sizeMismatch ? Color.red : Color.black);
+        tileSizeLabel.setToolTipText("<html>"+tileinfo+"</html>"); 
+        
+        double fovWidth = setting.getTileWidth_UM();
+        double fovHeight = setting.getTileHeight_UM();
+        if ((fovWidth < 0) || (fovHeight < 0)) {
+            tileSizeLabel.setText(NOT_CALIBRATED);
+        } else {
+            tileSizeLabel.setText(formatNumber("0.00", fovWidth) + "x" + formatNumber("0.00", fovHeight) + " um");
+        }
 
+        return sizeMismatch;
+    }
+    
     private void updateAcqLayoutPanel() {
         if (acqLayout != null) {
             totalAreasLabel.setText(Integer.toString(acqLayout.getNoOfSelectedAreas()));
@@ -9276,8 +9364,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             List<Future<Integer>> resultList = acqLayout.calculateTiles(
                     areas,
                     aSetting.getDoxelManager(), 
-                    aSetting.getTileWidth_UM(),
-                    aSetting.getTileHeight_UM(),
+                    aSetting.getFieldOfView(),
                     aSetting.getTilingSetting());
             Thread retilingMonitorThread = new Thread(new TileCalculationMonitor(acqLayout, resultList, processProgressBar, cmd));//, areas));
             retilingMonitorThread.start();

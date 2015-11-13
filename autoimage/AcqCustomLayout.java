@@ -5,8 +5,10 @@ import autoimage.api.RefArea;
 import autoimage.gui.AcqFrame;
 import autoimage.api.BasicArea;
 import ij.IJ;
+import java.awt.Shape;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.NoninvertibleTransformException;
+import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
@@ -184,37 +186,34 @@ public class AcqCustomLayout extends AcqBasicLayout {
         areas=new ArrayList(elements);
     }
     
-    //returns true if gaps exist between tiles
+/*    //returns true if gaps exist between tiles
     //considers camera field rotation and stage-to-layout rotation
     @Override
     public boolean hasGaps(FieldOfView fov, double tileOverlap) {
         Rectangle2D fovROI=fov.getROI_Pixel(1);
         Point2D tileOffset=BasicArea.calculateTileOffset(fovROI.getWidth(), fovROI.getHeight(), tileOverlap);
-        AffineTransform rot=new AffineTransform();
-        rot.rotate(fov.getFieldRotation()-getStageToLayoutRot(),fovROI.getWidth()/2,fovROI.getHeight()/2);
+        AffineTransform absTransform=new AffineTransform();
+        absTransform.rotate(fov.getFieldRotation()-getStageToLayoutRot(),fovROI.getWidth()/2,fovROI.getHeight()/2);
         AffineTransform tOrigin=new AffineTransform();
         tOrigin.translate(-fovROI.getWidth()/2,-fovROI.getHeight()/2);
         java.awt.geom.Area[] a=new java.awt.geom.Area[4];
         for (int i=0; i<4; i++) {
             a[i]=new java.awt.geom.Area(fovROI);
-            a[i].transform(rot);
+            a[i].transform(absTransform);
             a[i].transform(tOrigin);
             switch (i) {
                 case 1: {
-                    AffineTransform transl=new AffineTransform();
-                    transl.translate(tileOffset.getX(), 0);
+                    AffineTransform transl=AffineTransform.getTranslateInstance(tileOffset.getX(), 0);
                     a[i].transform(transl);
                     break;
                 }    
                 case 2: {
-                    AffineTransform transl=new AffineTransform();
-                    transl.translate(0,tileOffset.getY());
+                    AffineTransform transl=AffineTransform.getTranslateInstance(0,tileOffset.getY());
                     a[i].transform(transl);
                     break;
                 }    
                 case 3: {
-                    AffineTransform transl=new AffineTransform();
-                    transl.translate(tileOffset.getX(), tileOffset.getY());
+                    AffineTransform transl=AffineTransform.getTranslateInstance(tileOffset.getX(), tileOffset.getY());
                     a[i].transform(transl);
                     break;
                 }    
@@ -226,7 +225,22 @@ public class AcqCustomLayout extends AcqBasicLayout {
         return (!(a[0].contains(centerX, centerY) && a[3].contains(centerX, centerY)) 
                                         || (a[1].contains(centerX, centerY) && a[2].contains(centerX, centerY)));
     }
+*/
     
+    //returns true if gaps exist between tiles
+    //considers camera field rotation and stage-to-layout rotation
+    @Override
+    public boolean hasGaps(FieldOfView fov, double tileOverlap) {
+        Point2D tileOffset=BasicArea.calculateTileOffset(fov, tileOverlap);
+        AffineTransform absTransform=AffineTransform.getRotateInstance(-getStageToLayoutRot());
+        Shape absFov0=absTransform.createTransformedShape(fov.getEffectiveRoiPath());
+
+        double cornerX=tileOffset.getX()/2;
+        double cornerY=tileOffset.getY()/2;
+        return !((absFov0.contains(-cornerX, -cornerY) && absFov0.contains(cornerX, cornerY)) 
+              || (absFov0.contains(-cornerX, cornerY) && absFov0.contains(cornerX, -cornerY)));
+    }
+
     @Override
     public void setWidth(double w) {
         width=w;
@@ -241,7 +255,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     public void setLength(double l) {
         length=l;
     }
-    
+/*    
     //returns minimal relative tile overlap (0 <= tileOverlap <=1) to eliminate all gaps
     //considers camera field rotation and stage-to-layout rotation
     @Override
@@ -268,21 +282,18 @@ public class AcqCustomLayout extends AcqBasicLayout {
                 a[i].transform(tOrigin);
                 switch (i) {
                     case 1: {
-                        AffineTransform transl=new AffineTransform();
-                        transl.translate(tileOffset.getX(), 0);
+                        AffineTransform transl=AffineTransform.getTranslateInstance(tileOffset.getX(), 0);
                         a[i].transform(transl);
 //                      a[i]=a[0].createTransformedArea(transl);
                         break;
                     }    
                     case 2: {
-                        AffineTransform transl=new AffineTransform();
-                        transl.translate(0,tileOffset.getY());
+                        AffineTransform transl=AffineTransform.getTranslateInstance(0,tileOffset.getY());
                         a[i].transform(transl);
                         break;
                     }    
                     case 3: {
-                        AffineTransform transl=new AffineTransform();
-                        transl.translate(tileOffset.getX(), tileOffset.getY());
+                        AffineTransform transl=AffineTransform.getTranslateInstance(tileOffset.getX(), tileOffset.getY());
                         a[i].transform(transl);
                         break;
                     }
@@ -297,7 +308,24 @@ public class AcqCustomLayout extends AcqBasicLayout {
         }
         return newOverlap;
     }
-    
+    */
+    //returns minimal relative tile overlap (0 <= tileOverlap <=1) to eliminate all gaps
+    //considers camera field rotation and stage-to-layout rotation
+    @Override
+    public double closeTilingGaps(FieldOfView fov, double accuracy) {
+        double newOverlap=0;
+        double lowOverlap=0;
+        double highOverlap=1;
+        while (highOverlap-lowOverlap > accuracy) {
+            newOverlap=(highOverlap+lowOverlap)/2;
+            if (hasGaps(fov,newOverlap)) {
+                lowOverlap=newOverlap;
+            } else {
+                highOverlap=newOverlap;
+            }
+        }
+        return newOverlap;
+    }
     
     //in radians
     @Override
@@ -656,7 +684,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
             RefArea oldLm=landmarks.get(index);
             oldLm.setStageCoord(lm.getStageCoordX(), lm.getStageCoordY(), lm.getStageCoordZ());
             oldLm.setLayoutCoord(lm.getLayoutCoordX(),lm.getLayoutCoordY(), lm.getLayoutCoordZ());
-            oldLm.setDimension(lm.getPhysWidth(), lm.getPhysHeight());
+            oldLm.setPhysDimension(lm.getPhysWidth(), lm.getPhysHeight());
             oldLm.setZDefined(lm.isZPosDefined());
             oldLm.setName(lm.getName());
             oldLm.setRefImageFile(lm.getRefImageFile());
@@ -1253,8 +1281,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
         return (!error ? totalTiles : -totalTiles);
     }
     
-    public List<Future<Integer>> calculateTiles(List<BasicArea> areasToTile, final DoxelManager dManager, final double fovWidth_UM, final double fovHeight_UM, final TilingSetting tSetting) {
-        IJ.log("AcqLayout.calculateTiles...started");
+    public List<Future<Integer>> calculateTiles(List<BasicArea> areasToTile, final DoxelManager dManager, final FieldOfView fov, final TilingSetting tSetting) {
         tilingAborted=false;
         ThreadFactory threadFactory = Executors.defaultThreadFactory();
         tilingExecutor = new ThreadPoolExecutor(2, 4, 10, TimeUnit.SECONDS,
@@ -1273,9 +1300,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
                     @Override
                     public Integer call() {
                         try {
-                            return a.calcTilePositions(dManager,
-                                    fovWidth_UM, 
-                                    fovHeight_UM, tSetting);
+                            return a.calcTilePositions(dManager,fov, tSetting);
                         } catch (InterruptedException ex) {
                             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                             return -1;

@@ -75,7 +75,7 @@ public class AcqSetting {
     private String channelGroupStr; //visible in GUI
     private String objLabel;        //visible in GUI
     private double objPixSize;      //internal based on existing MM calibration
-    private Detector detector;
+    private List<Detector> detectors;
     private FieldOfView fieldOfView;
     private String binningStr;            //visible in GUI 
     private TilingSetting tiling;
@@ -108,8 +108,7 @@ public class AcqSetting {
     private DefaultMutableTreeNode imageProcRoot; //stores image processing tree
     private ScheduledTime startTime;         //visible
     private Calendar absoluteStart;   //internal
-    
-    
+
     public static class ScheduledTime {
         public final static int ASAP = 0;
         public final static int DELAY = 1;
@@ -174,7 +173,7 @@ public class AcqSetting {
      * @param n label for this acquisition setting
      */
     public AcqSetting(String n) {
-        this(n, null,"", -1d);
+        this(n,"", -1d);
     }
 
     /**
@@ -184,8 +183,8 @@ public class AcqSetting {
      * @param objective label of the objective to be used (needs to correspond to a valid entry in the objective turret device group
      * @param oPixSize pixel size of chosen objective, camera binning is assumed to be 1.
      */
-    public AcqSetting(String n, FieldOfView fov, String objective, double oPixSize) {
-        this(n, fov, objective, oPixSize, "1", false);
+    public AcqSetting(String n, String objective, double oPixSize) {
+        this(n, objective, oPixSize, "1", false);
     }
 
     /**
@@ -197,16 +196,11 @@ public class AcqSetting {
      * @param bin label that describes the binning value (appropriate values are defined by camera device adapter
      * @param autof boolean value to enable or disable use of autofocus during acquisition.
      */
-    public AcqSetting(String n, FieldOfView fov, String objective, double oPixSize, String bin, boolean autof) {
+    public AcqSetting(String n, String objective, double oPixSize, String bin, boolean autof) {
         name=n;                     
         binningStr=bin;
         objectiveDevStr="";
         
-        if (fov == null)
-            fieldOfView = new FieldOfView(1,1,FieldOfView.ROTATION_UNKNOWN);
-        else
-            fieldOfView=fov;
-        setObjective(objective,oPixSize);        
         autofocus=autof;
         autofocusSettings=new JSONObject();
         afSkipFrames=0;
@@ -230,7 +224,9 @@ public class AcqSetting {
         tiling=new TilingSetting();
         isModified=false;
         doxelManager = new DoxelManager(null, this);
-        detector=null;
+        detectors=new ArrayList<Detector>();
+        fieldOfView = new FieldOfView(0,0,FieldOfView.ROTATION_UNKNOWN);
+        setObjective(objective,oPixSize);        
     }
         
     public AcqSetting (JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalArgumentException, IllegalAccessException {
@@ -245,13 +241,14 @@ public class AcqSetting {
                 chShutterOpen=false;
             }
             binningStr=obj.getString(TAG_BINNING);
-            try {
+            fieldOfView = new FieldOfView(0,0,FieldOfView.ROTATION_UNKNOWN);
+/*            try {
                 JSONObject fovObj=obj.getJSONObject(TAG_FIELD_OF_VIEW);
                 fieldOfView = new FieldOfView(fovObj);
             } catch (JSONException e) {
                 ReportingUtils.logError("Cannot load detector from acquisition settings. Instantiating standard detector");
-                fieldOfView = new FieldOfView(1,1,-1);
-            }    
+                fieldOfView = new FieldOfView(1,1,FieldOfView.ROTATION_UNKNOWN);
+            }  */  
             setObjective(obj.getString(TAG_OBJ_LABEL),-1);
             autofocus=obj.getBoolean(TAG_AUTOFOCUS);
             autofocusSettings=obj.getJSONObject(TAG_AUTOFOCUS_SETTINGS);
@@ -301,15 +298,53 @@ public class AcqSetting {
                 imageProcRoot=Utils.createDefaultImageProcTree();
             }    
         }
-        detector=null;
+        fieldOfView = new FieldOfView(0,0,FieldOfView.ROTATION_UNKNOWN);
+        detectors=new ArrayList<Detector>();
     }
     
-    public void setDetector(Detector det) {
-        detector=det;
+    public List<Detector> getDetectors() {
+        return detectors;
     }
     
-    public Detector getDetector() {
-        return detector;
+    public void setDetectors(List<Detector> det) {
+        detectors=det;
+        if (!det.isEmpty()) {
+            Detector firstDetector=det.get(0);
+            fieldOfView=new FieldOfView(
+//                    firstDetector.getFullWidth_Pixel(), 
+//                    firstDetector.getFullHeight_Pixel(),
+                    firstDetector.getUnbinnedRoi().width,
+                    firstDetector.getUnbinnedRoi().height,
+                    firstDetector.getUnbinnedRoi(),
+                    firstDetector.getFieldRotation());
+        } else {
+            fieldOfView=new FieldOfView(
+                    0,
+                    0,
+                    null,
+                    FieldOfView.ROTATION_UNKNOWN);
+        }
+//        fieldOfView.createFullChipPath(objPixSize);
+        fieldOfView.createRoiPath(objPixSize);   
+    }
+    
+    public void addDetector(Detector det) {
+        if (detectors==null) {
+            detectors=new ArrayList<Detector>();
+        }
+        detectors.add(det);
+        if (detectors.isEmpty()) {
+            //this ensures that fieldOfView is updated
+            setDetectors(detectors);
+        }
+    }
+    
+    public Detector getDetector(int index) {
+        if (detectors!=null && index>=0 && index<detectors.size()) {
+            return detectors.get(index);
+        } else {
+            return null;
+        }
     }
     
     public static JSONObject convertAutofocusSettings(Autofocus af, CMMCore core_) throws JSONException, MMException {
@@ -429,7 +464,7 @@ public class AcqSetting {
         obj.put(TAG_CHANNEL_SHUTTER_OPEN, chShutterOpen);
         obj.put(TAG_OBJ_LABEL, objLabel);
         obj.put(TAG_BINNING, binningStr);
-        obj.put(TAG_FIELD_OF_VIEW, fieldOfView.toJSONObject());
+//        obj.put(TAG_FIELD_OF_VIEW, fieldOfView.toJSONObject());
         obj.put(TAG_AUTOFOCUS, autofocus);
         obj.put(TAG_AUTOFOCUS_SETTINGS, autofocusSettings);
         obj.put(TAG_AUTOFOCUS_SKIP_FRAMES, afSkipFrames);
@@ -469,7 +504,7 @@ public class AcqSetting {
     
     public AcqSetting duplicate() {
 //        AcqSetting copy = new AcqSetting(this.name, this.cameraPixX, this.cameraPixY, this.objLabel, this.objPixSize, this.binning, this.autofocus);
-        AcqSetting copy = new AcqSetting(this.name, new FieldOfView(fieldOfView), this.objLabel, this.objPixSize, this.binningStr, this.autofocus);
+        AcqSetting copy = new AcqSetting(this.name, this.objLabel, this.objPixSize, this.binningStr, this.autofocus);
         for (Channel c:channels)
             copy.getChannels().add(c.duplicate());
         copy.setStartTime(new ScheduledTime(this.startTime.type,this.startTime.startTimeMS));
@@ -507,10 +542,12 @@ public class AcqSetting {
     public FieldOfView getFieldOfView() {
         return fieldOfView;
     }
-    
+ 
+ /*   
     public void setFieldOfView(FieldOfView fov) {
         fieldOfView=fov;
     }
+ */
     
     public DoxelManager getDoxelManager() {
         return doxelManager;
@@ -573,6 +610,8 @@ public class AcqSetting {
     public void setObjective(String label, double oPixSize) {
         objLabel=label;
         objPixSize=oPixSize;
+//        fieldOfView.createFullChipPath(objPixSize);
+        fieldOfView.createRoiPath(objPixSize);
     }
     
     public String getObjective() {
@@ -584,7 +623,7 @@ public class AcqSetting {
     }
     
     public double getImagePixelSize() {
-        return objPixSize*detector.getBinningFactor(binningStr, -1);
+        return objPixSize*detectors.get(0).getBinningFactor(binningStr, -1);
     }
     
     public void setBinning(String bin) {
@@ -596,7 +635,7 @@ public class AcqSetting {
     }
 
     public int getBinningFactor() {
-        return detector.getBinningFactor(binningStr, -1);
+        return detectors.get(0).getBinningFactor(binningStr, -1);
     }
     
     public void setTilingMode(TilingSetting.Mode tm) {
@@ -717,6 +756,18 @@ public class AcqSetting {
     
     public List<Channel> getChannels() {
         return channels;
+    }
+    
+    public List<String> getChannelNames() {
+        if (channels==null) {
+            return null;
+        } else {
+            List<String> chNames=new ArrayList<String>(channels.size());
+            for (Channel ch:channels) {
+                chNames.add(ch.getName());
+            }
+            return chNames;
+        }
     }
     
     public boolean hasDuplicateChannels() {

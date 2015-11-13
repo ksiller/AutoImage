@@ -1,5 +1,6 @@
 package autoimage.tools;
 
+import autoimage.Detector;
 import autoimage.FieldOfView;
 import autoimage.api.ILiveListener;
 import autoimage.MMCoreUtils;
@@ -585,7 +586,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         }
     }
     
-    public CameraRotDlg(java.awt.Frame parent, final ScriptInterface gui, String chGroupStr, double stepSize, boolean modal) {
+    public CameraRotDlg(java.awt.Frame parent, final ScriptInterface gui, String chGroupStr, boolean modal) {
         super(parent, modal);
         initComponents();
         lastMeasuredDetector="";
@@ -622,6 +623,18 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
         }
         configGroupComboBox.setSelectedItem(chGroupStr);  
         
+        double stepSize=100;
+        try {
+            Detector detector=MMCoreUtils.getActiveDetector(core,chGroupStr,(String)channelComboBox.getSelectedItem());
+            core.setCameraDevice(detector.getLabel());
+            core.snapImage();
+            Object imgArray=core.getImage();
+            int w = (int)core.getImageWidth();
+            int h = (int)core.getImageHeight();
+            double pixSize=core.getPixelSizeUm();
+            stepSize=0.5 * Math.min(w, h) * pixSize;
+        } catch (Exception ex) {
+        }
         setStageStepSize(stepSize);
         exposure=100;
         exposureField.setValue(exposure);
@@ -641,7 +654,7 @@ public class CameraRotDlg extends javax.swing.JDialog implements ILiveListener, 
     }
 
     public CameraRotDlg(java.awt.Frame parent, ScriptInterface gui, boolean modal) {
-        this(parent,gui,configGroupStr,0, modal);
+        this(parent,gui,configGroupStr, modal);
     }
 
     

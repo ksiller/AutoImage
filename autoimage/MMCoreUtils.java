@@ -10,14 +10,21 @@ import ij.process.ColorProcessor;
 import ij.process.ImageProcessor;
 import ij.process.ImageStatistics;
 import ij.process.ShortProcessor;
+import java.awt.Rectangle;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Vector;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import mmcorej.CMMCore;
+import mmcorej.Configuration;
+import mmcorej.MMCoreJ;
+import mmcorej.PropertySetting;
 import mmcorej.StrVector;
 import org.micromanager.utils.ReportingUtils;
 
@@ -31,6 +38,8 @@ public class MMCoreUtils {
     public final static int SCALE_CAMERA = -2;
     public final static int SCALE_AUTO = -1;
     public final static int SCALE_NONE = 0;
+    
+    public static Map<String,Detector> detectors = new HashMap<String,Detector>();
 
     public static String[] getPropertyNamesForAFDevice(String devName_, CMMCore core_){
         Vector<String> propNames = new Vector<String>();
@@ -323,7 +332,198 @@ public class MMCoreUtils {
         else
             return configs.toArray();
     }
+
+    public static Detector getCoreDetector(CMMCore core) {
+        if (detectors==null) {
+            updateAvailableCameras(core);
+        }
+        return detectors.get(core.getCameraDevice());
+    }
+
+
+    public static Detector getActiveDetector (CMMCore core, String group, String channel) {
+        if (detectors==null || detectors.isEmpty()) {
+            updateAvailableCameras(core);
+        }
+        if (group==null || "".equals(group) || channel==null || "".equals(channel)) {
+            return getCoreDetector(core);
+        }
+        try {
+            Configuration c=core.getConfigData(group, channel);
+            boolean found=false;
+            for (int l=0; l<c.size(); l++) {
+                PropertySetting ps=c.getSetting(l);
+                if (detectors.containsKey(ps.getPropertyValue())) {
+                    return detectors.get(ps.getPropertyValue());
+                }
+            }
+//            return null;
+            return getCoreDetector(core);
+        } catch (Exception ex) {
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            return null;
+        }
+    }
+
+    public static List<Detector> getActiveDetectors(CMMCore core, String channelGroup, List<String> channels) {
+        List<Detector> activeDetectors=new ArrayList<Detector>();
+        if (channelGroup!=null && channels!=null) {
+            boolean isFirstChannel=true;
+            for (String ch:channels) {
+                Detector d=MMCoreUtils.getActiveDetector(core, channelGroup, ch);
+                if (d==null && isFirstChannel) {
+                    d=MMCoreUtils.getCoreDetector(core);
+                }
+                if (!activeDetectors.contains(d)) {
+                    activeDetectors.add(d);
+                }
+            }
+        }
+        return activeDetectors;
+    }
     
+    
+    
+    //fovRotation: angle rad rotStr of camera field of view relative to stage
+    //if fovRotation == null or currentDetector ==null --> set fovRotation to FieldOfView.ROTATION_UNKNOWN
+    public static Detector updateAvailableCameras(CMMCore core) {
+        IJ.log("Loading camera specification.");
+        if (detectors==null) {
+            detectors=new HashMap<String,Detector>();
+        }
+        List<String> detToBeRemoved=new ArrayList<String>(detectors.size());
+        for (String name:detectors.keySet()) {
+            detToBeRemoved.add(name);
+        }
+        String currentCamera=null;
+        Detector currentDetector=null;
+        try {
+            currentCamera = core.getCameraDevice();
+            String cameraDeviceLabel = core.getDeviceType(currentCamera).toString();
+            StrVector devices=core.getLoadedDevices();
+            for (String device:devices) {
+                if (core.getDeviceType(device).toString().equals(cameraDeviceLabel)) {
+                    try {
+                        Rectangle deviceRoi=core.getROI(device);
+                        core.setCameraDevice(device);
+                        
+//                        int cCameraPixX=-1;
+//                        int cCameraPixY=-1;
+                        int bitDepth=0;
+                        String[] binningOptions={"1"};
+                        Map<String,Integer> binningMap=new HashMap<String,Integer>();
+                        binningMap.put(binningOptions[0], 1);
+                        String smallestBinOption;
+                        StrVector props = core.getDevicePropertyNames(device);
+                        for (String propsStr : props) {
+                            StrVector allowedVals = core.getAllowedPropertyValues(device, propsStr);
+    /*                        if (propsStr.equals("OnCameraCCDXSize")) {
+                                cCameraPixX = Integer.parseInt(core.getProperty(device, propsStr));
+                            }
+                            else if (propsStr.equals("OnCameraCCDYSize")) {
+                                cCameraPixY = Integer.parseInt(core.getProperty(device, propsStr));
+                            }*/
+                            if (propsStr.equals(MMCoreJ.getG_Keyword_Binning())) {
+                                binningOptions=allowedVals.toArray();
+                                Arrays.sort(binningOptions);
+                                //save current binning setting
+                                String currentBin=core.getProperty(device, propsStr);
+                                double pixSizes[] = new double[binningOptions.length];
+                                int i=0;
+                                double minPixSize=-1;
+                                for (String bin:binningOptions) {
+                                    core.setProperty(device, propsStr, bin);
+                                    pixSizes[i]=core.getPixelSizeUm();
+    //                                IJ.log("    "+device+", pixSize: "+Double.toString(pixSizes[i])+", binning: "+option+", ROI: "+core.getROI(device).toString());
+                                    if (minPixSize==-1 || pixSizes[i] < minPixSize) {
+                                        minPixSize=pixSizes[i];
+                                        smallestBinOption=bin;
+                                    }
+                                    i++;
+                                }
+                                //restore initial binning setting
+                                core.setProperty(device, propsStr, currentBin);
+                                binningMap=new HashMap<String,Integer>();
+                                //Assumption: smallest pixel size obtained when binning=1
+                                for (i=0; i<binningOptions.length; i++) {
+                                    binningMap.put(binningOptions[i],(int)Math.round(pixSizes[i]/minPixSize));
+                                }
+                            }
+                            if (propsStr.equals("BitDepth")) {
+                                bitDepth = Integer.parseInt(core.getProperty(device, propsStr));
+                            }
+                        }
+                        int currentBinning=1;
+                        if (binningMap.containsKey(core.getProperty(device, MMCoreJ.getG_Keyword_Binning()))) {
+                            currentBinning=binningMap.get(core.getProperty(device, MMCoreJ.getG_Keyword_Binning()));
+                        }
+                        long bytesPerPixel=core.getBytesPerPixel();
+/*                        if (cCameraPixX == -1 || cCameraPixY == -1) {//can't read OnCameraCCD chip size
+                            IJ.log(device+":Cannot read camera chip size");
+                            core.setCameraDevice(device);
+                            core.clearROI();
+                            core.snapImage();
+                            Object img=core.getImage();
+                            bitDepth = (int)core.getImageBitDepth();   
+                            if (cCameraPixX==-1 || cCameraPixY==-1) {
+                                cCameraPixX = currentBinning * (int) core.getImageWidth();
+                                cCameraPixY = currentBinning * (int) core.getImageHeight();
+                            }
+                            core.setROI(deviceRoi.x, deviceRoi.y , deviceRoi.width, deviceRoi.height);
+                        } */   
+                        Rectangle unbinnedRoi=Utils.scaleRoi(deviceRoi,currentBinning);
+                        if (detectors.containsKey(device)) {
+                            //update existing detector
+                            Detector detector=detectors.get(device);
+//                            detector.setFullWidth_Pixel(cCameraPixX);
+//                            detector.setFullHeight_Pixel(cCameraPixY);
+                            detector.setUnbinnedRoi(unbinnedRoi);
+                            detector.setBitDepth(bitDepth);
+                            detector.setBytesPerPixel(bytesPerPixel);
+                            detector.setBinningMap(binningMap);
+                            //don't update fieldRotation field
+                            IJ.log("        Camera device updated: "+detector.toString());
+                        } else {
+                            Detector detector=new Detector(
+                                    device, 
+                                    unbinnedRoi.width, 
+                                    unbinnedRoi.height, 
+                                    unbinnedRoi, 
+                                    bitDepth, 
+                                    bytesPerPixel,
+                                    binningMap, 
+                                    FieldOfView.ROTATION_UNKNOWN);                
+                            detectors.put(device,detector);
+                            IJ.log("        New Camera device found: "+detector.toString());
+                        }
+                        detToBeRemoved.remove(device);
+                    } catch (Exception e) {
+                        IJ.log("        Camera device "+device+" ignored - not a physcial camera.");
+                    }    
+
+                }
+            }
+            currentDetector=detectors.get(currentCamera);
+        } catch (Exception ex) {
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            IJ.log("Error during loading of camera specifications: "+ex.toString());
+            currentDetector=null;
+        } finally {
+            //restore to original camera
+            if (currentCamera!=null) {
+                try {
+                    core.setCameraDevice(currentCamera);            
+                } catch (Exception e) {}
+            }        
+            //remove detectors not present anymore
+            for (String name:detToBeRemoved) {
+                detectors.remove(name);
+                IJ.log("        Camera device removed from system: "+name);
+            }
+        }
+        IJ.log("        Current camera device: "+currentDetector.toString());
+        return currentDetector;
+    }
 
     
 }

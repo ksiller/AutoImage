@@ -112,7 +112,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         mergeAreasBounds=null;
         cAcqSetting=as;
         
-        setAcquisitionLayout(al, 0);
+        setAcquisitionLayout(al);
       
 //        this.addComponentListener(new ComponentHandler());
 
@@ -142,7 +142,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         repaint();
     }
         
-    public void setAcquisitionLayout(IAcqLayout al, double borderD) {
+    public void setAcquisitionLayout(IAcqLayout al) {
  //       IJ.log("LayoutPanel.setAcquisitionLayout: start");
         this.acqLayout=al;
         zoom=1;
@@ -416,14 +416,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
 //        IJ.log("drawLandmark");
         if ((acqLayout!=null) && (acqLayout.getLandmarks()!=null)) {
             List<RefArea> landmarks=acqLayout.getLandmarks();
-            for (int i=0; i<landmarks.size(); i++) {
-                RefArea lm=landmarks.get(i);
-                int xo = (int) Math.round(lm.getLayoutCoordOrigX());
-                int yo = (int) Math.round(lm.getLayoutCoordOrigY());
-                int xCenter = (int) Math.round(lm.getLayoutCoordX());
-                int yCenter = (int) Math.round(lm.getLayoutCoordY());
-                int w = (int) Math.round(lm.getPhysWidth());
-                int h = (int) Math.round(lm.getPhysHeight());
+            for (RefArea lm:landmarks) {
 //                IJ.log("drawLandmark "+Integer.toString(i)+": "+Integer.toString(x)+" "+Integer.toString(y)+" "+Integer.toString(w)+" "+Integer.toString(h));
                 if (lm.isSelected())
                     g2d.setColor(COLOR_SEL_LANDMARK);
@@ -433,30 +426,19 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
                     g2d.setStroke(SOLID_STROKE);
                 } else {
                     g2d.setStroke(DASHED_STROKE);
-                } 
-                AffineTransform at=g2d.getTransform();
+                }
+                g2d.draw(new Rectangle2D.Double(
+                        lm.getLayoutCoordX()-lm.getPhysWidth()/2,
+                        lm.getLayoutCoordY() - lm.getPhysHeight()/2 , 
+                        lm.getPhysWidth(), 
+                        lm.getPhysHeight()));
+/*                AffineTransform at=g2d.getTransform();
                 g2d.translate(xCenter,yCenter);
 //                    double stageRotAngle=Math.atan2(acqLayout.getStageToLayoutTransform().getShearY(), acqLayout.getStageToLayoutTransform().getScaleY());
                 g2d.rotate(RefArea.getStageToLayoutRot());
                 if (RefArea.getCameraRot() != FieldOfView.ROTATION_UNKNOWN) {
                     g2d.rotate(-RefArea.getCameraRot());                        
                 }
-                g2d.translate(-xCenter,-yCenter);
-                g2d.drawRect(xo,yo,w,h);
-                g2d.setTransform(at);
-            /*    
-                Point2D p=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(lm.getStageCoordX(),lm.getStageCoordY()));
-                xo = bdPix + (int) Math.round((p.getX()-lm.getPhysWidth()/2)*physToPixelRatio);
-                yo = bdPix + (int) Math.round((p.getY()-lm.getPhysHeight()/2)*physToPixelRatio);
-                xCenter = bdPix + (int) Math.round(p.getX()*physToPixelRatio);
-                yCenter = bdPix + (int) Math.round(p.getY()*physToPixelRatio);
-                w = (int) Math.round(lm.getPhysWidth()*physToPixelRatio);
-                h = (int) Math.round(lm.getPhysHeight()*physToPixelRatio);
-//                IJ.log("drawLandmark "+Integer.toString(i)+": "+Integer.toString(x)+" "+Integer.toString(y)+" "+Integer.toString(w)+" "+Integer.toString(h));
-                g2d.setColor(Color.BLUE);       
-                at=g2d.getTransform();
-                g2d.translate(xCenter,yCenter);
-                g2d.rotate(RefArea.getCameraRot());                        
                 g2d.translate(-xCenter,-yCenter);
                 g2d.drawRect(xo,yo,w,h);
                 g2d.setTransform(at);*/
@@ -532,9 +514,9 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
 */
         g2d.setColor(COLOR_FOV);
         AffineTransform roiTrans=AffineTransform.getTranslateInstance(fullChipCenter.getX(),fullChipCenter.getY());
-        fov.createFullChipPath(objPixSize);
-        Shape roi=roiTrans.createTransformedShape(fov.getFullChipPath());
-        g2d.draw(roi);
+//        fov.createFullChipPath(objPixSize);
+//        Shape roi=roiTrans.createTransformedShape(fov.getFullChipPath());
+//        g2d.draw(roi);
         
         
 /*        g2d.translate(x+w/2, y+h/2);
@@ -562,7 +544,7 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
         g2d.fillRect(x,y,w,h);
 */      
         fov.createRoiPath(objPixSize);
-        roi=roiTrans.createTransformedShape(fov.getRoiPath());
+        Shape roi=roiTrans.createTransformedShape(fov.getEffectiveRoiPath());
         g2d.fill(roi);
 
         g2d.setComposite(oldComposite);

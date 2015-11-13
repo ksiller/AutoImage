@@ -31,6 +31,7 @@ public class FieldOfView implements Shape {
     protected AffineTransform fieldTransform;
     protected Path2D roiPath;
     protected Path2D fullChipPath;
+    protected Path2D nativeRoiPath;
     protected Rectangle unbinnedRoi_Pixel;
 
     /**
@@ -62,14 +63,10 @@ public class FieldOfView implements Shape {
      * @param fieldRot rotation of detector field-of-view relative to stage x-y coordinate system
      */
     public FieldOfView (int fullPixX, int fullPixY, Rectangle unbinnedRoi_Pix, double fieldRot) {
-        fullChipWidth_Pixel=fullPixX;
-        fullChipHeight_Pixel=fullPixY;
+//        fullChipWidth_Pixel=fullPixX;
+//        fullChipHeight_Pixel=fullPixY;
         fieldRotation=fieldRot;
-        if (unbinnedRoi_Pix==null) {
-            clearROI();
-        } else {
-            unbinnedRoi_Pixel=unbinnedRoi_Pix;
-        }
+        setRoi_Pixel(unbinnedRoi_Pix, 1);
     }
     
     
@@ -84,6 +81,7 @@ public class FieldOfView implements Shape {
         int y=fovObj.getInt(TAG_ROI_Y_PIXEL);
         int width=fovObj.getInt(TAG_ROI_WIDTH_PIXEL);
         int height=fovObj.getInt(TAG_ROI_HEIGHT_PIXEL);
+        fieldRotation=FieldOfView.ROTATION_UNKNOWN;
         unbinnedRoi_Pixel = new Rectangle(x,y,width,height);
     }
     
@@ -139,9 +137,9 @@ public class FieldOfView implements Shape {
      * @param objPixSize The pixel size, e.g. based on chosen objective
      * @return Width of the full chip's field-of-view in micron 
      */
-    public double getFullWidth_UM(double objPixSize) {
+/*    public double getFullWidth_UM(double objPixSize) {
         return fullChipWidth_Pixel*objPixSize;    
-    }
+    }*/
 
     
     /**
@@ -150,9 +148,9 @@ public class FieldOfView implements Shape {
      * @param objPixSize The pixel size, e.g. based on chosen objective
      * @return Width of the full chip's field-of-view in micron 
      */
-    public double getFullHeight_UM(double objPixSize) {
+/*    public double getFullHeight_UM(double objPixSize) {
         return fullChipHeight_Pixel*objPixSize;    
-    }
+    }*/
 
     
     /** 
@@ -160,13 +158,13 @@ public class FieldOfView implements Shape {
      * 
      * @param fullPixX number of pixels along x-axis
      */
-    public void setFullWidth_Pixel(int fullPixX) {
+/*    public void setFullWidth_Pixel(int fullPixX) {
         fullChipWidth_Pixel=fullPixX;
         //ensure that roi width <= full width
         if (unbinnedRoi_Pixel!=null) {
             unbinnedRoi_Pixel.width=Math.min(fullPixX, unbinnedRoi_Pixel.width);
         }    
-    }
+    }*/
 
     
     /** 
@@ -174,13 +172,13 @@ public class FieldOfView implements Shape {
      * 
      * @param fullPixY number of pixels along y-axis
      */
-    public void setFullHeight_Pixel(int fullPixY) {
+/*    public void setFullHeight_Pixel(int fullPixY) {
         fullChipHeight_Pixel=fullPixY;    
          //ensure that roi height <= full height
         if (unbinnedRoi_Pixel!=null) {
             unbinnedRoi_Pixel.height=Math.min(fullPixY, unbinnedRoi_Pixel.height);
         }    
-    }
+    }*/
 
     
     /** 
@@ -189,10 +187,10 @@ public class FieldOfView implements Shape {
      * @param fullPixX number of pixels along x-axis
      * @param fullPixY number of pixels along y-axis
      */
-    public void setFullSize_Pixel(int fullPixX, int fullPixY) {
+/*    public void setFullSize_Pixel(int fullPixX, int fullPixY) {
         setFullWidth_Pixel(fullPixX);
         setFullHeight_Pixel(fullPixY);
-    }
+    }*/
     
     
     /**
@@ -202,9 +200,10 @@ public class FieldOfView implements Shape {
      * @return Width of the ROI's in micron 
      */    
     public double getRoiWidth_UM(double objPixSize) {
-        if (unbinnedRoi_Pixel==null)
+/*        if (unbinnedRoi_Pixel==null)
             return fullChipWidth_Pixel*objPixSize;
-        return Math.min(fullChipWidth_Pixel,unbinnedRoi_Pixel.getWidth())*objPixSize;
+        return Math.min(fullChipWidth_Pixel,unbinnedRoi_Pixel.getWidth())*objPixSize;*/
+        return unbinnedRoi_Pixel.width * objPixSize;
     }
     
     
@@ -215,9 +214,10 @@ public class FieldOfView implements Shape {
      * @return Width of the ROI's in micron 
      */    
     public double getRoiHeight_UM(double objPixSize) {
-        if (unbinnedRoi_Pixel==null)
+/*        if (unbinnedRoi_Pixel==null)
             return fullChipHeight_Pixel*objPixSize;
-        return Math.min(fullChipHeight_Pixel,unbinnedRoi_Pixel.getHeight())*objPixSize;
+        return Math.min(fullChipHeight_Pixel,unbinnedRoi_Pixel.getHeight())*objPixSize;*/
+        return unbinnedRoi_Pixel.height * objPixSize;
     }
 
     /**
@@ -229,16 +229,20 @@ public class FieldOfView implements Shape {
      */
     public void setRoi_Pixel(Rectangle binnedRoi, int binning) {
         if (binnedRoi==null) {
-            unbinnedRoi_Pixel=null;
+            IJ.log("FieldOfView.setRoi_Pixel: binnedRoi=null, setting to 0,0,0,0");
+            unbinnedRoi_Pixel=new Rectangle(0,0,0,0);
             return;
+        } else {
+            unbinnedRoi_Pixel=Utils.scaleRoi(binnedRoi, binning);
         }
-        int x=(int)Math.min(binnedRoi.x*binning,fullChipWidth_Pixel-1);
+/*        int x=(int)Math.min(binnedRoi.x*binning,fullChipWidth_Pixel-1);
         int y=(int)Math.min(binnedRoi.y*binning,fullChipHeight_Pixel-1);
         unbinnedRoi_Pixel=new Rectangle(
             x,
             y,
             Math.min(fullChipWidth_Pixel-x,binnedRoi.width*binning),
-            Math.min(fullChipHeight_Pixel-y, binnedRoi.height*binning));
+            Math.min(fullChipHeight_Pixel-y, binnedRoi.height*binning));*/
+        IJ.log("FieldOfView.setRoi_Pixel: unbinnedRoi_Pixel="+unbinnedRoi_Pixel.toString());
     }
   
 
@@ -261,7 +265,7 @@ public class FieldOfView implements Shape {
     
     
     /**
-     * Retains the current roi width and height but translates the roi's origin (top left corner) such that the is centered. 
+     * Retains the current roi width and height but translates the roi's origin (top left corner) such that the Roi is centered on the chip. 
      */
     public void centerRoi() {
         if (unbinnedRoi_Pixel==null)
@@ -274,60 +278,74 @@ public class FieldOfView implements Shape {
      * 
      * @return True if no roi is set or the roi's width and height equal width and height of this full size field-of-view  
      */
-    public boolean isFullSize() {
+/*    public boolean isFullSize() {
         return (unbinnedRoi_Pixel==null || (unbinnedRoi_Pixel.width == fullChipWidth_Pixel && unbinnedRoi_Pixel.height == fullChipHeight_Pixel));
-    }
+    }*/
     
     
     /**
      * Sets the roi such that its width and height corresponds to this full size field-of-view
      */
-    public void clearROI() {
+/*    public void clearROI() {
         unbinnedRoi_Pixel=new Rectangle(0,0,fullChipWidth_Pixel,fullChipHeight_Pixel);
-    }
+    }*/
     
-    //x-y dist of ROI origin from full chip origin in um
+/*    //x-y dist of ROI origin from full chip origin in um
     public Point2D.Double getRoiOffset_UM(double objPixSize) {
         if (isFullSize()) {
             return new Point2D.Double(0,0);
         } else {    
             return new Point2D.Double(unbinnedRoi_Pixel.x*objPixSize,unbinnedRoi_Pixel.y*objPixSize);
         }
-    }
+    }*/
     
-    public boolean isCentered() {
+/*    public boolean isCentered() {
         if (isFullSize()) {
             return true;
         }
         return ((2*unbinnedRoi_Pixel.x+unbinnedRoi_Pixel.width == fullChipWidth_Pixel) 
             && (2*unbinnedRoi_Pixel.y+unbinnedRoi_Pixel.height == fullChipHeight_Pixel)); 
     }
-    
+    */
     public void createRoiPath(double objPixSize) {
-        //translate roi to center
-        AffineTransform at=AffineTransform.getScaleInstance(objPixSize, objPixSize);
-        if (fieldRotation != ROTATION_UNKNOWN) {
-//            at.concatenate(AffineTransform.getTranslateInstance(fullChipWidth_Pixel/2, fullChipHeight_Pixel/2));
-            at.concatenate(AffineTransform.getRotateInstance(-fieldRotation));
+        if (objPixSize==-1) {
+                roiPath=new Path2D.Double(new Rectangle2D.Double(0,0,0,0));
+                nativeRoiPath=new Path2D.Double(new Rectangle2D.Double(0,0,0,0));
+        } else {
+            //translate roi to center
+            AffineTransform effectiveTrans=AffineTransform.getScaleInstance(objPixSize, objPixSize);
+            if (fieldRotation != ROTATION_UNKNOWN) {
+    //            effectiveTrans.concatenate(AffineTransform.getTranslateInstance(fullChipWidth_Pixel/2, fullChipHeight_Pixel/2));
+                effectiveTrans.concatenate(AffineTransform.getRotateInstance(-fieldRotation));
+            }
+            effectiveTrans.concatenate(AffineTransform.getTranslateInstance(-fullChipWidth_Pixel/2, -fullChipHeight_Pixel/2));
+            IJ.log("FieldOfView.createRoiPath:unbinnedRoi_Pixel="+ unbinnedRoi_Pixel.toString());
+            roiPath=new Path2D.Double(effectiveTrans.createTransformedShape(unbinnedRoi_Pixel));
+
+            AffineTransform nativeTrans=AffineTransform.getScaleInstance(objPixSize, objPixSize);
+            nativeTrans.concatenate(AffineTransform.getTranslateInstance(-fullChipWidth_Pixel/2, -fullChipHeight_Pixel/2));
+            nativeRoiPath=new Path2D.Double(nativeTrans.createTransformedShape(unbinnedRoi_Pixel));
         }
-        at.concatenate(AffineTransform.getTranslateInstance(-fullChipWidth_Pixel/2, -fullChipHeight_Pixel/2));
-        roiPath=new Path2D.Double(at.createTransformedShape(unbinnedRoi_Pixel));
     }
 
-    public void createFullChipPath(double objPixSize) {
-        //translate roi to center
-        AffineTransform at=AffineTransform.getScaleInstance(objPixSize, objPixSize);
-        if (fieldRotation != ROTATION_UNKNOWN) {
-//            at.concatenate(AffineTransform.getTranslateInstance(fullChipWidth_Pixel/2, fullChipHeight_Pixel/2));
-            at.concatenate(AffineTransform.getRotateInstance(-fieldRotation));
+/*    public void createFullChipPath(double objPixSize) {
+        if (objPixSize==-1) {
+                fullChipPath=new Path2D.Double(new Rectangle2D.Double(0,0,0,0));
+        } else {
+            //translate roi to center
+            AffineTransform at=AffineTransform.getScaleInstance(objPixSize, objPixSize);
+            if (fieldRotation != ROTATION_UNKNOWN) {
+    //            effectiveTrans.concatenate(AffineTransform.getTranslateInstance(fullChipWidth_Pixel/2, fullChipHeight_Pixel/2));
+                at.concatenate(AffineTransform.getRotateInstance(-fieldRotation));
+            }
+            fullChipPath=new Path2D.Double(at.createTransformedShape(new Rectangle2D.Double(
+                    -fullChipWidth_Pixel/2, 
+                    -fullChipHeight_Pixel/2,
+                    fullChipWidth_Pixel, 
+                    fullChipHeight_Pixel)));
         }
-        fullChipPath=new Path2D.Double(at.createTransformedShape(new Rectangle2D.Double(
-                -fullChipWidth_Pixel/2, 
-                -fullChipHeight_Pixel/2,
-                fullChipWidth_Pixel, 
-                fullChipHeight_Pixel)));
     }
-
+*/
     @Override
     public Rectangle getBounds() {
         return roiPath.getBounds();
@@ -378,11 +396,15 @@ public class FieldOfView implements Shape {
         return roiPath.getPathIterator(at, flatness);
     }
     
-    public Path2D getRoiPath() {
+    public Path2D getEffectiveRoiPath() {
         return roiPath;
     }
 
-    public Path2D getFullChipPath() {
+/*    public Path2D getFullChipPath() {
         return fullChipPath;
+    }*/
+
+    public Path2D getNativeRoiPath() {
+        return nativeRoiPath;
     }
 }

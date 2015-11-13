@@ -239,7 +239,7 @@ public interface IAcqLayout {
 
     void writeSingleArea(XMLStreamWriter xtw, BasicArea a, TilingSetting setting) throws XMLStreamException;
     
-    public List<Future<Integer>> calculateTiles(List<BasicArea> areasToTile, final DoxelManager dManager, final double fovWidth_UM, final double fovHeight_UM, final TilingSetting tSetting);
+    public List<Future<Integer>> calculateTiles(List<BasicArea> areasToTile, final DoxelManager dManager, final FieldOfView fov, final TilingSetting tSetting);
     
     public int getTilingStatus();
     

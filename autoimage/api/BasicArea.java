@@ -58,7 +58,7 @@ public abstract class BasicArea implements Shape {
     public static final int TILING_UNKNOWN_NUMBER = -2;
         
     protected String name;
-    protected static double cameraRot = FieldOfView.ROTATION_UNKNOWN;//in radians relative to x-y stagePos axis, NOT layout
+    //protected static double cameraRot = FieldOfView.ROTATION_UNKNOWN;//in radians relative to x-y stagePos axis, NOT layout
     protected static double stageToLayoutRot = 0; //in radians
     protected static boolean optimizedForCameraRotation = true;
     protected volatile List<Tile> tilePosList;//has absolute layout positions in um
@@ -84,7 +84,7 @@ public abstract class BasicArea implements Shape {
     public static final String CLUSTER_NAME_PADDING = "%06d";
     
     protected static final long DELAY_TO_CANCEL = 1000;
-    protected static final int MAX_TILING_ATTEMPTS = 200;
+    protected static final int MAX_TILING_ATTEMPTS = 500;
 
            
     public BasicArea() {
@@ -174,20 +174,20 @@ public abstract class BasicArea implements Shape {
      * @param rot 
      */
     //in radians
-    public static void setCameraRot(double rot) {
+/*    public static void setCameraRot(double rot) {
         cameraRot=rot;
     }
-    
+*/    
     
     /**
      * 
      * @return 
      */
     //in radians
-    public static double getCameraRot() {
+/*    public static double getCameraRot() {
         return cameraRot;
     } 
-    
+*/    
     
     /**
      * 
@@ -285,11 +285,21 @@ public abstract class BasicArea implements Shape {
         return s;
     }
     
-    
-    private boolean overlapsOtherTiles(Rectangle2D.Double r, double fovX, double fovY) {
-        Rectangle2D fovBounds=getFovBounds(fovX,fovY);
+/*    
+    private boolean overlapsOtherTiles(Rectangle2D.Double r, FieldOfView fov) {
+      Rectangle2D fovBounds=fov.getBounds2D();
         for (Tile t:tilePosList) {
             Rectangle2D.Double tRect=new Rectangle2D.Double(t.centerX-fovBounds.getWidth()/2, t.centerY-fovBounds.getHeight()/2,fovBounds.getWidth(),fovBounds.getHeight());
+            if (tRect.intersects(r))
+                return true;
+        }
+        return false;
+    }
+*/    
+    private boolean overlapsOtherTiles(Rectangle2D r, FieldOfView fov) {
+        Rectangle2D fovBounds=fov.getBounds2D();
+        for (Tile t:tilePosList) {
+            Rectangle2D tRect=new Rectangle2D.Double(t.centerX-fovBounds.getWidth()/2, t.centerY-fovBounds.getHeight()/2,fovBounds.getWidth(),fovBounds.getHeight());
             if (tRect.intersects(r))
                 return true;
         }
@@ -299,13 +309,15 @@ public abstract class BasicArea implements Shape {
     
     /**
      * 
-     * @param fovX
-     * @param fovY
+     * @param fov
      * @param overlap
      * @return 
      */
-    public static Point2D calculateTileOffset(double fovX, double fovY, double overlap) {
-        if (optimizedForCameraRotation && cameraRot!=FieldOfView.ROTATION_UNKNOWN) {
+    public static Point2D calculateTileOffset(FieldOfView fov, double overlap) {
+        double fovX=fov.getNativeRoiPath().getBounds2D().getWidth();
+        double fovY=fov.getNativeRoiPath().getBounds2D().getHeight();
+        double cameraRot=fov.getFieldRotation();
+        if (optimizedForCameraRotation && fov.getFieldRotation()!=FieldOfView.ROTATION_UNKNOWN) {
             double tileOffsetX;
             double tileOffsetY;
             double xFlipAngle=Math.atan2(fovY,fovX);
@@ -325,8 +337,19 @@ public abstract class BasicArea implements Shape {
             return new Point2D.Double((1-overlap) * fovX,(1-overlap) * fovY);
         }
     }
-    
-    
+/*    
+    public static Point2D calculateTileOffset(FieldOfView fov, double overlap) {
+        Rectangle2D bounds=fov.getEffectiveRoiPath().getBounds2D();
+        Point2D tileOffset=new Point2D.Double((1-overlap) * bounds.getWidth(),(1-overlap) * bounds.getHeight());
+        AffineTransform at=AffineTransform.getRotateInstance(-stageToLayoutRot);
+        at.transform(tileOffset, tileOffset);
+        IJ.log("calculateTileOffset: fov.fieldRotation="+Double.toString(fov.getFieldRotation()));
+        IJ.log("calculateTileOffset: fov.nativeRoiPath.getBounds2D="+fov.getNativeRoiPath().getBounds2D().toString());
+        IJ.log("calculateTileOffset: fov.effectiveRoiPath.getBounds2D="+fov.getEffectiveRoiPath().getBounds2D().toString());
+        IJ.log("calculateTileOffset: tileOffset="+tileOffset.toString());
+        return tileOffset;
+    }
+*/    
     /**
      * 
      * @param clusterNr
@@ -337,12 +360,12 @@ public abstract class BasicArea implements Shape {
      * @param setting
      * @return 
      */
-    private int createCluster(int clusterNr,double seedX, double seedY, double fovX, double fovY, TilingSetting setting ) {
+    private int createCluster(int clusterNr,double seedX, double seedY, FieldOfView fov, TilingSetting setting ) {
         double tileOverlap=setting.getTileOverlap();
         int tilingDir=setting.getTilingDirection();
 
-        Point2D tileOffset=calculateTileOffset(fovX, fovY, setting.getTileOverlap());
-        Rectangle2D fovBounds=getFovBounds(fovX, fovY);
+        Point2D tileOffset=calculateTileOffset(fov, setting.getTileOverlap());
+        Rectangle2D fovBounds=fov.getBounds2D();
 
         int xTiles=setting.getNrClusterTileX();
         int yTiles=setting.getNrClusterTileY();
@@ -351,7 +374,7 @@ public abstract class BasicArea implements Shape {
         double startx=seedX-(clusterW/2)+fovBounds.getWidth()/2;//*physToPixelRatio;
         double starty=seedY-(clusterH/2)+fovBounds.getHeight()/2;//*physToPixelRatio;
 
-        if (!setting.isSiteOverlap() && overlapsOtherTiles(new Rectangle2D.Double(startx-fovBounds.getWidth()/2, starty-fovBounds.getHeight()/2, clusterW, clusterH),fovX,fovY)) {
+        if (!setting.isSiteOverlap() && overlapsOtherTiles(new Rectangle2D.Double(startx-fovBounds.getWidth()/2, starty-fovBounds.getHeight()/2, clusterW, clusterH),fov)) {
             return TILING_ERROR;
         }
         
@@ -482,14 +505,14 @@ public abstract class BasicArea implements Shape {
      * @param fovY
      * @return 
      */
+    /*
     public static Rectangle2D getFovBounds(double fovX, double fovY) {
         java.awt.geom.Area a= new java.awt.geom.Area(new Rectangle2D.Double(0,0,fovX,fovY));
         AffineTransform rot=new AffineTransform();
         rot.rotate(cameraRot-stageToLayoutRot);
         a.transform(rot);
         return a.getBounds2D();
-    }
-    
+    } */   
     
     /**
      * 
@@ -499,13 +522,13 @@ public abstract class BasicArea implements Shape {
      * @return
      * @throws InterruptedException 
      */
-    public int calcFullTilePositions(double fovX, double fovY, TilingSetting setting) throws InterruptedException {
+    public int calcFullTilePositions(FieldOfView fov, TilingSetting setting) throws InterruptedException {
         double tileOverlap=setting.getTileOverlap();
         boolean insideOnly=setting.isInsideOnly();
         int tilingDir=setting.getTilingDirection();
         
-        Point2D tileOffset=calculateTileOffset(fovX, fovY, setting.getTileOverlap());
-        Rectangle2D fovBounds=getFovBounds(fovX,fovY);
+        Point2D tileOffset=calculateTileOffset(fov, setting.getTileOverlap());
+        Rectangle2D fovBounds=fov.getBounds2D();
         int xTiles;
         int yTiles;
         double startx;
@@ -664,9 +687,9 @@ public abstract class BasicArea implements Shape {
     }
 
     
-    private int calcRandomTilePositions(double fovX, double fovY, TilingSetting tSetting) throws InterruptedException {
-        Rectangle2D fovBounds=getFovBounds(fovX, fovY);
-        Point2D tileOffset=calculateTileOffset(fovX, fovY, tSetting.getTileOverlap());
+    private int calcRandomTilePositions(FieldOfView fov, TilingSetting tSetting) throws InterruptedException {
+        Rectangle2D fovBounds=fov.getBounds2D();
+        Point2D tileOffset=calculateTileOffset(fov, tSetting.getTileOverlap());
 
         int size=tSetting.getMaxSites();
         if (tSetting.isCluster())
@@ -693,11 +716,13 @@ public abstract class BasicArea implements Shape {
                 double y=getTopLeftY()+Math.random()*shapeBounds.getWidth();
                 if (acceptTilePos(x,y,w,h,tSetting.isInsideOnly())) {
                     if (tSetting.isCluster() && (tSetting.getNrClusterTileX()>1 || tSetting.getNrClusterTileY()>1)) {
-                        if (createCluster(noOfClusters,x,y,fovX,fovY, tSetting) == TILING_OK) {
+                        if (createCluster(noOfClusters,x,y,fov, tSetting) == TILING_OK) {
                             noOfClusters++;
                         }
                     } else {
-                        if (tSetting.isSiteOverlap() || (!tSetting.isSiteOverlap() && !overlapsOtherTiles(new Rectangle2D.Double(x-fovBounds.getWidth()/2,y-fovBounds.getHeight()/2,fovX,fovY),fovX,fovY))) {
+                        //using bunding rect of fov for simplicity
+                        Rectangle2D tRect=new Rectangle2D.Double(x-fovBounds.getWidth()/2,y-fovBounds.getHeight()/2,fovBounds.getWidth(),fovBounds.getHeight());
+                        if (tSetting.isSiteOverlap() || (!tSetting.isSiteOverlap() && !overlapsOtherTiles(tRect,fov))) {
                             tilePosList.add(Tile.createTile(createTileName(0,noOfClusters), x, y, relativeZPos, false));
                             noOfClusters++;
                         }
@@ -719,7 +744,7 @@ public abstract class BasicArea implements Shape {
     }
     
     
-    private int calcCenterTilePositions(double fovX, double fovY, TilingSetting tSetting) throws InterruptedException {
+    private int calcCenterTilePositions(FieldOfView fov, TilingSetting tSetting) throws InterruptedException {
         int tiles=1;
         if (tSetting.isCluster())
             tiles=tiles*tSetting.getNrClusterTileX()*tSetting.getNrClusterTileY();
@@ -729,16 +754,16 @@ public abstract class BasicArea implements Shape {
 /*        if (centerXYPos==null || relDefaultXYPos==null) {
             calcCenterAndDefaultPos();
         }*/
-        tilingStatus=addTilesAroundSeed(0,centerXYPos.getX(), centerXYPos.getY(), fovX, fovY, tSetting);
+        tilingStatus=addTilesAroundSeed(0,centerXYPos.getX(), centerXYPos.getY(), fov, tSetting);
         unknownTileNum=tilingStatus==TILING_UNKNOWN_NUMBER;
         noOfClusters=tilingStatus == TILING_OK ? 1 : 0;
         return (tilingStatus==TILING_OK ? tilePosList.size() : tilingStatus);
     }
     
     
-    private int addTilesAroundSeed(int clusterNr,double seedX, double seedY, double fovX, double fovY, TilingSetting tSetting) {
-        Point2D tileOffset=BasicArea.calculateTileOffset(fovX, fovY, tSetting.getTileOverlap());
-        Rectangle2D fovBounds=getFovBounds(fovX, fovY);
+    private int addTilesAroundSeed(int clusterNr,double seedX, double seedY, FieldOfView fov, TilingSetting tSetting) {
+        Point2D tileOffset=BasicArea.calculateTileOffset(fov, tSetting.getTileOverlap());
+        Rectangle2D fovBounds=fov.getBounds2D();
         double w;
         double h;
         if (tSetting.isCluster() && (tSetting.getNrClusterTileX()>1 || tSetting.getNrClusterTileY()>1)) {
@@ -750,7 +775,7 @@ public abstract class BasicArea implements Shape {
         }        
         if (acceptTilePos(seedX,seedY,w,h,tSetting.isInsideOnly())) {
             if (tSetting.isCluster() && (tSetting.getNrClusterTileX()>1 || tSetting.getNrClusterTileY()>1)) {
-                return createCluster(clusterNr,seedX,seedY,fovX,fovY, tSetting);
+                return createCluster(clusterNr,seedX,seedY,fov, tSetting);
             }
             else {
                 tilePosList.add(Tile.createTile(createTileName(clusterNr,0), seedX, seedY, relativeZPos, false));
@@ -762,7 +787,7 @@ public abstract class BasicArea implements Shape {
     
     
     //NEED TO SET RELZPOS
-    private int calcRuntimeTilePositions(DoxelManager doxelManager,double fovX, double fovY, TilingSetting tSetting) throws InterruptedException {
+    private int calcRuntimeTilePositions(DoxelManager doxelManager,FieldOfView fov, TilingSetting tSetting) throws InterruptedException {
         if (doxelManager==null || doxelManager.getAreaMap().isEmpty()) {
             IJ.log("    Area.calcRuntimeTilePosition: "+(doxelManager==null ? "doxelManager=null" : "no ROIs"));
             unknownTileNum=true;
@@ -783,7 +808,7 @@ public abstract class BasicArea implements Shape {
                 //use random index in seedList
                 int index=(int)Math.round(Math.random()*(seedList.size()-1));
                 //xPos and yPos are layout coordinates (already converted by DoxelManager
-                if (addTilesAroundSeed(acceptedNr,seedList.get(index).xPos, seedList.get(index).yPos, fovX, fovY, tSetting) == TILING_OK) {
+                if (addTilesAroundSeed(acceptedNr,seedList.get(index).xPos, seedList.get(index).yPos, fov, tSetting) == TILING_OK) {
                     acceptedNr++;
                 }    
                 seedList.remove(index);
@@ -812,17 +837,17 @@ public abstract class BasicArea implements Shape {
      * @return
      * @throws InterruptedException 
      */
-    public synchronized int calcTilePositions(DoxelManager doxelManager,double fovX, double fovY, TilingSetting setting) throws InterruptedException {
+    public synchronized int calcTilePositions(DoxelManager doxelManager,FieldOfView fov, TilingSetting setting) throws InterruptedException {
         if (selectedForAcq) {
             switch (setting.getMode()) {
                 case FULL:      
-                            return calcFullTilePositions(fovX, fovY, setting);
+                            return calcFullTilePositions(fov, setting);
                 case CENTER:    
-                            return calcCenterTilePositions(fovX, fovY, setting);
+                            return calcCenterTilePositions(fov, setting);
                 case RANDOM:    
-                            return calcRandomTilePositions(fovX, fovY, setting);
+                            return calcRandomTilePositions(fov, setting);
                 case ADAPTIVE:
-                            return calcRuntimeTilePositions(doxelManager, fovX, fovY, setting);
+                            return calcRuntimeTilePositions(doxelManager, fov, setting);
                 case FILE:      {
                             unknownTileNum=true;
                             return TILING_UNKNOWN_NUMBER;

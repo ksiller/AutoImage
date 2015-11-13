@@ -10,16 +10,18 @@ import autoimage.api.BasicArea;
 public class TilingThread implements Runnable {//Callable<List<Area.Tile>> {
     
     private BasicArea area;
-    private double fovX;
-    private double fovY;
+    private FieldOfView fov;
+//    private double fovX;
+//    private double fovY;
     private TilingSetting setting;
     private DoxelManager tileManager;
     
-    public TilingThread(DoxelManager tManager, BasicArea a, double w, double h, TilingSetting s) {
+    public TilingThread(DoxelManager tManager, BasicArea a, FieldOfView f, TilingSetting s) {
         area=a;
         setting=s;
-        fovX=w;
-        fovY=h;
+        fov=f;
+//        fovX=w;
+//        fovY=h;
         tileManager=tManager;
     }
 
@@ -28,7 +30,7 @@ public class TilingThread implements Runnable {//Callable<List<Area.Tile>> {
         try {
             if (area!=null) {
 //                for (BasicArea a:areas) {
-                    area.calcTilePositions(tileManager,fovX, fovY, setting);
+                    area.calcTilePositions(tileManager,fov, setting);
 //                }  
             }    
         } catch (InterruptedException ie) {

@@ -8,6 +8,7 @@ import autoimage.dataprocessors.SiteInfoUpdater;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.measure.Calibration;
+import java.awt.Rectangle;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Path2D;
@@ -510,6 +511,10 @@ BasicArea.class.getClassLoader());
             }
         }
         return byteArray;
+    }
+    
+    public static Rectangle scaleRoi(Rectangle roi, int factor) {
+        return new Rectangle(roi.x*factor, roi.y*factor, roi.width*factor, roi.height*factor);
     }
     
 }

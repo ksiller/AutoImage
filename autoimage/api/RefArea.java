@@ -1,6 +1,5 @@
 package autoimage.api;
 
-import autoimage.FieldOfView;
 import autoimage.Vec3d;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -19,8 +18,8 @@ public class RefArea {
     private double physHeight;
     private double layoutCoordX; //center of RefArea
     private double layoutCoordY; //center of RefArea
-    private double layoutCoordOrigX;
-    private double layoutCoordOrigY;
+//    private double layoutCoordOrigX;
+//    private double layoutCoordOrigY;
     private double layoutCoordZ; //offset from layout flat bottom plane
     private boolean zDefined;
     private String name;
@@ -28,7 +27,7 @@ public class RefArea {
     private boolean changed;
     private boolean stagePosMapped; //false unless stagePos mapped to Layout; currently via RefPointListDialog
     private boolean selected; //used to highlight landmark in LayoutPanel
-    private static double cameraRot=FieldOfView.ROTATION_UNKNOWN; //in radians relative to x-y staga axis, NOT layout 
+//    private static double cameraRot=FieldOfView.ROTATION_UNKNOWN; //in radians relative to x-y staga axis, NOT layout 
     private static double stageToLayoutRot=0;//in radians
     
     public final static String TAG_NAME="NAME";
@@ -97,7 +96,6 @@ public class RefArea {
     }
 
     public void initializeFromJSONObject(JSONObject obj) throws JSONException {
-//        IJ.log("initializing: "+this.getClass().getName());
         name=obj.getString(TAG_NAME);
         stageX=obj.getDouble(TAG_STAGE_X);
         stageY=obj.getDouble(TAG_STAGE_Y);
@@ -112,14 +110,13 @@ public class RefArea {
         changed=false;
         selected=false;
         stagePosMapped=false;
-        cameraRot=FieldOfView.ROTATION_UNKNOWN;
-//        IJ.log("initialization completed: "+this.getClass().getName());
+//        cameraRot=FieldOfView.ROTATION_UNKNOWN;
     }
     
     public RefArea (JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         initializeFromJSONObject(obj);
     }
-
+/*
     public static void setCameraRot(double rot) {
         cameraRot=rot;
     }
@@ -127,7 +124,7 @@ public class RefArea {
     public static double getCameraRot() {
         return cameraRot;
     }
-   
+*/   
     public static void setStageToLayoutRot(double rot) {
         stageToLayoutRot=rot;
     }
@@ -209,25 +206,15 @@ public class RefArea {
     public double getLayoutCoordZ() {
         return layoutCoordZ;
     }
-
-    public double getLayoutCoordOrigX() {
-        return layoutCoordOrigX;
-    }
-    
-    public double getLayoutCoordOrigY() {
-        return layoutCoordOrigY;
-    }
     
     public void setLayoutCoordX(double lx) {
         layoutCoordX=lx;
-        layoutCoordOrigX=lx-physWidth/2;
         changed=true;
     }
     
 
     public void setLayoutCoordY(double ly) {
         layoutCoordY=ly;
-        layoutCoordOrigY=ly-physHeight/2;
         changed=true;
     }
     
@@ -252,7 +239,7 @@ public class RefArea {
         return physHeight;
     }
     
-    public void setDimension(double w, double h) {
+    public void setPhysDimension(double w, double h) {
         physWidth=w;
         physHeight=h;
     }
@@ -265,23 +252,6 @@ public class RefArea {
         refImageFile=rif;
     }
     
-    /*
-    public double convertLayoutCoordToStageCoord_X (double lX) {
-        return stageX+lX-layoutCoordX;
-    }
-    
-    public double convertLayoutCoordToStageCoord_Y (double lY) {
-        return stageY+lY-layoutCoordY;
-    }
-    
-    public double convertStagePosToLayoutCoord_X (double sX) {
-        return sX-stageX+layoutCoordX;
-    }
-    
-    public double convertStagePosToLayoutCoord_Y (double sY) {
-        return sY-stageY+layoutCoordY;
-    }
-*/
     public boolean isZPosDefined() {
         return zDefined;
     }
