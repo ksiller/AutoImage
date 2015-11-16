@@ -1,16 +1,11 @@
 package autoimage;
 
-import autoimage.api.ExtImageTags;
 import autoimage.api.BasicArea;
 import autoimage.gui.ProcessorTree;
 import autoimage.dataprocessors.ExtDataProcessor;
 import autoimage.dataprocessors.SiteInfoUpdater;
-import ij.IJ;
-import ij.ImagePlus;
-import ij.measure.Calibration;
 import java.awt.Rectangle;
 import java.awt.geom.AffineTransform;
-import java.awt.geom.Ellipse2D;
 import java.awt.geom.Path2D;
 import java.awt.geom.PathIterator;
 import java.awt.geom.Point2D;
@@ -34,7 +29,6 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.swing.JOptionPane;
 import javax.swing.tree.DefaultMutableTreeNode;
 import mmcorej.TaggedImage;
 import org.apache.commons.math.linear.Array2DRowRealMatrix;
@@ -44,14 +38,13 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.micromanager.api.DataProcessor;
-import org.micromanager.api.MMTags;
 import org.micromanager.api.ScriptInterface;
 import org.micromanager.utils.MMScriptException;
 import org.micromanager.utils.ReportingUtils;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 public class Utils {
 
@@ -181,8 +174,8 @@ public class Utils {
             double[][] matrix = y.multiply(inv_x).getData();
             at = new AffineTransform(new double[] { matrix[0][0], matrix[1][0], matrix[0][1], matrix[1][1], matrix[0][2], matrix[1][2] });
 //            IJ.log("angle: "+angleRad/Math.PI*180+", scale: "+scale+", translate: "+(dst[0].x-src[0].x)+"/"+(dst[0].y-src[0].y));
-            IJ.log("1mod. "+at.toString());
-            IJ.log("1mod. angle: "+Math.atan2(at.getShearY(), at.getScaleY())/Math.PI*180);
+//            IJ.log("at="+at.toString());
+//            IJ.log("angle="+Math.atan2(at.getShearY(), at.getScaleY())/Math.PI*180);
         }
         //three points: translation, scale, rotation, shear
         if (src.length > 2) {
@@ -359,7 +352,7 @@ public class Utils {
                 }
             }
         } catch (JSONException ex) {
-            IJ.log("Utils.createProcessorTree: "+className+": no children");
+            ReportingUtils.logError("Utils.createProcessorTree: "+className+": no children");
         }
         return node;
     }
@@ -426,7 +419,7 @@ public class Utils {
         URL[] urls = { new URL(locationStr) };
         classLoader = URLClassLoader.newInstance(urls,
             //    this.getClass().getClassLoader());
-BasicArea.class.getClassLoader());
+        BasicArea.class.getClassLoader());
 
         int i=0;
         Map<String, String> availableAreaClasses = new HashMap<String,String>();
@@ -440,7 +433,6 @@ BasicArea.class.getClassLoader());
             className = className.replace('/', '.');
             try {
                 clazz=Class.forName(className);
-                IJ.log(clazz.getName());
                 //only add non-abstract BasicArea classes that support custom layouts
                 if (BasicArea.class.isAssignableFrom(clazz) && !Modifier.isAbstract(clazz.getModifiers())) {
                     BasicArea area=(BasicArea)clazz.newInstance();
@@ -457,10 +449,6 @@ BasicArea.class.getClassLoader());
             } catch (Exception ex) {
                 //catch all other exceptions so we can continue with remaining class definitions
                 Logger.getLogger(Utils.class.getName()).log(Level.SEVERE, null, ex);
-                IJ.log(ex.toString());
-                for (StackTraceElement s:ex.getStackTrace()) {
-                    IJ.log(s.getClassName()+", "+s.getMethodName()+", "+s.getLineNumber());
-                }
             }                       
         }
         return availableAreaClasses; 

@@ -1,6 +1,5 @@
 package autoimage;
 
-import ij.IJ;
 import java.awt.Rectangle;
 import java.awt.Shape;
 import java.awt.geom.AffineTransform;
@@ -13,7 +12,7 @@ import org.json.JSONObject;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 public class FieldOfView implements Shape {
     
@@ -229,20 +228,13 @@ public class FieldOfView implements Shape {
      */
     public void setRoi_Pixel(Rectangle binnedRoi, int binning) {
         if (binnedRoi==null) {
-            IJ.log("FieldOfView.setRoi_Pixel: binnedRoi=null, setting to 0,0,0,0");
             unbinnedRoi_Pixel=new Rectangle(0,0,0,0);
             return;
         } else {
             unbinnedRoi_Pixel=Utils.scaleRoi(binnedRoi, binning);
         }
-/*        int x=(int)Math.min(binnedRoi.x*binning,fullChipWidth_Pixel-1);
-        int y=(int)Math.min(binnedRoi.y*binning,fullChipHeight_Pixel-1);
-        unbinnedRoi_Pixel=new Rectangle(
-            x,
-            y,
-            Math.min(fullChipWidth_Pixel-x,binnedRoi.width*binning),
-            Math.min(fullChipHeight_Pixel-y, binnedRoi.height*binning));*/
-        IJ.log("FieldOfView.setRoi_Pixel: unbinnedRoi_Pixel="+unbinnedRoi_Pixel.toString());
+        this.fullChipWidth_Pixel=unbinnedRoi_Pixel.width;
+        this.fullChipHeight_Pixel=unbinnedRoi_Pixel.height;
     }
   
 
@@ -319,7 +311,6 @@ public class FieldOfView implements Shape {
                 effectiveTrans.concatenate(AffineTransform.getRotateInstance(-fieldRotation));
             }
             effectiveTrans.concatenate(AffineTransform.getTranslateInstance(-fullChipWidth_Pixel/2, -fullChipHeight_Pixel/2));
-            IJ.log("FieldOfView.createRoiPath:unbinnedRoi_Pixel="+ unbinnedRoi_Pixel.toString());
             roiPath=new Path2D.Double(effectiveTrans.createTransformedShape(unbinnedRoi_Pixel));
 
             AffineTransform nativeTrans=AffineTransform.getScaleInstance(objPixSize, objPixSize);

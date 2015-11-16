@@ -30,14 +30,14 @@ public class TilingSetting {
     double overlap;
     int direction;
     
-    public static final byte DR_TILING = 0;
-    public static final byte UR_TILING = 1;//TILING_UP;//2
-    public static final byte DL_TILING = 2;//TILING_LEFT;//4
-    public static final byte UL_TILING = 3;//TILING_UP+TILING_LEFT;//6
-    public static final byte RD_TILING = 4;//TILING_HORIZONTAL_FIRST;//1
-    public static final byte LD_TILING = 5;//TILING_HORIZONTAL_FIRST+TILING_LEFT;//5
-    public static final byte RU_TILING = 6;//TILING_HORIZONTAL_FIRST+TILING_UP;//3
-    public static final byte LU_TILING = 7;//TILING_HORIZONTAL_FIRST+TILING_UP+TILING_LEFT;//7
+    public static final int DR_TILING = 0;
+    public static final int UR_TILING = 1;//TILING_UP;//2
+    public static final int DL_TILING = 2;//TILING_LEFT;//4
+    public static final int UL_TILING = 3;//TILING_UP+TILING_LEFT;//6
+    public static final int RD_TILING = 4;//TILING_HORIZONTAL_FIRST;//1
+    public static final int LD_TILING = 5;//TILING_HORIZONTAL_FIRST+TILING_LEFT;//5
+    public static final int RU_TILING = 6;//TILING_HORIZONTAL_FIRST+TILING_UP;//3
+    public static final int LU_TILING = 7;//TILING_HORIZONTAL_FIRST+TILING_UP+TILING_LEFT;//7
     
     public static final String TAG_TILING = "TILING";   
     public static final String TAG_MODE = "MODE";
@@ -54,7 +54,7 @@ public class TilingSetting {
     
 
     
-    public TilingSetting(Mode m, boolean c, int nrCX, int nrCY, boolean sOverlap, int mSites, boolean iOnly, double tOverlap, byte tileDir) {
+    public TilingSetting(Mode m, boolean c, int nrCX, int nrCY, boolean sOverlap, int mSites, boolean iOnly, double tOverlap, int tileDir) {
         mode=m;
         tileCoordFName="";
         cluster=c;

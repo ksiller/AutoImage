@@ -47,7 +47,7 @@ public interface IAcqLayout {
     public final static String TAG_TILE_SEED_FILE = "TILE_SEEDS";
     public final static String TAG_VERSION = "VERSION";
     
-    public final static int NO_TILING_EXECUTOR = -1;
+    public final static int TILING_NO_EXECUTOR = -1;
     public final static int TILING_IN_PROGRESS = 1;
     public final static int TILING_IS_TERMINATING = 2;
     public final static int TILING_COMPLETED = 3;

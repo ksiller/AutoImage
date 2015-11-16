@@ -646,7 +646,7 @@ public class AcqSetting {
         return tiling.mode;
     }
     
-    public void setTilingDir(byte td) {
+    public void setTilingDir(int td) {
         tiling.direction=td;
     }
     

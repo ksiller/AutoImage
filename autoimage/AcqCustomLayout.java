@@ -8,7 +8,6 @@ import ij.IJ;
 import java.awt.Shape;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.NoninvertibleTransformException;
-import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
@@ -1317,7 +1316,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     @Override
     public int getTilingStatus() {
         if (tilingExecutor==null) {
-            return NO_TILING_EXECUTOR;
+            return TILING_NO_EXECUTOR;
         } else if (tilingExecutor.isTerminated() && !tilingAborted) {
             return TILING_COMPLETED;
         } else if (tilingExecutor.isTerminated() && tilingAborted) {
@@ -1334,7 +1333,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
         if (tilingExecutor!=null) {
             return tilingExecutor.getCompletedTaskCount();
         } else
-            return NO_TILING_EXECUTOR;
+            return TILING_NO_EXECUTOR;
     }
     
     @Override
@@ -1342,7 +1341,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
         if (tilingExecutor!=null) {
             return tilingExecutor.getCompletedTaskCount()/tilingExecutor.getTaskCount()*100;
         } else {
-            return NO_TILING_EXECUTOR;
+            return TILING_NO_EXECUTOR;
         }
     }
     

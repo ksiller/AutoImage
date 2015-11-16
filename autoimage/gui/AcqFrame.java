@@ -743,9 +743,9 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             enableGUI(true);
             timepointLabel.setText("Timepoint:");
             //select first sequence setting;
-            retilingAllowed = false;
+//            retilingAllowed = false;
             acqSettingTable.setRowSelectionInterval(0, 0);
-            retilingAllowed = true;
+//            retilingAllowed = true;
         }
     }
     //end ImageCacheListener
@@ -4588,11 +4588,11 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 //        cAcqSettingIdx=0;
         String s = null;
 //        if (acqSettings!=null && acqSettings.size() > 0)
-        if (currentAcqSetting != null) {
+/*        if (currentAcqSetting != null) {
             retilingAllowed = false;
-        }
+        }*/
         acqSettingTable.setRowSelectionInterval(0, 0);
-        retilingAllowed = true;
+/*        retilingAllowed = true;*/
         imageDestPath = createUniqueExpName(rootDirLabel.getText(), experimentTextField.getText());
         File imageDestDir = new File(imageDestPath);
         if (!imageDestDir.exists()) {
@@ -7153,8 +7153,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 
     private void tilingDirComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_tilingDirComboBoxActionPerformed
         if (acqLayout.getTilingStatus()!=IAcqLayout.TILING_IN_PROGRESS && retilingAllowed) {
-            if ((Byte) tilingDirComboBox.getSelectedItem()!=currentAcqSetting.getTilingDir()) {
-                currentAcqSetting.setTilingDir((Byte) tilingDirComboBox.getSelectedItem());
+            if ((Integer)tilingDirComboBox.getSelectedItem()!=currentAcqSetting.getTilingDir()) {
+                currentAcqSetting.setTilingDir((Integer) tilingDirComboBox.getSelectedItem());
                 calcTilePositions(null, currentAcqSetting, ADJUSTING_SETTINGS);
             }
         }
@@ -9089,6 +9089,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 }    
                 ListSelectionModel lsm = (ListSelectionModel) e.getSource();
                 int minIndex = lsm.getMinSelectionIndex();
+                IJ.log("valueChanged:"+minIndex);
                 if (minIndex >= 0) {
                     //convert minIndex (row in view) to index in TableModel, then retrieve the AcqSetting object
                     AcqSetting newSetting = ((AcqSettingTableModel)acqSettingTable.getModel()).getRowData(acqSettingTable.convertRowIndexToModel(minIndex));
@@ -9171,7 +9172,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 
     private boolean updateTileSize(AcqSetting setting) {
         List<Detector> activeDetectors=currentAcqSetting.getDetectors();
-        IJ.log("updateTileSizeLabel");
         if (activeDetectors == null) {
             return false;
         }
@@ -9188,7 +9188,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             String bitStr="";
             try {
                 Rectangle r=ad.getUnbinnedRoi();
-                IJ.log("updateTileSize: unbinnedROI="+r.toString());
                 if (lastW==-1)  {
                     setting.getFieldOfView().setRoi_Pixel(r, 1);
                 }
@@ -9341,9 +9340,12 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     //starts calculation of tile positions in new thread(s)
     //if areas==null, calculates for all areas in layout 
     public void calcTilePositions(List<BasicArea> areas, AcqSetting aSetting, String cmd) {
+        IJ.log("AcqFrame.calcTilePositions");
         if (!retilingAllowed) {
+            IJ.log("    AcqFrame retilingAllowed=false");
             return;
         }
+        IJ.log("    AcqFrame retilingAllowed=true");
         if (aSetting.getImagePixelSize()<=0) {
             //if pixelsize is unknown (<=0), tile positions cannot be calculated
             for (BasicArea a:acqLayout.getAreaArray()) {
