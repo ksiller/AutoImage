@@ -170,7 +170,6 @@ import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 import mmcorej.CMMCore;
 import mmcorej.Configuration;
-import mmcorej.PropertySetting;
 import mmcorej.StrVector;
 import mmcorej.TaggedImage;
 import org.json.JSONArray;
@@ -258,14 +257,17 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     //Operational Status
     private boolean instrumentOnline;
     private boolean updatingAcqSettingTable=false;
-    private boolean moveToMode;
+    
+/*    private boolean moveToMode;
     private boolean zoomMode;
     private boolean selectMode;
     private boolean commentMode;
     private boolean mergeAreasMode;
     private boolean newEllipseMode;
     private boolean newPolygonMode;
-    private boolean newRectangleMode;
+    private boolean newRectangleMode;*/
+
+    private int layoutMode;
     private SelectionPath selPath=null;
 //    private Path2D selectionPath=null;
     private boolean isLeftMouseButton;
@@ -312,6 +314,15 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private static final String CMD_Z_OFFSET = "Set Z-Offset";
     private static final String CMD_MANAGE_PLATE_LAYOUT = "Manage Well Plate Layout";
     private static final String CMD_MANAGE_CUSTOM_LAYOUT = "Manage Custom Layout";
+    
+    private static final int LAYOUT_MODE_MOVETO = 1;
+    private static final int LAYOUT_MODE_SELECT = 2;
+    private static final int LAYOUT_MODE_ZOOM = 4;
+    private static final int LAYOUT_MODE_COMMENT = 8;
+    private static final int LAYOUT_MODE_NEW_RECTANGLE = 16;
+    private static final int LAYOUT_MODE_NEW_ELLIPSE = 32;
+    private static final int LAYOUT_MODE_NEW_POLYGON = 64;
+    private static final int LAYOUT_MODE_MERGE_AREAS = 128;
 
 
 
@@ -514,10 +525,11 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     @Override
     public void windowClosed(WindowEvent we) {
         if (we.getSource() == mergeAreasDialog) {
-            mergeAreasMode = false;
+            layoutMode=0;
+/*            mergeAreasMode = false;
             newPolygonMode = false;
             newRectangleMode = false;
-            newEllipseMode = false;
+            newEllipseMode = false;*/
             newRectangleButton.setEnabled(true);
             newEllipseButton.setEnabled(true);
             newPolygonButton.setEnabled(true);
@@ -526,7 +538,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             acqLayoutPanel.repaint();
             selectButton.setEnabled(true);
             commentButton.setEnabled(true);
-            moveToScreenCoordButton.setEnabled(true);
+            moveToButton.setEnabled(true);
             setLandmarkButton.setEnabled(true);
             for (BasicArea a : acqLayout.getAreaArray()) {
                 a.setSelectedForMerge(false);
@@ -1446,18 +1458,30 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         cursorHotSpot = new Point(16, 16);
         moveToCursor = toolkit.createCustomCursor(cursorImage, cursorHotSpot, "Move-to Cursor");
 
-        acqSettings=null;
-        retilingAllowed = false;
-        zoomMode = false;
+/*        zoomMode = false;
         selectMode = false;
+        moveToMode=false;
         commentMode = false;
         mergeAreasMode = false;
         newRectangleMode = false;
         newEllipseMode = false;
-        newPolygonMode = false;
+        newPolygonMode = false;*/
+        layoutMode=0;
 
+        acqSettings=null;
+        retilingAllowed = false;
         instrumentOnline = false; //to ensure that during app initialization instrument does not respond 
         initComponents();
+        
+        ButtonGroup navigationButtonGroup =  new ButtonGroup();
+        navigationButtonGroup.add(zoomButton);
+        navigationButtonGroup.add(selectButton);
+        navigationButtonGroup.add(moveToButton);
+        navigationButtonGroup.add(commentButton);
+        navigationButtonGroup.add(newRectangleButton);
+        navigationButtonGroup.add(newEllipseButton);
+        navigationButtonGroup.add(newPolygonButton);
+        navigationButtonGroup.add(mergeAreasButton);
         
         //initialize LayoutPanel and layout headers
         layoutColumnHeader = new AcqCustomRule(SwingConstants.HORIZONTAL);
@@ -1835,9 +1859,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
-        buttonGroup1 = new javax.swing.ButtonGroup();
-        buttonGroup2 = new javax.swing.ButtonGroup();
-        jLabel36 = new javax.swing.JLabel();
         settingsPanel = new javax.swing.JPanel();
         sequenceTabbedPane = new javax.swing.JTabbedPane();
         jPanel2 = new javax.swing.JPanel();
@@ -1995,7 +2016,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         timepointLabel = new javax.swing.JLabel();
         progressBar = new javax.swing.JProgressBar();
         setLandmarkButton = new javax.swing.JButton();
-        moveToScreenCoordButton = new javax.swing.JToggleButton();
+        moveToButton = new javax.swing.JToggleButton();
         zoomButton = new javax.swing.JToggleButton();
         cursorLabel = new javax.swing.JLabel();
         selectButton = new javax.swing.JToggleButton();
@@ -2005,8 +2026,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         showAreaLabelsCheckBox = new javax.swing.JCheckBox();
         layoutScrollPane = new LayoutScrollPane();
         acqLayoutPanel = new LayoutPanel(null,null);
-
-        jLabel36.setText("jLabel36");
 
         setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
         setTitle("AutoImage");
@@ -3721,13 +3740,13 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             }
         });
 
-        moveToScreenCoordButton.setFont(new java.awt.Font("Lucida Grande", 0, 11)); // NOI18N
-        moveToScreenCoordButton.setText("Move To");
-        moveToScreenCoordButton.setToolTipText("Click to move to layout position");
-        moveToScreenCoordButton.setSize(new java.awt.Dimension(70, 29));
-        moveToScreenCoordButton.addActionListener(new java.awt.event.ActionListener() {
+        moveToButton.setFont(new java.awt.Font("Lucida Grande", 0, 11)); // NOI18N
+        moveToButton.setText("Move To");
+        moveToButton.setToolTipText("Click to move to layout position");
+        moveToButton.setSize(new java.awt.Dimension(70, 29));
+        moveToButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                moveToScreenCoordButtonActionPerformed(evt);
+                moveToButtonActionPerformed(evt);
             }
         });
 
@@ -3830,7 +3849,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                                 .addGap(0, 0, 0)
                                 .addComponent(stageControlButton)
                                 .addGap(0, 0, 0)
-                                .addComponent(moveToScreenCoordButton, javax.swing.GroupLayout.PREFERRED_SIZE, 77, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addComponent(moveToButton, javax.swing.GroupLayout.PREFERRED_SIZE, 77, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addGap(0, 0, 0)
                                 .addComponent(setLandmarkButton)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -3846,7 +3865,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 .addGap(0, 0, 0)
                 .addGroup(statusPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(setLandmarkButton)
-                    .addComponent(moveToScreenCoordButton)
+                    .addComponent(moveToButton)
                     .addComponent(zoomButton)
                     .addComponent(selectButton)
                     .addComponent(commentButton)
@@ -3871,7 +3890,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 .addGap(12, 12, 12))
         );
 
-        statusPanelLayout.linkSize(javax.swing.SwingConstants.VERTICAL, new java.awt.Component[] {commentButton, moveToScreenCoordButton, selectButton, setLandmarkButton, stageControlButton, zoomButton});
+        statusPanelLayout.linkSize(javax.swing.SwingConstants.VERTICAL, new java.awt.Component[] {commentButton, moveToButton, selectButton, setLandmarkButton, stageControlButton, zoomButton});
 
         layoutScrollPane.addComponentListener(new java.awt.event.ComponentAdapter() {
             public void componentResized(java.awt.event.ComponentEvent evt) {
@@ -3973,7 +3992,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 
     public void setLandmarkFound(boolean b) {
         acquireButton.setEnabled(b);
-        moveToScreenCoordButton.setEnabled(b);
+        moveToButton.setEnabled(b);
         newAreaButton.setEnabled(b);
 //        newRectangleButton.setEnabled(b);
 //        newPolygonButton.setEnabled(b);
@@ -4065,7 +4084,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     }
     
     private void enableGUI(boolean b) {
-        moveToScreenCoordButton.setEnabled(b);
+        moveToButton.setEnabled(b);
         stageControlButton.setEnabled(b);
         setLandmarkButton.setEnabled(b && !acqLayout.isEmpty());
         snapButton.setEnabled(b);
@@ -4713,63 +4732,67 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             JViewport vp = layoutScrollPane.getViewport();
             Dimension vpSize = vp.getViewSize();
             Rectangle vpRect = vp.getViewRect();
-            if (moveToMode) {
-                if (coordX >= 0 && coordX <= acqLayout.getWidth() && coordY >= 0 && coordY < acqLayout.getLength()) {
-                    if (((LayoutPanel) acqLayoutPanel).getZoom() != 1) {
-                        Point newPos = new Point();
-                        newPos.x = Math.max(0, (int) Math.round(evt.getX() - vpRect.width / 2));
-                        if (newPos.x + vpRect.width > vpSize.width) {
-                            newPos.x = vpSize.width - vpRect.width;
+            switch (layoutMode) {
+                case LAYOUT_MODE_MOVETO:
+                    if (coordX >= 0 && coordX <= acqLayout.getWidth() && coordY >= 0 && coordY < acqLayout.getLength()) {
+                        if (((LayoutPanel) acqLayoutPanel).getZoom() != 1) {
+                            Point newPos = new Point();
+                            newPos.x = Math.max(0, (int) Math.round(evt.getX() - vpRect.width / 2));
+                            if (newPos.x + vpRect.width > vpSize.width) {
+                                newPos.x = vpSize.width - vpRect.width;
+                            }
+                            newPos.y = Math.max(0, (int) Math.round(evt.getY() - vpRect.height / 2));
+                            if (newPos.y + vpRect.height > vpSize.height) {
+                                newPos.y = vpSize.height - vpRect.height;
+                            }
+                            vp.setViewPosition(newPos);
                         }
-                        newPos.y = Math.max(0, (int) Math.round(evt.getY() - vpRect.height / 2));
-                        if (newPos.y + vpRect.height > vpSize.height) {
-                            newPos.y = vpSize.height - vpRect.height;
+                        //RefArea lm = acqLayout.getLandmark(0);
+                        if (SwingUtilities.isLeftMouseButton(evt)) {
+                            moveToLayoutPos(coordX, coordY);
+                        } else if (SwingUtilities.isRightMouseButton(evt)) {                        
+                            moveToAreaDefaultPos(acqLayout.getAreaByLayoutPos(coordX, coordY));
+                        }
+                    }
+                    break;
+                case LAYOUT_MODE_ZOOM:
+                    double oldZoom = ((LayoutPanel) acqLayoutPanel).getZoom();
+                    double newZoom = oldZoom;
+                    if (SwingUtilities.isLeftMouseButton(evt)) {
+    //                    IJ.log("zooming in: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
+                        newZoom = ((LayoutPanel) acqLayoutPanel).zoomIn(); //calls acqLayoutPanel.setSize
+    //                    IJ.log("zooming in: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
+    //                    IJ.log("-----");
+                    }
+                    if (SwingUtilities.isRightMouseButton(evt)) {
+    //                    IJ.log("zooming out: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
+                        newZoom = ((LayoutPanel) acqLayoutPanel).zoomOut(vpRect.width, vpRect.height); //calls acqLAyoutPanel.setSize
+    //                    IJ.log("zooming out: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
+    //                    IJ.log("-----");
+                    }
+                    layoutColumnHeader.setZoom(newZoom);
+                    layoutRowHeader.setZoom(newZoom);
+                    layoutColumnHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().width);
+                    layoutRowHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().height);
+                    if ((newZoom != 1) && (newZoom != oldZoom)) {
+                        Point newPos = new Point();
+                        Dimension vpSizeNew = vp.getViewSize();
+    //                    Dimension vpSizeNew=new Dimension((int)Math.round(vpSize.width*newZoom/oldZoom),(int)Math.round(vpSize.height*newZoom/oldZoom));
+                        Rectangle vpRectNew = vp.getViewRect();
+                        double x = (double) evt.getX() * newZoom / oldZoom;
+                        newPos.x = Math.max(0, (int) Math.round(x - vpRectNew.width / 2));
+                        if (newPos.x + vpRectNew.width > vpSizeNew.width) {
+                            newPos.x = vpSizeNew.width - vpRectNew.width;
+                        }
+                        double y = (double) evt.getY() * newZoom / oldZoom;
+                        newPos.y = Math.max(0, (int) Math.round(y - vpRectNew.height / 2));
+                        if (newPos.y + vpRectNew.height > vpSizeNew.height) {
+                            newPos.y = vpSizeNew.height - vpRectNew.height;
                         }
                         vp.setViewPosition(newPos);
                     }
-                    //RefArea lm = acqLayout.getLandmark(0);
-                    if (SwingUtilities.isLeftMouseButton(evt)) {
-                        moveToLayoutPos(coordX, coordY);
-                    } else if (SwingUtilities.isRightMouseButton(evt)) {                        
-                        moveToAreaDefaultPos(acqLayout.getAreaByLayoutPos(coordX, coordY));
-                    }
-                }
-            } else if (zoomMode) {
-                double oldZoom = ((LayoutPanel) acqLayoutPanel).getZoom();
-                double newZoom = oldZoom;
-                if (SwingUtilities.isLeftMouseButton(evt)) {
-//                    IJ.log("zooming in: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
-                    newZoom = ((LayoutPanel) acqLayoutPanel).zoomIn(); //calls acqLayoutPanel.setSize
-//                    IJ.log("zooming in: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
-//                    IJ.log("-----");
-                }
-                if (SwingUtilities.isRightMouseButton(evt)) {
-//                    IJ.log("zooming out: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
-                    newZoom = ((LayoutPanel) acqLayoutPanel).zoomOut(vpRect.width, vpRect.height); //calls acqLAyoutPanel.setSize
-//                    IJ.log("zooming out: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
-//                    IJ.log("-----");
-                }
-                layoutColumnHeader.setZoom(newZoom);
-                layoutRowHeader.setZoom(newZoom);
-                layoutColumnHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().width);
-                layoutRowHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().height);
-                if ((newZoom != 1) && (newZoom != oldZoom)) {
-                    Point newPos = new Point();
-                    Dimension vpSizeNew = vp.getViewSize();
-//                    Dimension vpSizeNew=new Dimension((int)Math.round(vpSize.width*newZoom/oldZoom),(int)Math.round(vpSize.height*newZoom/oldZoom));
-                    Rectangle vpRectNew = vp.getViewRect();
-                    double x = (double) evt.getX() * newZoom / oldZoom;
-                    newPos.x = Math.max(0, (int) Math.round(x - vpRectNew.width / 2));
-                    if (newPos.x + vpRectNew.width > vpSizeNew.width) {
-                        newPos.x = vpSizeNew.width - vpRectNew.width;
-                    }
-                    double y = (double) evt.getY() * newZoom / oldZoom;
-                    newPos.y = Math.max(0, (int) Math.round(y - vpRectNew.height / 2));
-                    if (newPos.y + vpRectNew.height > vpSizeNew.height) {
-                        newPos.y = vpSizeNew.height - vpRectNew.height;
-                    }
-                    vp.setViewPosition(newPos);
-                }
+                    break;
+                default: {}    
             }
         }
     }//GEN-LAST:event_acqLayoutPanelMouseClicked
@@ -4784,7 +4807,11 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 
     private void acqLayoutPanelMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_acqLayoutPanelMousePressed
         Point2D layoutCoord = ((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(new Point(evt.getX(), evt.getY()));
-        if (selectMode || commentMode || mergeAreasMode || newRectangleMode || newEllipseMode) {
+        if (layoutMode==LAYOUT_MODE_SELECT 
+                || layoutMode==LAYOUT_MODE_COMMENT 
+                || layoutMode==LAYOUT_MODE_MERGE_AREAS 
+                || layoutMode==LAYOUT_MODE_NEW_RECTANGLE 
+                || layoutMode==LAYOUT_MODE_NEW_ELLIPSE) {
             if (selPath==null) {
                 selPath=new SelectionPath(layoutCoord);
                 selPath.getPath().moveTo(layoutCoord.getX(),layoutCoord.getY());
@@ -4798,7 +4825,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 isLeftMouseButton = false;
 //                    IJ.log("Right MousePressed");  
             }
-        } else if (newPolygonMode) {    
+        } else if (layoutMode==LAYOUT_MODE_NEW_POLYGON) {    
             if (evt.getClickCount() == 1) {
                 if (selPath==null) {
                     selPath=new SelectionPath(layoutCoord);
@@ -4858,12 +4885,12 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     }
 
     private void acqLayoutPanelMouseReleased(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_acqLayoutPanelMouseReleased
-        if (newRectangleMode || newEllipseMode) {
+        if (layoutMode==LAYOUT_MODE_NEW_RECTANGLE || layoutMode==LAYOUT_MODE_NEW_ELLIPSE) {
             if (selPath!=null) {
                 Point2D endPoint=((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(new Point(evt.getX(), evt.getY()));                
                 Rectangle2D rect=this.createRectangle2D(selPath.getStart(), endPoint);
                 BasicArea area=null;
-                if (newRectangleMode) {
+                if (layoutMode==LAYOUT_MODE_NEW_RECTANGLE) {
                     area=new RectArea(
                         createNewAreaName(), 
                         acqLayout.createUniqueAreaId(), 
@@ -4874,7 +4901,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                         rect.getHeight(), 
                         false, 
                         "");
-                } else if (newEllipseMode) {
+                } else if (layoutMode==LAYOUT_MODE_NEW_ELLIPSE) {
                     area=new EllipseArea(
                         createNewAreaName(), 
                         acqLayout.createUniqueAreaId(), 
@@ -4898,7 +4925,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                acqLayoutPanel.repaint();
             }
             selPath=null;
-        } else if (selPath!=null && (selectMode || mergeAreasMode || commentMode)) {
+        } else if (selPath!=null && (layoutMode==LAYOUT_MODE_SELECT || layoutMode==LAYOUT_MODE_MERGE_AREAS || layoutMode==LAYOUT_MODE_COMMENT)) {
             if (selPath.getPath()!=null) {
                 Point2D startPoint=selPath.getStart();
                 Point2D endPoint=((LayoutPanel) acqLayoutPanel).convertPixToLayoutCoord(new Point(evt.getX(), evt.getY()));
@@ -4907,26 +4934,26 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 List<BasicArea> al=null;//will hold allPoints of all affected areas
                 if (!identicalPoints(startPoint, endPoint)) { 
                     // drag and relase to mark group of areas
-                    if (selectMode) {
+                    if (layoutMode==LAYOUT_MODE_SELECT) {
                         if (isLeftMouseButton)
                             al = acqLayout.getUnselectedAreasInsideRect(createRectangle2D(startPoint, endPoint));
                         else if (isRightMouseButton)
                             al = acqLayout.getSelectedAreasInsideRect(createRectangle2D(startPoint, endPoint));
-                    } else if (mergeAreasMode || commentMode) {
+                    } else if (layoutMode==LAYOUT_MODE_MERGE_AREAS || layoutMode==LAYOUT_MODE_COMMENT) {
                         al = acqLayout.getAllAreasInsideRect(createRectangle2D(startPoint, endPoint));
                     }
                 } else { //single click
-                    if (selectMode) {
+                    if (layoutMode==LAYOUT_MODE_SELECT) {
                         if (isLeftMouseButton)
                             al = acqLayout.getUnselectedAreasTouching(endPoint.getX(), endPoint.getY());
                         else if (isRightMouseButton)
                             al = acqLayout.getSelectedAreasTouching(endPoint.getX(), endPoint.getY());
-                    } else if (mergeAreasMode || commentMode) {
+                    } else if (layoutMode==LAYOUT_MODE_MERGE_AREAS || layoutMode==LAYOUT_MODE_COMMENT) {
                         al = acqLayout.getAllAreasTouching(endPoint.getX(), endPoint.getY());
                     }
                 }
                 AreaTableModel atm = (AreaTableModel) areaTable.getModel();
-                if (selectMode && al!=null) {
+                if (layoutMode==LAYOUT_MODE_SELECT && al!=null) {
                     retilingAllowed = false;
                     for (BasicArea area : al) {
                         int id = area.getId();
@@ -4950,14 +4977,14 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                         updateTotalTileNumber();
                         updateAcqLayoutPanel();
                     }
-                } else if (mergeAreasMode) {
+                } else if (layoutMode==LAYOUT_MODE_MERGE_AREAS) {
                     for (BasicArea area : al) {
                         area.setSelectedForMerge(true);
                     }
                     if (mergeAreasDialog != null) {
                         mergeAreasDialog.addAreas(al);
                     }
-                } else if (commentMode && isLeftMouseButton && al.size() > 0) {
+                } else if (layoutMode==LAYOUT_MODE_COMMENT && isLeftMouseButton && al.size() > 0) {
                     GenericDialog gd = new GenericDialog("Change Comment");
                     gd.addStringField("New Comment:", "");
                     gd.showDialog();
@@ -4985,15 +5012,15 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             return;
         }
         ((LayoutPanel) acqLayoutPanel).updateSelectionPath(selPath);
-        if (newPolygonMode && selPath.getPath()!=null) {
+        if (layoutMode==LAYOUT_MODE_NEW_POLYGON && selPath.getPath()!=null) {
             selPath.getPath().lineTo(coordX, coordY);
-        } else if (selectMode || mergeAreasMode || commentMode || newRectangleMode) {
+        } else if (layoutMode==LAYOUT_MODE_SELECT || layoutMode==LAYOUT_MODE_MERGE_AREAS || layoutMode==LAYOUT_MODE_COMMENT || layoutMode==LAYOUT_MODE_NEW_RECTANGLE) {
             selPath.setPath(new Path2D.Double(new Rectangle2D.Double(
                     Math.min(selPath.getStart().getX(),coordX),
                     Math.min(selPath.getStart().getY(),coordY),
                     Math.abs(coordX-selPath.getStart().getX()),
                     Math.abs(coordY-selPath.getStart().getY()))));
-        } else if (newEllipseMode) {
+        } else if (layoutMode==LAYOUT_MODE_NEW_ELLIPSE) {
             selPath.setPath(new Path2D.Double(new Ellipse2D.Double(
                     Math.min(selPath.getStart().getX(),coordX),
                     Math.min(selPath.getStart().getY(),coordY),
@@ -5528,25 +5555,27 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         } else {
             mergeAreasDialog.setAcquisitionLayout(acqLayout);
         }
-        zoomMode = false;
-        selectMode = false;
+        layoutMode=LAYOUT_MODE_MERGE_AREAS;
+//        zoomMode = false;
+//        selectMode = false;
         selectButton.setSelected(false);
         selectButton.setEnabled(false);
-        commentMode = false;
+//        commentMode = false;
         commentButton.setSelected(false);
         commentButton.setEnabled(false);
-        moveToMode = false;
-        moveToScreenCoordButton.setSelected(false);
-        moveToScreenCoordButton.setEnabled(false);
+//        moveToMode = false;
+        moveToButton.setSelected(false);
+        moveToButton.setEnabled(false);
         setLandmarkButton.setSelected(false);
         setLandmarkButton.setEnabled(false);
+        newAreaButton.setEnabled(false);
         newPolygonButton.setSelected(false);
         newPolygonButton.setEnabled(false);
         newRectangleButton.setSelected(false);
         newRectangleButton.setEnabled(false);
         newEllipseButton.setSelected(false);
         newEllipseButton.setEnabled(false);
-        mergeAreasMode = true;
+//        mergeAreasMode = true;
         acqLayoutPanel.setCursor(normCursor);
         mergeAreasDialog.setVisible(true);
     }//GEN-LAST:event_mergeAreasButtonActionPerformed
@@ -6783,83 +6812,87 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     }//GEN-LAST:event_showZProfileCheckBoxActionPerformed
 
     private void commentButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_commentButtonActionPerformed
-        commentMode = commentButton.isSelected();
+        boolean commentMode = commentButton.isSelected();
+        layoutMode = commentMode ? LAYOUT_MODE_COMMENT : 0;
         if (commentMode) {
             acqLayoutPanel.setCursor(normCursor);
-            moveToMode = false;
-            moveToScreenCoordButton.setSelected(false);
-            zoomMode = false;
+/*            moveToMode = false;
+            moveToButton.setSelected(false);
+//            zoomMode = false;
             zoomButton.setSelected(false);
-            selectMode = false;
+//            selectMode = false;
             selectButton.setSelected(false);
             
-            newPolygonMode = false;
+//            newPolygonMode = false;
             newPolygonButton.setSelected(false);
-            newRectangleMode = false;
+//            newRectangleMode = false;
             newRectangleButton.setSelected(false);
-            newEllipseMode = false;
+//            newEllipseMode = false;
             newEllipseButton.setSelected(false);
-            mergeAreasMode = false;
-            mergeAreasButton.setSelected(false);
+//            mergeAreasMode = false;
+            mergeAreasButton.setSelected(false);*/
         }
     }//GEN-LAST:event_commentButtonActionPerformed
 
     private void selectButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_selectButtonActionPerformed
-        selectMode = selectButton.isSelected();
+        boolean selectMode = selectButton.isSelected();
+        layoutMode=selectMode ? LAYOUT_MODE_SELECT : 0;
         if (selectMode) {
             acqLayoutPanel.setCursor(normCursor);
-            moveToMode = false;
-            moveToScreenCoordButton.setSelected(false);
-            zoomMode = false;
+/*            moveToMode = false;
+            moveToButton.setSelected(false);
+//            zoomMode = false;
             zoomButton.setSelected(false);
-            commentMode = false;
+//            commentMode = false;
             commentButton.setSelected(false);
             
-            newPolygonMode = false;
+//            newPolygonMode = false;
             newPolygonButton.setSelected(false);
-            newRectangleMode = false;
+//            newRectangleMode = false;
             newRectangleButton.setSelected(false);
-            newEllipseMode = false;
+//            newEllipseMode = false;
             newEllipseButton.setSelected(false);
-            mergeAreasMode = false;
-            mergeAreasButton.setSelected(false);
+//            mergeAreasMode = false;
+            mergeAreasButton.setSelected(false);*/
         }
     }//GEN-LAST:event_selectButtonActionPerformed
 
     private void zoomButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_zoomButtonActionPerformed
-        zoomMode = zoomButton.isSelected();
+        boolean zoomMode = zoomButton.isSelected();
+        layoutMode=zoomMode ? LAYOUT_MODE_ZOOM : 0;
         if (zoomMode) {
             acqLayoutPanel.setCursor(zoomCursor);
-            moveToMode = false;
-            moveToScreenCoordButton.setSelected(false);
-            selectMode = false;
+/*            moveToMode = false;
+            moveToButton.setSelected(false);
+//            selectMode = false;
             selectButton.setSelected(false);
-            commentMode = false;
+//            commentMode = false;
             commentButton.setSelected(false);
             
-            newPolygonMode = false;
+//            newPolygonMode = false;
             newPolygonButton.setSelected(false);
-            newRectangleMode = false;
+//            newRectangleMode = false;
             newRectangleButton.setSelected(false);
-            newEllipseMode = false;
+//            newEllipseMode = false;
             newEllipseButton.setSelected(false);
-            mergeAreasMode = false;
-            mergeAreasButton.setSelected(false);
+//            mergeAreasMode = false;
+            mergeAreasButton.setSelected(false);*/
         } else {
             acqLayoutPanel.setCursor(normCursor);
         }
     }//GEN-LAST:event_zoomButtonActionPerformed
 
-    private void moveToScreenCoordButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_moveToScreenCoordButtonActionPerformed
-        if (moveToScreenCoordButton.isSelected() && acqLayout.getNoOfMappedStagePos() == 0) {
+    private void moveToButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_moveToButtonActionPerformed
+        if (moveToButton.isSelected() && acqLayout.getNoOfMappedStagePos() == 0) {
             JOptionPane.showMessageDialog(this,"At least one layout landmark needs to be set first.");
-            moveToScreenCoordButton.setSelected(false);
+            moveToButton.setSelected(false);
             return;
         }
-        moveToMode = moveToScreenCoordButton.isSelected();
+        boolean moveToMode = moveToButton.isSelected();
+        layoutMode=moveToMode ? LAYOUT_MODE_MOVETO : 0;
         if (moveToMode) {
             acqLayoutPanel.setCursor(moveToCursor);
-            zoomMode = false;
+/*            zoomMode = false;
             zoomButton.setSelected(false);
             selectMode = false;
             selectButton.setSelected(false);
@@ -6873,11 +6906,11 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             newEllipseMode = false;
             newEllipseButton.setSelected(false);
             mergeAreasMode = false;
-            mergeAreasButton.setSelected(false);
+            mergeAreasButton.setSelected(false);*/
         } else {
             acqLayoutPanel.setCursor(normCursor);
         }
-    }//GEN-LAST:event_moveToScreenCoordButtonActionPerformed
+    }//GEN-LAST:event_moveToButtonActionPerformed
 
     private void setLandmarkButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_setLandmarkButtonActionPerformed
         if (acqLayout.isEmpty()) {
@@ -8088,78 +8121,81 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         IJ.log("item state changed: newPolygonButton is not selected");
       }*/
         IJ.log("newPolygonButton.itemStateChanged: "+evt.toString());
-        newPolygonMode=newPolygonButton.isSelected();
+        boolean newPolygonMode=newPolygonButton.isSelected();
+        layoutMode=newPolygonMode ? LAYOUT_MODE_NEW_POLYGON : 0;
         ((LayoutPanel)acqLayoutPanel).updateSelectionPath(selPath);
         selPath=null;
         
         if (newPolygonMode) {
             acqLayoutPanel.setCursor(normCursor);
-            zoomMode = false;
+/*            zoomMode = false;
             zoomButton.setSelected(false);
             selectMode = false;
             selectButton.setSelected(false);
             commentMode = false;
             commentButton.setSelected(false);
             moveToMode = false;
-            moveToScreenCoordButton.setSelected(false);
+            moveToButton.setSelected(false);
             
             newRectangleMode = false;
             newRectangleButton.setSelected(false);
             newEllipseMode = false;
             newEllipseButton.setSelected(false);
             mergeAreasMode = false;
-            mergeAreasButton.setSelected(false);
+            mergeAreasButton.setSelected(false);*/
         }
     }//GEN-LAST:event_newPolygonButtonItemStateChanged
 
     private void newRectangleButtonItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_newRectangleButtonItemStateChanged
-        newRectangleMode=newRectangleButton.isSelected();
+        boolean newRectangleMode=newRectangleButton.isSelected();
+        layoutMode=newRectangleMode ? LAYOUT_MODE_NEW_RECTANGLE : 0;
         ((LayoutPanel)acqLayoutPanel).updateSelectionPath(selPath);
         selPath=null;
         
         if (newRectangleMode) {
             acqLayoutPanel.setCursor(normCursor);
-            zoomMode = false;
+/*            zoomMode = false;
             zoomButton.setSelected(false);
             selectMode = false;
             selectButton.setSelected(false);
             commentMode = false;
             commentButton.setSelected(false);
             moveToMode = false;
-            moveToScreenCoordButton.setSelected(false);
+            moveToButton.setSelected(false);
             
             newPolygonMode = false;
             newPolygonButton.setSelected(false);
             newEllipseMode = false;
             newEllipseButton.setSelected(false);
             mergeAreasMode = false;
-            mergeAreasButton.setSelected(false);
+            mergeAreasButton.setSelected(false);*/
         }
     }//GEN-LAST:event_newRectangleButtonItemStateChanged
 
     private void newEllipseButtonItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_newEllipseButtonItemStateChanged
-        newEllipseMode=newEllipseButton.isSelected();
+        boolean newEllipseMode=newEllipseButton.isSelected();
+        layoutMode=newEllipseMode ? LAYOUT_MODE_NEW_ELLIPSE : 0;
         ((LayoutPanel)acqLayoutPanel).updateSelectionPath(selPath);
 //        selectionPath=null;
         selPath=null;
         
         if (newEllipseMode) {
             acqLayoutPanel.setCursor(normCursor);
-            zoomMode = false;
+/*            zoomMode = false;
             zoomButton.setSelected(false);
             selectMode = false;
             selectButton.setSelected(false);
             commentMode = false;
             commentButton.setSelected(false);
             moveToMode = false;
-            moveToScreenCoordButton.setSelected(false);
+            moveToButton.setSelected(false);
             
             newPolygonMode = false;
             newPolygonButton.setSelected(false);
             newRectangleMode = false;
             newRectangleButton.setSelected(false);
             mergeAreasMode = false;
-            mergeAreasButton.setSelected(false);
+            mergeAreasButton.setSelected(false);*/
         }
     }//GEN-LAST:event_newEllipseButtonItemStateChanged
 
@@ -8298,8 +8334,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private javax.swing.JButton autoExposureButton;
     private javax.swing.JComboBox binningComboBox;
     private javax.swing.JButton browseImageDestPathButton;
-    private javax.swing.ButtonGroup buttonGroup1;
-    private javax.swing.ButtonGroup buttonGroup2;
     private javax.swing.JButton cancelThreadButton;
     private javax.swing.JPanel chPanel;
     private javax.swing.JCheckBox chShutterCheckBox;
@@ -8351,7 +8385,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private javax.swing.JLabel jLabel33;
     private javax.swing.JLabel jLabel34;
     private javax.swing.JLabel jLabel35;
-    private javax.swing.JLabel jLabel36;
     private javax.swing.JLabel jLabel37;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
@@ -8384,7 +8417,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private javax.swing.JTextField maxSitesField;
     private javax.swing.JLabel maxSitesLabel;
     private javax.swing.JButton mergeAreasButton;
-    private javax.swing.JToggleButton moveToScreenCoordButton;
+    private javax.swing.JToggleButton moveToButton;
     private javax.swing.JButton newAreaButton;
     private javax.swing.JToggleButton newEllipseButton;
     private javax.swing.JToggleButton newPolygonButton;
@@ -9339,18 +9372,14 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     //starts calculation of tile positions in new thread(s)
     //if areas==null, calculates for all areas in layout 
     public void calcTilePositions(List<BasicArea> areas, AcqSetting aSetting, String cmd) {
-        IJ.log("AcqFrame.calcTilePositions");
         if (!retilingAllowed) {
-            IJ.log("    AcqFrame retilingAllowed=false");
             return;
         }
-        IJ.log("    AcqFrame retilingAllowed=true");
         if (aSetting.getImagePixelSize()<=0) {
             //if pixelsize is unknown (<=0), tile positions cannot be calculated
             for (BasicArea a:acqLayout.getAreaArray()) {
                 a.setUnknownTileNum(true);
             }
-//            aSetting.setTotalTiles(BasicArea.TILING_UNKNOWN_NUMBER);
             ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.convertRowIndexToModel(acqSettingTable.getSelectedRow()));
             return;
         }

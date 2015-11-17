@@ -231,7 +231,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     @Override
     public boolean hasGaps(FieldOfView fov, double tileOverlap) {
         Point2D tileOffset=BasicArea.calculateTileOffset(fov, tileOverlap);
-        AffineTransform absTransform=AffineTransform.getRotateInstance(-getStageToLayoutRot());
+        AffineTransform absTransform=AffineTransform.getRotateInstance(getStageToLayoutRot());
         Shape absFov0=absTransform.createTransformedShape(fov.getEffectiveRoiPath());
 
         double cornerX=tileOffset.getX()/2;
