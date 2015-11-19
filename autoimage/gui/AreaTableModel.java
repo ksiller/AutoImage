@@ -1,7 +1,6 @@
 package autoimage.gui;
 
 import autoimage.api.BasicArea;
-import ij.IJ;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -108,7 +107,6 @@ import javax.swing.table.AbstractTableModel;
                 area = areas.get(rowIndex);
                 switch (colIndex) {
                     case 0: {
-                        IJ.log("AreaTableModel.setValueAt:"+rowIndex+", "+Boolean.toString((Boolean)value));
                         area.setSelectedForAcq(new Boolean((Boolean) value));
                         fireTableCellUpdated(rowIndex, colIndex);
 //                        fireTableCellUpdated(rowIndex, 3);

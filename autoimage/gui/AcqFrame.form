@@ -3,7 +3,7 @@
 <Form version="1.6" maxVersion="1.8" type="org.netbeans.modules.form.forminfo.JFrameFormInfo">
   <Properties>
     <Property name="defaultCloseOperation" type="int" value="2"/>
-    <Property name="title" type="java.lang.String" value="AutoImage"/>
+    <Property name="title" type="java.lang.String" value="5dISC"/>
     <Property name="bounds" type="java.awt.Rectangle" editor="org.netbeans.beaninfo.editors.RectangleEditor">
       <Rectangle value="[0, 22, 1024, 710]"/>
     </Property>
@@ -345,7 +345,7 @@
                     <Property name="icon" type="javax.swing.Icon" editor="org.netbeans.modules.form.editors2.IconEditor">
                       <Image iconType="3" name="/autoimage/resources/merge.png"/>
                     </Property>
-                    <Property name="toolTipText" type="java.lang.String" value="Merge Areas"/>
+                    <Property name="toolTipText" type="java.lang.String" value="Merge Areas in Layout"/>
                     <Property name="margin" type="java.awt.Insets" editor="org.netbeans.beaninfo.editors.InsetsEditor">
                       <Insets value="[0, 0, 0, 0]"/>
                     </Property>

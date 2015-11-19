@@ -7,21 +7,21 @@ import org.micromanager.api.ScriptInterface;
  *
  * @author Karsten Siller, University of Virginia
  */
-public class Auto_Image implements org.micromanager.api.MMPlugin{
-   public static String MENU_NAME = "AutoImage";
-   public static String TOOL_DESCR = "AutoImage: Automatic Image Acquisition and Processing";
+public class FiveD_ISC implements org.micromanager.api.MMPlugin{
+   public static String menuName = "5dISC";
+   public static String tooltipDescription = "5dISC: 5d Image Sequence Controller";
    private AcqFrame acqFrame;
     
     @Override
     public void dispose() {
         acqFrame.cleanUp();        
-        acqFrame.dispose(); //create new onClosingWindow method as event handler to allow saving of Prefs before window is closed
+        acqFrame.dispose();
     }
 
     @Override
     public void setApp(ScriptInterface app) {
         if (acqFrame == null) {
-            acqFrame = new AcqFrame(app);//gui);
+            acqFrame = new AcqFrame(app);
         }
         acqFrame.setVisible(true);
     }
@@ -34,12 +34,12 @@ public class Auto_Image implements org.micromanager.api.MMPlugin{
 
     @Override
     public String getDescription() {
-        return TOOL_DESCR;
+        return tooltipDescription;
     }
 
     @Override
     public String getInfo() {
-        return TOOL_DESCR;
+        return tooltipDescription;
     }
 
     @Override
@@ -49,7 +49,7 @@ public class Auto_Image implements org.micromanager.api.MMPlugin{
 
     @Override
     public String getCopyright() {
-        return "Karsten Siller - University of Virginia, 2014"; 
+        return "Karsten Siller - University of Virginia, 2015"; 
     }
     
     

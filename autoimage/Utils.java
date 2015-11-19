@@ -505,4 +505,11 @@ public class Utils {
         return new Rectangle(roi.x*factor, roi.y*factor, roi.width*factor, roi.height*factor);
     }
     
+    public static Path2D createLinePath(double startX, double startY, double endX, double endY) {
+        Path2D path = new Path2D.Double();
+        path.moveTo(startX, startY);
+        path.lineTo(endX, endY);
+        return path;
+    }
+    
 }

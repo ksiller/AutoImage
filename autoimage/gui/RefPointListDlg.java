@@ -6,7 +6,6 @@ import autoimage.api.RefArea;
 import autoimage.Vec3d;
 import autoimage.api.IAcqLayout;
 import autoimage.api.BasicArea;
-//import ij.IJ;
 import java.awt.event.WindowEvent;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
