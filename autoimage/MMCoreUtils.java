@@ -367,15 +367,20 @@ public class MMCoreUtils {
 
     public static List<Detector> getActiveDetectors(CMMCore core, String channelGroup, List<String> channels) {
         List<Detector> activeDetectors=new ArrayList<Detector>();
-        if (channelGroup!=null && channels!=null) {
-            boolean isFirstChannel=true;
-            for (String ch:channels) {
-                Detector d=MMCoreUtils.getActiveDetector(core, channelGroup, ch);
-                if (d==null && isFirstChannel) {
-                    d=MMCoreUtils.getCoreDetector(core);
-                }
-                if (!activeDetectors.contains(d)) {
-                    activeDetectors.add(d);
+        if (channelGroup!=null) {
+            if (channels==null || channels.size()==0) {
+                activeDetectors.add(MMCoreUtils.getCoreDetector(core));
+            }
+            if (channels !=null) {
+                boolean isFirstChannel=true;
+                for (String ch:channels) {
+                    Detector d=MMCoreUtils.getActiveDetector(core, channelGroup, ch);
+                    if (d==null && isFirstChannel) {
+                        d=MMCoreUtils.getCoreDetector(core);
+                    }
+                    if (!activeDetectors.contains(d)) {
+                        activeDetectors.add(d);
+                    }
                 }
             }
         }

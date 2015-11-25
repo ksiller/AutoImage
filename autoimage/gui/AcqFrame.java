@@ -744,9 +744,13 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         int currentIndex=acqSettings.indexOf(currentAcqSetting);
         if ((acqSettings.size() > currentIndex + 1) && !isAborted) {
             acqSettingTable.setRowSelectionInterval(currentIndex + 1, currentIndex + 1);
+            acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(currentIndex + 1, 0, true));
+/*            AcqSetting newSetting=((AcqSettingTableModel)acqSettingTable.getModel()).getRowData(
+                    acqSettingTable.convertRowIndexToModel(currentIndex+1));
+            selectAcquisition(newSetting);*/
             runAcquisition(currentAcqSetting);
         } else {
-            //restore GUI
+            //finished: restore GUI
             acquireButton.setText("Acquire");
             progressBar.setValue(0);
             isAcquiring = false;
@@ -756,6 +760,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             //select first sequence setting;
 //            retilingAllowed = false;
             acqSettingTable.setRowSelectionInterval(0, 0);
+            acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(0, 0, true));
 //            retilingAllowed = true;
         }
     }
@@ -1368,7 +1373,9 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 JOptionPane.showMessageDialog(null, "Tiling error.\nDeselect 'Inside only' and select 'Overlapping sites', or reduce tile/cluster size.");
             }
             updateTotalTileNumber();
-            enableGUI(true);
+            if (!isAcquiring) {
+                enableGUI(true);
+            }    
             acquireButton.setEnabled(acqLayout.getNoOfMappedStagePos()>0);
             updateAcqLayoutPanel();
         }
@@ -4535,29 +4542,15 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     }
 
     public String startAcquisition() {
-//        IJ.log("AcqFrame.runningAcquisition");
-
-//	  if (!enoughMemoryAvailable()) {
-//	         return null;
-//	  }
-
         if (refPointListDialog != null) {
             if (stageMonitor!=null) {
                 stageMonitor.removeListener(refPointListDialog);
             }
             refPointListDialog.dispose();
-//                refPointListDialog.closeDialog();
             refPointListDialog=null;
         }
-
         if (zOffsetDialog != null) {
-/*            if (stageMonitor!=null) {
-                stageMonitor.removeListener(zOffsetDialog);
-            }
-            if (liveModeMonitor!=null)
-                liveModeMonitor.removeListener(zOffsetDialog);*/
             zOffsetDialog.dispose();
-//            zOffsetDialog=null;
         }
         
         AbstractCellEditor ace = (AbstractCellEditor) acqSettingTable.getCellEditor();
@@ -4574,42 +4567,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             ace.stopCellEditing();
         }
 
-        
-        //camera ROI not supported yet. current ROI saved, cleared before acquisition start, and restored after autoimage closes 
-        try {
-            FieldOfView fov=currentAcqSetting.getFieldOfView();
-            /*
-            cameraROI = core.getROI();
-            if (cameraROI != null
-                    && (cameraROI.width != fov.getROI_Pixel(currentAcqSetting.getBinningFactor()).width 
-                    || cameraROI.height != fov.getROI_Pixel(currentAcqSetting.getBinningFactor()).height)) {
-                JOptionPane.showMessageDialog(this,"ROIs are not supported.\nUsing full camera chip.");
-//                core.clearROI();
-//                currentDetector=updateAvailableCameras(currentDetector.getFieldRotation());
-                for (AcqSetting setting:acqSettings) {
-                    setting.getFieldOfView().clearROI();
-                }            
-            }*/
-        } catch (Exception ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-        }
-
-        /*for future: set roi for camera/detector
-        Rectangle roi=currentAcqSetting.getFieldOfView().roi_Pixel_bin;
-        try {
-            core.setROI(roi.x,roi.y,roi.width,roi.height);
-        } catch (Exception ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        */
-//        cAcqSettingIdx=0;
         String s = null;
-//        if (acqSettings!=null && acqSettings.size() > 0)
-/*        if (currentAcqSetting != null) {
-            retilingAllowed = false;
-        }*/
         acqSettingTable.setRowSelectionInterval(0, 0);
-/*        retilingAllowed = true;*/
         imageDestPath = createUniqueExpName(rootDirLabel.getText(), experimentTextField.getText());
         File imageDestDir = new File(imageDestPath);
         if (!imageDestDir.exists()) {
@@ -5286,29 +5245,37 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             AcqSetting setting = acqSettings.get(i);
             if (setting.hasDuplicateChannels()) {
                 JOptionPane.showMessageDialog(this, "Cannot use same channel twice.", "Acquisition: " + setting.getName(), JOptionPane.ERROR_MESSAGE);
-                retilingAllowed = false;
-                acqSettingTable.setRowSelectionInterval(i, i);
-//                acqSettingListBox.setSelectedValue(setting.getName(),true);
-                retilingAllowed = true;
+                if (i!=acqSettingTable.getSelectedRow()) {
+    //                retilingAllowed = false;
+                    acqSettingTable.setRowSelectionInterval(i, i);
+                    acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(i, 0, true));
+    //                retilingAllowed = true;
+                }
                 sequenceTabbedPane.setSelectedIndex(1);
                 channelTable.requestFocusInWindow();
                 return;
             }
             if (setting.getChannels().size() < 1) {
                 JOptionPane.showMessageDialog(this, "Add Channel for acquisition sequence " + setting.getName() + ".", "Acquisition: " + setting.getName(), JOptionPane.ERROR_MESSAGE);
-                retilingAllowed = false;
-                acqSettingTable.setRowSelectionInterval(i, i);
-//                acqSettingListBox.setSelectedValue(setting.getName(), true);
-                retilingAllowed = true;
+                if (i!=acqSettingTable.getSelectedRow()) {
+//                retilingAllowed = false;
+                    acqSettingTable.setRowSelectionInterval(i, i);
+                    acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(i, 0, true));
+//                retilingAllowed = true;
+                }    
+                acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(i, 0, true));
                 sequenceTabbedPane.setSelectedIndex(1);
                 channelTable.requestFocusInWindow();
                 return;
             }
             if (setting.getImagePixelSize() == -1) {
                 retilingAllowed = false;
-                acqSettingTable.setRowSelectionInterval(i, i);
-//                acqSettingListBox.setSelectedValue(setting.getName(), true);
-                retilingAllowed = true;
+                if (i!=acqSettingTable.getSelectedRow()) {
+//                retilingAllowed = false;
+                    acqSettingTable.setRowSelectionInterval(i, i);
+                    acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(i, 0, true));
+//                    retilingAllowed = true;
+                }
                 JOptionPane.showMessageDialog(this, "Pixel size is not calibrated for acquisition sequence\n " + setting.getName() + ".", "Acquisition", JOptionPane.ERROR_MESSAGE);
                 return;
             }
@@ -8625,14 +8592,14 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 settings = new ArrayList<AcqSetting>();
 //                AcqSetting setting = new AcqSetting("Seq_1", cCameraPixX, cCameraPixY, availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)), Integer.parseInt(binningDesc[0]), false);
 //                FieldOfView fov=new FieldOfView(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel(),currentDetector.getFieldRotation());
-                List<Detector> activeDetectors=MMCoreUtils.getActiveDetectors(core,currentAcqSetting.getChannelGroupStr(), currentAcqSetting.getChannelNames());
+                Detector coreDetector=MMCoreUtils.getCoreDetector(core);
                 AcqSetting setting = new AcqSetting(
                         "Seq_1", 
                         availableObjectives.get(0), 
                         getObjPixelSize(availableObjectives.get(0)),
-                        activeDetectors.get(0).getBinningDesc(0), 
+                        coreDetector.getBinningDesc(0), 
                         false);
-                setting.setDetectors(activeDetectors);
+                //setting.setDetectors(activeDetectors);
                 settings.add(setting);
                 expSettingsFile=new File(Prefs.getHomeDir(),"not found");
                 expSettingsFileLabel.setToolTipText("");    
@@ -8669,6 +8636,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             acqLayout=layout;        
             newAreaButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
             newRectangleButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
+            newEllipseButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
             newPolygonButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
             removeAreaButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaRemovalAllowed());
             mergeAreasButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaMergingAllowed());
@@ -9000,6 +8968,21 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         return pSize;
     }
 
+    private void selectAcquisition(AcqSetting newSetting) {
+        if (currentAcqSetting != newSetting) {
+            currentAcqSetting = newSetting;
+            sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
+                    "Sequence: "+currentAcqSetting.getName()));
+            prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
+            prevObjLabel = currentAcqSetting.getObjective();
+            calcTilePositions(null, currentAcqSetting, ADJUSTING_SETTINGS);
+            ((LayoutPanel) acqLayoutPanel).setAcqSetting(currentAcqSetting, true);
+            updateAcqSettingTab(currentAcqSetting);
+            updateProcessorTreeView(currentAcqSetting);
+            acqSettingTable.requestFocusInWindow();
+        }
+    }
+    
     private void initializeAcqSettingTable() {
         acqSettingTable.setModel(new AcqSettingTableModel(acqSettings));
         //select first acquisition sequence
@@ -9019,18 +9002,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 if (minIndex >= 0) {
                     //convert minIndex (row in view) to index in TableModel, then retrieve the AcqSetting object
                     AcqSetting newSetting = ((AcqSettingTableModel)acqSettingTable.getModel()).getRowData(acqSettingTable.convertRowIndexToModel(minIndex));
-                    if (currentAcqSetting != newSetting) {
-                        currentAcqSetting = newSetting;
-                        sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
-                                "Sequence: "+currentAcqSetting.getName()));
-                        prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
-                        prevObjLabel = currentAcqSetting.getObjective();
-                        calcTilePositions(null, currentAcqSetting, ADJUSTING_SETTINGS);
-                        ((LayoutPanel) acqLayoutPanel).setAcqSetting(currentAcqSetting, true);
-                        updateAcqSettingTab(currentAcqSetting);
-                        updateProcessorTreeView(currentAcqSetting);
-                        acqSettingTable.requestFocusInWindow();
-                    }
+                    selectAcquisition(newSetting);
                 }            
             }
         });
