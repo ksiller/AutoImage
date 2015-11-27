@@ -100,11 +100,13 @@ public class ColorEditor extends AbstractCellEditor
     }
  
     //Implement the one CellEditor method that AbstractCellEditor doesn't.
+    @Override
     public Object getCellEditorValue() {
         return currentColor;
     }
  
     //Implement the one method defined by TableCellEditor.
+    @Override
     public Component getTableCellEditorComponent(JTable table,
                                                  Object value,
                                                  boolean isSelected,

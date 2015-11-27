@@ -333,7 +333,8 @@ public class AcqSetting {
             detectors=new ArrayList<Detector>();
         }
         detectors.add(det);
-        if (detectors.isEmpty()) {
+        if (detectors.size()==1) {
+            //first detector
             //this ensures that fieldOfView is updated
             setDetectors(detectors);
         }

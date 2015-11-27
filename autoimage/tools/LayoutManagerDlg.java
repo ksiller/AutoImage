@@ -6,20 +6,9 @@ import autoimage.AcqWellplateLayout;
 import autoimage.api.BasicArea;
 import autoimage.Utils;
 import autoimage.api.IAcqLayout;
-import autoimage.area.CompoundArea;
-import static autoimage.area.CompoundArea.COMBINED_AND;
-import static autoimage.area.CompoundArea.COMBINED_NOT;
-import static autoimage.area.CompoundArea.COMBINED_OR;
-import static autoimage.area.CompoundArea.COMBINED_XOR;
-import autoimage.area.CompoundArea;
-import autoimage.area.EllipseArea;
-import autoimage.area.PolygonArea;
-import autoimage.area.RectArea;
 import autoimage.gui.NumberTableCellRenderer;
 import ij.IJ;
 import ij.Prefs;
-import java.awt.geom.AffineTransform;
-import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
 import java.io.FileWriter;
@@ -52,7 +41,6 @@ import org.json.JSONObject;
 public class LayoutManagerDlg extends javax.swing.JDialog {
 
     private IAcqLayout startUpLayout;
-    //private AcqCustomLayout currentLayout;
     private static String lastFileLocation="";
     private static Map<String, String> availableAreaClasses=null;
     private String lastAreaType=null;
@@ -727,7 +715,7 @@ BasicArea.class.getClassLoader());
             }
             startUpLayout=layout;
             setCustomLayout(startUpLayout);
-        }        // TODO add your handling code here:
+        }
     }//GEN-LAST:event_openButtonActionPerformed
 
     private void newButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_newButtonActionPerformed

@@ -4,6 +4,8 @@ import autoimage.api.AcqSetting;
 import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseEvent;
+import java.util.EventObject;
 import javax.swing.AbstractCellEditor;
 import javax.swing.JButton;
 import javax.swing.JTable;
@@ -11,7 +13,7 @@ import javax.swing.table.TableCellEditor;
 
 /**
  *
- * @author Karsten
+ * @author Karsten Siller
  */
 public class StartTimeEditor extends AbstractCellEditor
                          implements TableCellEditor, ActionListener {
@@ -30,7 +32,14 @@ public class StartTimeEditor extends AbstractCellEditor
         timeChooser.addOkCancelListener(this);
     }
  
- 
+    @Override
+    public boolean isCellEditable(EventObject evt) {
+        if (evt instanceof MouseEvent) { 
+            return ((MouseEvent)evt).getClickCount() >= 2;
+        }
+        return true;
+    }
+    
     @Override
     public void actionPerformed(ActionEvent e) {
         if (EDIT.equals(e.getActionCommand())) {
@@ -48,13 +57,11 @@ public class StartTimeEditor extends AbstractCellEditor
         }
     }
     
-    //AbstractCellEditor
     @Override
     public Object getCellEditorValue() {
         return startTime;
     }
  
-    //AbstractCellEditor
     @Override
     public Component getTableCellEditorComponent(JTable table,
                                                  Object value,
