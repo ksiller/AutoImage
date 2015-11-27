@@ -4569,6 +4569,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 
         String s = null;
         acqSettingTable.setRowSelectionInterval(0, 0);
+        acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(0, 0, true));
         imageDestPath = createUniqueExpName(rootDirLabel.getText(), experimentTextField.getText());
         File imageDestDir = new File(imageDestPath);
         if (!imageDestDir.exists()) {
