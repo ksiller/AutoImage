@@ -525,8 +525,10 @@ public class MMCoreUtils {
                 detectors.remove(name);
                 IJ.log("        Camera device removed from system: "+name);
             }
+            if (currentDetector!=null) {
+                IJ.log("        Current camera device: "+currentDetector.toString());
+            }    
         }
-        IJ.log("        Current camera device: "+currentDetector.toString());
         return currentDetector;
     }
 

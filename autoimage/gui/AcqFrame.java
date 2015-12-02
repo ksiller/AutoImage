@@ -14,6 +14,7 @@ import autoimage.AcqCustomLayout;
 import autoimage.AcqWellplateLayout;
 import autoimage.AcquisitionTask;
 import autoimage.Detector;
+import autoimage.DisplayUpdater;
 import autoimage.FieldOfView;
 import autoimage.IDataProcessorNotifier;
 import autoimage.IMergeAreaListener;
@@ -242,6 +243,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private String prevObjLabel;
     
     //Operational Status
+    private boolean initialized=false;
     private boolean instrumentOnline;
     private boolean updatingAcqSettingTable=false;    
     private int layoutMode;
@@ -1383,6 +1385,13 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         //get currentCamera from core; readout chip size, binning (stored in currentDetector)
         //param: null --> set fovRotation to FieldOfView.ROTATION_UNKNOWN
         Detector currentDetector=MMCoreUtils.updateAvailableCameras(core); //detector pixel size
+        if (currentDetector==null) {
+            JOptionPane.showMessageDialog(this, "Error loading camera or hardware configuration.");
+            liveModeMonitor=null;
+            stageMonitor=null;
+            initialized=false;
+            return;
+        }
         //update binning
         binningComboBox.setModel(new DefaultComboBoxModel(currentDetector.getBinningDescriptions()));
         
@@ -1498,7 +1507,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         
         //load last settings
         expSettingsFile = new File(Prefs.getHomeDir(),"LastExpSettings.txt");
-        loadExpSettings(expSettingsFile, true);
+        loadExpSettings(expSettingsFile, true, false);
         
         //format acgSettingTable
         acqSettingTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -1536,9 +1545,13 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 
         instrumentOnline = true;
         gui.addMMListener(this);
+        initialized=true;
     }
 
-
+    public boolean isInitialized() {
+        return initialized;
+    }
+    
     private Component createAfPaneTab() {
         JPanel panel=new JPanel(new FlowLayout(FlowLayout.LEFT,2,0));
         panel.setOpaque(false);
@@ -4329,6 +4342,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                                         virtualDisplay=null;
                                         Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                                     }
+//                                    DisplayUpdater display=new DisplayUpdater(acquisitionTask.getImageCache());
+//                                    display.execute();
                                 } else {
                                     virtualDisplay=null;
                                 }
@@ -4989,7 +5004,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                         "Experiment setting files have to be in txt format.\nSettings have not been loaded.", "", JOptionPane.ERROR_MESSAGE);
                 return;
             }
-            loadExpSettings(fc.getSelectedFile(),false); 
+            loadExpSettings(fc.getSelectedFile(),false, false); 
         }
     }//GEN-LAST:event_loadExpSettingFileButtonActionPerformed
 
@@ -7135,7 +7150,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                         double startZPos=core.getPosition(zStage);                            
                         int i = 0;
                         for (int row : rows) {
-                            Channel ch = ctm.getRowData(row);
+                            Channel ch = ctm.getRowData(channelTable.convertRowIndexToModel(row));
                             app.setChannelColor(acqName, i, ch.getColor());
                             app.setChannelName(acqName, i, ch.getName());
                             //apply channel z-offset
@@ -7162,7 +7177,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                             i++;
                         }
                         // set channel contrast based on the first frame/slice
-                        app.setContrastBasedOnFrame(acqName, 0, 0);
+                        //app.setContrastBasedOnFrame(acqName, 0, 0);
                         // return to original z position
                         core.setPosition(zStage, startZPos);
                         core.waitForDevice(zStage);
@@ -8353,13 +8368,19 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         }
     }
     
-    private void loadExpSettings(File file, boolean revertToDefault) {
+    private void loadExpSettings(File file, boolean revertToDefault, boolean showSummary) {
+        boolean error=false;
+        String expMessage="- Opened experiment settings.";
+        String layoutMessage="- Layout loaded.";
+        String settingsMessage="- Acquisition settings loaded.";
+        String objMessage="";
         List<AcqSetting> settings=null;
         IAcqLayout layout=null;
-        if (!file.exists()) {
+/*        if (!file.exists()) {
             IJ.log("Loading experiment settings: "+file.getAbsolutePath() + " not found, creating default settings.");
-            JOptionPane.showMessageDialog(this, "Experiment setting file "+file.getAbsolutePath()+" not found.");
-        } else {   
+            expMessage="- Experiment file not found."; 
+            error=true;
+        } else {   */
             IJ.log("Loading experiment settings: "+file.getAbsolutePath());
             try {
                 BufferedReader br=new BufferedReader(new FileReader(file));
@@ -8369,17 +8390,29 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                     sb.append(line);
                 }
                 JSONObject expSettingsObj=new JSONObject(sb.toString());
+                try {
+                    layout=AcqBasicLayout.createFromJSONObject(expSettingsObj.getJSONObject(IAcqLayout.TAG_LAYOUT), file);
+                } catch (JSONException ex) {
+                    error=true;
+                }
+                try {
+                    settings=loadAcquisitionSettings(expSettingsObj.getJSONArray(AcqSetting.TAG_ACQ_SETTING_ARRAY));  
+                } catch (JSONException ex) {
+                    error=true;
+                }
                 //returns null if problem with parsing of JSONObject
-                layout=AcqBasicLayout.createFromJSONObject(expSettingsObj.getJSONObject(IAcqLayout.TAG_LAYOUT), file);
-                settings=loadAcquisitionSettings(expSettingsObj.getJSONArray(AcqSetting.TAG_ACQ_SETTING_ARRAY));  
-            } catch (FileNotFoundException ex) {    
-                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (FileNotFoundException ex) {   
+                expMessage="- Experiment file not found.";   
+                error=true;
             } catch (IOException ex) {
-                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                expMessage="- Experiment file read error.";
+                error=true;
             } catch (JSONException ex) {    
-                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                expMessage="- Experiment file parsing error.";
+                error=true;
             }
-        }
+//        }
+        error=error || layout==null || settings==null;    
         if (settings!=null || layout!=null) {
             expSettingsFile=file;
             expSettingsFileLabel.setText(expSettingsFile.getName());
@@ -8392,21 +8425,23 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         if (layout==null) {
             if (revertToDefault) {
                 IJ.log("    Layout not found. Initializing with empty layout."); 
-                JOptionPane.showMessageDialog(this, "Last used layout definition could not be found or read!\n"
-                        + "Creating default layout.");
+                layoutMessage="- Layout could not be read. Initializing with empty layout.";
                 layout=new AcqCustomLayout();//creates emptyLayout
+                //set active layout
+                acqLayout=layout;
             } else {
                 IJ.log("    Layout not found."); 
-                JOptionPane.showMessageDialog(this, "Last used layout definition could not be found or read!");                
+                layoutMessage="- Layout could not be read.";
             }    
         } else {
+            //set active layout
+            acqLayout=layout;
             IJ.log("    Layout loaded, file: "+layout.getName()); 
         }
         if (settings==null || settings.size()==0) {
-            JOptionPane.showMessageDialog(this,"Could not read acquisition settings from file '"+expSettingsFile.getName()+"'.");
-            //set up a default acquisition setting
             if (revertToDefault) {
                 IJ.log("    Acquisition settings could not be loaded. Initializing default acquisition settings.");
+                settingsMessage="- Acquisition settings could not be loaded. Initializing default settings.";
                 settings = new ArrayList<AcqSetting>();
 //                AcqSetting setting = new AcqSetting("Seq_1", cCameraPixX, cCameraPixY, availableObjectives.get(0), getObjPixelSize(availableObjectives.get(0)), Integer.parseInt(binningDesc[0]), false);
 //                FieldOfView fov=new FieldOfView(currentDetector.getFullWidth_Pixel(), currentDetector.getFullHeight_Pixel(),currentDetector.getFieldRotation());
@@ -8423,11 +8458,12 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 expSettingsFileLabel.setToolTipText("");    
             } else {
                 IJ.log("    Acquisition settings could not be loaded.");
+                settingsMessage="- Acquisition settings could not be loaded.";
             }
         }
         IJ.log("    "+settings.size()+ " acquisition sequence(s) initialized.");
-        acqLayout=layout;        
-//        if (settings!=null) {
+//        acqLayout=layout;        
+        if (settings!=null) {
             acqSettings=settings;
             for (AcqSetting setting:acqSettings) {
                 if (!objectiveDevStr.equals(setting.getObjectiveDevStr())) {
@@ -8438,7 +8474,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             }
             currentAcqSetting=acqSettings.get(0);
          
-                //update AcqSetting
+            //update AcqSetting
             initializeAcqSettingTable();
             initializeChannelTable(currentAcqSetting);
             updateProcessorTreeView(currentAcqSetting);
@@ -8447,11 +8483,10 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             updateAcqSettingTab(currentAcqSetting);
             calculateTotalZDist(currentAcqSetting);
             calculateDuration(currentAcqSetting);
-//        } 
+        } 
         IJ.log("    GUI updated for sequence: "+currentAcqSetting.getName());
-        //set active layout
-        if (layout!=null) {
-            acqLayout=layout;        
+        if (layout!=null) {//layout loading successful, or reverted to default
+//            acqLayout=layout;        
             newAreaButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
             newRectangleButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
             newEllipseButton.setEnabled(!acqLayout.isEmpty() && acqLayout.isAreaAdditionAllowed());
@@ -8534,7 +8569,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 }
             }
             if (!selObjective.equals(objectiveComboBox.getSelectedItem().toString())) {
-                JOptionPane.showMessageDialog(this, selObjective + " objective is no longer installed!");
+//                JOptionPane.showMessageDialog(this, selObjective + " objective is no longer installed!");
+                objMessage="- "+selObjective + " objective is not available in current group.";
                 selObjective = objectiveComboBox.getSelectedItem().toString();
             }
         }
@@ -8542,6 +8578,13 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         updateTileSize(currentAcqSetting);
         retilingAllowed=true;    
         calcTilePositions(null, currentAcqSetting, SELECTING_AREA);
+        if (error || showSummary) {
+            JOptionPane.showMessageDialog(this,"Loading experiment settings:\n"
+                    +"    "+expMessage+"\n"
+                    +"    "+layoutMessage+"\n"
+                    +"    "+settingsMessage+"\n"
+                    +"    "+objMessage);
+            }
         IJ.log("Loading of experiment settings completed.");
     }    
     

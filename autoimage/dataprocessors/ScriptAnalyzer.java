@@ -3,7 +3,6 @@ package autoimage.dataprocessors;
 import autoimage.ImgUtils;
 import autoimage.api.ExtImageTags;
 import autoimage.api.ImageFileQueue;
-import autoimage.MMCoreUtils;
 import bsh.EvalError;
 import bsh.Interpreter;
 import bsh.TargetError;
@@ -206,7 +205,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
     }
     
     private boolean executePy(List<File> files, String dirForResults, String resultFile) {
-        IJ.log(    "Excuting Py script:"+script_+"; args="+args_);
+        IJ.log(    "Excuting Py script:"+script_+"; args:"+args_);
 
         String fileList=new String();
         for (File f:files) {
@@ -246,6 +245,7 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
     }
     
     private boolean executeBsh(List<File> files, String dirForResults, String resultFile) {
+        IJ.log(    "Excuting Bsh script:"+script_+"; args:"+args_);
         if (files==null || files.size()==0) {
             return true;
         }
@@ -265,7 +265,6 @@ public class ScriptAnalyzer extends GroupProcessor<File>  {
             interpreter.source(script_);
             rTable_=(ResultsTable)interpreter.get("rt");
             getScriptVariables(interpreter);
-            IJ.log(    "Bsh Script executed:"+script_+".");
         } catch ( TargetError e ) {
             IJ.log("    "+this.getClass().getName()+": The script or code called by the script "
                     +script_+" threw an exception: "+ e.getTarget() );

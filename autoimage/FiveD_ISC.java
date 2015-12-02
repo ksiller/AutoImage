@@ -23,12 +23,15 @@ public class FiveD_ISC implements org.micromanager.api.MMPlugin{
         if (acqFrame == null) {
             acqFrame = new AcqFrame(app);
         }
-        acqFrame.setVisible(true);
+        if (!acqFrame.isInitialized()) {
+            acqFrame=null;
+        }
+//        show();
     }
 
     @Override
     public void show() {
-        if (acqFrame!=null)
+        if (acqFrame!=null && acqFrame.isInitialized())
             acqFrame.setVisible(true);
     }
 
