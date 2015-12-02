@@ -100,6 +100,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Enumeration;
+import java.util.EventObject;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -1213,10 +1214,10 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         }  
 
         @Override
-        public void mousePressed(MouseEvent e)  {  
+        public void mousePressed(MouseEvent e)  {
             JTableHeader th = (JTableHeader)e.getSource();  
             int col= th.columnAtPoint(e.getPoint());
-            if(col==0) {
+            if(col==0 && e.getClickCount() >= 2) {
                 TableColumn column = th.getColumnModel().getColumn(col);  
                 String oldValue = (String)column.getHeaderValue();  
                 StrVector groups=core.getAvailableConfigGroups();
@@ -8781,13 +8782,24 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         }
         JComboBox comboBox = new JComboBox(availableChannels);
         channelTable.setModel(new ChannelTableModel(setting.getChannels()));
-        channelTable.getColumnModel().getColumn(0).setCellEditor(new DefaultCellEditor(comboBox)); 
+        channelTable.getColumnModel().getColumn(0).setCellEditor(new DefaultCellEditor(comboBox) {
+                @Override
+                public boolean isCellEditable(EventObject evt) {
+                    if (evt instanceof MouseEvent) { 
+                        return ((MouseEvent)evt).getClickCount() >= 2;
+                    }
+                    return true;
+                }
+        }); 
         //update group name in channel table header
         channelTable.getColumnModel().getColumn(0).setHeaderValue(setting.getChannelGroupStr());  
 
         TableColumn colorColumn = channelTable.getColumnModel().getColumn(3);
         colorColumn.setCellEditor(new ColorEditor());
         colorColumn.setCellRenderer(new ColorRenderer(true));
+        
+        channelTable.setColumnSelectionAllowed(false);
+        
         //since new table model was created, need to add listener again
         channelTable.getModel().addTableModelListener(this);
         List<Detector> activeDetectors=MMCoreUtils.getActiveDetectors(core,setting.getChannelGroupStr(), setting.getChannelNames());
