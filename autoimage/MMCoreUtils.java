@@ -477,10 +477,7 @@ public class MMCoreUtils {
                             }
                             core.setROI(deviceRoi.x, deviceRoi.y , deviceRoi.width, deviceRoi.height);
                         } */   
-                        IJ.log("DeviceRoi="+deviceRoi.toString());
-                        IJ.log("currentBinning="+Integer.toString(currentBinning));
                         Rectangle unbinnedRoi=Utils.scaleRoi(deviceRoi,currentBinning);
-                        IJ.log("unbinnedRoi="+unbinnedRoi.toString());
                         if (detectors.containsKey(device)) {
                             //update existing detector
                             Detector detector=detectors.get(device);

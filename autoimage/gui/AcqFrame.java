@@ -4563,22 +4563,24 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                     double oldZoom = ((LayoutPanel) acqLayoutPanel).getZoom();
                     double newZoom = oldZoom;
                     if (SwingUtilities.isLeftMouseButton(evt)) {
-    //                    IJ.log("zooming in: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
+                        IJ.log("zooming in: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
                         newZoom = ((LayoutPanel) acqLayoutPanel).zoomIn(); //calls acqLayoutPanel.setSize
-    //                    IJ.log("zooming in: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
-    //                    IJ.log("-----");
+                        IJ.log("zooming in: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
+                        IJ.log("-----");
                     }
                     if (SwingUtilities.isRightMouseButton(evt)) {
-    //                    IJ.log("zooming out: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
+                        IJ.log("zooming out: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
                         newZoom = ((LayoutPanel) acqLayoutPanel).zoomOut(vpRect.width, vpRect.height); //calls acqLAyoutPanel.setSize
-    //                    IJ.log("zooming out: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
-    //                    IJ.log("-----");
+                        IJ.log("zooming out: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
+                        IJ.log("-----");
                     }
-                    layoutColumnHeader.setZoom(newZoom);
-                    layoutRowHeader.setZoom(newZoom);
+                    double newScale=((LayoutPanel) acqLayoutPanel).getScale();
+                    layoutColumnHeader.setScaleAndZoom(newScale,newZoom);
+                    layoutRowHeader.setScaleAndZoom(newScale,newZoom);
                     layoutColumnHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().width);
                     layoutRowHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().height);
                     if ((newZoom != 1) && (newZoom != oldZoom)) {
+//                    if ((newZoom != oldZoom)) {
                         Point newPos = new Point();
                         Dimension vpSizeNew = vp.getViewSize();
     //                    Dimension vpSizeNew=new Dimension((int)Math.round(vpSize.width*newZoom/oldZoom),(int)Math.round(vpSize.height*newZoom/oldZoom));
