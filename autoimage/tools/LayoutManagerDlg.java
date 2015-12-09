@@ -236,7 +236,7 @@ public class LayoutManagerDlg extends javax.swing.JDialog {
             URL[] urls = { new URL(locationStr) };
             classLoader = URLClassLoader.newInstance(urls,
                 //    this.getClass().getClassLoader());
-BasicArea.class.getClassLoader());
+            BasicArea.class.getClassLoader());
 
             int i=0;
             availableAreaClasses=new HashMap<String,String>();
@@ -250,7 +250,6 @@ BasicArea.class.getClassLoader());
                 className = className.replace('/', '.');
                 try {
                     clazz=Class.forName(className);
-                    IJ.log(clazz.getName());
                     //only add non-abstract BasicArea classes that support custom layouts
                     if (BasicArea.class.isAssignableFrom(clazz) && !Modifier.isAbstract(clazz.getModifiers())) {
                         BasicArea area=(BasicArea)clazz.newInstance();
@@ -334,9 +333,19 @@ BasicArea.class.getClassLoader());
 
         plateWidthField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.000"))));
         plateWidthField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        plateWidthField.addPropertyChangeListener(new java.beans.PropertyChangeListener() {
+            public void propertyChange(java.beans.PropertyChangeEvent evt) {
+                plateWidthFieldPropertyChange(evt);
+            }
+        });
 
         plateHeightField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.000"))));
         plateHeightField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        plateHeightField.addPropertyChangeListener(new java.beans.PropertyChangeListener() {
+            public void propertyChange(java.beans.PropertyChangeEvent evt) {
+                plateHeightFieldPropertyChange(evt);
+            }
+        });
 
         closeButton.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
         closeButton.setText("Close");
@@ -394,6 +403,11 @@ BasicArea.class.getClassLoader());
 
         plateLengthField.setFormatterFactory(new javax.swing.text.DefaultFormatterFactory(new javax.swing.text.NumberFormatter(new java.text.DecimalFormat("#,##0.000"))));
         plateLengthField.setFont(new java.awt.Font("Lucida Grande", 0, 12)); // NOI18N
+        plateLengthField.addPropertyChangeListener(new java.beans.PropertyChangeListener() {
+            public void propertyChange(java.beans.PropertyChangeEvent evt) {
+                plateLengthFieldPropertyChange(evt);
+            }
+        });
 
         areaTable.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
@@ -849,6 +863,10 @@ BasicArea.class.getClassLoader());
             try {
                 clazz = Class.forName(availableAreaClasses.get(selectedType));
                 BasicArea newArea=((BasicArea)clazz.newInstance());
+                
+//                double width=((Number)plateWidthField.getValue()).doubleValue();
+//                double length=((Number)plateLengthField.getValue()).doubleValue();
+//                newArea=newArea.showConfigDialog(new Rectangle2D.Double(0,0,width, length));
                 newArea=newArea.showConfigDialog(new Rectangle2D.Double(0,0,startUpLayout.getWidth(), startUpLayout.getLength()));
                 if (newArea!=null) {
                     AreaTableModel model=(AreaTableModel)areaTable.getModel();
@@ -866,6 +884,33 @@ BasicArea.class.getClassLoader());
             }
         }
     }//GEN-LAST:event_newAreaButtonActionPerformed
+
+    private void plateWidthFieldPropertyChange(java.beans.PropertyChangeEvent evt) {//GEN-FIRST:event_plateWidthFieldPropertyChange
+        if (plateWidthField.getValue()!=null && startUpLayout!=null) {
+            double newValue=((Number)plateWidthField.getValue()).doubleValue() * 1000;
+            if (newValue != startUpLayout.getWidth()) {
+                startUpLayout.setWidth(newValue);
+            }    
+        }
+    }//GEN-LAST:event_plateWidthFieldPropertyChange
+
+    private void plateLengthFieldPropertyChange(java.beans.PropertyChangeEvent evt) {//GEN-FIRST:event_plateLengthFieldPropertyChange
+        if (plateLengthField.getValue()!=null && startUpLayout!=null) {
+            double newValue=((Number)plateLengthField.getValue()).doubleValue() * 1000;
+            if (newValue != startUpLayout.getLength()) {
+                startUpLayout.setLength(newValue);
+            }    
+        }
+    }//GEN-LAST:event_plateLengthFieldPropertyChange
+
+    private void plateHeightFieldPropertyChange(java.beans.PropertyChangeEvent evt) {//GEN-FIRST:event_plateHeightFieldPropertyChange
+        if (plateHeightField.getValue()!=null && startUpLayout!=null) {
+            double newValue=((Number)plateHeightField.getValue()).doubleValue() * 1000;
+            if (newValue != startUpLayout.getHeight()) {
+                startUpLayout.setHeight(newValue);
+            }    
+        }
+    }//GEN-LAST:event_plateHeightFieldPropertyChange
 
     
     // Variables declaration - do not modify//GEN-BEGIN:variables

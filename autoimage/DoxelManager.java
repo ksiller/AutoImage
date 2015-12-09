@@ -11,8 +11,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  *
@@ -21,19 +19,19 @@ import java.util.logging.Logger;
 public class DoxelManager implements IDoxelListener {
     
     private Map<String,List<Doxel>> areaMap; //tile positions stored as layout coordinates
-    private IAcqLayout acqLayout;
+//    private IAcqLayout acqLayout;
     private AcqSetting acqSetting;
     
     public DoxelManager (IAcqLayout aLayout, AcqSetting aSetting) {
         areaMap=new HashMap<String,List<Doxel>>();
-        acqLayout=aLayout;
+//        acqLayout=aLayout;
         acqSetting=aSetting;
     }
     
-    public void setAcquisitionLayout(IAcqLayout aLayout) {
+/*    public void setAcquisitionLayout(IAcqLayout aLayout) {
         acqLayout=aLayout;
     }
-    
+*/    
     public void setAcquisitionSetting(AcqSetting aSetting) {
         acqSetting=aSetting;
     }
@@ -162,12 +160,17 @@ public class DoxelManager implements IDoxelListener {
         try {
         */
             //convert spatial doxel coordinates into micron
-            doxel.convertToMicron();
+            try {
+                doxel.convertToMicron();
+            } catch (IllegalArgumentException ie) {
+                
+            }
             
             String areaName="all";//default in case it cannot be parsed
             try {
                 areaName=(String)doxel.get(ExtImageTags.AREA_NAME);
-            } catch (Exception e) {}
+            } catch (Exception e) {
+            }
             List doxelList=areaMap.get(areaName);
 
             /*           
@@ -178,9 +181,6 @@ public class DoxelManager implements IDoxelListener {
             doxel.zPos=lCoord.z;
             */
             
-            //add annotation
-            doxel.put(Doxel.IDENTIFIER,areaName+"-Doxel "+Integer.toString(doxelList.size()));
-            doxel.put(ExtImageTags.AREA_NAME, areaName);
             if (doxelList!=null) {
                 doxelList.add(doxel);
             } else {
@@ -188,6 +188,9 @@ public class DoxelManager implements IDoxelListener {
                 doxelList.add(doxel);
                 areaMap.put(areaName,doxelList);
             }    
+            //add annotation
+            doxel.put(ExtImageTags.AREA_NAME, areaName);
+            doxel.put(Doxel.IDENTIFIER,areaName+"-Doxel "+Integer.toString(doxelList.size()));
             IJ.log(this.getClass().getName()+": add to doxelList for area "+areaName+": "+doxel.toString(false));//+", layout:"+lCoord.x+", "+lCoord.y+", "+lCoord.z);
 /*        
         } catch (Exception ex) {

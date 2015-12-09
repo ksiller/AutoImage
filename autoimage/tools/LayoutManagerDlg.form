@@ -199,6 +199,9 @@
           <Font name="Lucida Grande" size="12" style="0"/>
         </Property>
       </Properties>
+      <Events>
+        <EventHandler event="propertyChange" listener="java.beans.PropertyChangeListener" parameters="java.beans.PropertyChangeEvent" handler="plateWidthFieldPropertyChange"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JFormattedTextField" name="plateHeightField">
       <Properties>
@@ -209,6 +212,9 @@
           <Font name="Lucida Grande" size="12" style="0"/>
         </Property>
       </Properties>
+      <Events>
+        <EventHandler event="propertyChange" listener="java.beans.PropertyChangeListener" parameters="java.beans.PropertyChangeEvent" handler="plateHeightFieldPropertyChange"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JButton" name="closeButton">
       <Properties>
@@ -333,6 +339,9 @@
           <Font name="Lucida Grande" size="12" style="0"/>
         </Property>
       </Properties>
+      <Events>
+        <EventHandler event="propertyChange" listener="java.beans.PropertyChangeListener" parameters="java.beans.PropertyChangeEvent" handler="plateLengthFieldPropertyChange"/>
+      </Events>
     </Component>
     <Component class="javax.swing.JSeparator" name="jSeparator2">
     </Component>

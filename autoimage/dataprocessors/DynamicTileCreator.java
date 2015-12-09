@@ -4,8 +4,6 @@ import autoimage.ImgUtils;
 import autoimage.api.ExtImageTags;
 import autoimage.api.Doxel;
 import autoimage.api.IDoxelListener;
-import autoimage.MMCoreUtils;
-import autoimage.Vec3d;
 
 //share last directory for script files with ScriptAnalyzer
 import static autoimage.dataprocessors.ScriptAnalyzer.scriptDir;
@@ -46,34 +44,35 @@ import org.micromanager.api.MMTags;
  *
  * @author Karsten Siller
  */
-public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<String> {
+public class DynamicTileCreator extends ScriptAnalyzer implements IDataProcessorOption<String> {
     
-    protected List<Doxel> roiList;
+    protected List<Doxel> doxelList;
     protected List<String> options_;
     protected List<String> selectedSeq;
     private final List<IDoxelListener> doxelListeners;
     private final ExecutorService listenerExecutor;
 
-    public RoiFinder () {
+    public DynamicTileCreator () {
         this("","","",null);
     }
     
-    public RoiFinder (final String script, final String args, String path, IDoxelListener listener) {
+    public DynamicTileCreator (final String script, final String args, String path, IDoxelListener listener) {
         this(false,script, args, path, listener,false);
     }
 
-    public RoiFinder (boolean procIncompl,final String script, final String args, String path, IDoxelListener listener, boolean saveRT) {
+    public DynamicTileCreator (boolean procIncompl,final String script, final String args, String path, IDoxelListener listener, boolean saveRT) {
         super(procIncompl,script, args, path, saveRT);
         doxelListeners=new ArrayList<IDoxelListener>();
         if (listener!=null)
             doxelListeners.add(listener);
         selectedSeq=new ArrayList<String> ();
         listenerExecutor = Executors.newFixedThreadPool(1);
+        //always separate by timepoint, xy position (stage pos, cluster, area)
         criteriaKeys.add(MMTags.Image.FRAME_INDEX);
         criteriaKeys.add(MMTags.Image.POS_INDEX);
         criteriaKeys.add(ExtImageTags.CLUSTER_INDEX);
         criteriaKeys.add(ExtImageTags.AREA_INDEX);
-//        criteriaKeys.add(ExtImageTags.AREA_COMMENT);
+        criteriaKeys.add(ExtImageTags.AREA_COMMENT);
     }
     
     @Override
@@ -99,13 +98,13 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
     
     @Override
     public String getProcName() {
-        return "ROI-Finder: "+new File(script_).getName()+" ["+args_+"]";
+        return "Dynamic Tiling: "+new File(script_).getName()+" ["+args_+"]";
     }
     
     @Override
     public void setScriptVariables(Interpreter interpreter) throws EvalError {
-        roiList= new ArrayList<Doxel>();
-        interpreter.set("roiList",roiList);
+        doxelList= new ArrayList<Doxel>();
+        interpreter.set("doxelList",doxelList);
 //        interpreter.set("workDir",workDir);
     }
 
@@ -144,11 +143,11 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
             final String area=meta.getString(ExtImageTags.AREA_NAME);
             double cosinus=Math.cos(detectorAngle);
             double sinus=Math.sin(detectorAngle);
-            if (roiList!=null && roiList.size()>0){
-                final List<Doxel> doxelList=new ArrayList<Doxel>(roiList.size());
-                for (final Doxel doxel:roiList) {
+            if (doxelList!=null && doxelList.size()>0){
+                final List<Doxel> doxelList=new ArrayList<Doxel>(this.doxelList.size());
+                for (final Doxel doxel:this.doxelList) {
 
-                    IJ.log("    roi (image): ("+doxel.toString(false));
+                    IJ.log("    doxel (image): ("+doxel.toString(false));
                     
                     //1. translate to center -> dx/dy
                     double dx;//offset from image center x in um
@@ -207,11 +206,11 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
                     
                     doxelList.add(doxel);
 
-                    IJ.log("    roi (relative to center of first image): ("+ dx +"/"+ dy +"/"+ dz +") [um/um/um]");
+                    IJ.log("    doxel (relative to center of first image): ("+ dx +"/"+ dy +"/"+ dz +") [um/um/um]");
                     IJ.log("    first image center (absolute): ("+(firstImgX)+"/"+(firstImgY)+"/"+(firstImgZ)+") [um/um/um]");
-                    IJ.log("    roi doxel (absolute): "+doxel.toString(false));
+                    IJ.log("    doxel (absolute): "+doxel.toString(false));
                 }
-                roiList.clear();
+                this.doxelList.clear();
                     
                 synchronized (doxelListeners) {
                     for (final IDoxelListener tm : doxelListeners) {
@@ -224,9 +223,9 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
                     }
                 }
       
-                IJ.log("    "+Integer.toString(doxelList.size())+" ROIs added for area "+area);
+                IJ.log("    "+Integer.toString(doxelList.size())+" Doxels added for area "+area);
             } else {
-                IJ.log("    no ROIs found");
+                IJ.log("    no Doxels created");
             }    
         } catch (JSONException ex) {
             IJ.log("    Script "+script_+"Problem parsing JSONObject.");
@@ -241,7 +240,7 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
         BoxLayout layout = new BoxLayout(optionPanel,BoxLayout.Y_AXIS);
         optionPanel.setLayout(layout);
 
-        JLabel l=new JLabel("Select acquisition sequences that utilize the ROIs");
+        JLabel l=new JLabel("Select acquisition sequences that will utilize the dynamic Tile coordinates");
         l.setAlignmentX(Component.LEFT_ALIGNMENT);
         optionPanel.add(l);
         JCheckBox[] optCB;
@@ -393,7 +392,7 @@ public class RoiFinder extends ScriptAnalyzer implements IDataProcessorOption<St
                 criteriaKeys.add(ExtImageTags.AREA_INDEX);
             }
             if (commentsCB.isSelected()) {
-//                criteriaKeys.add(ExtImageTags.AREA_COMMENT);
+                criteriaKeys.add(ExtImageTags.AREA_COMMENT);
             }
             script_=scriptField.getText();
             args_=argField.getText().replaceAll("\n", " ");

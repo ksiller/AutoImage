@@ -124,11 +124,11 @@ public class Doxel {
     /**
      *
      * @param key
-     * @return
+     * @return Object defined under key
      * @throws NullPointerException
      * @throws IllegalArgumentException
      */
-    public Object get(String key) throws NullPointerException, IllegalArgumentException, JSONException {
+    public Object get(String key) throws NullPointerException, IllegalArgumentException {
         if (properties==null) {
             throw new NullPointerException();
         }

@@ -7,7 +7,7 @@ package autoimage.gui;
 import autoimage.dataprocessors.BranchedProcessor;
 import autoimage.dataprocessors.ExtDataProcessor;
 import autoimage.dataprocessors.FilterProcessor;
-import autoimage.dataprocessors.RoiFinder;
+import autoimage.dataprocessors.DynamicTileCreator;
 import autoimage.dataprocessors.ScriptAnalyzer;
 import ij.IJ;
 import java.awt.Component;
@@ -88,7 +88,7 @@ public class ProcessorTreeCellRenderer extends DefaultTreeCellRenderer {
                 setIcon(scriptIcon);
  /*           if (dp instanceof MultiChMultiZAnalyzer)
                 setIcon(aMC_MZ_Icon);*/
-            if (dp instanceof RoiFinder)
+            if (dp instanceof DynamicTileCreator)
                 setIcon(roiIcon);
         } else {
             setText(dp.getClass().getSimpleName());

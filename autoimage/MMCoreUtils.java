@@ -446,8 +446,9 @@ public class MMCoreUtils {
                                     }
                                     i++;
                                 }
-                                //restore initial binning setting
+                                //restore initial binning setting and Roi
                                 core.setProperty(device, propsStr, currentBin);
+                                core.setROI(deviceRoi.x, deviceRoi.y, deviceRoi.width, deviceRoi.height);
                                 binningMap=new HashMap<String,Integer>();
                                 //Assumption: smallest pixel size obtained when binning=1
                                 for (i=0; i<binningOptions.length; i++) {
@@ -476,7 +477,10 @@ public class MMCoreUtils {
                             }
                             core.setROI(deviceRoi.x, deviceRoi.y , deviceRoi.width, deviceRoi.height);
                         } */   
+                        IJ.log("DeviceRoi="+deviceRoi.toString());
+                        IJ.log("currentBinning="+Integer.toString(currentBinning));
                         Rectangle unbinnedRoi=Utils.scaleRoi(deviceRoi,currentBinning);
+                        IJ.log("unbinnedRoi="+unbinnedRoi.toString());
                         if (detectors.containsKey(device)) {
                             //update existing detector
                             Detector detector=detectors.get(device);

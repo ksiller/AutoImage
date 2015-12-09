@@ -14,7 +14,7 @@ import autoimage.AcqCustomLayout;
 import autoimage.AcqWellplateLayout;
 import autoimage.AcquisitionTask;
 import autoimage.Detector;
-import autoimage.DisplayUpdater;
+import autoimage.AcqDisplay;
 import autoimage.FieldOfView;
 import autoimage.IDataProcessorNotifier;
 import autoimage.IMergeAreaListener;
@@ -41,7 +41,7 @@ import autoimage.dataprocessors.ImageTagFilterOpt;
 import autoimage.dataprocessors.ImageTagFilterOptLong;
 import autoimage.dataprocessors.ImageTagFilterOptString;
 import autoimage.dataprocessors.ImageTagFilterString;
-import autoimage.dataprocessors.RoiFinder;
+import autoimage.dataprocessors.DynamicTileCreator;
 import autoimage.dataprocessors.ScriptAnalyzer;
 import autoimage.dataprocessors.SiteInfoUpdater;
 import autoimage.olddp.NoFilterSeqAnalyzer;
@@ -818,6 +818,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         LayoutManagerDlg layoutDialog=new LayoutManagerDlg(this, modal);
         if (!acqLayout.isEmpty() && !(acqLayout instanceof AcqWellplateLayout)) {
             try {
+                //pass copy of layout
                 layoutDialog.setCustomLayout(AcqBasicLayout.createFromJSONObject(acqLayout.toJSONObject(),acqLayout.getFile()));
             } catch (JSONException ex) {
                 layoutDialog.setCustomLayout(new AcqCustomLayout());
@@ -4343,7 +4344,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                                         virtualDisplay=null;
                                         Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
                                     }
-//                                    DisplayUpdater display=new DisplayUpdater(acquisitionTask.getImageCache());
+//                                    AcqDisplay display=new AcqDisplay(app,acquisitionTask.getImageCache(), acquisitionTask.getPrefix());
 //                                    display.execute();
                                 } else {
                                     virtualDisplay=null;
@@ -4458,14 +4459,14 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 if (dp instanceof IDataProcessorNotifier) {
                     ((IDataProcessorNotifier)dp).addListener(this);
                 }
-                if (dp instanceof RoiFinder) {
-                    RoiFinder roifinder=(RoiFinder)dp;
+                if (dp instanceof DynamicTileCreator) {
+                    DynamicTileCreator roifinder=(DynamicTileCreator)dp;
                     roifinder.removeAllDoxelListeners();
                     for (String selSeq:roifinder.getSelSeqNames()) {
                         boolean sequenceFound=false;
                         for (AcqSetting as:acqSettings) {
                             if (as.getName().equals(selSeq)) {
-                                as.getDoxelManager().setAcquisitionLayout(acqLayout);
+//                                as.getDoxelManager().setAcquisitionLayout(acqLayout);
                                 as.getDoxelManager().clearList();
                                 roifinder.addDoxelListener(as.getDoxelManager());
                                 sequenceFound=true;
@@ -5148,7 +5149,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                     while (en.hasMoreElements()) {
                         DefaultMutableTreeNode node=en.nextElement();
                         DataProcessor dp=((DataProcessor)node.getUserObject());
-                        if (dp instanceof RoiFinder && (((RoiFinder)dp).getSelSeqNames().contains(setting.getName()))) {
+                        if (dp instanceof DynamicTileCreator && (((DynamicTileCreator)dp).getSelSeqNames().contains(setting.getName()))) {
                             roiFinderDefined=true;
                             break;
                         }
@@ -5912,11 +5913,11 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             JOptionPane.showMessageDialog(null, "Script Analyzers need to be inserted downstream of Image Storage node");
             return;
         }
-/*        RoiFinder rf=showRoiFinderDlg(null, selectedNode);
+/*        DynamicTileCreator rf=showRoiFinderDlg(null, selectedNode);
         if (rf!=null) {
             createAndAddProcessorNode(selectedNode,rf);
         }*/
-        RoiFinder rf=new RoiFinder();
+        DynamicTileCreator rf=new DynamicTileCreator();
         List<String> list = new ArrayList<String>();
         for (AcqSetting setting:acqSettings) {
             list.add(setting.getName());
@@ -5951,12 +5952,12 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 //            showAreaFilterDlg((FilterProcessor)dp, selectedNode);
 //        else if (dp instanceof FilterProcessor)
 //            showImageTagFilterDlg((FilterProcessor)dp, selectedNode);  
-        if (dp instanceof RoiFinder) {
+        if (dp instanceof DynamicTileCreator) {
             List<String> list = new ArrayList<String>();
             for (AcqSetting setting:acqSettings) {
                 list.add(setting.getName());
             }                
-            ((RoiFinder)dp).setOptions(list);
+            ((DynamicTileCreator)dp).setOptions(list);
         }    
         if (dp instanceof ImageTagFilterOpt) {
             ImageTagFilterOpt itfo=(ImageTagFilterOpt)dp;
