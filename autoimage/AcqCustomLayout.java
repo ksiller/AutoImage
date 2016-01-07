@@ -1339,7 +1339,7 @@ public class AcqCustomLayout extends AcqBasicLayout {
     @Override
     public double getCompletedTilingTasksPercent() {
         if (tilingExecutor!=null) {
-            return tilingExecutor.getCompletedTaskCount()/tilingExecutor.getTaskCount()*100;
+            return (double)tilingExecutor.getCompletedTaskCount()/tilingExecutor.getTaskCount()*100;
         } else {
             return TILING_NO_EXECUTOR;
         }

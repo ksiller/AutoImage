@@ -179,7 +179,6 @@ public class AcqSetting {
     /**
      * 
      * @param n label for this acquisition setting
-     * @param fov defines the current field-of-view (defined by camera chip size, camera roi); it's dimensions determine the current tile size
      * @param objective label of the objective to be used (needs to correspond to a valid entry in the objective turret device group
      * @param oPixSize pixel size of chosen objective, camera binning is assumed to be 1.
      */
@@ -190,7 +189,6 @@ public class AcqSetting {
     /**
      * 
      * @param n label for this acquisition setting
-     * @param fov defines the current field-of-view (defined by camera chip size, camera roi); it's dimensions determine the current tile size
      * @param objective label of the objective to be used (needs to correspond to a valid entry in the objective turret device group
      * @param oPixSize pixel size of chosen objective, camera binning is assumed to be 1.
      * @param bin label that describes the binning value (appropriate values are defined by camera device adapter

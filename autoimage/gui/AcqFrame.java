@@ -5,20 +5,21 @@ import autoimage.api.BasicArea;
 import autoimage.api.Channel;
 import autoimage.api.ExtImageTags;
 import autoimage.api.IAcqLayout;
-import autoimage.api.IDataProcessorListener;
 import autoimage.api.ILiveListener;
 import autoimage.api.IStageMonitorListener;
 import autoimage.api.RefArea;
 import autoimage.AcqBasicLayout;
+import autoimage.AcqConfig;
 import autoimage.AcqCustomLayout;
 import autoimage.AcqWellplateLayout;
-import autoimage.AcquisitionTask;
 import autoimage.Detector;
-import autoimage.AcqDisplay;
+import autoimage.AcqJobManager;
+import autoimage.AcquisitionJob;
 import autoimage.FieldOfView;
-import autoimage.IDataProcessorNotifier;
 import autoimage.IMergeAreaListener;
 import autoimage.IRefPointListener;
+import autoimage.JobCallback;
+import autoimage.JobException;
 import autoimage.LiveModeMonitor;
 import autoimage.MMCoreUtils;
 import autoimage.PlateConfiguration;
@@ -43,19 +44,19 @@ import autoimage.dataprocessors.ImageTagFilterOptString;
 import autoimage.dataprocessors.ImageTagFilterString;
 import autoimage.dataprocessors.DynamicTileCreator;
 import autoimage.dataprocessors.ScriptAnalyzer;
-import autoimage.dataprocessors.SiteInfoUpdater;
+import autoimage.events.AllJobsCompletedEvent;
+import autoimage.events.JobSwitchEvent;
 import autoimage.olddp.NoFilterSeqAnalyzer;
 import autoimage.tools.CameraRotDlg;
+import com.google.common.eventbus.Subscribe;
 import ij.IJ;
 import ij.Prefs;
 import ij.gui.PolygonRoi;
 import ij.gui.Roi;
 import ij.process.ImageProcessor;
 import ij.process.ImageStatistics;
-import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
-import static java.awt.Component.LEFT_ALIGNMENT;
 import java.awt.Container;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -95,18 +96,16 @@ import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.security.InvalidParameterException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.Enumeration;
 import java.util.EventObject;
-import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Timer;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.jar.JarEntry;
@@ -177,7 +176,6 @@ import org.json.JSONObject;
 import org.micromanager.api.Autofocus;
 import org.micromanager.api.DataProcessor;
 import org.micromanager.api.IAcquisitionEngine2010;
-import org.micromanager.api.ImageCacheListener;
 import org.micromanager.api.MMListenerInterface;
 import org.micromanager.api.MMPlugin;
 import org.micromanager.api.MMTags;
@@ -185,7 +183,6 @@ import org.micromanager.api.ScriptInterface;
 import org.micromanager.api.SequenceSettings;
 import org.micromanager.api.TaggedImageAnalyzer;
 import org.micromanager.imagedisplay.VirtualAcquisitionDisplay;
-import org.micromanager.internalinterfaces.AcqSettingsListener;
 import org.micromanager.utils.ChannelSpec;
 import org.micromanager.utils.MMException;
 import org.micromanager.utils.MMScriptException;
@@ -196,7 +193,7 @@ import org.micromanager.utils.ReportingUtils;
  *
  * @author Karsten Siller
  */
-public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface, ActionListener, TableModelListener, WindowListener, IStageMonitorListener, ILiveListener, IRefPointListener, IMergeAreaListener, AcqSettingsListener, ImageCacheListener, IDataProcessorListener {
+public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface, ActionListener, TableModelListener, WindowListener, IStageMonitorListener, ILiveListener, IRefPointListener, IMergeAreaListener {//, IDataProcessorListener {
 
     //core, acqquisition engine, mmplugins
     private final ScriptInterface app;
@@ -225,7 +222,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private VirtualAcquisitionDisplay virtualDisplay;
     private final LiveModeMonitor liveModeMonitor;
     private final StagePosMonitor stageMonitor;
-    private AcquisitionTask acquisitionTask=null;
+    private final AcqJobManager acqManager;
 
     //MM Config Parameters
     private String objectiveDevStr;
@@ -251,10 +248,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private SelectionPath selPath=null;
     private boolean isLeftMouseButton;
     private boolean isRightMouseButton;
-    private boolean isAcquiring = false;
-    private boolean isProcessing = false;
-    private boolean isAborted = false;
-    private boolean isWaiting = false;//true when user pressed 'Acquire' and app is waiting for AcquisitionTask to start acquiring at desired time
     private boolean retilingAllowed = false;
 //    private boolean isCalculatingTiles;
     private BasicArea mostRecentArea;
@@ -304,25 +297,47 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private static final int LAYOUT_MODE_MERGE_AREAS = 128;
 
 
+    @Subscribe
+    public void acquisitionJobsSwitched(JobSwitchEvent e) {
+        if (e.getCurrentJob()!=null) {
+            retilingAllowed=false;
+            acquireButton.setText("Stop");
+            enableGUI(false);
+            selectAcquisition(((AcquisitionJob)e.getCurrentJob()).getConfiguration().getAcqSetting(),false);
+        }
+    }
+    
+    @Subscribe
+    public void acquisitionJobsCompleted(AllJobsCompletedEvent e) {
+        acquireButton.setText("Acquire");
+        enableGUI(true);
+        retilingAllowed=true;
+    }
+    
     //WindowListener interface
     @Override
-    public void windowOpened(WindowEvent we) {
-  /*      if (we.getSource() == cameraRotDialog) {
-            IJ.showMessage("cameraRotDialog opened");
-        }
-        if (we.getSource() == refPointListDialog) {
-            IJ.showMessage("refPointListDialog opened");
-        }
-        if (we.getSource() == zOffsetDialog) {
-            IJ.showMessage("zOffsetDialog opened");
-        }
-        if (we.getSource() == mergeAreasDialog) {
-            IJ.showMessage("mergeAreasDialog opened");
-        }*/
-    }
+    public void windowOpened(WindowEvent we) {}
+    
+    @Override
+    public void windowIconified(WindowEvent we) {}
 
     @Override
+    public void windowDeiconified(WindowEvent we) {}
+
+    @Override
+    public void windowActivated(WindowEvent we) {}
+
+    @Override
+    public void windowDeactivated(WindowEvent we) {}
+    
+    @Override
     public void windowClosing(WindowEvent we) {
+        if (we.getSource()==this) {
+            if (this.cleanUp()) {
+                this.dispose();
+            }
+            return;
+        }
         if (we.getSource() == cameraRotDialog) {
             if (!cameraRotDialog.getResults().isEmpty()) {                        
                 int result=JOptionPane.showConfirmDialog(null, "Do you want to discard measurements?","Camera Rotation Measurement",JOptionPane.YES_NO_OPTION);
@@ -373,230 +388,11 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             zOffsetDialog=null;
         }
     }
-
-    @Override
-    public void windowIconified(WindowEvent we) {
-    }
-
-    @Override
-    public void windowDeiconified(WindowEvent we) {
-    }
-
-    @Override
-    public void windowActivated(WindowEvent we) {
-    }
-
-    @Override
-    public void windowDeactivated(WindowEvent we) {
-    }
-
-    // AcqSettingsListener interface
-    @Override
-    public void settingsChanged() {
-        //settings in AcqFrame and MDA window are not synchronized at the moment
-//        IJ.log("AcqFrame.settingsChanged: ");
-        JOptionPane.showMessageDialog(this,"AcqFrame.settingsChanged: acquisition settings changed");
-    }
-
-    //ImageCacheListener interface
-    @Override
-    public void imageReceived(TaggedImage ti) {}
-
-    @Override
-    public void imagingFinished(final String string) {
-        //may not be called from EDT, so use SwingUtilities to update GUI elements
-        if (virtualDisplay!=null) {
-            VirtualAcquisitionDisplay vd=virtualDisplay;
-            virtualDisplay=null;
-            vd.close();
-            //VirtualAcquisitionDisplay.onWindowClose will call imagingFinished again
-            return;
-        }
-        acquisitionTask=null;
-        currentAcqSetting.getDoxelManager().clearList();
-        /* 
-            string!=null: passed  by ImageCache when it receives a "Poison" image (=acquisition is done)
-            string==null: used by AcqFrame to indicate acquisition has been aborted 
-        */
-        if (string!=null) {
-            IJ.log("Finished acquiring sequence: "+currentAcqSetting.getName());
-            final AcqSetting acqSetting=currentAcqSetting;
-            try {
-                SwingUtilities.invokeAndWait(new Runnable() {
-                    
-                    @Override
-                    public void run() {
-                        final JFrame frame=new JFrame("Image Processing: "+acqSetting.getName());
-                        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-                        frame.setPreferredSize(new Dimension(400,420));
-                        frame.setResizable(false);
-                        frame.getContentPane().setLayout(new GridLayout(0,1));
-
-                        JLabel label=new JLabel("Active Processors");
-                        final JList list=new JList();
-                        list.setVisibleRowCount(10);
-                        final JScrollPane scrollPane = new JScrollPane(list);
-                        scrollPane.setPreferredSize(new Dimension(250, 80));
-                        scrollPane.setAlignmentX(LEFT_ALIGNMENT);
-                        //scrollPane.add(allPoints);
-                        JPanel listPanel = new JPanel();
-                        listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.PAGE_AXIS));
-                        listPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-                        listPanel.add(label);
-                        listPanel.add(Box.createRigidArea(new Dimension(0, 5)));
-                        listPanel.add(scrollPane);
-
-                        final DefaultMutableTreeNode node=acqSetting.getImageProcessorTree();
-
-                        final SwingWorker<Void, String[]> worker=new SwingWorker<Void,String[]>() {
-
-                            @Override
-                            protected Void doInBackground() throws Exception {
-                                List<String> activeProcs;
-                                do {
-                                    activeProcs=new ArrayList<String>();
-                                    Enumeration<DefaultMutableTreeNode> en=node.preorderEnumeration();
-                                    //get allPoints of active processors
-                                    while (en.hasMoreElements()) {
-                                        DataProcessor dp=(DataProcessor)en.nextElement().getUserObject();
-                                        if (//!(dp instanceof ExtDataProcessor) ||
-                                                (dp instanceof ExtDataProcessor && !((ExtDataProcessor)dp).getProcName().equals(ProcessorTree.PROC_NAME_IMAGE_STORAGE))) {
-                                            if (dp.isAlive()) {
-                                                if (dp instanceof ExtDataProcessor) {
-                                                    if (!((ExtDataProcessor)dp).isDone()) {
-                                                        activeProcs.add(dp.getName());
-                                                    } 
-                                                } else {
-                                                    activeProcs.add(dp.getName());
-                                                }
-                                            }    
-                                        }
-                                    }
-
-                                    try {
-                                        String[] procNames=new String[activeProcs.size()];
-                                        for (int i=0; i<activeProcs.size(); i++) {
-                                            procNames[i]=activeProcs.get(i);
-                                        }
-                                        publish(procNames);
-                                        Thread.sleep(200);
-                                    } catch (InterruptedException ex) {
-                                        Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                                    }
-                                } while (activeProcs.size()>0);
-                                return null;
-                            }
-
-                            @Override
-                            protected void process(List<String[]> chunks) {
-                                String[] procNames=chunks.get(chunks.size()-1);
-                                if (procNames.length!=list.getModel().getSize())
-                                    IJ.log(acqSetting.getName()+": "+procNames.length+" active Processors");
-                                //create simple animation to indicate that processors are alive
-                                for (int i=0; i<procNames.length; i++) {
-                                    long x=1+(System.currentTimeMillis()/1000) % 5;
-                                    for (int j=0; j<x; j++) {
-                                        procNames[i]+=".";
-                                    }
-                                }
-                                //update allPoints with active processor names
-                                list.setListData(procNames);
-                            }
-
-                            @Override
-                            protected void done() {
-                                frame.dispose();
-                                IJ.log("Finished processing of sequence: "+acqSetting.getName());
-                                isProcessing=false;
-                            }    
-                        };//end SwingWorker
-
-                        final JButton abortButton=new JButton("Abort Processing");
-                        abortButton.addActionListener(new ActionListener() {
-                            @Override
-                            public void actionPerformed(ActionEvent e) {
-                                abortButton.setEnabled(false);
-                                Enumeration<DefaultMutableTreeNode> en=node.preorderEnumeration();
-                                //get allPoints of active processors
-                                while (en.hasMoreElements()) {
-                                    DataProcessor dp=(DataProcessor)en.nextElement().getUserObject();
-                                    dp.requestStop();
-                                }
-                            }
-                        });
-                        JPanel buttonPanel=new JPanel();
-                        buttonPanel.add(abortButton);
-
-                        frame.getContentPane().add(listPanel, BorderLayout.PAGE_START);
-                        frame.getContentPane().add(buttonPanel);
-                        frame.pack();
-                        frame.setLocationRelativeTo(null);
-                        frame.setVisible(true);
-
-                        worker.execute();
-                    } //end run
-                    
-                    
-                }); //end invokeLater
-                while (isProcessing) {
-                    try {
-                        Thread.sleep(200);
-                    } catch (InterruptedException ex) {
-                        Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                }
-            } catch (InterruptedException ex) {
-                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (InvocationTargetException ex) {
-                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        } else {   
-            IJ.log("Aborting sequence: "+currentAcqSetting.getName());
-        }    
-
-//        try {
-            final int currentIndex=acqSettings.indexOf(currentAcqSetting);
-            SwingUtilities.invokeLater(new Runnable() {
-                
-                @Override
-                public void run() {
-                    //start next sequence, or restore GUI if this was last sequence
-                    if ((acqSettings.size() > currentIndex + 1) && !isAborted) {
-                        acqSettingTable.setRowSelectionInterval(currentIndex + 1, currentIndex + 1);
-                        acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(currentIndex + 1, 0, true));
-            /*            AcqSetting newSetting=((AcqSettingTableModel)acqSettingTable.getModel()).getRowData(
-                                acqSettingTable.convertRowIndexToModel(currentIndex+1));
-                        selectAcquisition(newSetting);*/
-                        runAcquisition(currentAcqSetting);
-                    } else {
-                        //finished: restore GUI
-                        acquireButton.setText("Acquire");
-                        progressBar.setValue(0);
-                        isAcquiring = false;
-                        acquireButton.setEnabled(acqLayout.getNoOfMappedStagePos()>0);
-                        enableGUI(true);
-                        timepointLabel.setText("Timepoint:");
-                        //select first sequence setting;
-            //            retilingAllowed = false;
-                        acqSettingTable.setRowSelectionInterval(0, 0);
-                        acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(0, 0, true));
-            //            retilingAllowed = true;
-                    }
-                }
-            });
-/*        } catch (InterruptedException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (InvocationTargetException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-        }*/
-
-    }
-    //end ImageCacheListener
-    
+   
     
     //IDataProcessorListener
     //called by implementations of IDataProcessorNotifier (for example SiteInfoUpdater
-    @Override
+/*    @Override
     public void imageProcessed(final JSONObject metadata, final DataProcessor source) {
         if (metadata==null)  {
             return;
@@ -618,7 +414,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         }
     }
     //end IDataProcessorListener
-    
+*/    
     private void setCameraRotation(Map<String, CameraRotDlg.Measurement> measurements) {
         double cameraAngle = FieldOfView.ROTATION_UNKNOWN;
         for (String detectorName:measurements.keySet()) {
@@ -854,8 +650,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             @Override
             public void run() {
                 liveButton.setText(isLive ? "Stop Live" : "Live");
-                snapButton.setEnabled(!isLive && acqLayout.getTilingStatus()!=IAcqLayout.TILING_IN_PROGRESS && !isAcquiring);
-                autoExposureButton.setEnabled(!isLive && acqLayout.getTilingStatus()!=IAcqLayout.TILING_IN_PROGRESS && !isAcquiring);
+                snapButton.setEnabled(!isLive && acqLayout.getTilingStatus()!=IAcqLayout.TILING_IN_PROGRESS && !acqManager.hasActiveJobs());
+                autoExposureButton.setEnabled(!isLive && acqLayout.getTilingStatus()!=IAcqLayout.TILING_IN_PROGRESS && !acqManager.hasActiveJobs());
         //        acquireButton.setEnabled(!isLive && !isCalculatingTiles && !isAcquiring && acqLayout.getNoOfMappedStagePos() > 0);
             }
         });
@@ -1199,7 +995,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 JOptionPane.showMessageDialog(null, "Tiling error.\nDeselect 'Inside only' and select 'Overlapping sites', or reduce tile/cluster size.");
             }
             updateTotalTileNumber();
-            if (!isAcquiring) {
+            if (!acqManager.hasJobRunning()) {
                 enableGUI(true);
             }    
             acquireButton.setEnabled(acqLayout.getNoOfMappedStagePos()>0);
@@ -1262,6 +1058,13 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 
     public AcqFrame(ScriptInterface gui) {
         this.app = gui;
+        
+        acqEng2010 = gui.getAcquisitionEngine2010();// .getAcquisitionEngine();
+        core = gui.getMMCore();
+
+        acqManager=AcqJobManager.ManagerFactory(app.getAcquisitionEngine2010(), app.getMMCore(), app.getAutofocusManager());//, app.getDataManager());
+        acqManager.registerForEvents(this);     
+        
         IJ.log("Micro-Manager: "+gui.getVersion());
         try {
             /* version Strings on Mac and Windows build are different in nightly build 1.4.18
@@ -1277,8 +1080,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 imagePipelineSupported=false;
             }
         }
-        acqEng2010 = gui.getAcquisitionEngine2010();// .getAcquisitionEngine();
-        core = gui.getMMCore();
 
         Toolkit toolkit = Toolkit.getDefaultToolkit();
         Image cursorImage = toolkit.getImage(getClass().getClassLoader().getResource("autoimage/resources/ZoomCursor.png"));
@@ -1293,6 +1094,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         retilingAllowed = false;
         instrumentOnline = false; //to ensure that during app initialization instrument does not respond 
         initComponents();
+        this.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+        addWindowListener(this);
         
         ButtonGroup navigationButtonGroup =  new ButtonGroup();
         navigationButtonGroup.add(zoomButton);
@@ -1397,9 +1200,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         //update binning
         binningComboBox.setModel(new DefaultComboBoxModel(currentDetector.getBinningDescriptions()));
         
-
-        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-
         //format areaTable
         areaTable.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
         areaTable.setShowVerticalLines(true);
@@ -1650,7 +1450,16 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         ((AcqSettingTableModel)acqSettingTable.getModel()).updateTileCell(acqSettingTable.convertRowIndexToModel(acqSettingTable.getSelectedRow()));
     }
 
-    public void cleanUp() {
+    public boolean cleanUp() {
+        if (!acqManager.close(false)) {
+            int abort = JOptionPane.showConfirmDialog(null, "Acquisition Manager has active jobs.\nDo you want to abort all jobs?", "", JOptionPane.YES_NO_OPTION);
+            if (abort == JOptionPane.YES_OPTION) {
+                acqManager.close(true);//force abort
+            } else {
+                return false;
+            }
+            
+        }
         if (stageMonitor != null) {
             stageMonitor.cancel(true);
         }
@@ -1658,7 +1467,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             liveModeMonitor.cancel(true);
         }
         if (acqLayout.isModified()) {
-            int save = JOptionPane.showConfirmDialog(null, "Acquisition layout has been modified.\n\nDo you want to save it?", "", JOptionPane.YES_NO_OPTION);
+            int save = JOptionPane.showConfirmDialog(null, "Acquisition layout has been modified.\nDo you want to save it?", "", JOptionPane.YES_NO_OPTION);
             if (save == JOptionPane.YES_OPTION) {
                 saveLayout();
             }
@@ -1672,7 +1481,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         }
 */
         savePreferences();
-        saveExperimentSettings(new File(Prefs.getHomeDir(),"LastExpSettings.txt"));
+        saveExperimentSettings(new File(Prefs.getHomeDir(),"LastExpSettings.txt"),true);
+        return true;
     }
 
     public void setMergeAreasBounds(Rectangle2D.Double rect) {
@@ -1859,7 +1669,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         layoutScrollPane = new LayoutScrollPane();
         acqLayoutPanel = new LayoutPanel(null,null);
 
-        setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
+        setDefaultCloseOperation(javax.swing.WindowConstants.DO_NOTHING_ON_CLOSE);
         setTitle("5dISC");
         setBounds(new java.awt.Rectangle(0, 22, 1024, 710));
         setMinimumSize(new java.awt.Dimension(1024, 725));
@@ -4051,7 +3861,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         return new File(root, exp + ext).getAbsolutePath();
     }
 
-    private boolean setObjectiveAndBinning(AcqSetting setting, boolean updateGUI) {
+    /*private boolean setObjectiveAndBinning(AcqSetting setting, boolean updateGUI) {
         if (setting != null) {
             try {
                 core.setProperty(objectiveDevStr, "Label", setting.getObjective());
@@ -4083,7 +3893,50 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         } else {
             return false;
         }
-    }
+    }*/
+    
+    private boolean setObjectiveAndBinning(AcqSetting setting, boolean updateGUI, boolean suppressWarning) {
+        boolean error=false;
+        if (setting != null) {
+            //try to set objective
+            try {
+                core.setProperty(objectiveDevStr, "Label", setting.getObjective());
+                //core.setConfig(objectiveDevStr, setting.getObjective());
+            } catch (Exception e) {
+                error=true;
+                if (!suppressWarning) {
+                    //allow user to select new objectiveDevStr
+                    ReportingUtils.showError(e);
+                    objectiveDevStr=MMCoreUtils.selectDeviceStr(this,core,"Objective");
+                    try {
+                        core.setProperty(objectiveDevStr, "Label", "test");//setting.getObjective());
+                    } catch (Exception ex) {
+                        Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                    JOptionPane.showMessageDialog(this,"Error selecting "+objectiveDevStr+", "+setting.getObjective());
+                    setting.setObjectiveDevStr(objectiveDevStr);
+                    error=true;
+                }
+            }
+            
+            //try to set binning
+            try {
+                core.setProperty(core.getCameraDevice(), "Binning", setting.getBinningDesc());
+            } catch (Exception e) {
+                if (!suppressWarning) {
+                    ReportingUtils.showError(e);
+                }
+                error=true;
+            }
+            if (updateGUI) {
+                app.refreshGUI();
+            }
+//            error=false;
+        } else {
+            error=true;
+        }
+        return !error;
+    }    
 
     
     private void saveAcquisitionSettings(File file, List<AcqSetting> settings) {
@@ -4121,7 +3974,73 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     }
 
     
-    private void saveExperimentSettings(File file) {
+    private boolean saveExperimentSettings(File file, boolean showErrorMsg) {
+        FileWriter fw=null;
+        boolean error=false;
+        try {
+            if (!file.getParentFile().exists()) {
+                file.getParentFile().mkdirs();
+            }
+            fw = new FileWriter(file);
+            JSONObject expSettingObj=new JSONObject();
+            
+            try {
+                expSettingObj.put(TAG_ROOT_DIR,rootDirLabel.getText());
+                expSettingObj.put(TAG_EXP_BASE_NAME,experimentTextField.getText());
+            
+                updateAreaListFromAreaTableView(true,true);
+                JSONObject layoutObj=acqLayout.toJSONObject();
+                expSettingObj.put(IAcqLayout.TAG_LAYOUT, layoutObj);
+            } catch (JSONException ex) {
+                error=true;
+                if (showErrorMsg) {
+                    JOptionPane.showMessageDialog(this,"Error parsing layout file '"+acqLayout.getName()+"'.");
+                }
+                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            JSONArray settingArray=new JSONArray();
+            for (int i=0; i<acqSettings.size(); i++) {
+                try {  
+                    settingArray.put(i,acqSettings.get(i).toJSONObject());
+                } catch (JSONException ex) {
+                    error=true;
+                    if (showErrorMsg) {
+                        JOptionPane.showMessageDialog(this,"Error parsing acquisition setting '"+acqSettings.get(i).getName()+"'.");
+                    }    
+                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+            try {
+                expSettingObj.put(AcqSetting.TAG_ACQ_SETTING_ARRAY, settingArray);
+                fw.write(expSettingObj.toString(4));  
+            } catch (JSONException ex) {
+                error=true;
+                if (showErrorMsg) {
+                    JOptionPane.showMessageDialog(this,"JSONException occured while saving acquisition settings.\n"+ex.getMessage());
+                }
+                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            }    
+        } catch (IOException ex) {
+            error=true;
+            if (showErrorMsg) {
+                JOptionPane.showMessageDialog(this,"I/O Error saving acquisition settings.\n" +ex.getMessage());
+            }    
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        } finally {
+            try {
+                fw.close();
+            } catch (IOException ex) {
+                error=true;
+                if (showErrorMsg) {                
+                    JOptionPane.showMessageDialog(this,"I/O Error: failed to close file "+file.getName()+".");
+                }
+                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+        return !error;
+
+        
+/*        
         FileWriter fw=null;
         try {
             fw = new FileWriter(file);
@@ -4163,7 +4082,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             } catch (IOException ex) {
                 Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             }
-        }
+        }*/
     }
 
     
@@ -4223,7 +4142,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         }
     }
     
-
+/*
     private String runAcquisition(final AcqSetting setting) {
         IJ.log("XXXXXXXXXXXXXXXXXXX\n\n");
         IJ.log("Next sequence: "+currentAcqSetting.getName());
@@ -4385,8 +4304,119 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             returnValue=currentAcqSetting.getName();
         return returnValue;
     }
-
+*/
+    
     public String startAcquisition() {
+        String s = null;
+        acqSettingTable.setRowSelectionInterval(0, 0);
+        acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(0, 0, true));
+        
+        //create unique storage path
+        imageDestPath = Utils.createUniqueExpName(rootDirLabel.getText(), experimentTextField.getText());        
+        
+        //check if autofocus function is available and set up tilemanagers for all acquisition sequences
+        for (AcqSetting setting:acqSettings) {
+            if (!preAcquisition_ConfigOk(setting, true)) {
+                return null;
+            }
+            if (!preAcquisition_ProcessPipelineOk(setting, true)) {
+                return null;
+            }
+        }
+        
+        //save settings
+        saveExperimentSettings(new File(imageDestPath,"ExpSettings.txt"), true);
+        
+        acqManager.reset();
+        try {
+            for (AcqSetting setting:acqSettings) {           
+                final AcqConfig config = new AcqConfig(setting, acqLayout, null);
+
+                Runnable preInit=new JobCallback<AcqConfig>(config) {
+                    @Override
+                    public void execute(AcqConfig config) throws RuntimeException {
+                        IJ.log("CALLBACK PRE INIT: "+config.getAcqSetting().getName());
+                    }
+                };
+                
+                Runnable postInit=new JobCallback<AcqConfig>(config) {
+                    @Override
+                    public void execute(AcqConfig config) throws RuntimeException {
+                        IJ.log("CALLBACK POST INIT: "+config.getAcqSetting().getName());
+                    }
+                };
+                
+                Runnable preRun=new JobCallback<AcqConfig>(config) {
+                    @Override
+                    public void execute(final AcqConfig config) throws RuntimeException {
+                        IJ.log("CALLBACK PRE RUN: "+config.getAcqSetting().getName());
+                        //synchronize channel group with MMStudio; this is important so that the same channels are available in autofocus configuration dialog window
+                        try {
+                            core.setChannelGroup(config.getAcqSetting().getChannelGroupStr());
+                            app.refreshGUI();
+                        } catch (Exception ex) {
+                            IJ.log("Cannot set channel configuration group "+config.getAcqSetting().getChannelGroupStr()+ " for sequence "+config.getAcqSetting().getName());
+                            ReportingUtils.logError(ex);
+                        }
+
+                        SwingUtilities.invokeLater(new Runnable() {
+                            @Override
+                            public void run() {    
+                                timepointLabel.setText(config.getAcqSetting().getName() + ", Timepoint: ");
+                                progressBar.setValue(0);
+                                progressBar.setMaximum(100);//acquisitionTask.getTotalImages());
+                                progressBar.setStringPainted(true);
+                                boolean ok=setObjectiveAndBinning(config.getAcqSetting(), true, true);
+                                if (!ok) {
+                                    throw new RuntimeException(JobException.RUNTIME_ERROR);
+                                }
+                            }
+                        });
+                    }
+                };
+                
+                Runnable postRun=new JobCallback<AcqConfig>(config) {
+                    @Override
+                    public void execute(AcqConfig config) throws RuntimeException {
+                        IJ.log("CALLBACK POST RUN: "+config.getAcqSetting().getName());
+                        SwingUtilities.invokeLater(new Runnable() {
+                            @Override
+                            public void run() {    
+                                progressBar.setValue(0);
+                            }
+                        });
+                    }
+                };
+                
+                AcquisitionJob newJob=new AcqJobManager.JobBuilder(acqManager, setting.getName(), config)
+                    .imageStorageRoot(imageDestPath)
+                    .acquisitionDisplay(!app.getHideMDADisplayOption())    
+                    .preInitCallback(preInit)
+                    .postInitCallback(postInit)
+                    .preRunCallback(preRun)
+                    .postRunCallback(postRun)
+                    .build();
+                        
+                        
+                     //   acqManager.createJob(config, imageDestPath);
+
+                acqManager.putJob(newJob);
+//                newJob.setCallbacks(preInit, postInit, preRun, postRun, 1000);
+            }
+            acqManager.updateStartTimes(System.currentTimeMillis());
+            acqManager.scheduleJobs();
+            acqManager.createJobStatusWindow(this).setVisible(true);
+        } catch (InvalidParameterException ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), "Acquisition Manager Error",JOptionPane.ERROR_MESSAGE);
+        } catch (JobException ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), "Acquisition Manager Error",JOptionPane.ERROR_MESSAGE);
+        }
+        return s;        
+        
+        
+        
+        
+/*        
         if (refPointListDialog != null) {
             if (stageMonitor!=null) {
                 stageMonitor.removeListener(refPointListDialog);
@@ -4514,7 +4544,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             lastms=ms;
         }
         s = runAcquisition(currentAcqSetting);
-        return s;
+        return s;*/
     }
 
     private void layoutScrollPaneComponentResized(java.awt.event.ComponentEvent evt) {//GEN-FIRST:event_layoutScrollPaneComponentResized
@@ -4574,8 +4604,9 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     //                    IJ.log("zooming out: vpSize: "+vpSize.toString()+", vpRect: "+vpRect.toString());
     //                    IJ.log("-----");
                     }
-                    layoutColumnHeader.setZoom(newZoom);
-                    layoutRowHeader.setZoom(newZoom);
+                    double newScale=((LayoutPanel) acqLayoutPanel).getScale();
+                    layoutColumnHeader.setScaleAndZoom(newScale,newZoom);
+                    layoutRowHeader.setScaleAndZoom(newScale,newZoom);
                     layoutColumnHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().width);
                     layoutRowHeader.setPreferredSize(acqLayoutPanel.getPreferredSize().height);
                     if ((newZoom != 1) && (newZoom != oldZoom)) {
@@ -4936,14 +4967,20 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     }//GEN-LAST:event_saveLayoutButtonActionPerformed
 
     private void experimentTextFieldFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_experimentTextFieldFocusLost
-//        experimentName=experimentTextField.getText();
-        File f = new File(imageDestPath, experimentTextField.getText());
-        if (f.exists()) {
-            imageDestPath=createUniqueExpName(rootDirLabel.getText(),experimentTextField.getName());
+//        File f = new File(rootDirLabel.getText(), experimentTextField.getText());
+        String uniquePath=Utils.createUniqueExpName(rootDirLabel.getText(),experimentTextField.getText());
+        if (!uniquePath.equals(new File(rootDirLabel.getText(), experimentTextField.getText()).getAbsolutePath())) {
+//        if (f.exists()) {
+//            imageDestPath=Utils.createUniqueExpName(rootDirLabel.getText(),experimentTextField.getText(),true);
+            imageDestPath=uniquePath;
+            JOptionPane.showMessageDialog(this, "Experiment name contains illegal characters or folder already exists.\n"
+                + " Suggested experiment name: "+new File(uniquePath).getName());
             experimentTextField.setText(new File(imageDestPath).getName());
+            experimentTextField.requestFocusInWindow();
             experimentTextField.selectAll();
         } else {
-        }
+            imageDestPath=new File(rootDirLabel.getText(), experimentTextField.getText()).getAbsolutePath();
+        }        
     }//GEN-LAST:event_experimentTextFieldFocusLost
 
     private void saveExpSettingFileButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveExpSettingFileButtonActionPerformed
@@ -4979,7 +5016,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         expSettingsFileLabel.setText(file.getName());
         expSettingsFileLabel.setToolTipText(file.getAbsolutePath());
         layoutFileLabel.setToolTipText("LOADED FROM: "+file.getAbsolutePath());
-        saveExperimentSettings(expSettingsFile);
+        saveExperimentSettings(expSettingsFile, true);
     }//GEN-LAST:event_saveExpSettingFileButtonActionPerformed
 
     private void loadExpSettingFileButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loadExpSettingFileButtonActionPerformed
@@ -5010,22 +5047,318 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         }
     }//GEN-LAST:event_loadExpSettingFileButtonActionPerformed
 
-    private void abortAllSequences() {
-        IJ.log("Aborting all sequences");
-        isAborted = true;
-        if (acqEng2010.isRunning() && isAcquiring) {
-            acqEng2010.stop();
+ 
+    public boolean preAcquisition_ConfigOk(AcqSetting setting, boolean suppressWarning) {
+        // check autofocus setting
+        boolean error=setting.isAutofocus() && !app.getAutofocusManager().hasDevice(setting.getAutofocusDevice());
+        if (error && !suppressWarning) {
+            JOptionPane.showMessageDialog(this,"Autofocus device "+setting.getAutofocusDevice()+ " not available");
+        }        
+        
+        // check channel configuration
+        String groupStr=MMCoreUtils.verifyAndSelectConfigGroup(this,core,setting.getChannelGroupStr());
+        if (groupStr==null) {
+            return false;
+        }
+        error = false;
+        String[] availableChannels;
+        setting.setChannelGroupStr(groupStr);
+        availableChannels=MMCoreUtils.getAvailableConfigs(core, groupStr);
+        //synchronize channel group with MMStudio; this is important so that the same channels are available in autofocus configuration dialog window
+        try {
+            core.setChannelGroup(groupStr);
+//            app.refreshGUI();
+        } catch (Exception ex) {
+            ReportingUtils.logError(ex);
+        }
+
+        //remove all channels that do not exist in this channel group
+        String missingPresets="The following Channel configurations are not available in group '"+groupStr+"' and will be removed:\n\n";
+        List<Channel> toremove=new ArrayList<Channel>();
+        for (int i = setting.getChannels().size() - 1; i >= 0; i--) {
+            Channel ch=setting.getChannels().get(i);
+            if (!isInChannelList(ch.getName(), availableChannels)) {
+                missingPresets+="    "+ch.getName()+"\n";
+                toremove.add(ch);
+                error = true;
+            }
+        }
+        if (error && !suppressWarning) {
+            JOptionPane.showMessageDialog(this, missingPresets);
+            for (Channel ch:toremove) {
+                setting.getChannels().remove(ch);
+            }
+        }
+ 
+    
+        // objective and binning
+        
+        
+        return !error;
+    }
+
+    private boolean preAcquisition_ProcessPipelineOk(AcqSetting setting, boolean suppressWarning) {
+        boolean error=false;
+        //create new copy of processor
+        //this is required to make sure stopRequested is false
+        try {
+            JSONObject procTreeObject = Utils.processortreeToJSONObject(setting.getImageProcessorTree(),setting.getImageProcessorTree());
+            DefaultMutableTreeNode newProcTree=Utils.createProcessorTree(procTreeObject);
+            setting.setImageProcTree(newProcTree);
+            //update reference to image processor tree in GUI
+            if (setting == acqSettings.get(0)) {
+                updateProcessorTreeView(setting);
+            }
+        } catch (JSONException ex) {
+            error=true;
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (ClassNotFoundException ex) {
+            error=true;
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InstantiationException ex) {
+            error=true;
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IllegalAccessException ex) {
+            error=true;
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
+        DefaultMutableTreeNode node=setting.getImageProcessorTree();
+        Enumeration<DefaultMutableTreeNode> en=node.preorderEnumeration();
+        while (en.hasMoreElements()) {
+            node=en.nextElement();
+            DataProcessor dp=(DataProcessor)node.getUserObject();
+            if (dp instanceof DynamicTileCreator) {
+                DynamicTileCreator roifinder=(DynamicTileCreator)dp;
+                roifinder.removeAllDoxelListeners();
+                for (String selSeq:roifinder.getSelSeqNames()) {
+                    boolean sequenceFound=false;
+                    for (AcqSetting as:acqSettings) {
+                        if (as.getName().equals(selSeq)) {
+//                                as.getDoxelManager().setAcquisitionLayout(acqLayout);
+                            as.getDoxelManager().clearList();
+                            roifinder.addDoxelListener(as.getDoxelManager());
+                            sequenceFound=true;
+                            break;
+                        }
+                    }
+                    if (!sequenceFound) {
+                        JOptionPane.showMessageDialog(this,"RoiFinder in setting "+setting.getName()+": Cannot find sequence setting "+selSeq);
+                        error=true;
+                    }
+                }
+            }    
+        }
+        return !error;
+    }
+        
+    
+    private boolean verifySettings() {
+        int dupIndex = acqLayout.hasDuplicateAreaNames();
+        if (dupIndex != -1) {
+            JOptionPane.showMessageDialog(this, "Each Area name has to be unique.\n"
+                    + "Area name '" + acqLayout.getAreaByIndex(dupIndex).getName() + "' is used more than once.", "Acquisition", JOptionPane.ERROR_MESSAGE);
+            sequenceTabbedPane.setSelectedIndex(0);
+            return false;
+        }
+        if (acqLayout.getNoOfSelectedAreas() < 1) {
+            JOptionPane.showMessageDialog(this, "No Areas selected.", "Acquisition", JOptionPane.ERROR_MESSAGE);
+            sequenceTabbedPane.setSelectedIndex(0);
+            return false;
+        }
+        for (int i = 0; i < acqSettings.size(); i++) {//(AcqSetting setting:acqSettings) {
+            AcqSetting setting = acqSettings.get(i);
+            if (setting.hasDuplicateChannels()) {
+                JOptionPane.showMessageDialog(this, "Cannot use same channel twice.", "Acquisition: " + setting.getName(), JOptionPane.ERROR_MESSAGE);
+                if (i!=acqSettingTable.getSelectedRow()) {
+    //                retilingAllowed = false;
+                    acqSettingTable.setRowSelectionInterval(i, i);
+                    acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(i, 0, true));
+    //                retilingAllowed = true;
+                }
+                sequenceTabbedPane.setSelectedIndex(1);
+                channelTable.requestFocusInWindow();
+                return false;
+            }
+            if (setting.getChannels().size() < 1) {
+                JOptionPane.showMessageDialog(this, "Add Channel for acquisition sequence " + setting.getName() + ".", "Acquisition: " + setting.getName(), JOptionPane.ERROR_MESSAGE);
+                if (i!=acqSettingTable.getSelectedRow()) {
+//                retilingAllowed = false;
+                    acqSettingTable.setRowSelectionInterval(i, i);
+                    acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(i, 0, true));
+//                retilingAllowed = true;
+                }    
+                acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(i, 0, true));
+                sequenceTabbedPane.setSelectedIndex(1);
+                channelTable.requestFocusInWindow();
+                return false;
+            }
+            if (setting.getImagePixelSize() == -1) {
+                retilingAllowed = false;
+                if (i!=acqSettingTable.getSelectedRow()) {
+//                retilingAllowed = false;
+                    acqSettingTable.setRowSelectionInterval(i, i);
+                    acqSettingTable.scrollRectToVisible(acqSettingTable.getCellRect(i, 0, true));
+//                    retilingAllowed = true;
+                }
+                JOptionPane.showMessageDialog(this, "Pixel size is not calibrated for acquisition sequence\n " + setting.getName() + ".", "Acquisition", JOptionPane.ERROR_MESSAGE);
+                return false;
+            }
+            if (!Utils.imageStoragePresent(setting.getImageProcessorTree())) {
+                JOptionPane.showMessageDialog(this, "No Image Storage node defined for Acquisition sequence "+setting.getName());
+                retilingAllowed = false;
+                acqSettingTable.setRowSelectionInterval(i, i);
+                retilingAllowed = true;
+                sequenceTabbedPane.setSelectedIndex(2);
+                processorTreeView.requestFocusInWindow();
+                return false;
+            }
+            if (setting.getTilingMode() == TilingSetting.Mode.ADAPTIVE) {
+                if (setting==acqSettings.get(0)) {
+                    retilingAllowed = false;
+                    acqSettingTable.setRowSelectionInterval(i, i);
+                    retilingAllowed = true;
+                    JOptionPane.showMessageDialog(this, "'"+setting.getTilingMode().toString()+" Tiling' cannot not be used for the first acquisition sequence.");
+                    return false;
+                }
+                boolean roiFinderDefined=false;
+                List<String> list=new ArrayList<String>();
+                for (AcqSetting set:acqSettings) {
+                    if (roiFinderDefined || set.getName().equals(setting.getName())) //ROIFinder needs to be defined in one of prior settings
+                        break;
+                    list.add(set.getName());
+                    Enumeration<DefaultMutableTreeNode> en=set.getImageProcessorTree().preorderEnumeration();
+                    while (en.hasMoreElements()) {
+                        DefaultMutableTreeNode node=en.nextElement();
+                        DataProcessor dp=((DataProcessor)node.getUserObject());
+                        if (dp instanceof DynamicTileCreator && (((DynamicTileCreator)dp).getSelSeqNames().contains(setting.getName()))) {
+                            roiFinderDefined=true;
+                            break;
+                        }
+                    }
+                    
+                }
+                if (!roiFinderDefined) {
+                    String s="";
+                    for (String seq:list)
+                        s=s+seq+"\n";
+                        JOptionPane.showMessageDialog(this, "In order to run acquisition sequence "+setting.getName()+ " in '"+setting.getTilingMode().toString()+" Tiling' mode, \n "
+                                + "a ROIFinder DataProcessor needs to be configured in one of these sequences: \n\n"
+                                + s);
+                        return false;
+                }
+            }
+        }
+        //try closeQueueAndStart new acquisition; if not successfull it returns null
+        if (currentAcqSetting != null) {
+            double fieldRot=0;
+            for (AcqSetting setting:acqSettings) {
+                if (setting.getFieldOfView().getFieldRotation() == FieldOfView.ROTATION_UNKNOWN) { 
+                    fieldRot=FieldOfView.ROTATION_UNKNOWN;
+                    break;
+                }    
+            }
+            if (fieldRot == FieldOfView.ROTATION_UNKNOWN) {
+                int result=JOptionPane.showConfirmDialog(this,"Camera field rotation unknown.\nTiling may create gaps.\nDo you want to run the camera rotation tool?","Warning",JOptionPane.YES_NO_OPTION);
+                if (result == JOptionPane.NO_OPTION) {
+                    fieldRot=0;
+                    for (AcqSetting setting:acqSettings) {
+                        setting.getFieldOfView().setFieldRotation(fieldRot);
+                        setting.getFieldOfView().createRoiPath(setting.getObjPixelSize());
+                    }
+                    acqLayoutPanel.repaint();
+                }
+                if (result ==  JOptionPane.YES_OPTION) {
+                    showCameraRotDlg(false);//true: run as modal dialog
+                    return false;                              
+                }
+
+            }
         } else {
-            if (acquisitionTask!=null) {
-                acquisitionTask.cancel();
-                acquisitionTask=null;
-            } 
-            isWaiting=false;
-            imagingFinished(null);
+            JOptionPane.showMessageDialog(this,"Undefined AcqSettings");
+        }
+        return true;
+    }
+
+    
+    private void stopAcquisition() {
+        //skip sequence or stop all acquisitions
+        Object[] options = {"Stop all sequences",
+                "Skip to next sequence",
+                "Cancel"};
+        int n = JOptionPane.showOptionDialog(this,
+            "Do you want to stop this acquisition?",
+            "Abort Acquisition",
+            JOptionPane.YES_NO_CANCEL_OPTION,
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            options,
+            options[2]);
+        switch (n) {
+            case 0: {//stop all sequences;
+                acqManager.cancelAllJobs();
+                break;
+            }
+            case 1: {//skip to next sequence
+                acqManager.skipToNextJob();
+                break;
+            }
         }
     }
     
+    
     private void acquireButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_acquireButtonActionPerformed
+        //deal with aborted acquisition first
+        if (acqManager.hasActiveJobs()) {
+            stopAcquisition();
+            return;
+        } else {
+            IAcquisitionEngine2010 engine=app.getAcquisitionEngine2010();
+            if (engine!=null && engine.isRunning() && !acqManager.hasJobRunning()) {
+                JOptionPane.showMessageDialog(this, "Acquisition is running in separate program instance.\n"
+                        + "Cannot start another acquisition", "Acquisition", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (engine==null || !engine.isRunning()) {
+                //stop camera live mode
+                if (app.isLiveModeOn()) {
+                    app.enableLiveMode(false);
+                }
+                //close various GUI windows not required for acquisition
+                if (refPointListDialog != null) {
+                    if (stageMonitor!=null) {
+                        stageMonitor.removeListener(refPointListDialog);
+                    }
+                    refPointListDialog.dispose();
+                    refPointListDialog=null;
+                }
+                if (zOffsetDialog != null) {
+                    zOffsetDialog.dispose();
+                }
+                //stop table cell editors
+                AbstractCellEditor ace = (AbstractCellEditor) acqSettingTable.getCellEditor();
+                if (ace != null) {
+                    ace.stopCellEditing();
+                }
+                ace = (AbstractCellEditor) channelTable.getCellEditor();
+                if (ace != null) {
+                    ace.stopCellEditing();
+                }
+                ace = (AbstractCellEditor) areaTable.getCellEditor();
+                if (ace != null) {
+                    ace.stopCellEditing();
+                }
+                //make sure settings are valid
+                if (verifySettings()) {
+                    startAcquisition();
+                }
+            }
+        }
+    
+    
+/*        
+        
+        
         //deal with aborted acquisition first
         if ((acqEng2010.isRunning() && isAcquiring) || (acquisitionTask!=null && acquisitionTask.isWaiting())) {
             //skip sequence or stop all acquisitions
@@ -5223,7 +5556,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             IJ.log("AcqFrame.acquireButtonActionPerformed: Problem - GUI is unaware that acqEng2010 is not running");
         } else {
             IJ.log("Acquisition is still running");
-        }
+        }*/
     }//GEN-LAST:event_acquireButtonActionPerformed
 
     private void browseImageDestPathButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_browseImageDestPathButtonActionPerformed
@@ -7055,7 +7388,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             }
             ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
             Channel c = ctm.getRowData(rows[0]);
-            if (setObjectiveAndBinning(currentAcqSetting, true)) {
+            if (setObjectiveAndBinning(currentAcqSetting, true, false)) {
                 try {
                     core.setExposure(c.getExposure());
                     core.setConfig(currentAcqSetting.getChannelGroupStr(), c.getName());
@@ -7114,7 +7447,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         } catch (Exception ex) {
             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
-        if (!setObjectiveAndBinning(currentAcqSetting, true)) {
+        if (!setObjectiveAndBinning(currentAcqSetting, true, false)) {
             currentAcqSetting.setObjectiveDevStr(MMCoreUtils.changeConfigGroupStr(this,core,"Objective",""));
             return;
         }
@@ -7433,8 +7766,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             Enumeration e = jarFile.entries();
 
             URL[] urls = { new URL("jar:file:" + jarFileStr+"!/") };
-            URLClassLoader classLoader = URLClassLoader.newInstance(urls,
-                //    this.getClass().getClassLoader());
+            URLClassLoader classLoader = URLClassLoader.newInstance(
+                urls,
                 MMPlugin.class.getClassLoader());
 
             int i=0;
@@ -7471,7 +7804,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             }
 
         } catch (MalformedURLException ex) {
-            JOptionPane.showMessageDialog(this,"Cannot from URL to load classes in jar file.");
+            JOptionPane.showMessageDialog(this,"Cannot form URL to load classes in jar file.");
             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
             return;
         } catch (IOException ex) {
@@ -7480,9 +7813,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             return;    
         } 
         if (stageControlClassName!="") {
-            Class<?> clazz;
             try {
-                clazz = Class.forName(stageControlClassName);
+                Class<?> clazz = Class.forName(stageControlClassName);
                 stageControlPlugin = (MMPlugin) clazz.newInstance();
             } catch (ClassNotFoundException ex) {
                 ReportingUtils.logError(ex);
@@ -7495,7 +7827,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     }
     
     private void stageControlButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_stageControlButtonActionPerformed
-
         if (stageControlPlugin != null) {
             stageControlPlugin.setApp(app);
             stageControlPlugin.show();
@@ -7559,7 +7890,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         } catch (Exception ex) {
             Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
         }
-        if (!setObjectiveAndBinning(currentAcqSetting, true)) {
+        if (!setObjectiveAndBinning(currentAcqSetting, true, false)) {
             currentAcqSetting.setObjectiveDevStr(MMCoreUtils.changeConfigGroupStr(this,core,"Objective",""));
             return;
         }
@@ -8842,14 +9173,16 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         return pSize;
     }
 
-    private void selectAcquisition(AcqSetting newSetting) {
+    private void selectAcquisition(AcqSetting newSetting, boolean retile) {
         if (currentAcqSetting != newSetting) {
             currentAcqSetting = newSetting;
             sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
                     "Sequence: "+currentAcqSetting.getName()));
             prevTilingSetting = currentAcqSetting.getTilingSetting().duplicate();
             prevObjLabel = currentAcqSetting.getObjective();
-            calcTilePositions(null, currentAcqSetting, ADJUSTING_SETTINGS);
+            if (retile) {
+                calcTilePositions(null, currentAcqSetting, ADJUSTING_SETTINGS);
+            }
             ((LayoutPanel) acqLayoutPanel).setAcqSetting(currentAcqSetting, true);
             updateAcqSettingTab(currentAcqSetting);
             updateProcessorTreeView(currentAcqSetting);
@@ -8876,7 +9209,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 if (minIndex >= 0) {
                     //convert minIndex (row in view) to index in TableModel, then retrieve the AcqSetting object
                     AcqSetting newSetting = ((AcqSettingTableModel)acqSettingTable.getModel()).getRowData(acqSettingTable.convertRowIndexToModel(minIndex));
-                    selectAcquisition(newSetting);
+                    selectAcquisition(newSetting, true);
                 }            
             }
         });
@@ -9016,12 +9349,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         }
     }
 
-    private boolean isZStageInstalled() {
-        String focusDeviceStr = core.getFocusDevice();
-//        IJ.log(focusDeviceStr);
-        return !focusDeviceStr.equals("");
-    }
-
+    
     private void moveToAbsoluteXYPos(double x, double y) {
         try {
 //            if (!core.deviceBusy(core.getXYStageDevice()))

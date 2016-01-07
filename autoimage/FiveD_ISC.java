@@ -1,21 +1,23 @@
 package autoimage;
 
 import autoimage.gui.AcqFrame;
+import org.micromanager.api.MMPlugin;
 import org.micromanager.api.ScriptInterface;
 
 /**
  *
  * @author Karsten Siller, University of Virginia
  */
-public class FiveD_ISC implements org.micromanager.api.MMPlugin{
+public class FiveD_ISC implements MMPlugin {
    public static String menuName = "5dISC";
    public static String tooltipDescription = "5dISC: 5d Image Sequence Controller";
    private AcqFrame acqFrame;
     
     @Override
     public void dispose() {
-        acqFrame.cleanUp();        
-        acqFrame.dispose();
+        if (acqFrame.cleanUp()); {        
+            acqFrame.dispose();
+        }
     }
 
     @Override
@@ -26,7 +28,6 @@ public class FiveD_ISC implements org.micromanager.api.MMPlugin{
         if (!acqFrame.isInitialized()) {
             acqFrame=null;
         }
-//        show();
     }
 
     @Override

@@ -4,6 +4,7 @@ import autoimage.api.BasicArea;
 import autoimage.gui.ProcessorTree;
 import autoimage.dataprocessors.ExtDataProcessor;
 import autoimage.dataprocessors.SiteInfoUpdater;
+import ij.IJ;
 import java.awt.Rectangle;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Path2D;
@@ -29,6 +30,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import javax.swing.tree.DefaultMutableTreeNode;
 import mmcorej.TaggedImage;
 import org.apache.commons.math.linear.Array2DRowRealMatrix;
@@ -512,4 +514,25 @@ public class Utils {
         return path;
     }
     
+    public static String createUniqueExpName(String root, String exp) {
+        //remove leading and trailing whitespaces
+        exp=exp.trim();
+        //replace all internal whitespace with "_"
+        exp=exp.replaceAll(" ", "_");
+        //remove all illegal characters
+        exp=exp.replaceAll("[^a-zA-Z0-9_\\-.]", "");
+        int i = 1;
+        String ext="";
+        while (new File(root, exp + ext).exists()) {
+            //trim all numericals after last underscore
+            while (Pattern.matches("[_0123456789]",exp.substring(exp.length()-1))) {
+                exp=exp.substring(0,exp.length()-1);
+            }
+            ext = "_" + Integer.toString(i);
+            i++;
+        }
+        return new File(root, exp + ext).getAbsolutePath();
+    }
+
+
 }

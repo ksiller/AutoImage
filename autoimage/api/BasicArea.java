@@ -516,8 +516,7 @@ public abstract class BasicArea implements Shape {
     
     /**
      * 
-     * @param fovX
-     * @param fovY
+     * @param fov
      * @param setting
      * @return
      * @throws InterruptedException 
@@ -831,8 +830,7 @@ public abstract class BasicArea implements Shape {
     /**
      * 
      * @param doxelManager
-     * @param fovX
-     * @param fovY
+     * @param fov
      * @param setting
      * @return
      * @throws InterruptedException 
@@ -1164,6 +1162,7 @@ public abstract class BasicArea implements Shape {
     public synchronized PositionList addTilePositions(PositionList pl, ArrayList<JSONObject> posInfoL, String xyStageLabel, String zStageLabel, IAcqLayout aLayout) {
         if (pl==null)
             pl=new PositionList();
+        IJ.log("ADDING TILEPOSITIONS: "+this.getName());
         for (Tile tile:tilePosList) {
             Vec3d stagePos;
             try {

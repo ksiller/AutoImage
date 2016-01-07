@@ -291,13 +291,12 @@ public class DynamicTileCreator extends ScriptAnalyzer implements IDataProcessor
         positionsCB.setSelected(true);//(criteriaKeys.contains(MMTags.Image.POS_NAME) || criteriaKeys.contains(MMTags.Image.POS_INDEX));
         clustersCB.setSelected(true);//(criteriaKeys.contains(ExtImageTags.CLUSTER_INDEX));
         areasCB.setSelected(true);//(criteriaKeys.contains(ExtImageTags.AREA_NAME) || criteriaKeys.contains(ExtImageTags.AREA_INDEX));
-        commentsCB.setSelected(true);//(criteriaKeys.contains(ExtImageTags.AREA_COMMENT));
+        commentsCB.setSelected(criteriaKeys.contains(ExtImageTags.AREA_COMMENT));
         
         framesCB.setEnabled(false);
         positionsCB.setEnabled(false);
         clustersCB.setEnabled(false);
         areasCB.setEnabled(false);
-        commentsCB.setEnabled(false);
         
         l=new JLabel("Script File:");
         l.setAlignmentX(Component.LEFT_ALIGNMENT);
