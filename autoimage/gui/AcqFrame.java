@@ -45,6 +45,7 @@ import autoimage.dataprocessors.ImageTagFilterString;
 import autoimage.dataprocessors.DynamicTileCreator;
 import autoimage.dataprocessors.ScriptAnalyzer;
 import autoimage.events.AllJobsCompletedEvent;
+import autoimage.events.JobImageStoredEvent;
 import autoimage.events.JobSwitchEvent;
 import autoimage.olddp.NoFilterSeqAnalyzer;
 import autoimage.tools.CameraRotDlg;
@@ -143,6 +144,7 @@ import javax.swing.JProgressBar;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.JViewport;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
@@ -303,6 +305,9 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             retilingAllowed=false;
             acquireButton.setText("Stop");
             enableGUI(false);
+            progressBar.setValue(0);
+            progressBar.setStringPainted(true);
+            timepointLabel.setText(e.getCurrentJob().getId()+", Timepoint: ");
             selectAcquisition(((AcquisitionJob)e.getCurrentJob()).getConfiguration().getAcqSetting(),false);
         }
     }
@@ -311,9 +316,26 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     public void acquisitionJobsCompleted(AllJobsCompletedEvent e) {
         acquireButton.setText("Acquire");
         enableGUI(true);
+        progressBar.setValue(0);
+        timepointLabel.setText("");
         retilingAllowed=true;
     }
     
+    @Subscribe
+    public void acquisitionProgress(JobImageStoredEvent e) {
+        progressBar.setValue((int)(100f*e.getImageNumber()/e.getTotalImages()));
+        String timepoint="?";
+        try {
+            int frame=((TaggedImage)e.getImage()).tags.getInt(MMTags.Image.FRAME_INDEX);
+            //frame is 0 indexed
+            timepoint=Integer.toString(frame+1);
+        } catch (JSONException ex) {
+            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        timepointLabel.setText(e.getJob().getId()+", Timepoint: "+timepoint);
+    } 
+            
+            
     //WindowListener interface
     @Override
     public void windowOpened(WindowEvent we) {}
@@ -919,20 +941,16 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         
         private final static int INTERVAL_MS = 100;
 
-//        private final ThreadPoolExecutor executor;
         private final IAcqLayout acqLayout;
         private final List<Future<Integer>> tilingResults;
         private final JProgressBar progressBar;
         private final String command;
-//        private final Object restoreObj;
 
         public TileCalculationMonitor(IAcqLayout aLayout, List<Future<Integer>> results, JProgressBar pb, String cmd) {//, Object restoreObj) {
-//            this.executor = executor;
             this.acqLayout=aLayout;
             this.tilingResults = results;
             this.progressBar = pb;
             this.command = cmd;
-//            this.restoreObj = restoreObj;
             if (pb != null) {
                 this.progressBar.setMinimum(0);
                 this.progressBar.setMaximum(100);
@@ -943,13 +961,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 
         @Override
         protected Void doInBackground() throws Exception {
-/*            while (!executor.isTerminated() && !this.isCancelled()) {
-                publish((int) Math.round((double) executor.getCompletedTaskCount() / executor.getTaskCount() * 100));
-                try {
-                    Thread.sleep(INTERVAL_MS);
-                } catch (InterruptedException e) {
-                }
-            }*/
             while ((acqLayout.getTilingStatus()==IAcqLayout.TILING_IN_PROGRESS) && !this.isCancelled()) {
                 publish(acqLayout.getCompletedTilingTasksPercent());
                 try {
@@ -977,7 +988,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 progressBar.setString("");
                 progressBar.repaint();
             }
-//            isCalculatingTiles = false;
             boolean error=false;
             if (acqLayout.getTilingStatus()!=IAcqLayout.TILING_ABORTED) {
                 //check if all areas tiled successfully (Future<Integer> in tilingResults >=0;
@@ -3619,17 +3629,19 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 calcTilePositions(null, currentAcqSetting, ADJUSTING_SETTINGS);
             }
             
-        }/*else if (e.getSource() == acqSettingTable.getModel() && (column == 0 
+        } else if (e.getSource() == acqSettingTable.getModel() && (column == 0 
                 || e.getColumn() == TableModelEvent.ALL_COLUMNS 
                 || e.getType() == TableModelEvent.DELETE 
                 || e.getType() == TableModelEvent.INSERT)) {
 //                || e.getType() == TableModelEvent.UPDATE)) {
             
             updatingAcqSettingTable=true;
+            sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
+                        "Sequence: "+currentAcqSetting.getName()));
 //            updateProcessorTreeView(currentAcqSetting);
 //            initializeAutofocusPanel(currentAcqSetting);
             updatingAcqSettingTable=false;
-        }*/ 
+        } 
     }
 
     public void setLandmarkFound(boolean b) {
@@ -3643,78 +3655,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 //        }
     }
 
-    private SequenceSettings createMDASettings(AcqSetting acqSetting) {
-        //check that chosen channel preset are in selected channelgroup
-        String chGroupStr=MMCoreUtils.verifyAndSelectConfigGroup(this,core,acqSetting.getChannelGroupStr());
-        if (chGroupStr==null) {
-            return null;
-        }
-        acqSetting.setChannelGroupStr(chGroupStr);
-        if (!initializeChannelTable(acqSetting)) {
-            return null;
-        }
-        //ok, create new mda sequence settings
-        SequenceSettings settings = new SequenceSettings();
-        //setup time-lapse
-//            settings.numFrames = timelapseCheckBox.isSelected() ? acqSetting.getFrames() : 1;
-        settings.numFrames = acqSetting.isTimelapse() ? acqSetting.getFrames() : 1;
-        settings.intervalMs = acqSetting.getTotalIntervalInMilliS();
-        
-        //setup z-stack
-        settings.slices = new ArrayList<Double>();
-        if (zStackCheckBox.isSelected()) {
-            double z = acqSetting.getZBegin();
-            for (int i = 0; i < acqSetting.getZSlices(); i++) {
-                settings.slices.add(z);
-                if (acqSetting.getZBegin() < acqSetting.getZEnd()) {
-                    z += acqSetting.getZStepSize();
-                } else {
-                    z -= acqSetting.getZStepSize();
-                }
-            }
-        } else {
-            settings.slices.add(new Double(0));
-        }
-        settings.relativeZSlice = true;
-        settings.keepShutterOpenSlices = acqSetting.isKeepZShutterOpen();
-        
-        //setup channels
-        settings.channels = new ArrayList<ChannelSpec>();
-        ChannelTableModel ctm = (ChannelTableModel) channelTable.getModel();
-//            settings.channelGroup = channelGroupStr;
-        settings.channelGroup = acqSetting.getChannelGroupStr();
-        for (int i = 0; i < ctm.getRowCount(); i++) {
-            Channel c = ctm.getRowData(i);
-            ChannelSpec cs = new ChannelSpec();
-            cs.config = c.getName();
-            cs.exposure = c.getExposure();
-            cs.color = c.getColor();
-            cs.doZStack = zStackCheckBox.isSelected();
-            cs.zOffset = c.getZOffset();
-            cs.useChannel = true;
-            //cs.camera = core.getCameraDevice();
-            settings.channels.add(cs);
-        }
-        settings.keepShutterOpenChannels = acqSetting.isKeepChShutterOpen();
-        
-        //setup autofocus
-        settings.useAutofocus = acqSetting.isAutofocus();
-        settings.skipAutofocusCount = acqSetting.getAutofocusSkipFrames();
-        //the actual autofocus properties need to be set in MMCore object before starting the acquisition
 
-        //setup xy positions
-        settings.usePositionList = true;
-        
-        //setup acquisition order
-        settings.slicesFirst = (acqOrderList.getSelectedIndex() == 1 | acqOrderList.getSelectedIndex() == 3);
-        settings.timeFirst = acqOrderList.getSelectedIndex() >= 2;
-        
-        //save images to disk, use acquisition sequence name as prefix, set root directory 
-        settings.save = true;
-        settings.prefix = acqSetting.getName();
-        settings.root = imageDestPath;
-        return settings;
-    }
     
     private void enableGUI(boolean b) {
         moveToButton.setEnabled(b);
@@ -3801,56 +3742,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         enableComponent(zStackPanel,true,zStackCheckBox.isSelected());
         enableComponent(timelapsePanel,true,timelapseCheckBox.isSelected());
     }
-/*
-    public JSONObject createSummary(AcqSetting as, SequenceSettings s, PositionList pl) {
-        // create summary metadata
-        JSONObject summary = new JSONObject();
-        try {
-            summary.put(MMTags.Summary.SLICES, s.slices.size());
-            summary.put(MMTags.Summary.POSITIONS, pl.getNumberOfPositions());
-            summary.put(MMTags.Summary.CHANNELS, s.channels.size());
-            summary.put(MMTags.Summary.FRAMES, s.numFrames);
-            summary.put(MMTags.Summary.SLICES_FIRST, true);
-            summary.put(MMTags.Summary.TIME_FIRST, false);
 
-            long d = core.getBytesPerPixel();
-            if (d == 2) {
-                summary.put(MMTags.Summary.PIX_TYPE, "GRAY16");
-                summary.put(MMTags.Summary.IJ_TYPE, ImagePlus.GRAY16);
-            } else if (d == 1) {
-                summary.put(MMTags.Summary.PIX_TYPE, "GRAY8");
-                summary.put(MMTags.Summary.IJ_TYPE, ImagePlus.GRAY8);
-            } else {
-                System.out.println("Unsupported pixel type");
-                return summary;
-            }
-            summary.put(MMTags.Summary.WIDTH, as.getTileWidth_UM());
-            summary.put(MMTags.Summary.HEIGHT, as.getTileHeight_UM());
-            summary.put(MMTags.Summary.PREFIX, s.prefix); // Acquisition name
-
-            //these are used to create display settings
-            JSONArray chColors = new JSONArray();
-            JSONArray chNames = new JSONArray();
-            JSONArray chMins = new JSONArray();
-            JSONArray chMaxs = new JSONArray();
-            for (int ch = 0; ch < s.channels.size(); ch++) {
-                chColors.put(s.channels.get(ch).color.getRGB());
-                chNames.put(s.channels.get(ch).config);
-                chMins.put(0);
-                chMaxs.put(d == 2 ? 65535 : 255);
-            }
-            summary.put(MMTags.Summary.COLORS, chColors);
-            summary.put(MMTags.Summary.NAMES, chNames);
-            summary.put(MMTags.Summary.CHANNEL_MINS, chMins);
-            summary.put(MMTags.Summary.CHANNEL_MAXES, chMaxs);
-
-        } catch (JSONException e2) {
-            // TODO Auto-generated catch block
-            e2.printStackTrace();
-        }
-        return summary;
-    }
-*/
     public String createUniqueExpName(String root, String exp) {
         int i = 1;
         String ext = "";
@@ -3860,40 +3752,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         }
         return new File(root, exp + ext).getAbsolutePath();
     }
-
-    /*private boolean setObjectiveAndBinning(AcqSetting setting, boolean updateGUI) {
-        if (setting != null) {
-            try {
-                core.setProperty(objectiveDevStr, "Label", setting.getObjective());
-                //core.setConfig(objectiveDevStr, setting.getObjective());
-            } catch (Exception e) {
-                ReportingUtils.showError(e);
-                objectiveDevStr=MMCoreUtils.selectDeviceStr(this,core,"Objective");
-                try {
-                    core.setProperty(objectiveDevStr, "Label", "test");//setting.getObjective());
-                } catch (Exception ex) {
-                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                }
-                JOptionPane.showMessageDialog(this,"Error selecting "+objectiveDevStr+", "+setting.getObjective());
-                setting.setObjectiveDevStr(objectiveDevStr);
-                return false;
-            }
-            
-            try {
-                core.setProperty(core.getCameraDevice(), "Binning", setting.getBinningDesc());
-            } catch (Exception e) {
-                ReportingUtils.showError(e);
-                return false;
-            } finally {
-                if (updateGUI) {
-                    app.refreshGUI();
-                }
-            }
-            return true;
-        } else {
-            return false;
-        }
-    }*/
     
     private boolean setObjectiveAndBinning(AcqSetting setting, boolean updateGUI, boolean suppressWarning) {
         boolean error=false;
@@ -4038,51 +3896,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             }
         }
         return !error;
-
-        
-/*        
-        FileWriter fw=null;
-        try {
-            fw = new FileWriter(file);
-            JSONObject expSettingObj=new JSONObject();
-            
-            try {
-                expSettingObj.put(TAG_ROOT_DIR,rootDirLabel.getText());
-                expSettingObj.put(TAG_EXP_BASE_NAME,experimentTextField.getText());
-            
-                updateAreaListFromAreaTableView(true,true);
-                JSONObject layoutObj=acqLayout.toJSONObject();
-                expSettingObj.put(IAcqLayout.TAG_LAYOUT, layoutObj);
-            } catch (JSONException ex) {
-                JOptionPane.showMessageDialog(this,"Error parsing layout file '"+acqLayout.getName()+"'.");
-                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            JSONArray settingArray=new JSONArray();
-            for (int i=0; i<acqSettings.size(); i++) {
-                try {  
-                    settingArray.put(i,acqSettings.get(i).toJSONObject());
-                } catch (JSONException ex) {
-                    JOptionPane.showMessageDialog(this,"Error parsing acquisition setting '"+acqSettings.get(i).getName()+"'.");
-                    Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }
-            try {
-                expSettingObj.put(AcqSetting.TAG_ACQ_SETTING_ARRAY, settingArray);
-                fw.write(expSettingObj.toString(4));  
-            } catch (JSONException ex) {
-                JOptionPane.showMessageDialog(this,"Error saving acquisition settings.");
-                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            }    
-        } catch (IOException ex) {
-            Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            JOptionPane.showMessageDialog(this,"Error saving acquisition settings");
-        } finally {
-            try {
-                fw.close();
-            } catch (IOException ex) {
-                Logger.getLogger(AcqFrame.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }*/
     }
 
     
@@ -4359,19 +4172,10 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                             ReportingUtils.logError(ex);
                         }
 
-                        SwingUtilities.invokeLater(new Runnable() {
-                            @Override
-                            public void run() {    
-                                timepointLabel.setText(config.getAcqSetting().getName() + ", Timepoint: ");
-                                progressBar.setValue(0);
-                                progressBar.setMaximum(100);//acquisitionTask.getTotalImages());
-                                progressBar.setStringPainted(true);
-                                boolean ok=setObjectiveAndBinning(config.getAcqSetting(), true, true);
-                                if (!ok) {
-                                    throw new RuntimeException(JobException.RUNTIME_ERROR);
-                                }
-                            }
-                        });
+                        boolean ok=setObjectiveAndBinning(config.getAcqSetting(), true, true);
+                        if (!ok) {
+                            throw new RuntimeException(JobException.RUNTIME_ERROR);
+                        }
                     }
                 };
                 
@@ -4396,10 +4200,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                     .preRunCallback(preRun)
                     .postRunCallback(postRun)
                     .build();
-                        
-                        
-                     //   acqManager.createJob(config, imageDestPath);
-
                 acqManager.putJob(newJob);
 //                newJob.setCallbacks(preInit, postInit, preRun, postRun, 1000);
             }
@@ -5249,7 +5049,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 }
             }
         }
-        //try closeQueueAndStart new acquisition; if not successfull it returns null
         if (currentAcqSetting != null) {
             double fieldRot=0;
             for (AcqSetting setting:acqSettings) {
@@ -5270,9 +5069,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 }
                 if (result ==  JOptionPane.YES_OPTION) {
                     showCameraRotDlg(false);//true: run as modal dialog
-                    return false;                              
+                    return false;
                 }
-
             }
         } else {
             JOptionPane.showMessageDialog(this,"Undefined AcqSettings");
@@ -5347,6 +5145,15 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 ace = (AbstractCellEditor) areaTable.getCellEditor();
                 if (ace != null) {
                     ace.stopCellEditing();
+                }
+                String uniquePath=Utils.createUniqueExpName(rootDirLabel.getText(),experimentTextField.getText());
+                if (!uniquePath.equals(new File(rootDirLabel.getText(), experimentTextField.getText()).getAbsolutePath())) {
+        //        if (f.exists()) {
+        //            imageDestPath=Utils.createUniqueExpName(rootDirLabel.getText(),experimentTextField.getText(),true);
+                    imageDestPath=uniquePath;
+                    JOptionPane.showMessageDialog(this, "Experiment name contains illegal characters or folder already exists.\n"
+                        + " Suggested experiment name: "+new File(uniquePath).getName());
+                    experimentTextField.setText(new File(imageDestPath).getName());                
                 }
                 //make sure settings are valid
                 if (verifySettings()) {
@@ -6381,10 +6188,10 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 int selRowAfterAdd=acqSettingTable.getSelectedRowCount()==0 ? acqSettingTable.getRowCount() : acqSettingTable.getSelectedRow()+1;                
                 int[] selRowsView = acqSettingTable.getSelectedRows();
                 AcqSettingTableModel atm = (AcqSettingTableModel) acqSettingTable.getModel();
-                List<String> settingNames=new ArrayList<String>();
+/*                List<String> settingNames=new ArrayList<String>();
                 for (AcqSetting s:acqSettings) {
                     settingNames.add(s.getName());
-                }
+                }*/
                 String renamingMessage = "";
                 int counter=1;
                 for (AcqSetting setting:list) {
@@ -6400,18 +6207,22 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                     if (!objectiveDevStr.equals(setting.getObjectiveDevStr())) {
                         setting.setObjectiveDevStr(objectiveDevStr);
                     }
-                    int i=1;
+                    
                     String originalName=setting.getName();
-                    String newName=originalName;
-                    while (settingNames.contains(newName)) {
+
+                    setting=AcqSetting.createUniqueCopy(acqSettings, setting);
+
+//                    String newName=originalName;
+                    int i=1;
+/*                    while (settingNames.contains(newName)) {
                         newName=setting.getName()+"_"+Integer.toString(i);
                         i++;
+                    }*/
+                    if (!originalName.equals(setting.getName())) {
+                        renamingMessage+=originalName+" --> "+setting.getName()+"\n";                        
+//                        setting.setName(newName);
                     }
-                    if (!originalName.equals(newName)) {
-                        renamingMessage+=originalName+" --> "+newName+"\n";
-                        setting.setName(newName);
-                    }
-                    settingNames.add(setting.getName());
+//                    settingNames.add(setting.getName());*/
 
                     if (selRowsView.length > 0) { //add after last selected row
                         atm.addRow(setting, acqSettingTable.convertRowIndexToModel(selRowsView[selRowsView.length - 1] + counter));
@@ -8541,7 +8352,10 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         for (int i=0; i<acqSettingArray.length(); i++) {
             JSONObject acqSettingObj=acqSettingArray.getJSONObject(i);
             try {
-                AcqSetting setting=new AcqSetting(acqSettingObj);
+                AcqSetting setting=AcqSetting.AcqSettingFactory(acqSettingObj);
+                if (settings.contains(setting)) {
+                    setting=AcqSetting.createUniqueCopy(settings,setting);
+                }
                 IJ.log("    Loading acquisition sequence # "+Integer.toString(i+1)+", name: "+setting.getName());
                 if (!availableObjectives.contains(setting.getObjective())) {
                     JOptionPane.showMessageDialog(this, "Objective "+setting.getObjective()+" not found. Choosing alternative.");
@@ -9174,6 +8988,9 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     }
 
     private void selectAcquisition(AcqSetting newSetting, boolean retile) {
+        if (!acqSettings.contains(newSetting)) {
+            return;
+        }
         if (currentAcqSetting != newSetting) {
             currentAcqSetting = newSetting;
             sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
@@ -9195,6 +9012,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         //select first acquisition sequence
         currentAcqSetting = acqSettings.get(0);
         acqSettingTable.getModel().addTableModelListener(this);
+        TableColumn column=acqSettingTable.getColumnModel().getColumn(0);
+        column.setCellEditor(new AcqSettingNameCellEditor(acqSettings));
         ListSelectionModel selectionModel = acqSettingTable.getSelectionModel();
         selectionModel.addListSelectionListener(new ListSelectionListener() {
             

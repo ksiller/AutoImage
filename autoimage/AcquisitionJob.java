@@ -21,10 +21,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.swing.tree.DefaultMutableTreeNode;
 import mmcorej.CMMCore;
 import mmcorej.TaggedImage;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.micromanager.acquisition.DefaultTaggedImageSink;
 import org.micromanager.acquisition.MMImageCache;
@@ -66,6 +71,7 @@ public class AcquisitionJob extends Job<AcqConfig> implements ImageCacheListener
 //    private List<ProcessorFactory> processorFactories;
     private MMImageCache imageCache;
     private IDataProcessorListener listener;
+    private long imagesReceived;
     private long totalImages;
     private volatile boolean acquisitionComplete;
 
@@ -192,11 +198,16 @@ public class AcquisitionJob extends Job<AcqConfig> implements ImageCacheListener
         sequencePath=new File(imageStorageRoot,configuration.getAcqSetting().getName()).getAbsolutePath();
 //        datastores=new ArrayList<Datastore>(); 
         showAcquisitionDisplay=showAcqDisplay;
+        imagesReceived=0;
     } 
     
     @Override
     public void imageReceived(TaggedImage ti) {
-        this.jeventBus.post(new JobImageStoredEvent<TaggedImage>(this, ti));
+        synchronized (this) {
+            imagesReceived++;
+            progressMap.put(Status.ACQUIRING, (float)imagesReceived/totalImages);
+            jeventBus.post(new JobImageStoredEvent<TaggedImage>(this, ti, imagesReceived, totalImages));
+        }
     }
 
     @Override
@@ -320,6 +331,22 @@ public class AcquisitionJob extends Job<AcqConfig> implements ImageCacheListener
         IAcqLayout acqLayout=configuration.getAcqLayout();
         AcqSetting acqSetting=configuration.getAcqSetting();
 
+        List<Future<Integer>> resultList = acqLayout.calculateTiles(null, 
+                acqSetting.getDoxelManager(),
+                acqSetting.getFieldOfView(), 
+                acqSetting.getTilingSetting());
+        while ((acqLayout.getTilingStatus()==IAcqLayout.TILING_IN_PROGRESS) && !Thread.currentThread().isInterrupted()) {
+            Thread.sleep(100);
+        }
+        for (Future<Integer> tileResult:resultList)  {
+            try {
+                IJ.log(this.getClass().getName()+".initialize : "+this.identifier+", Tiles:"+tileResult.get());
+            } catch (ExecutionException ex) {
+                Logger.getLogger(AcquisitionJob.class.getName()).log(Level.SEVERE, null, ex);
+                throw new JobException(this,"Tiling execution exception");
+            }
+        }        
+        
         acqLayout.saveTileCoordsToXMLFile(new File(sequencePath, "TileCoordinates.XML").getAbsolutePath(), acqSetting.getTilingSetting(),acqSetting.getTileWidth_UM(),acqSetting.getTileHeight_UM(),acqSetting.getImagePixelSize());
 
         ArrayList<JSONObject> posInfoList = new ArrayList<JSONObject>();
@@ -423,10 +450,17 @@ public class AcquisitionJob extends Job<AcqConfig> implements ImageCacheListener
             BlockingQueue<TaggedImage> procTreeOutputQueue = ProcessorTree.runImage(engineOutputQueue, 
                     (DefaultMutableTreeNode)acqSetting.getImageProcessorTree().getRoot());
 
-            TaggedImageStorage storage = new TaggedImageStorageDiskDefault(sequencePath, true, summaryMetadata);
-            imageCache = new MMImageCache(storage);
-            imageCache.addImageCacheListener(this);
-
+            try {
+                TaggedImageStorage storage = new TaggedImageStorageDiskDefault(sequencePath, true, summaryMetadata);
+                imageCache = new MMImageCache(storage);
+                imageCache.addImageCacheListener(this);
+            } catch (Exception ex) {
+                if (ex instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                } else {
+                    throw new JobException(this, "Error initializing storage");
+                }
+            } 
             if (mainImageStorageNode.getChildCount()>0) {
                 // create fileoutputqueue and ProcessorTree
                 BlockingQueue<File> fileOutputQueue = new LinkedBlockingQueue<File>(1);
@@ -437,17 +471,12 @@ public class AcquisitionJob extends Job<AcqConfig> implements ImageCacheListener
                 DefaultTaggedImageSink sink = new DefaultTaggedImageSink(procTreeOutputQueue, imageCache);                
                 sink.start();
             }
-        } catch (Exception e) {
-            IJ.log(e.getMessage());
-            throw new JobException(this, e.getMessage());
-        } finally {
-        }
-        while (!Thread.currentThread().isInterrupted() && status==Job.Status.ACQUIRING) {
-            if (status!=Job.Status.ACQUIRING) {
-                break;
-            } else {
+            while (!Thread.currentThread().isInterrupted() && status==Job.Status.ACQUIRING) {
                 Thread.sleep(200);
             }
+        } catch (JSONException je) {
+            throw new JobException(this, je.getMessage());
+        } finally {
         }
         return this;
     }
@@ -467,6 +496,7 @@ public class AcquisitionJob extends Job<AcqConfig> implements ImageCacheListener
     
     
     protected Job finishProcessing() throws JobException, InterruptedException {
+        IJ.log("FINISH PROCESSING");
         DefaultMutableTreeNode node=configuration.getAcqSetting().getImageProcessorTree();
         List<DataProcessor> activeProcs=new ArrayList<DataProcessor>();
         boolean interrupted=false;
@@ -523,10 +553,14 @@ public class AcquisitionJob extends Job<AcqConfig> implements ImageCacheListener
     @Override 
     protected Job run() throws JobException, InterruptedException {
         updateAndBroadcastStatus(Status.ACQUIRING);
+        progressMap.put(Status.ACQUIRING, 0f);
         runAcquisition();
-        updateAndBroadcastStatus(Job.Status.ACQUISITION_DONE);
+        progressMap.put(Status.ACQUIRING, 1f);
+        updateAndBroadcastStatus(Status.ACQUISITION_DONE);
         updateAndBroadcastStatus(Status.PROCESSING);
+        progressMap.put(Status.PROCESSING, 0f);
         finishProcessing();
+        progressMap.put(Status.PROCESSING, 1f);
         updateAndBroadcastStatus(Status.PROCESSING_DONE);
         return this;
     }

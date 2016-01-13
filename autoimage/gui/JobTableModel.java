@@ -22,10 +22,15 @@ public class JobTableModel extends AbstractTableModel {
     private List<Job> jobs;
     private final static DecimalFormat NUMBER_FORMAT = new DecimalFormat("###,###,##0.000");
     
-    public JobTableModel(List<Job>j) {
+    public JobTableModel(List<Job> j) {
         jobs=j;
     }
     
+    public void setJobs(List<Job> j) {
+        jobs=j;
+        fireTableDataChanged();
+    } 
+            
     @Override
     public int getRowCount() {
         if (jobs!=null) {
@@ -52,7 +57,7 @@ public class JobTableModel extends AbstractTableModel {
                 case 0:
                     return job.getId();
                 case 1:
-                    return job.getStatus().toString();
+                    return job.getStatus();
                 case 2: {
                     Calendar cal= new GregorianCalendar();
                     cal.setTimeInMillis(job.getScheduledTimeMS());
@@ -80,12 +85,23 @@ public class JobTableModel extends AbstractTableModel {
         }
     }
 
-    public int getRowForJob(Job job) {
-        if (jobs!=null) {
-            return jobs.indexOf(job);
+    public Job get(int row) {
+        if (row>=0 && row < jobs.size()) {
+            return jobs.get(row);
         } else {
-            return -1;
-        }       
+            return null;
+        }
+    }
+    
+    public int getRowForJob(String id) {
+        if (jobs!=null) {
+            for (int i=0; i<jobs.size(); i++) {
+                if (jobs.get(i).getId().equals(id)) {
+                    return i;
+                }    
+            }
+        } 
+        return -1;
     }
     
     public void updateTable() {

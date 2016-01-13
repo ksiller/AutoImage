@@ -8,9 +8,9 @@ import java.util.List;
  *
  * @author Karsten Siller
  */
-public class JobListReorderedEvent extends JobListManagerEvent {
+public class JobListChangedEvent extends JobListManagerEvent {
     
-    public JobListReorderedEvent(JobManager mgr, List<Job> j) {
+    public JobListChangedEvent(JobManager mgr, List<Job> j) {
         super(mgr,j);
     }
     

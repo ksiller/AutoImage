@@ -8,7 +8,12 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
@@ -31,7 +36,11 @@ public abstract class Job<T> implements Callable<Job> {
     protected long scheduledTimeMS;
     protected long actualTimeMS;
     protected long runtimeMS;
-    protected ListenableFuture<Job> futureresult;
+    protected final Map<Status,Float> progressMap;
+    protected final Map<Status,Float> publicProgressMap;
+    protected volatile ListenableFuture<Job> futureresult;
+    
+    private volatile boolean isCalled;
         
     public enum Status {
         UNDEFINED, CREATED, INITIALIZING, INITIALIZED, SCHEDULED, RUNNING, ACQUIRING, ACQUISITION_DONE, PROCESSING, PROCESSING_DONE, COMPLETED, ERROR, CANCEL_REQUESTED, CANCELLED, INTERRUPTED;
@@ -43,26 +52,11 @@ public abstract class Job<T> implements Callable<Job> {
             return name.replaceAll("_", " ");
         }
     };
-    
-    public static final int DONE=0;
-    public static final int CANCEL_REQUESTED=1;
-    public static final int CANCELLED=2;
-    public static final int CREATED=3;
-    public static final int INITIALIZING=4;
-    public static final int INITIALIZED=5;
-    public static final int SCHEDULED=6;
-    public static final int RUNNING=7;
-    public static final int ACQUIRING=8;
-    public static final int PROCESSING=9;
-    public static final int COMPLETED=10;
-    public static final int ERROR=11;
-    public static final int UNDEFINED=12;
-    public static final int INTERRUPTED=13;
-    
-
+       
 
     protected Job (EventBus evtbus, String id, T config, Runnable preInit, Runnable postInit, Runnable preRun, Runnable postRun, long timeoutMS) {
         status = Status.UNDEFINED;
+        isCalled=false;
         jeventBus=evtbus;
         identifier=id;
         configuration=config;
@@ -75,6 +69,8 @@ public abstract class Job<T> implements Callable<Job> {
         actualTimeMS = -1;
         runtimeMS=0;
         futureresult=null;
+        progressMap=Collections.synchronizedMap(new EnumMap<Status,Float>(Status.class));
+        publicProgressMap=Collections.unmodifiableMap(progressMap);
 //        updateAndBroadcastStatus(CREATED);
     }
 
@@ -101,30 +97,62 @@ public abstract class Job<T> implements Callable<Job> {
     }
 
     public synchronized final void schedule(ListeningScheduledExecutorService executor, FutureCallback callback) {
-        schedule(executor, callback, scheduledTimeMS);
+        if (status==Status.CREATED) {
+            long delay=scheduledTimeMS-System.currentTimeMillis();
+            futureresult=executor.schedule(this, delay, TimeUnit.MILLISECONDS);   
+            Futures.addCallback(futureresult, callback);
+            updateAndBroadcastStatus(Status.SCHEDULED);
+        } else {
+            //ignore
+        }
     }
 
-    public synchronized final void schedule(ListeningScheduledExecutorService executor, FutureCallback callback, long timeMS) {
-        scheduledTimeMS=timeMS;
-        long delay=scheduledTimeMS-System.currentTimeMillis();
-        futureresult=executor.schedule(this, delay, TimeUnit.MILLISECONDS);   
-        Futures.addCallback(futureresult, callback);
-        updateAndBroadcastStatus(Status.SCHEDULED);
+    public synchronized final void schedule(ListeningScheduledExecutorService executor, FutureCallback callback, long timeMS) throws IllegalStateException {
+        if (status==Status.CREATED) {
+            scheduledTimeMS=timeMS;
+            schedule(executor, callback);
+        } else {
+            //already scheduled or executed
+            if (timeMS==scheduledTimeMS) {
+                //same time --> do nothing
+                return;
+            } else {
+                //rescheduling unsuccessful
+                throw new IllegalStateException("Job is already scheduled or executed and cannot be rescheduled.");
+            }
+        }
     }
 
+    /*public synchronized void setProgress(Status st, float p) {
+        if (p>=0 && p<=1) {
+            progressMap.put(st, p);
+        }    
+    }
+    */
+    
+    public synchronized Float getProgress(Status st) {
+        if (progressMap.containsKey(st)) {
+            return progressMap.get(st);
+        } else {
+            return null;
+        }
+    }
+    
     public T getConfiguration() {
         return configuration;
     }
 
-    public Status getStatus() {
+    public synchronized Status getStatus() {
         return status;
     }
 
-    public synchronized void requestScheduledTimeMS(long timeMS) {
+    public synchronized void requestRescheduling(long timeMS) throws IllegalStateException {
         if (status==Status.CREATED) {
             long previousSchedule=scheduledTimeMS;
             scheduledTimeMS=timeMS;
             jeventBus.post(new JobScheduleChangedEvent(this,previousSchedule, timeMS));
+        } else {
+            throw new IllegalStateException("Job is already scheduled or executed.");
         }
     }
     
@@ -140,6 +168,14 @@ public abstract class Job<T> implements Callable<Job> {
         return runtimeMS;
     }
 
+    public synchronized boolean isActive() {
+        return Job.JobIsActive(status);
+    }
+    
+    public static boolean JobIsActive(Status status) {
+        return status!=Status.CREATED && !Job.JobFinished(status);
+    }
+    
     public synchronized boolean isRunning() {
         return JobRunning(status);
     }
@@ -166,11 +202,11 @@ public abstract class Job<T> implements Callable<Job> {
     }
 
     protected synchronized final void requestCancel(boolean mayInterrupt) {
-        updateAndBroadcastStatus(Job.Status.CANCEL_REQUESTED);
         if (isFinished()) {
            //do nothing 
            return; 
         }    
+        updateAndBroadcastStatus(Job.Status.CANCEL_REQUESTED);
         if (futureresult!=null) {
             //after scheduled
             boolean cancelled=futureresult.cancel(mayInterrupt);
@@ -178,15 +214,14 @@ public abstract class Job<T> implements Callable<Job> {
                 if (isRunning()) {
                     updateAndBroadcastStatus(Status.INTERRUPTED);
                 } else {
-                    //created, initialized, scheduled, but not running
+                    //created and scheduled, but not running
                     updateAndBroadcastStatus(Status.CANCELLED);
                 }
             } else {
                 //after finished, should not happen
-//                updateAndBroadcastStatus(CANCELLED);
             }
         } else {
-            //before scheduled
+            //craated but not scheduled
             updateAndBroadcastStatus(Status.CANCELLED);
         }
     }
@@ -205,20 +240,29 @@ public abstract class Job<T> implements Callable<Job> {
     
     @Override
     public final Job call() throws JobException {
+        synchronized (this) {
+            if (isCalled) {
+                throw new JobException(this, "Job has been executed or is currently running");
+            }
+        }
+        isCalled=true;
         try {
             executeCallback(preInitCallback);
             updateAndBroadcastStatus(Status.INITIALIZING);
+            progressMap.put(Status.INITIALIZED, 0f);
             initialize();
+            progressMap.put(Status.INITIALIZED, 1f);
             updateAndBroadcastStatus(Status.INITIALIZED);
             executeCallback(postInitCallback);
             executeCallback(preRunCallback);
             updateAndBroadcastStatus(Status.RUNNING);
+            progressMap.put(Status.RUNNING, 0f);
             actualTimeMS=System.currentTimeMillis();
             run();
+            progressMap.put(Status.RUNNING, 1f);
             runtimeMS=actualTimeMS-System.currentTimeMillis();
             executeCallback(postRunCallback);
             updateAndBroadcastStatus(Status.COMPLETED);
-            return this;
         } catch (InterruptedException ie) {
             updateAndBroadcastStatus(Status.INTERRUPTED);                        
             throw new JobException(this,JobException.INTERRUPT);
@@ -228,14 +272,13 @@ public abstract class Job<T> implements Callable<Job> {
         } finally {
             cleanUp();
         }
+        return this;
     }
 
     protected abstract void initialize() throws JobException, InterruptedException;
 
     protected abstract Job run() throws JobException, InterruptedException;
         
-//    protected abstract Job finishProcessing() throws JobException, InterruptedException;
-
     protected abstract void cleanUp();
      
 }

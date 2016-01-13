@@ -227,19 +227,18 @@ public class AcqSetting {
         setObjective(objective,oPixSize);        
     }
         
-    public AcqSetting (JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalArgumentException, IllegalAccessException {
-        this("");
+    public static AcqSetting AcqSettingFactory (JSONObject obj) throws JSONException, ClassNotFoundException, InstantiationException, IllegalArgumentException, IllegalAccessException {
+        AcqSetting newSetting=null;
         if (obj!=null) {
-            name=obj.getString(TAG_NAME);
-            objectiveDevStr=obj.getString(TAG_OBJ_GROUP_STR);
-            channelGroupStr=obj.getString(TAG_CHANNEL_GROUP_STR);
+            newSetting=new AcqSetting(obj.getString(TAG_NAME));
+            newSetting.setObjectiveDevStr(obj.getString(TAG_OBJ_GROUP_STR));
+            newSetting.setChannelGroupStr(obj.getString(TAG_CHANNEL_GROUP_STR));
             try {
-                chShutterOpen=obj.getBoolean(TAG_CHANNEL_SHUTTER_OPEN);
+                newSetting.setKeepChShutterOpen(obj.getBoolean(TAG_CHANNEL_SHUTTER_OPEN));
             } catch (JSONException e) {
-                chShutterOpen=false;
+                newSetting.setKeepChShutterOpen(false);
             }
-            binningStr=obj.getString(TAG_BINNING);
-            fieldOfView = new FieldOfView(0,0,FieldOfView.ROTATION_UNKNOWN);
+            newSetting.setBinning(obj.getString(TAG_BINNING));
 /*            try {
                 JSONObject fovObj=obj.getJSONObject(TAG_FIELD_OF_VIEW);
                 fieldOfView = new FieldOfView(fovObj);
@@ -247,59 +246,89 @@ public class AcqSetting {
                 ReportingUtils.logError("Cannot load detector from acquisition settings. Instantiating standard detector");
                 fieldOfView = new FieldOfView(1,1,FieldOfView.ROTATION_UNKNOWN);
             }  */  
-            setObjective(obj.getString(TAG_OBJ_LABEL),-1);
-            autofocus=obj.getBoolean(TAG_AUTOFOCUS);
-            autofocusSettings=obj.getJSONObject(TAG_AUTOFOCUS_SETTINGS);
+            newSetting.setObjective(obj.getString(TAG_OBJ_LABEL),-1);
+            newSetting.enableAutofocus(obj.getBoolean(TAG_AUTOFOCUS));
+            newSetting.autofocusSettings=obj.getJSONObject(TAG_AUTOFOCUS_SETTINGS);
             try {
-                afSkipFrames=obj.getInt(TAG_AUTOFOCUS_SKIP_FRAMES);
+                newSetting.setAutofocusSkipFrames(obj.getInt(TAG_AUTOFOCUS_SKIP_FRAMES));
             } catch (JSONException e) {
-                afSkipFrames=0;
+                newSetting.setAutofocusSkipFrames(0);
             }
-            zStack=obj.getBoolean(TAG_Z_STACK);
-            zStackCentered=obj.getBoolean(TAG_Z_STACK_CENTERED);
-            zBegin=obj.getDouble(TAG_Z_BEGIN);
-            zEnd=obj.getDouble(TAG_Z_END);
-            zStepSize=obj.getDouble(TAG_Z_STEP_SIZE);
+            newSetting.enableZStack(obj.getBoolean(TAG_Z_STACK));
+            newSetting.enableZStackCentered(obj.getBoolean(TAG_Z_STACK_CENTERED));
+            newSetting.setZBegin(obj.getDouble(TAG_Z_BEGIN));
+            newSetting.setZEnd(obj.getDouble(TAG_Z_END));
+            newSetting.setZStepSize(obj.getDouble(TAG_Z_STEP_SIZE));
             try {
-                zShutterOpen=obj.getBoolean(TAG_Z_SHUTTER_OPEN);
+                newSetting.setKeepZShutterOpen(obj.getBoolean(TAG_Z_SHUTTER_OPEN));
             } catch (JSONException e) {
-                zShutterOpen=false;
+                newSetting.setKeepZShutterOpen(false);
             }
-            slices=obj.getInt(TAG_SLICES);                    
-            timelapse=obj.getBoolean(TAG_TIMELAPSE);
+            newSetting.setZSlices(obj.getInt(TAG_SLICES));                    
+            newSetting.enableTimelapse(obj.getBoolean(TAG_TIMELAPSE));
             try {
-                intervalInMS=obj.getLong(TAG_MILLIS_INTERVAL);
+                newSetting.setTotalMilliSInterval(obj.getLong(TAG_MILLIS_INTERVAL));
             } catch (JSONException e) {
-                intervalInMS=0;
+                newSetting.setTotalMilliSInterval(0);
             }
-            hours=(int)Math.floor(intervalInMS / 3600000);
-            minutes=(int)Math.floor((intervalInMS -(hours*3600000)) / 60000);
-            seconds=(int)Math.floor((intervalInMS -(hours*3600000 + minutes*60000)) / 1000);
-            milliseconds=(int)(intervalInMS % 1000);
-            frames=obj.getInt(TAG_FRAMES);
-            acqOrder=obj.getInt(TAG_ACQ_ORDER);                    
-            startTime=new ScheduledTime(obj.getJSONObject(TAG_START_TIME));
-            tiling=new TilingSetting(obj.getJSONObject(TilingSetting.TAG_TILING));    
+            newSetting.setFrames(obj.getInt(TAG_FRAMES));
+            newSetting.setAcqOrder(obj.getInt(TAG_ACQ_ORDER));                    
+            newSetting.setStartTime(new ScheduledTime(obj.getJSONObject(TAG_START_TIME)));
+            newSetting.setTilingSetting(new TilingSetting(obj.getJSONObject(TilingSetting.TAG_TILING)));    
             JSONArray channelArray=obj.getJSONArray(Channel.TAG_CHANNEL_ARRAY);
-            channels=new ArrayList<Channel>();
+            List<Channel> channels=new ArrayList<Channel>();
             for (int i=0; i<channelArray.length(); i++) {
                 JSONObject chObj=channelArray.getJSONObject(i);
                 channels.add(new Channel(chObj));  
             }
+            newSetting.setChannels(channels);
             try {
                 JSONObject procTreeObj=obj.getJSONObject("ProcTree");
                 if (procTreeObj!=null)
-                    imageProcRoot=Utils.createProcessorTree(procTreeObj);
+                    newSetting.setImageProcTree(Utils.createProcessorTree(procTreeObj));
                 else
-                    imageProcRoot=Utils.createDefaultImageProcTree();
+                    newSetting.setImageProcTree(Utils.createDefaultImageProcTree());
             } catch (JSONException ex) {
-                imageProcRoot=Utils.createDefaultImageProcTree();
+                newSetting.setImageProcTree(Utils.createDefaultImageProcTree());
             }    
+            newSetting.fieldOfView = new FieldOfView(0,0,FieldOfView.ROTATION_UNKNOWN);
         }
-        fieldOfView = new FieldOfView(0,0,FieldOfView.ROTATION_UNKNOWN);
-        detectors=new ArrayList<Detector>();
+        return newSetting;
     }
     
+    public static AcqSetting createUniqueCopy(final List<AcqSetting> settings, final AcqSetting setting) {
+        AcqSetting uniqueCopy=null;
+        JSONObject acqSettingObj;
+        try {
+            acqSettingObj = setting.toJSONObject();
+            acqSettingObj.put(TAG_NAME, Utils.createUniqueAcqSettingName(settings, setting.getName()));
+            uniqueCopy=AcqSetting.AcqSettingFactory(acqSettingObj);
+        } catch (JSONException ex) {
+            Logger.getLogger(AcqSetting.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (ClassNotFoundException ex) {
+            Logger.getLogger(AcqSetting.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InstantiationException ex) {
+            Logger.getLogger(AcqSetting.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IllegalArgumentException ex) {
+            Logger.getLogger(AcqSetting.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IllegalAccessException ex) {
+            Logger.getLogger(AcqSetting.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return uniqueCopy;
+    }
+    
+/*    @Override
+    public boolean equals(Object setting) {
+        return setting!=null && setting instanceof String && this.name.equals((String)setting);
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 47 * hash + (this.name != null ? this.name.hashCode() : 0);
+        return hash;
+    }
+*/    
     public List<Detector> getDetectors() {
         return detectors;
     }
@@ -588,10 +617,11 @@ public class AcqSetting {
         return totalTiles;
     }
 */    
+
     public void setName(String n) {
         name=n;
     }
-    
+        
     public String getName() {
         return name;
     }

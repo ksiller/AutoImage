@@ -1,7 +1,5 @@
 package autoimage;
 
-import autoimage.Job;
-
 /**
  *
  * @author Karsten

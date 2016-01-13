@@ -4,7 +4,7 @@ import autoimage.Job.Status;
 import autoimage.events.JobStatusChangedEvent;
 import autoimage.events.AllJobsCompletedEvent;
 import autoimage.events.JobSwitchEvent;
-import autoimage.events.JobListReorderedEvent;
+import autoimage.events.JobListChangedEvent;
 import autoimage.events.JobPlacedInQueueEvent;
 import autoimage.gui.JobStatusWindow;
 import com.google.common.eventbus.EventBus;
@@ -20,15 +20,15 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-//import org.micromanager.events.AcquisitionEndedEvent;
-//import org.micromanager.events.AcquisitionStartedEvent;
 
 /**
  *
@@ -36,17 +36,19 @@ import java.util.logging.Logger;
  */
 public abstract class JobManager {
     
+    public enum Order {FIFO, LIFO, TIME_SORTED};
     /**
      *
      */
     protected final EventBus jobEventBus;
     private ListeningScheduledExecutorService executor;
     private final List<Job> jobs;
+    private final List<Job> jobsForPublic;
+    private final Map<String, Job> jobMap;
     private final FutureCallback<Job> callback;
     private JobStatusWindow statusWindow;
-    private Job currentJob;
-    private boolean sortByScheduledTime=false;
-    //protected boolean jobQueueClosed;
+    private volatile Job currentJob;
+    private Order schedulingOrder;
     private boolean cancellingAllJobs;
     
     /**
@@ -75,11 +77,14 @@ public abstract class JobManager {
     //----------------------
     
     public JobManager() {
-        jobEventBus= new EventBus();        
+        jobEventBus= new EventBus(); 
+        schedulingOrder=Order.FIFO;
         cancellingAllJobs=false;
         currentJob=null;
         executor = JobManager.ExecutorFactory();
-        jobs=new ArrayList<Job>();
+        jobs=Collections.synchronizedList(new ArrayList<Job>());
+        jobsForPublic=Collections.unmodifiableList(jobs);
+        jobMap=new ConcurrentHashMap<String, Job>();
         callback = new FutureCallback<Job> () {
 
             @Override
@@ -110,8 +115,8 @@ public abstract class JobManager {
      * Determines whether jobs are reordered based on each job's scheduled execution time. Used in the scheduleJobs() method.
      * @param b false (default), no reordering
      */
-    public void setSortByScheduledTime(boolean b) {
-        sortByScheduledTime=b;
+    public void setSchedulingOrder(Order order) {
+        schedulingOrder=order;
     }
     
 /*    
@@ -132,17 +137,16 @@ public abstract class JobManager {
      */
     @Subscribe
     public void jobStatusUpdated(JobStatusChangedEvent e) {
-        int index=jobs.indexOf(e.getJob());
+        int index=-1;
+        synchronized (jobs) {
+            index=jobs.indexOf(e.getJob());
+        }
         if (index<0) {
             //this means job is not in job list, do nothing
             return;
         }
         Status newStatus=e.getNewStatus();
         Status oldStatus=e.getOldStatus();
-        IJ.log(this.getClass().getName()+".jobStatusUpdated: "
-                + e.getJob().getId()
-                + ", old status=" + oldStatus.toString()
-                + ", new status=" + newStatus.toString());
         synchronized (this) {
             IJ.log("CURRENTJOB="+(currentJob==null ? "null" : currentJob.getId()));
             if (currentJob==null && !Job.JobFinished(newStatus)) {
@@ -158,7 +162,7 @@ public abstract class JobManager {
                     currentJob=null;
                     jobEventBus.post(new AllJobsCompletedEvent(this,jobs));
                 } else if (!cancellingAllJobs) {    
-                    //more jobs, go to next in queue
+                    //more jobs, go to next in job list
                     Job previousJob=currentJob;
                     //set current job to next in job list
                     currentJob=jobs.get(index+1);
@@ -174,15 +178,8 @@ public abstract class JobManager {
      */
     @Subscribe
     public void allJobsCompleted(AllJobsCompletedEvent e) {
-        IJ.log(this.getClass().getName()+".allJobsCompleted:");
-        for (Job j:e.getJobs()) {
-            IJ.log("    "+j.getId()+", status="+j.getStatus());
-        }
-//        jobEventBus.post(new AllJobsCompletedEvent(this, e.getJobs()));
-//        eventbus.post(new AllJobsCompletedEvent(e.getJobs()));
     }
-    
-    
+        
     /**
      * Register this object as a listener of the jobEventBus. Both jobs and this manager post to the jobEventBus. Listeners need to add the @Subscribe annotation to a single argument public method to handle events posted on the jobEventBus 
      * @param listener Object to be added as listener
@@ -201,82 +198,142 @@ public abstract class JobManager {
 //        eventbus.unregisterForEvents(listener);
     }
     
-/*    private String calculateWaitTime(long time) {
-        long deltaMS=time - System.currentTimeMillis();
-
-        int seconds = (int)Math.floor(deltaMS / 1000) % 60 ;
-        int minutes = (int) Math.floor(deltaMS / (1000*60)) % 60;
-        int hours   = (int) Math.floor(deltaMS / (1000*60*60)) % 24;
-        int days = (int) Math.floor(deltaMS / (1000*60*60*24));                                    
-        String d="";
-        if (days > 0) {
-            d=d+Integer.toString(days)+" d, ";
-        }
-        if (hours > 0 | days > 0) {
-            d=d+Integer.toString(hours)+" h, ";
-        }
-        if (minutes > 0 || hours > 0 || days > 0) {
-            d=d+Integer.toString(minutes)+" min, ";
-        }
-        return d+Integer.toString(seconds)+" s";
-    }
-*/  
     /**
-     * Places a new job at the end of the job queue
-     * @param newJob The job object to be added to the job queue
+     * Places a new job at the end of the job list
+     * @param newJob The job object to be added to the job list
      * @throws JobException is thrown if the job executor has been shutdown and cannot accept new jobs. The job executor's shutDown() method is invoked at the end of scheduleJobs() method.
      */
-    public void putJob(Job newJob) throws JobException {
+    public boolean putJob(Job newJob) throws JobException {
         if (executor.isShutdown()) {
             throw new JobException(newJob, "AcquisitionManager cannot accept new jobs. Reset AcquisitonManager first");
         } 
+        boolean addJob=false;
         if (newJob!=null) {
-            jobs.add(newJob);
-//            eventbus.post(new JobPlacedInQueueEvent(newJob));
-            jobEventBus.post(new JobPlacedInQueueEvent(this,newJob));
+            synchronized (this) {
+                addJob=!jobMap.containsKey(newJob.getId());
+                if (addJob) {
+                    jobs.add(newJob);
+                    jobMap.put(newJob.getId(),newJob);
+                }
+            }
+            if (addJob) {
+                jobEventBus.post(new JobPlacedInQueueEvent(this,newJob));
+            }
         }
+        return addJob;
     }
     
     /**
-     * Schedules all jobs. If sortedByScheduledTime == true, job queue is resorted based on each job's scheduled time. If sortedByScheduleTime == false, jobs are not reordered based on scheduled time
+     * Removes job from job list. Jobs can only be removed if not active (isActive()==false).
+     * @param id identifier of job (is compared to field identifier of all Job objects in job list)
+     * @return true is job was removed
+     */
+    public boolean removeJob(String id) {
+        Job toRemove=null;
+        Job previousJob;
+        synchronized (this) {
+            previousJob=currentJob;
+            toRemove=jobMap.get(id);
+            if (toRemove==null) {
+                //not in job list --> do nothing
+                return false;
+            }
+            if (toRemove.isActive()) {
+                //cannot remove active job
+                toRemove=null;
+            } else {
+                if (currentJob==toRemove) {
+                    previousJob=currentJob;
+                    currentJob=null;
+                }
+                jobMap.remove(id, toRemove);
+                jobs.remove(toRemove);
+            }
+        }
+        if (toRemove!=null) {
+            jobEventBus.post(new JobListChangedEvent(this,jobsForPublic));
+        }
+        if (currentJob!=previousJob) {
+            jobEventBus.post(new JobSwitchEvent(this,previousJob,currentJob));
+        }
+        return toRemove!=null;
+    }
+
+    /**
+     * Searches job list and returns Job based on identifier
+     * @param id identifier of job (is compared to field identifier of all Job objects in job list)
+     * @return Job for which getId()==id
+     */
+    public Job getJob(String id) {
+        return jobMap.get(id);
+    }
+    
+    /**
+     * Schedules all jobs. If sortedByScheduledTime == true, job list is resorted based on each job's scheduled time. If sortedByScheduleTime == false, jobs are not reordered based on scheduled time
      * @throws JobException is thrown if sortedByScheduleTime == false and the scheduled times for all jobs is out of order.
      */
-    public void scheduleJobs() throws JobException {
+    public synchronized void scheduleJobs() throws JobException {
         if (jobs==null || jobs.isEmpty()) {
             throw new JobException(null,"No jobs in queue.");
         }
         long lastStartTimeMS=-1;
-        if (sortByScheduledTime) {
-            Collections.sort(jobs, new ScheduledTimeComparator());
-            for (Job job:jobs) {
-                job.schedule(executor, callback);
-            }    
-            this.jobEventBus.post(new JobListReorderedEvent(this,jobs));
-        } else {
-            Job previousJob=null;
-            for (Job job:jobs) {
-                if (previousJob!=null && job.getScheduledTimeMS() < previousJob.getScheduledTimeMS()) {
-                    cancelAllJobs();
-                    throw new JobException(job,"Job scheduling time is out of order. Check scheduled start time for jobs");
-                } else {   
+        switch (schedulingOrder) {
+            case TIME_SORTED: {
+                Collections.sort(jobs, new ScheduledTimeComparator());
+                for (Job job:jobs) {
                     job.schedule(executor, callback);
+                }    
+                jobEventBus.post(new JobListChangedEvent(this,jobsForPublic));
+//                jobEventBus.post(new JobListChangedEvent(this,jobs));
+                break;
+            }
+            case LIFO: {
+                Collections.reverse(jobs);
+                Job previousJob=null;
+                for (Job job:jobs) {
+                    if (previousJob!=null && job.getScheduledTimeMS() < previousJob.getScheduledTimeMS()) {
+                        cancelAllJobs();
+                        throw new JobException(job,"Job scheduling time is out of order. Check scheduled start time for jobs");
+                    } else {   
+                        job.schedule(executor, callback);
+                    }
+                    previousJob=job;
                 }
-                previousJob=job;
+                jobEventBus.post(new JobListChangedEvent(this,jobsForPublic));
+//                jobEventBus.post(new JobListChangedEvent(this,jobs));
+                break;
+            }
+            default: {
+                Job previousJob=null;
+                for (Job job:jobs) {
+                    if (previousJob!=null && job.getScheduledTimeMS() < previousJob.getScheduledTimeMS()) {
+                        cancelAllJobs();
+                        throw new JobException(job,"Job scheduling time is out of order. Check scheduled start time for jobs");
+                    } else {   
+                        job.schedule(executor, callback);
+                    }
+                    previousJob=job;
+                }                
             }
         }
         executor.shutdown();
     }
     
     /**
-     * Attempts to cancel all jobs in job queue. Completed jobs are unaffected. Scheduled but not executed jobs are cancelled. Running jobs are interrupted.
+     * Attempts to cancel all jobs in job list. Completed jobs are unaffected. Scheduled but not executed jobs are cancelled. Running jobs are interrupted.
      * @return List of Runnables that have not been executed
      */
     public List<Runnable> cancelAllJobs() {
+        if (cancellingAllJobs) {
+            //prevent reentrance
+            return null;
+        }
         cancellingAllJobs=true;
         List<Runnable> interruptedtasks=executor.shutdownNow();
         try {
             executor.awaitTermination(10000, TimeUnit.MILLISECONDS);
         } catch (InterruptedException ex) {
+            IJ.log("Executor await termination interrupted Exception ");
             Logger.getLogger(AcqJobManager.class.getName()).log(Level.SEVERE, null, ex);
         }
         for (Job j:jobs) {
@@ -295,6 +352,7 @@ public abstract class JobManager {
                         IJ.log("    EE: "+j.toString());
                     } catch (CancellationException ex) {
                         IJ.log("    CE: "+j.toString());
+                        j.updateAndBroadcastStatus(Job.Status.CANCELLED);
                     } catch (TimeoutException ex) {
                         IJ.log("    TE: "+j.toString());
                         j.updateAndBroadcastStatus(Job.Status.CANCELLED);
@@ -312,13 +370,14 @@ public abstract class JobManager {
             }
         }
 //        getActiveJobs();//for debugging
+        cancellingAllJobs=false;
         return interruptedtasks;
     }
     
     /**
-     * Jumps to execute the next scheduled job in the queue. The next job's execution schedule is honored.
+     * Jumps to execute the next scheduled job in the list. The next job's execution schedule is honored.
      */
-    public void skipToNextJob() {
+    public synchronized void skipToNextJob() {
         if (!hasActiveJobs() || currentJob==null) {
             return;
         }
@@ -329,21 +388,24 @@ public abstract class JobManager {
     
     /**
      * 
-     * @return reference to job that is currently executing or is the next in the job queue 
+     * @return reference to job that is currently executing or is the next in the job list 
      */
     public synchronized Job getCurrentJob() {
         return currentJob;
     }
     
+    
     /**
      * 
-     * @return list of jobs in queue that have run and completed. Completeness is determined by job's isFinished() method 
+     * @return list of jobs in list that have run and completed. Completeness is determined by job's isFinished() method 
      */
-    public synchronized List<Job> getCompletedJobs() {
+    public List<Job> getCompletedJobs() {
         List completed=new ArrayList();
-        for (Job job:jobs) {
-            if (job.isFinished()) {
-                completed.add(job);
+        synchronized(jobs) {
+            for (Job job:jobs) {
+                if (job.isFinished()) {
+                    completed.add(job);
+                }
             }
         }
         return completed;
@@ -351,7 +413,7 @@ public abstract class JobManager {
     
     /**
      * 
-     * @return true if there are any jobs in queue regardless of status. 
+     * @return true if there are any jobs in list regardless of status. 
      */
     public synchronized boolean hasJobsInQueue() {
         return !jobs.isEmpty();
@@ -359,15 +421,17 @@ public abstract class JobManager {
     
     /**
      * 
-     * @return list of jobs in queue that have not run yet.
+     * @return list of jobs in list that are scheduled and have not run yet.
      */
-    public synchronized List<Job> getActiveJobs() {
+    public List<Job> getActiveJobs() {
         List active=new ArrayList();
-        for (Job job:jobs) {
-            IJ.log("Job: "+job.getId()+", "+job.getStatus().toString());
-            if (!job.isFinished()) {
-                IJ.log("    active Job: "+job.getId()+", "+job.getStatus().toString());
-                active.add(job);
+        synchronized (jobs) {
+            for (Job job:jobs) {
+                IJ.log("Job: "+job.getId()+", "+job.getStatus().toString());
+                if (Job.JobIsActive(job.getStatus())) {
+                    IJ.log("    active Job: "+job.getId()+", "+job.getStatus().toString());
+                    active.add(job);
+                }
             }
         }
         return active;
@@ -375,7 +439,7 @@ public abstract class JobManager {
     
     /**
      * 
-     * @return true if jobs are in queue that have been scheduled but not run yet. 
+     * @return true if jobs are in list that have been scheduled but not run yet. 
      */
     public boolean hasActiveJobs() {
         return !getActiveJobs().isEmpty();
@@ -383,17 +447,18 @@ public abstract class JobManager {
     
     /**
      * 
-     * @return list of all jobs in queue regardless of status. 
+     * @return list of all jobs in list regardless of status. 
      */
     public synchronized List<Job> getJobs() {
-        return jobs;
+        return jobsForPublic;
+//        return jobs;
     }
     
     /**
      * 
      * @return true is executor is running a job 
      */
-    public synchronized boolean hasJobRunning() {
+    public boolean hasJobRunning() {
         return getCurrentJob()!=null;
     }    
     
@@ -405,15 +470,26 @@ public abstract class JobManager {
     }
     
     /**
-     * Tries to clear all jobs in queue.
-     * @throws JobException if job executor is not terminated (active jobs in queue)
+     * Tries to clear all jobs in list.
+     * @throws JobException if job executor is not terminated (active jobs in list)
      */
     public void clearJobs() throws JobException {
+        Job previousJob=null;
         if (!executor.isTerminated()) {
             throw new JobException(null,"Error in JobManager: cannot clear active jobs.");
         } else {
-            jobs.clear();
-            currentJob=null;
+            synchronized (this) {
+                if (jobs.isEmpty()) {
+                    //ensures that repeated (reentrant) calls do not fire events again
+                    return;
+                }
+                jobs.clear();
+                jobMap.clear();
+                previousJob=currentJob;
+                currentJob=null;
+            }
+            jobEventBus.post(new JobListChangedEvent(this,jobsForPublic));
+            jobEventBus.post(new JobSwitchEvent(this,previousJob,null));
         }
     }
     
@@ -424,13 +500,13 @@ public abstract class JobManager {
      */
     public JobStatusWindow createJobStatusWindow(Frame parent) {
         if (statusWindow==null) {
-            statusWindow=new JobStatusWindow(parent,this,jobs);
+            statusWindow=new JobStatusWindow(parent,this);
+//            statusWindow=new JobStatusWindow(parent,this,jobs);
             jobEventBus.register(statusWindow);
             statusWindow.addWindowListener(new WindowAdapter() {
             
                 @Override
                 public void windowClosing(WindowEvent evt) {
-                    IJ.log("STATUSWINDOW==null: "+Boolean.toString(statusWindow==null));
                     jobEventBus.unregister(statusWindow);
                     statusWindow=null;
                 }
@@ -441,15 +517,23 @@ public abstract class JobManager {
     }
     
     /**
-     * Cancels all active jobs, clears all jobs from queue, and creates a new job executor instance.
+     * Cancels all active jobs, clears all jobs from list, and creates a new job executor instance.
      * @return List of all unfinished Runnables
      */
     public List<Runnable> reset() {
-        List<Runnable> unfinishedJobs=cancelAllJobs();
-        executor=JobManager.ExecutorFactory();
-        cancellingAllJobs=false;
-        jobs.clear();
-        currentJob=null;
+        List<Runnable> unfinishedJobs;
+        Job previousJob=null;
+        synchronized (this) {
+            unfinishedJobs=cancelAllJobs();
+            executor=JobManager.ExecutorFactory();
+            cancellingAllJobs=false;
+            previousJob=currentJob;
+            jobs.clear();
+            jobMap.clear();
+            currentJob=null;
+        }
+        jobEventBus.post(new JobListChangedEvent(this,jobsForPublic));
+        jobEventBus.post(new JobSwitchEvent(this,previousJob,null));
         return unfinishedJobs;
     }
 

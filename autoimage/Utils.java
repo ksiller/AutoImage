@@ -1,5 +1,6 @@
 package autoimage;
 
+import autoimage.api.AcqSetting;
 import autoimage.api.BasicArea;
 import autoimage.gui.ProcessorTree;
 import autoimage.dataprocessors.ExtDataProcessor;
@@ -192,8 +193,6 @@ public class Utils {
         }
         return at;
     }
-    
-    
     
     
     private DefaultMutableTreeNode copyNode(DefaultMutableTreeNode OriginNode){
@@ -534,5 +533,35 @@ public class Utils {
         return new File(root, exp + ext).getAbsolutePath();
     }
 
+    
+    public static String createUniqueAcqSettingName(List<AcqSetting> settings, String name) {
+        //remove leading and trailing whitespaces
+        name=name.trim();
+        //replace all internal whitespace with "_"
+        name=name.replaceAll(" ", "_");
+        //remove all illegal characters
+        name=name.replaceAll("[^a-zA-Z0-9_\\-.]", "");
+        int i = 1;
+        boolean isUnique;
+        do {
+            isUnique=true;
+            for (AcqSetting setting:settings) {
+                if (setting.getName().equals(name)) {
+                    isUnique=false;
+                    break;
+                }
+            }
+            if (!isUnique) {
+                //trim all numericals after last underscore
+                while (Pattern.matches("[_0123456789]",name.substring(name.length()-1))) {
+                    name=name.substring(0,name.length()-1);
+                }
+                name+="_" + Integer.toString(i);
+            }
+            i++;
+        } while (!isUnique);
+        return name;
+    }
+    
 
 }

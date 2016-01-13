@@ -195,7 +195,7 @@ public class AcqJobManager extends JobManager {
                     break;
                 }
             }    
-            job.requestScheduledTimeMS(ms);
+            job.requestRescheduling(ms);
             Calendar scheduled=new GregorianCalendar();
             scheduled.setTimeInMillis(ms);
             IJ.log(setting.getName() +" scheduled for: "+scheduled.getTime().toString());
