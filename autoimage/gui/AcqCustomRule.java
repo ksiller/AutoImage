@@ -75,9 +75,9 @@ public class AcqCustomRule extends JComponent implements Scrollable, IRuleNotifi
         return scale;
     }
     
-    public void setScaleAndZoom(double scale, double zoom) {
-        this.scale=scale;
-        this.zoom=zoom;
+    public void setScaleAndZoom(double s, double z) {
+        scale=s;
+        zoom=z;
         revalidate();
         repaint();
     }

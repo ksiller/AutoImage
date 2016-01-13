@@ -153,7 +153,8 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     public void calculateScale(int w, int h) { 
         Dimension d=new Dimension(getPreferredLayoutWidth(),getPreferredLayoutLength());
         if (zoom==1) {
-            scale=Math.min(((double)w-2)/d.width,((double)h-2)/d.height);
+//            scale=Math.min(((double)w-2)/d.width,((double)h-2)/d.height);
+            scale=Math.min(((double)w)/d.width,((double)h)/d.height);
             revalidate();
             repaint();
         }
@@ -240,11 +241,17 @@ class LayoutPanel extends JPanel implements Scrollable, IStageMonitorListener {
     
     public double zoomOut(int w, int h) {
         zoom=zoom/2;
-        if (zoom < 1) {
+        Dimension newDim=scaleDimension(getPreferredLayoutSize(),zoom);
+        if (zoom < 1) {// || (w > scale * newDim.width && h > scale * newDim.height)) {
             zoom=1;
             calculateScale(w,h);
-        } else {   
-            setSize(scaleDimension(getPreferredLayoutSize(),zoom));
+        } else {
+///            if (zoom==1) {
+                setSize(newDim);
+/*            } else {
+//                calculateScale(w,h);
+                scale=Math.min(((double)w)/(getPreferredLayoutWidth()/zoom),((double)h)/(getPreferredLayoutLength()/zoom));
+            }*/
             revalidate();
             repaint();
         }
