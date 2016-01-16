@@ -5,10 +5,13 @@
  */
 package autoimage.api;
 
-import autoimage.DoxelManager;
-import autoimage.FieldOfView;
-import autoimage.Tile;
-import autoimage.Vec3d;
+import autoimage.data.layout.Landmark;
+import autoimage.data.layout.TilingSetting;
+import autoimage.services.DoxelManager;
+import autoimage.data.FieldOfView;
+import autoimage.data.layout.Tile;
+import autoimage.data.Vec3d;
+import autoimage.gui.dialogs.RefPointListDlg;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
@@ -57,7 +60,7 @@ public interface IAcqLayout {
     
     void addArea(BasicArea a);
 
-    void addLandmark(RefArea lm);
+    void addLandmark(Landmark lm);
 
     // calculates 2D affine transform and normal vector for layout
     void calcStageToLayoutTransform();
@@ -78,11 +81,11 @@ public interface IAcqLayout {
 
     void deleteArea(int index);
 
-    void deleteLandmark(int index);
+    Landmark deleteLandmark(int index);
 
-    void deleteLandmark(RefArea lm);
+    boolean deleteLandmark(Landmark lm);
 
-    void deselectAllLandmarks();
+    //void deselectAllLandmarks();
 
     ArrayList<BasicArea> getAllAreasInsideRect(Rectangle2D r);
 
@@ -112,7 +115,7 @@ public interface IAcqLayout {
     public double getStageZPosForLayoutPos(double layoutX, double layoutY) throws Exception {
     if (getNoOfMappedStagePos() == 0)
     throw new Exception("Converting z position: no Landmarks defined");
-    RefArea rp=getMappedLandmarks().get(0);
+    Landmark rp=getMappedLandmarks().get(0);
     //        double z=((-normalVec.x*(layoutX-rp.getStageCoordX())-normalVec.y*(layoutY-rp.getStageCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
     double z=((-normalVec.x*(layoutX-rp.getLayoutCoordX())-normalVec.y*(layoutY-rp.getLayoutCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
     return z;
@@ -133,9 +136,9 @@ public interface IAcqLayout {
 
     double getHeight();
 
-    RefArea getLandmark(int index);
+    Landmark getLandmark(int index);
 
-    List<RefArea> getLandmarks();
+    List<Landmark> getLandmarks();
 
     //in radians
     double getLayoutToStageRot();
@@ -144,8 +147,8 @@ public interface IAcqLayout {
 
     double getLength();
 
-    //returns list of RefArea for which stagePosMapped==true
-    List<RefArea> getMappedLandmarks();
+    //returns list of Landmark for which stagePosMapped==true
+    List<Landmark> getMappedLandmarks();
 
     String getName();
 
@@ -161,10 +164,10 @@ public interface IAcqLayout {
 
     ArrayList<BasicArea> getSelectedAreasTouching(double x, double y);
 
-    double getStagePosX(BasicArea a, int tileIndex);
+/*    double getStagePosX(BasicArea a, int tileIndex);
 
     double getStagePosY(BasicArea a, int tileIndex);
-
+*/
     //in radians
     double getStageToLayoutRot();
 
@@ -223,9 +226,9 @@ public interface IAcqLayout {
 
     void setHeight(double h);
 
-    void setLandmark(int index, RefArea lm);
+    Landmark setLandmark(int index, Landmark lm);
 
-    void setLandmarks(List<RefArea> lm);
+    void setLandmarks(List<Landmark> lm);
 
     void setLength(double l);
 
@@ -248,5 +251,7 @@ public interface IAcqLayout {
     public double getCompletedTilingTasksPercent();
     
     public void cancelTileCalculation();
+
+    public void registerForEvents(Object listener);
     
 }

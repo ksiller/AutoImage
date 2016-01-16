@@ -1,10 +1,10 @@
 package autoimage.dataprocessors;
 
 import autoimage.api.ExtImageTags;
-import autoimage.FieldOfView;
-import autoimage.ImgUtils;
-import autoimage.MMCoreUtils;
-import autoimage.Utils;
+import autoimage.data.FieldOfView;
+import autoimage.utils.ImgUtils;
+import autoimage.utils.MMCoreUtils;
+import autoimage.utils.Utils;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Roi;

@@ -1,9 +1,9 @@
 package autoimage.dataprocessors;
 
-import autoimage.ImgUtils;
+import autoimage.utils.ImgUtils;
 import autoimage.api.ExtImageTags;
-import autoimage.api.Doxel;
-import autoimage.api.IDoxelListener;
+import autoimage.data.Doxel;
+import autoimage.events.IDoxelListener;
 
 //share last directory for script files with ScriptAnalyzer
 import static autoimage.dataprocessors.ScriptAnalyzer.scriptDir;

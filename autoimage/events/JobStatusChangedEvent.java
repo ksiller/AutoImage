@@ -1,7 +1,7 @@
 package autoimage.events;
 
-import autoimage.Job;
-import autoimage.Job.Status;
+import autoimage.data.acquisition.Job;
+import autoimage.data.acquisition.Job.Status;
 
 /**
  *

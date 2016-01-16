@@ -1,6 +1,7 @@
 package autoimage;
 
-import autoimage.gui.AcqFrame;
+import autoimage.gui.views.AcqFrame;
+import com.google.common.eventbus.EventBus;
 import org.micromanager.api.MMPlugin;
 import org.micromanager.api.ScriptInterface;
 
@@ -12,6 +13,7 @@ public class FiveD_ISC implements MMPlugin {
    public static String menuName = "5dISC";
    public static String tooltipDescription = "5dISC: 5d Image Sequence Controller";
    private AcqFrame acqFrame;
+   private EventBus eventbus = new EventBus();
     
     @Override
     public void dispose() {
@@ -23,7 +25,7 @@ public class FiveD_ISC implements MMPlugin {
     @Override
     public void setApp(ScriptInterface app) {
         if (acqFrame == null) {
-            acqFrame = new AcqFrame(app);
+            acqFrame = new AcqFrame(app, eventbus);
         }
         if (!acqFrame.isInitialized()) {
             acqFrame=null;

@@ -1,6 +1,6 @@
 package autoimage.events;
 
-import autoimage.AcquisitionJob;
+import autoimage.data.acquisition.AcquisitionJob;
 import java.util.List;
 
 /**

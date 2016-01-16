@@ -1,9 +1,11 @@
 package autoimage.api;
 
-import autoimage.FieldOfView;
-import autoimage.Tile;
-import autoimage.DoxelManager;
-import autoimage.Vec3d;
+import autoimage.data.layout.TilingSetting;
+import autoimage.data.Doxel;
+import autoimage.data.FieldOfView;
+import autoimage.data.layout.Tile;
+import autoimage.services.DoxelManager;
+import autoimage.data.Vec3d;
 import ij.IJ;
 import java.awt.Rectangle;
 import java.awt.Shape;
@@ -36,8 +38,8 @@ public abstract class BasicArea implements Shape {
     public static final String TAG_NAME = "NAME";
     public static final String TAG_ID="ID";
     public static final String TAG_COMMENT = "COMMENT";
-//    public static final String TAG_TOP_LEFT_X = "TOP_LEFT_X";
-//    public static final String TAG_TOP_LEFT_Y = "TOP_LEFT_Y";
+    public static final String TAG_TOP_LEFT_X = "TOP_LEFT_X";
+    public static final String TAG_TOP_LEFT_Y = "TOP_LEFT_Y";
     public static final String TAG_CENTER_X = "CENTER_X";
     public static final String TAG_CENTER_Y = "CENTER_Y";
     public static final String TAG_BOUNDS_WIDTH = "BOUNDS_WIDTH";   
@@ -57,29 +59,28 @@ public abstract class BasicArea implements Shape {
     public static final int TILING_ERROR = -1;
     public static final int TILING_UNKNOWN_NUMBER = -2;
         
-    protected String name;
     //protected static double cameraRot = FieldOfView.ROTATION_UNKNOWN;//in radians relative to x-y stagePos axis, NOT layout
     protected static double stageToLayoutRot = 0; //in radians
     protected static boolean optimizedForCameraRotation = true;
-    protected volatile List<Tile> tilePosList;//has absolute layout positions in um
-    protected volatile int tilingStatus;
-    private volatile boolean unknownTileNum; //is set when tilingmode is "runtime" or "file", or pixel tiles is not calibrated
-    private volatile int noOfClusters;
+
+    protected String name;
     protected int id; //unique identifier, reflects order of addition 
     protected int index; //index in arraylist of selected areas; required for metadata annotation 
     protected Point2D centerXYPos; //center cooridnates (in um) of shape in layout
     protected Point2D relDefaultXYPos; //coordinates (in um) realtive to center before affineTrans
     protected double relativeZPos; //in um relative to flat layout bottom
+    protected String comment;
     protected AffineTransform affineTrans;
     protected Path2D shape;//centered on (0/0) coordinate, before application of affineTrans
     protected GeneralPath generalPath;//created from shape, applied affineTrans, translated to centerXYPos
+
+    protected volatile List<Tile> tilePosList;//has absolute layout positions in um
+    protected volatile int tilingStatus;
+    private volatile boolean unknownTileNum; //is set when tilingmode is "runtime" or "file", or pixel tiles is not calibrated
+    private volatile int noOfClusters;
     protected boolean selectedForAcq;
     protected boolean selectedForMerge;
-    protected String comment;
-    protected boolean acquiring;
     
-    public static final String[] PLATE_ROW_ALPHABET={"A","B","C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF"};
-    public static final String[] PLATE_COL_ALPHABET=ColAlphabetFactory();
     public static final String TILE_NAME_PADDING = "%06d"; //padds tile name with preceding '0' to fill up to 6 digits
     public static final String CLUSTER_NAME_PADDING = "%06d";
     
@@ -104,7 +105,6 @@ public abstract class BasicArea implements Shape {
         relativeZPos=oz;
         selectedForAcq=selForAcq;
         comment=anot;
-        acquiring=false;
         tilePosList=null;
         tilingStatus=TILING_OK;
         unknownTileNum=true;
@@ -115,15 +115,7 @@ public abstract class BasicArea implements Shape {
         createGeneralPath();
     }
 
-    private static String[] ColAlphabetFactory() {
-        String[] alphabet=new String[48];
-        for (int i=0; i<48; i++) {
-            alphabet[i]=Integer.toString(i+1);
-        }
-        return alphabet;
-    }       
-    
-    
+        
     /**
      * 
      * @param b 
@@ -216,19 +208,15 @@ public abstract class BasicArea implements Shape {
      * @param absolute
      * @return 
      */
-    public Tile createTile(String n, double x, double y, double z, boolean absolute) {
-        return Tile.createTile(n,x,y,z,absolute);
+/*    public Tile createTile(String n, double x, double y, double z, boolean absolute) {
+        return new Tile.Builder(n)
+                .center(x,y)
+                .zPosition(z)
+                .absoluteCoordinates(absolute)
+                .build();
     }
-    
-    
-    /**
-     * 
-     * @param b 
-     */
-    public void setAcquiring(boolean b) {
-        acquiring=b;
-    }
-    
+*/    
+        
     
     /**
      * 
@@ -252,15 +240,6 @@ public abstract class BasicArea implements Shape {
      * 
      * @return 
      */
-    public boolean isAcquiring() {
-        return acquiring;
-    }
-
-    
-    /**
-     * 
-     * @return 
-     */
     public int getTilingStatus() {
         return tilingStatus;
     }
@@ -272,7 +251,12 @@ public abstract class BasicArea implements Shape {
             newCluster=new ArrayList<Tile>(source.size());
             int i=1;
             for (Tile t:source) {
-                newCluster.add(new Tile(createTileName(clusterNr,i),t.centerX+offsetX,t.centerY+offsetY,t.zPos, t.isAbsolute));
+                Tile tilecopy=new Tile.Builder(createTileName(clusterNr,i))
+                        .center(t.getCenterXPos()+offsetX,t.getCenterYPos()+offsetY)
+                        .zPosition(t.getZPos())
+                        .absoluteCoordinates(t.isAbsolute())
+                        .build();
+                newCluster.add(tilecopy);
                 i++;
             }
         }
@@ -299,7 +283,7 @@ public abstract class BasicArea implements Shape {
     private boolean overlapsOtherTiles(Rectangle2D r, FieldOfView fov) {
         Rectangle2D fovBounds=fov.getBounds2D();
         for (Tile t:tilePosList) {
-            Rectangle2D tRect=new Rectangle2D.Double(t.centerX-fovBounds.getWidth()/2, t.centerY-fovBounds.getHeight()/2,fovBounds.getWidth(),fovBounds.getHeight());
+            Rectangle2D tRect=new Rectangle2D.Double(t.getCenterXPos()-fovBounds.getWidth()/2, t.getCenterYPos()-fovBounds.getHeight()/2,fovBounds.getWidth(),fovBounds.getHeight());
             if (tRect.intersects(r))
                 return true;
         }
@@ -464,8 +448,12 @@ public abstract class BasicArea implements Shape {
                 for (int j=0; j<yTiles; j++) {   
                     y = starty+tileOffset.getY()*row;
     //                IJ.log(name+", test Tile: "+Integer.toString(i*yTiles+j)+", "+Double.toString(x)+","+Double.toString(y));
-                    Tile t=Tile.createTile(createTileName(clusterNr,siteCounter), x, y, relativeZPos,false);                
-                    tilePosList.add(t);
+//                    Tile t=Tile.createTile(createTileName(clusterNr,siteCounter), x, y, relativeZPos,false);                
+                    Tile t=new Tile.Builder(createTileName(clusterNr,siteCounter))
+                            .center(x, y)
+                            .zPosition(relativeZPos)
+                            .absoluteCoordinates(false)
+                            .build();                    tilePosList.add(t);
                     row+=vDir;
                     siteCounter++;
                 }
@@ -484,7 +472,12 @@ public abstract class BasicArea implements Shape {
                 for (int i=0; i<xTiles; i++) {  
                     x = startx+tileOffset.getX()*col;
   //                  IJ.log(name+", test Tile: "+Integer.toString(i*yTiles+j)+", "+Double.toString(x)+","+Double.toString(y));
-                    Tile t=Tile.createTile(createTileName(clusterNr,siteCounter), x, y, relativeZPos,false);                
+//                    Tile t=Tile.createTile(createTileName(clusterNr,siteCounter), x, y, relativeZPos,false);               
+                    Tile t=new Tile.Builder(createTileName(clusterNr,siteCounter))
+                            .center(x, y)
+                            .zPosition(relativeZPos)
+                            .absoluteCoordinates(false)
+                            .build();
                     tilePosList.add(t);
    //                 IJ.log(name+", "+Integer.toString(i*yTiles+j)+", "+Double.toString(x)+","+Double.toString(y));
                     col+=hDir;
@@ -638,8 +631,12 @@ public abstract class BasicArea implements Shape {
 //                    IJ.log(name+", test Tile: "+Integer.toString(i*yTiles+j)+", "+Double.toString(x)+","+Double.toString(y));
                     if (acceptTilePos(x,y,fovBounds.getWidth(),fovBounds.getHeight(),insideOnly)) {
                         siteCounter++;
-//                        Tile t=new Tile("Site"+paddedTileIndex(siteCounter), x, y, relativeZPos);  
-                        Tile t=Tile.createTile(createTileName(0,siteCounter), x, y, relativeZPos, false);
+//                        Tile t=Tile.createTile(createTileName(0,siteCounter), x, y, relativeZPos, false);
+                        Tile t=new Tile.Builder(createTileName(0,siteCounter))
+                            .center(x, y)
+                            .zPosition(relativeZPos)
+                            .absoluteCoordinates(false)
+                            .build();                        
                         tilePosList.add(t);
  //                       IJ.log(name+", accepted Tile: "+Integer.toString(col*yTiles+row)+", "+Double.toString(x)+","+Double.toString(y));
                     }
@@ -662,9 +659,12 @@ public abstract class BasicArea implements Shape {
  //                   IJ.log(name+", test Tile: "+Integer.toString(i*yTiles+j)+", "+Double.toString(x)+","+Double.toString(y));
                     if (acceptTilePos(x,y,fovBounds.getWidth(),fovBounds.getHeight(),insideOnly)) {
                         siteCounter++;
-//                        Tile t=new Tile("Site"+paddedTileIndex(siteCounter), x, y, relativeZPos);                
-                        Tile t=Tile.createTile(createTileName(0,siteCounter), x, y, relativeZPos,false);
-                        tilePosList.add(t);
+//                        Tile t=Tile.createTile(createTileName(0,siteCounter), x, y, relativeZPos,false);
+                        Tile t=new Tile.Builder(createTileName(0,siteCounter))
+                            .center(x, y)
+                            .zPosition(relativeZPos)
+                            .absoluteCoordinates(false)
+                            .build();                        tilePosList.add(t);
  //                       IJ.log(name+", acceptedTile: "+Integer.toString(col*yTiles+row)+", "+Double.toString(x)+","+Double.toString(y));
                     }
 //                    IJ.log(name+", "+Integer.toString(i*yTiles+j)+", "+Double.toString(x)+","+Double.toString(y));
@@ -722,8 +722,14 @@ public abstract class BasicArea implements Shape {
                         //using bunding rect of fov for simplicity
                         Rectangle2D tRect=new Rectangle2D.Double(x-fovBounds.getWidth()/2,y-fovBounds.getHeight()/2,fovBounds.getWidth(),fovBounds.getHeight());
                         if (tSetting.isSiteOverlap() || (!tSetting.isSiteOverlap() && !overlapsOtherTiles(tRect,fov))) {
-                            tilePosList.add(Tile.createTile(createTileName(0,noOfClusters), x, y, relativeZPos, false));
-                            noOfClusters++;
+                            Tile t=new Tile.Builder(createTileName(0,noOfClusters))
+                                    .center(x, y)
+                                    .zPosition(relativeZPos)
+                                    .absoluteCoordinates(false)
+                                    .build();                            
+                            tilePosList.add(t);
+//                            tilePosList.add(Tile.createTile(createTileName(0,noOfClusters), x, y, relativeZPos, false));
+                        noOfClusters++;
                         }
                     }
                 }
@@ -777,7 +783,13 @@ public abstract class BasicArea implements Shape {
                 return createCluster(clusterNr,seedX,seedY,fov, tSetting);
             }
             else {
-                tilePosList.add(Tile.createTile(createTileName(clusterNr,0), seedX, seedY, relativeZPos, false));
+                Tile t=new Tile.Builder(createTileName(clusterNr,0))
+                        .center(seedX, seedY)
+                        .zPosition(relativeZPos)
+                        .absoluteCoordinates(false)
+                        .build();                            
+                tilePosList.add(t);
+//                tilePosList.add(Tile.createTile(createTileName(clusterNr,0), seedX, seedY, relativeZPos, false));
                 return TILING_OK;
             }    
         } else
@@ -813,7 +825,7 @@ public abstract class BasicArea implements Shape {
                 seedList.remove(index);
             }
             for (Tile t:tilePosList) {
-                IJ.log("    Area.calcRuntimeTilePositions: layout: "+t.centerX+", "+t.centerY+", "+t.zPos);
+                IJ.log("    Area.calcRuntimeTilePositions: layout: "+t.toString());
             }
         } else {
             tilePosList.clear();
@@ -1166,17 +1178,17 @@ public abstract class BasicArea implements Shape {
         for (Tile tile:tilePosList) {
             Vec3d stagePos;
             try {
-                if (tile.isAbsolute) {
-                    stagePos=new Vec3d(tile.centerX,tile.centerY,tile.zPos);
+                if (tile.isAbsolute()) {
+                    stagePos=new Vec3d(tile.getCenterXPos(),tile.getCenterYPos(),tile.getZPos());
                 } else {
-                    stagePos = aLayout.convertLayoutToStagePos(tile.centerX,tile.centerY, tile.zPos);
+                    stagePos = aLayout.convertLayoutToStagePos(tile.getCenterXPos(),tile.getCenterYPos(),tile.getZPos());
     //                stagePos = aLayout.convertLayoutToStagePos(tile.centerX,tile.centerY, relativeZPos);
                 }
                 MultiStagePosition msp=new MultiStagePosition(xyStageLabel, stagePos.x, stagePos.y, zStageLabel, stagePos.z);
-                msp.setLabel(name+"-"+tile.name);
+                msp.setLabel(name+"-"+tile.getName());
                 pl.addPosition(msp);
                 if (posInfoL!=null)
-                    posInfoL.add(createSiteInfo(tile.name));
+                    posInfoL.add(createSiteInfo(tile.getName()));
             } catch (Exception ex) {
                 IJ.log("Area.addTilePosition: "+ex.getMessage());
                 Logger.getLogger(BasicArea.class.getName()).log(Level.SEVERE, null, ex);

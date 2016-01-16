@@ -4,7 +4,7 @@
  */
 package autoimage.dataprocessors;
 
-import autoimage.api.ImageFileQueue;
+import autoimage.data.ImageFileQueue;
 import ij.IJ;
 import java.io.File;
 import mmcorej.TaggedImage;

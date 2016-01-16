@@ -1,9 +1,9 @@
 package autoimage.dataprocessors;
 
-import autoimage.ImgUtils;
+import autoimage.utils.ImgUtils;
 import autoimage.api.ExtImageTags;
-import autoimage.MMCoreUtils;
-import autoimage.Utils;
+import autoimage.utils.MMCoreUtils;
+import autoimage.utils.Utils;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;

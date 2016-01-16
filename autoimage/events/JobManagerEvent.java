@@ -1,6 +1,6 @@
 package autoimage.events;
 
-import autoimage.JobManager;
+import autoimage.services.JobManager;
 
 /**
  *

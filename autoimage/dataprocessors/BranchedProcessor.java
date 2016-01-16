@@ -1,8 +1,8 @@
 package autoimage.dataprocessors;
 
-import autoimage.ImgUtils;
-import autoimage.api.ImageFileQueue;
-import autoimage.MMCoreUtils;
+import autoimage.utils.ImgUtils;
+import autoimage.data.ImageFileQueue;
+import autoimage.utils.MMCoreUtils;
 import ij.IJ;
 import java.io.File;
 import java.util.List;
