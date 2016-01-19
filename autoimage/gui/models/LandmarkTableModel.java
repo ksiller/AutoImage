@@ -2,10 +2,10 @@ package autoimage.gui.models;
 
 import autoimage.api.IAcqLayout;
 import autoimage.data.layout.Landmark;
-import autoimage.events.LandmarkAddedEvent;
-import autoimage.events.LandmarkDeletedEvent;
-import autoimage.events.LandmarkListEvent;
-import autoimage.events.LandmarkUpdatedEvent;
+import autoimage.events.landmark.LandmarkAddedEvent;
+import autoimage.events.landmark.LandmarkDeletedEvent;
+import autoimage.events.landmark.LandmarkListEvent;
+import autoimage.events.landmark.LandmarkUpdatedEvent;
 import com.google.common.eventbus.Subscribe;
 import java.util.List;
 import javax.swing.table.AbstractTableModel;

@@ -2,7 +2,7 @@ package autoimage.gui.views;
 
 import autoimage.gui.utils.NumberFilter;
 import autoimage.gui.utils.TilingIntVerifier;
-import autoimage.gui.dialogs.RefPointListDlg;
+import autoimage.gui.dialogs.LandmarkListDlg;
 import autoimage.gui.dialogs.MergeAreasDlg;
 import autoimage.gui.models.SelectionPath;
 import autoimage.gui.models.AcqSettingTableModel;
@@ -54,13 +54,14 @@ import autoimage.dataprocessors.ImageTagFilterOptString;
 import autoimage.dataprocessors.ImageTagFilterString;
 import autoimage.dataprocessors.DynamicTileCreator;
 import autoimage.dataprocessors.ScriptAnalyzer;
-import autoimage.events.AllJobsCompletedEvent;
-import autoimage.events.JobImageStoredEvent;
-import autoimage.events.JobSwitchEvent;
+import autoimage.events.job.AllJobsCompletedEvent;
+import autoimage.events.job.JobImageStoredEvent;
+import autoimage.events.job.JobSwitchEvent;
 import autoimage.olddp.NoFilterSeqAnalyzer;
 import autoimage.apptools.CameraRotDlg;
-import autoimage.events.LandmarkListEvent;
-import autoimage.events.SingleLandmarkEvent;
+import autoimage.data.acquisition.MMConfig;
+import autoimage.events.landmark.LandmarkListEvent;
+import autoimage.events.landmark.SingleLandmarkEvent;
 import autoimage.events.StagePositionChangedEvent;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
@@ -227,7 +228,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private AcqCustomRule layoutRowHeader;//in LayoutScrollPane
         
     //Dialogs
-    private RefPointListDlg refPointListDialog;
+    private LandmarkListDlg refPointListDialog;
     private MergeAreasDlg mergeAreasDialog;
     private CameraRotDlg cameraRotDialog;
     private ZOffsetDlg zOffsetDialog;
@@ -981,7 +982,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         });
     }*/
 
-    //called from RefPointListDlg on EDT
+    //called from LandmarkListDlg on EDT
     @Subscribe
     public void landmarksUpdated(final LandmarkListEvent e) {
         SwingUtilities.invokeLater(new Runnable() {
@@ -1002,7 +1003,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     }
 
 
-/*    //called from RefPointListDlg on EDT
+/*    //called from LandmarkListDlg on EDT
     @Override
     public void referencePointsUpdated(List<RefArea> refAreas) {
         setLandmarkFound(acqLayout.getNoOfMappedStagePos() > 0);
@@ -1441,6 +1442,10 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         instrumentOnline = true;
         gui.addMMListener(this);
         initialized=true;
+        
+        JDialog test=new ConfigWindow(this,currentAcqSetting,MMCoreUtils.getAvailableMMConfigs(core));
+        test.setVisible(true);
+
     }
 
     public boolean isInitialized() {
@@ -5549,7 +5554,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                     }
                     refPointListDialog.dispose();
                 }                
-                refPointListDialog = new RefPointListDlg(this, core, acqLayout, eventBus);
+                refPointListDialog = new LandmarkListDlg(this, core, acqLayout, eventBus);
                 refPointListDialog.addWindowListener(this);
 //                refPointListDialog.addListener(this);
 //                stageMonitor.addListener(refPointListDialog);
@@ -6927,7 +6932,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             return;
         }
         if (refPointListDialog == null) {
-            refPointListDialog = new RefPointListDlg(this, core, acqLayout, eventBus);
+            refPointListDialog = new LandmarkListDlg(this, core, acqLayout, eventBus);
             if (stageMonitor!=null) {
 //                stageMonitor.addListener(refPointListDialog);
                 stageMonitor.registerForEvents(refPointListDialog);

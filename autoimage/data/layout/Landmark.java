@@ -272,7 +272,7 @@ public class Landmark {
                 image=obj.get(TAG_IMAGE_DATA);
             }
             catch (JSONException ex) {
-                jsonExceptionStr+=TAG_IMAGE_DATA+",";
+                //jsonExceptionStr+=TAG_IMAGE_DATA+",";
             }
             if (!"".equals(jsonExceptionStr)) {
                 throw new JSONException(jsonExceptionStr);

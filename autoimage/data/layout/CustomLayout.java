@@ -1,6 +1,6 @@
 package autoimage.data.layout;
 
-import autoimage.events.LandmarkUpdatedEvent;
+import autoimage.events.landmark.LandmarkUpdatedEvent;
 import autoimage.utils.Utils;
 import autoimage.utils.XMLUtils;
 import autoimage.services.DoxelManager;
@@ -8,9 +8,9 @@ import autoimage.gui.views.AcqFrame;
 import autoimage.api.BasicArea;
 import autoimage.data.FieldOfView;
 import autoimage.data.Vec3d;
-import autoimage.events.LandmarkAddedEvent;
-import autoimage.events.LandmarkDeletedEvent;
-import autoimage.events.LandmarkListEvent;
+import autoimage.events.landmark.LandmarkAddedEvent;
+import autoimage.events.landmark.LandmarkDeletedEvent;
+import autoimage.events.landmark.LandmarkListEvent;
 import com.google.common.eventbus.EventBus;
 import ij.IJ;
 import java.awt.Shape;
@@ -73,15 +73,26 @@ public class CustomLayout extends AbstractLayout {
     private final List<Landmark> landmarksForPublic = Collections.unmodifiableList(landmarks);
     private ThreadPoolExecutor tilingExecutor;
     private boolean tilingAborted=false;
-    private EventBus eventBus;
+    private final EventBus eventBus = new EventBus();
      
     private static final String VERSION="1.0";
     private static final double ESCAPE_ZPOS_SAFETY=50; //keeps z-stage at least 50um below plate
     
     
     public CustomLayout() {
-        createEmptyLayout();
-        eventBus=new EventBus();
+        version=VERSION;
+        name="New_Layout.txt";
+        file = new File(System.getProperty("user.home"),name);
+        escapeZPos = 50; //in um; z-stage is moved to this position when moving xystage to avoid collision with plate
+        width=19999; //physical dim in um
+        length=10000; //physical dim in um
+        height=1000; //physical dim in um
+        bottomMaterial="Glass";
+        bottomThickness=170; //in um
+        areas = new ArrayList<BasicArea>();
+        setLandmarks(null);
+        isEmpty=true;
+        isModified=false;
     }
 /*    
     public static IAcqLayout loadLayout(File file) {//returns true if layout has been changed
@@ -143,7 +154,6 @@ public class CustomLayout extends AbstractLayout {
 */    
     @Override
     public void initializeFromJSONObject(JSONObject obj, File f) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
-        landmarks.clear();
         areas=new ArrayList<BasicArea>();
         version=obj.getString(TAG_VERSION);
         name=obj.getString(TAG_NAME);
@@ -411,9 +421,9 @@ public class CustomLayout extends AbstractLayout {
     }
     
     // calculates 2D affine transform and normal vector for layout
-    @Override
-    public void calcStageToLayoutTransform() {
+    protected void calcStageToLayoutTransform() {
         List<Landmark> mappedLandmarks=getMappedLandmarks();
+        AffineTransform transform=new AffineTransform();
         if (mappedLandmarks.size() > 0) {
             Point2D.Double[] src=new Point2D.Double[mappedLandmarks.size()];
             Point2D.Double[] dst=new Point2D.Double[mappedLandmarks.size()];
@@ -423,19 +433,16 @@ public class CustomLayout extends AbstractLayout {
                 dst[i]= new Point2D.Double(rp.getLayoutCoordX(),rp.getLayoutCoordY());
                 i++;
             }
-            try {
-                stageToLayoutTransform=Utils.calcAffTransform(src, dst);
-            } catch (Exception ex) {
-                stageToLayoutTransform=new AffineTransform();
-            }
-        } else {
-            stageToLayoutTransform=new AffineTransform();
+            transform=Utils.calcAffTransform(src, dst);
         }
+        AffineTransform inverse;
         try {    
-            layoutToStageTransform=stageToLayoutTransform.createInverse();
+            inverse=transform.createInverse();
         } catch (NoninvertibleTransformException ex) {
-            layoutToStageTransform=new AffineTransform();
+            inverse=new AffineTransform();
         }
+        stageToLayoutTransform=transform;
+        layoutToStageTransform=inverse;        
         calcNormalVector();        
     }
     
@@ -677,15 +684,13 @@ public class CustomLayout extends AbstractLayout {
     @Override
     public void setLandmarks(List<Landmark> newList) {
         landmarks.clear();
-        //create deep copy of list
-        for (Landmark lm:newList) {
-            landmarks.add(lm);
+        if (newList!=null) {
+            //create deep copy of list
+            for (Landmark lm:newList) {
+                landmarks.add(lm);
+            }
         }
-        try {
-            calcStageToLayoutTransform();
-        } catch (Exception ex) {
-            Logger.getLogger(CustomLayout.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        calcStageToLayoutTransform();
         eventBus.post(new LandmarkListEvent(this, landmarksForPublic));
     }
     
@@ -693,6 +698,7 @@ public class CustomLayout extends AbstractLayout {
     public Landmark setLandmark(int index, Landmark landmark) {
         if (index >=0 && index < landmarks.size()) {
             landmarks.set(index, landmark);
+            calcStageToLayoutTransform();
             eventBus.post(new LandmarkUpdatedEvent(this, landmark, index));
             return landmark;
         } else
@@ -706,6 +712,7 @@ public class CustomLayout extends AbstractLayout {
                     .setStageCoord(sX, sY, sZ)
                     .build();
             landmarks.set(index, landmark);
+            calcStageToLayoutTransform();
             eventBus.post(new LandmarkUpdatedEvent(this, landmark, index));
             return landmark;
         } else {
@@ -716,6 +723,7 @@ public class CustomLayout extends AbstractLayout {
     @Override
     public void addLandmark(Landmark landmark) {
         landmarks.add(landmark);
+        calcStageToLayoutTransform();
         eventBus.post(new LandmarkAddedEvent(this,landmark, landmarks.indexOf(landmark)));
     }
     
@@ -723,6 +731,7 @@ public class CustomLayout extends AbstractLayout {
     public Landmark deleteLandmark(int index) {
         Landmark landmark=landmarks.remove(index);
         if (landmark!=null) {
+            calcStageToLayoutTransform();
             eventBus.post(new LandmarkDeletedEvent(this,landmark, index));
         }
         return landmark;
@@ -972,24 +981,7 @@ public class CustomLayout extends AbstractLayout {
         }
         return al; 
     }
-        
-    private void createEmptyLayout() {
-        version=VERSION;
-        width=19999; //physical dim in um
-        length=10000; //physical dim in um
-        height=1000; //physical dim in um
-        bottomMaterial="Glass";
-        bottomThickness=170; //in um
-        areas = new ArrayList<BasicArea>();
-        landmarks.clear();
-        name="New_Layout.txt";
-        file = new File(System.getProperty("user.home"),name);
-        escapeZPos = 50; //in um; z-stage is moved to this position when moving xystage to avoid collision with plate
-        isEmpty=true;
-        isModified=false;;
-        calcStageToLayoutTransform();    
-    }
-    
+            
 
     private void writeSingleTile(XMLStreamWriter xtw, Tile t) throws XMLStreamException {
         XMLUtils.wStartElement(xtw, BasicArea.TAG_TILE);

@@ -1,15 +1,15 @@
 package autoimage.gui.dialogs;
 
 import autoimage.gui.models.JobTableModel;
-import autoimage.events.JobSwitchEvent;
+import autoimage.events.job.JobSwitchEvent;
 import autoimage.data.acquisition.Job;
 import autoimage.data.acquisition.Job.Status;
 import autoimage.services.JobManager;
-import autoimage.events.JobStatusChangedEvent;
-import autoimage.events.AllJobsCompletedEvent;
-import autoimage.events.JobImageStoredEvent;
-import autoimage.events.JobListChangedEvent;
-import autoimage.events.JobPlacedInQueueEvent;
+import autoimage.events.job.JobStatusChangedEvent;
+import autoimage.events.job.AllJobsCompletedEvent;
+import autoimage.events.job.JobImageStoredEvent;
+import autoimage.events.job.JobListChangedEvent;
+import autoimage.events.job.JobPlacedInQueueEvent;
 import com.google.common.eventbus.Subscribe;
 import java.awt.BorderLayout;
 import java.awt.Component;

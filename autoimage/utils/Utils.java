@@ -151,9 +151,9 @@ public class Utils {
      * @return AffineTransform that best fits src-to-dst point mapping
      * @throws Exception 
      */
-    public static AffineTransform calcAffTransform(Point2D[] src, Point2D[] dst) throws Exception {
+    public static AffineTransform calcAffTransform(Point2D[] src, Point2D[] dst) throws IllegalArgumentException {
         if (src == null || dst == null || src.length != dst.length || src.length==0)
-            throw new Exception("calcAffTransform: illegal arguments.");
+            throw new IllegalArgumentException("calcAffTransform: illegal arguments.");
         AffineTransform at=null;
         //single point: translation
         if (src.length == 1) {
@@ -563,5 +563,36 @@ public class Utils {
         return name;
     }
     
+    public static double[] getTransformProperties(AffineTransform at) {
+        if (at==null) {
+            return new double[]{0.0d,0.0d,0.0d};
+        }
+        Point2D origin = new Point2D.Double(0,0);
+        Point2D point_1 = new Point2D.Double(1,0);
+        Point2D point_2 = new Point2D.Double(0,1);
+        
+        Point2D point_1_trans=new Point2D.Double();
+        at.deltaTransform(point_1, point_1_trans);
+        Point2D point_2_trans=new Point2D.Double();
+        at.deltaTransform(point_2, point_2_trans);
+
+        double shearFactor;
+        if (point_1.equals(point_1_trans)) {
+            if (point_2.equals(point_2_trans)) {
+                shearFactor=1;
+            } else {
+                shearFactor=-1;
+            }
+        } else {
+            shearFactor=new Double(origin.distance(point_2_trans) / origin.distance(point_1_trans));
+        }
+        double point_1_scale=origin.distance(point_1_trans) / origin.distance(point_1);
+        double point_2_scale=origin.distance(point_2_trans) / origin.distance(point_2);
+        double scaleRatio=point_2_scale / point_1_scale;
+        double scale;
+        scale = new Double (0.5 * (point_1_scale + point_2_scale));
+        double rot = new Double(Math.atan2(at.getShearY(), at.getScaleY()));
+        return new double[] {scale, shearFactor, rot};
+    }
 
 }

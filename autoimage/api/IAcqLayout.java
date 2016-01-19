@@ -11,7 +11,7 @@ import autoimage.services.DoxelManager;
 import autoimage.data.FieldOfView;
 import autoimage.data.layout.Tile;
 import autoimage.data.Vec3d;
-import autoimage.gui.dialogs.RefPointListDlg;
+import autoimage.gui.dialogs.LandmarkListDlg;
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
@@ -63,7 +63,7 @@ public interface IAcqLayout {
     void addLandmark(Landmark lm);
 
     // calculates 2D affine transform and normal vector for layout
-    void calcStageToLayoutTransform();
+    //void calcStageToLayoutTransform();
 
     //returns minimal relative tile overlap (0 <= tileOverlap <=1) to eliminate all gaps
     //considers camera field rotation and stage-to-layout rotation

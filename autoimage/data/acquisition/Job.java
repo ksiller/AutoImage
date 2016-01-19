@@ -1,8 +1,8 @@
 package autoimage.data.acquisition;
 
 import autoimage.services.JobException;
-import autoimage.events.JobScheduleChangedEvent;
-import autoimage.events.JobStatusChangedEvent;
+import autoimage.events.job.JobScheduleChangedEvent;
+import autoimage.events.job.JobStatusChangedEvent;
 import com.google.common.eventbus.EventBus;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;

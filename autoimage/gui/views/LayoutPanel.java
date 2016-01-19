@@ -9,11 +9,11 @@ import autoimage.data.layout.TilingSetting;
 import autoimage.data.Vec3d;
 import autoimage.api.IAcqLayout;
 import autoimage.api.BasicArea;
-import autoimage.events.AreaDeletedEvent;
-import autoimage.events.AreasDeletedEvent;
-import autoimage.events.LandmarkListEvent;
-import autoimage.events.LandmarkSelectionChangedEvent;
-import autoimage.events.SingleLandmarkEvent;
+import autoimage.events.area.AreaDeletedEvent;
+import autoimage.events.area.AreasDeletedEvent;
+import autoimage.events.landmark.LandmarkListEvent;
+import autoimage.events.landmark.LandmarkSelectionChangedEvent;
+import autoimage.events.landmark.SingleLandmarkEvent;
 import autoimage.events.StagePositionChangedEvent;
 import com.google.common.eventbus.Subscribe;
 import java.awt.AlphaComposite;
@@ -86,7 +86,6 @@ class LayoutPanel extends JPanel implements Scrollable {
     
     private IAcqLayout acqLayout;
     private final Map<Long, Landmark> selectedLandmarks = new HashMap<Long, Landmark>();
-    private final List<BasicArea> areasAtStagePos = new ArrayList<BasicArea>();
     private AcqSetting cAcqSetting;//reference to current AcqSetting
     private Point anchorMousePos;
     private Point prevMousePos;
@@ -118,34 +117,13 @@ class LayoutPanel extends JPanel implements Scrollable {
         setAcquisitionLayout(al);
     }
 
-/*    //IStageMonitorListener
-    @Override
-    public void stagePositionChanged(Double[] stagePos) {
-        setCurrentXYStagePos(stagePos[0], stagePos[1]);
-        repaint();
-    }
-    //end IStageMonitorListener
-*/   
-
     @Subscribe
     public void stagePositionChanged(final StagePositionChangedEvent e) {
         final LayoutPanel thisPanel=this;
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
-                boolean needToRepaint=false;
-                double stageX=e.getStageX();
-                double stageY=e.getStageY();
-                needToRepaint=needToRepaint || setCurrentXYStagePos(stageX, stageY);
-                
-                BasicArea area = thisPanel.getAcqLayout().getFirstContainingAreaAbs(stageX, stageY, cAcqSetting.getTileWidth_UM(), cAcqSetting.getTileHeight_UM());
-                if (!areasAtStagePos.contains(area)) {
-                    areasAtStagePos.clear();
-                    areasAtStagePos.add(area);
-                    needToRepaint=true; 
-                }
-
-                if (needToRepaint) {
+                if (setCurrentXYStagePos(e.getStageX(), e.getStageY())) {
                     thisPanel.repaint();
                 }
             }
@@ -154,19 +132,13 @@ class LayoutPanel extends JPanel implements Scrollable {
     
     @Subscribe
     public void areaDeletedEvent(AreaDeletedEvent e) {
-        if (e.getLayout() == acqLayout && areasAtStagePos.contains(e.getArea())) {
-            areasAtStagePos.remove(e.getArea());
+        if (e.getLayout() == acqLayout) {          
         }
     }
     
     @Subscribe
     public void areasDeletedEvent(AreasDeletedEvent e) {
         if (e.getLayout() == acqLayout) {
-            for (BasicArea area:e.getAreaList()) {
-                if (areasAtStagePos.contains(area)) {
-                    areasAtStagePos.remove(area);
-                }
-            }
         }
     }
     
@@ -382,8 +354,22 @@ class LayoutPanel extends JPanel implements Scrollable {
     }
 
     protected Color getFillColor(BasicArea area, boolean showRelZPos) {
+        //default fill color for unselected area
         Color color=COLOR_UNSELECTED_AREA;
-        if (this.areasAtStagePos.contains(area)) {
+        
+        Point2D fullChipCenter=acqLayout.convertStageToLayoutPos_XY(new Point2D.Double(
+            currentStagePos_X ,
+            currentStagePos_Y ));            
+        FieldOfView fov=cAcqSetting.getFieldOfView();
+        AffineTransform fovTransform=AffineTransform.getTranslateInstance(fullChipCenter.getX(),fullChipCenter.getY());
+        fovTransform.concatenate(AffineTransform.getRotateInstance(acqLayout.getStageToLayoutRot()));
+        fov.createRoiPath(cAcqSetting.getObjPixelSize());
+        
+        Shape fovShape=fovTransform.createTransformedShape(fov.getEffectiveRoiPath());
+        java.awt.geom.Area fovIntersect=new java.awt.geom.Area(fovShape);
+        fovIntersect.intersect(new java.awt.geom.Area(area));
+        
+        if (!fovIntersect.isEmpty()) {
             color=COLOR_ACQUIRING_AREA;
         } else {
             if (showRelZPos) {

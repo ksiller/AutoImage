@@ -2,11 +2,11 @@ package autoimage.services;
 
 import autoimage.data.acquisition.Job;
 import autoimage.data.acquisition.Job.Status;
-import autoimage.events.JobStatusChangedEvent;
-import autoimage.events.AllJobsCompletedEvent;
-import autoimage.events.JobSwitchEvent;
-import autoimage.events.JobListChangedEvent;
-import autoimage.events.JobPlacedInQueueEvent;
+import autoimage.events.job.JobStatusChangedEvent;
+import autoimage.events.job.AllJobsCompletedEvent;
+import autoimage.events.job.JobSwitchEvent;
+import autoimage.events.job.JobListChangedEvent;
+import autoimage.events.job.JobPlacedInQueueEvent;
 import autoimage.gui.dialogs.JobStatusWindow;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;

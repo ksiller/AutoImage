@@ -5,14 +5,24 @@ import autoimage.utils.MMCoreUtils;
 import autoimage.services.DoxelManager;
 import autoimage.data.Detector;
 import autoimage.data.FieldOfView;
+import autoimage.events.config.MMConfigAddedEvent;
+import autoimage.events.config.MMConfigChGroupChangedEvent;
+import autoimage.events.config.MMConfigDeletedEvent;
+import autoimage.events.config.MMConfigListChangedEvent;
+import autoimage.events.config.MMConfigUpdatedEvent;
 import autoimage.utils.Utils;
+import com.google.common.eventbus.EventBus;
 import ij.IJ;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.tree.DefaultMutableTreeNode;
@@ -72,12 +82,15 @@ public class AcqSetting {
     public static final String TAG_FILE_PROCESSOR_TREE = "FILE_PROCESSOR_TREE";
     public static final String TAG_START_TIME = "START_TIME";
     
+    private final EventBus eventBus = new EventBus();
     private String name;            //visible in GUI
     private String objectiveDevStr="";//label of objective turret device
     private String channelGroupStr; //visible in GUI
     private String objLabel;        //visible in GUI
     private double objPixSize;      //internal based on existing MM calibration
     private List<Detector> detectors;
+    private final List<MMConfig> usedMMConfigs = Collections.synchronizedList(new ArrayList<MMConfig>());
+    private final List<MMConfig> usedMMConfigsForPublic = Collections.unmodifiableList(usedMMConfigs);
     private FieldOfView fieldOfView;
     private String binningStr;            //visible in GUI 
     private TilingSetting tiling;
@@ -323,6 +336,102 @@ public class AcqSetting {
         return uniqueCopy;
     }
     
+    public void registerForEvents(Object listener) {
+        eventBus.register(listener);
+    }
+    
+    public void unregisterForEvents(Object listener) {
+        eventBus.unregister(listener);
+    }
+    
+    // HARDWARE CONFIGS
+    public List<MMConfig> getUsedMMConfigs() {
+        return usedMMConfigsForPublic;
+    }
+    
+    public MMConfig putMMConfig(MMConfig newConfig) {
+        IJ.log("putMMConfig: isUsed="+newConfig.isUsed());
+        if (!newConfig.isUsed()) {
+            return null;
+        }
+        IJ.log("isUsed="+Boolean.toString(newConfig.isUsed()));
+        int index=-1;
+        for (int i=0; i<usedMMConfigs.size(); i++) {
+            MMConfig config=usedMMConfigs.get(i);
+            if (config.getName().equals(newConfig.getName())) {
+                index=i;
+                break;
+            }
+        }
+        if (index==-1) {
+            //add entry
+            usedMMConfigs.add(newConfig);
+            eventBus.post(new MMConfigAddedEvent(this,newConfig));
+        } else {
+            //replace entry
+            usedMMConfigs.set(index,newConfig);
+            eventBus.post(new MMConfigUpdatedEvent(this,newConfig));
+        }
+        if (newConfig.isChannel() && !newConfig.getName().equals(channelGroupStr)) {
+            //new channel group selected
+            String oldChannelGroup=this.channelGroupStr;
+            this.channelGroupStr=newConfig.getName();
+            eventBus.post(new MMConfigChGroupChangedEvent(this,oldChannelGroup, newConfig.getName()));
+        } else if (!newConfig.isChannel() && newConfig.getName().equals(channelGroupStr)) {
+            //channel group deselected
+            String oldChannelGroup=this.channelGroupStr;
+            this.channelGroupStr="";
+            eventBus.post(new MMConfigChGroupChangedEvent(this,oldChannelGroup, ""));
+        }
+        return newConfig;
+    }
+
+    public MMConfig deleteMMConfig(String name) {
+        IJ.log("deleteMMConfig");
+        for (MMConfig config:usedMMConfigs) {
+            if (config.getName().equals(name)) {
+                if (usedMMConfigs.remove(config)) {
+                    if (name.equals(channelGroupStr)) {
+                        String oldChannelGroup=this.channelGroupStr;
+                        channelGroupStr="";
+                        eventBus.post(new MMConfigChGroupChangedEvent(this,oldChannelGroup, ""));
+                    }
+                    eventBus.post(new MMConfigDeletedEvent(this,config));
+                    return config;
+                }
+            }
+        }
+        return null;    
+    }
+    
+    public MMConfig updateUsedMMConfig(MMConfig newConfig) {
+        IJ.log("updateMMConfig");
+        if (!newConfig.isUsed()) {
+            return null;
+        }
+        for (int index=0; index<usedMMConfigs.size(); index++) {
+            MMConfig config=usedMMConfigs.get(index);
+            if (config.getName().equals(newConfig.getName())) {
+                usedMMConfigs.set(index,newConfig);
+                eventBus.post(new MMConfigUpdatedEvent(this,newConfig));
+                return newConfig;
+            }
+        }
+        //not found in list
+        return null;
+    }
+    
+    public void setUsedMMConfigs(List<MMConfig> list) {
+        usedMMConfigs.clear();
+        for (MMConfig config:list) {
+            if (config.isUsed()) {
+                usedMMConfigs.add(config);
+            }
+        }
+        eventBus.post(new MMConfigListChangedEvent(this, usedMMConfigsForPublic));
+    }
+    
+    //END HARDWARE CONFIGS
 /*    @Override
     public boolean equals(Object setting) {
         return setting!=null && setting instanceof String && this.name.equals((String)setting);

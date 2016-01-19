@@ -3,6 +3,7 @@ package autoimage.data.layout;
 import autoimage.data.layout.area.RectWellArea;
 import autoimage.data.layout.area.EllipseWellArea;
 import autoimage.api.BasicArea;
+import static autoimage.data.layout.WellPlateLayout.TAG_LAYOUT_COLUMNS;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -98,18 +99,21 @@ public class WellPlateLayout extends CustomLayout {
         }
         Landmark.Builder builder=new Landmark.Builder();
         addLandmark(builder
+            //top left    
             .setName("Landmark "+PLATE_ROW_ALPHABET[0]+PLATE_COL_ALPHABET[0])
             .setStageCoord(0, 0, 0)
             .setLayoutCoord(oX, oY, 0)
             .setPhysDimension(512, 512)
             .build());    
         addLandmark(builder
-            .setName("Landmark "+PLATE_ROW_ALPHABET[rows-1]+PLATE_COL_ALPHABET[0])
+            //top right    
+            .setName("Landmark "+PLATE_ROW_ALPHABET[0]+PLATE_COL_ALPHABET[columns-1])
             .setStageCoord((columns-1)*wellToWellDistance, 0, 0)
             .setLayoutCoord(oX+(columns-1)*wellToWellDistance, oY, 0)
             .build());    
         addLandmark(builder
-            .setName("Landmark "+PLATE_ROW_ALPHABET[rows-1]+PLATE_COL_ALPHABET[columns-1])
+            //bottom left    
+            .setName("Landmark "+PLATE_ROW_ALPHABET[rows-1]+PLATE_COL_ALPHABET[0])
             .setStageCoord(0, (rows-1)*wellToWellDistance, 0)
             .setLayoutCoord(oX, oY+(rows-1)*wellToWellDistance, 0)
             .build());    
@@ -134,14 +138,50 @@ public class WellPlateLayout extends CustomLayout {
     @Override
     public void initializeFromJSONObject(JSONObject obj,File f) throws JSONException, ClassNotFoundException, InstantiationException, IllegalAccessException {
         super.initializeFromJSONObject(obj,f);
-        columns=obj.getInt(TAG_LAYOUT_COLUMNS);
-        rows=obj.getInt(TAG_LAYOUT_ROWS);
-        leftEdgeToA1=obj.getDouble(TAG_LAYOUT_LEFT_EDGE_TO_A1);
-        topEdgeToA1=obj.getDouble(TAG_LAYOUT_TOP_EDGE_TO_A1);
-        wellShape=obj.getString(TAG_LAYOUT_WELL_SHAPE);
-        wellDepth=obj.getDouble(TAG_LAYOUT_WELL_DEPTH);
-        wellToWellDistance=obj.getDouble(TAG_LAYOUT_WELL_DISTANCE);
-        wellDiameter=obj.getDouble(TAG_LAYOUT_WELL_DIAMETER);
+        String exceptionMsg="";
+        try {
+            columns=obj.getInt(TAG_LAYOUT_COLUMNS);
+        } catch (JSONException e) {
+            exceptionMsg+=", "+  TAG_LAYOUT_COLUMNS;  
+        }
+        try {
+            rows=obj.getInt(TAG_LAYOUT_ROWS);
+        } catch (JSONException e) {
+            exceptionMsg+=", "+  TAG_LAYOUT_ROWS;  
+        }
+        try {
+            leftEdgeToA1=obj.getDouble(TAG_LAYOUT_LEFT_EDGE_TO_A1);
+        } catch (JSONException e) {
+            exceptionMsg+=", "+  TAG_LAYOUT_LEFT_EDGE_TO_A1;  
+        }
+        try {
+            topEdgeToA1=obj.getDouble(TAG_LAYOUT_TOP_EDGE_TO_A1);
+        } catch (JSONException e) {
+            exceptionMsg+=", "+  TAG_LAYOUT_TOP_EDGE_TO_A1;  
+        }
+        try {
+            wellShape=obj.getString(TAG_LAYOUT_WELL_SHAPE);
+        } catch (JSONException e) {
+            exceptionMsg+=", "+  TAG_LAYOUT_WELL_SHAPE;  
+        }
+        try {
+            wellDepth=obj.getDouble(TAG_LAYOUT_WELL_DEPTH);
+        } catch (JSONException e) {
+            exceptionMsg+=", "+  TAG_LAYOUT_WELL_DEPTH;  
+        }
+        try {
+            wellToWellDistance=obj.getDouble(TAG_LAYOUT_WELL_DISTANCE);
+        } catch (JSONException e) {
+            exceptionMsg+=", "+  TAG_LAYOUT_WELL_DISTANCE;  
+        }
+        try {
+            wellDiameter=obj.getDouble(TAG_LAYOUT_WELL_DIAMETER);
+        } catch (JSONException e) {
+            exceptionMsg+=", "+  TAG_LAYOUT_WELL_DIAMETER;  
+        }
+        if (!"".equals(exceptionMsg)) {
+            throw new JSONException(exceptionMsg);
+        }
     }
     
     @Override

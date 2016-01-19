@@ -1,7 +1,6 @@
 package autoimage.data.layout;
 
 import autoimage.api.IAcqLayout;
-import com.google.common.eventbus.EventBus;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -52,11 +51,6 @@ public abstract class AbstractLayout implements IAcqLayout {
                 layout=(AbstractLayout) clazz.newInstance();
                 layout.setFile(f);
                 layout.initializeFromJSONObject(obj, f);
-                try {
-                    layout.calcStageToLayoutTransform();
-                } catch (Exception ex) {
-                    Logger.getLogger(AbstractLayout.class.getName()).log(Level.SEVERE, null, ex);
-                }        
             } catch (ClassNotFoundException ex) {
                 layout=null;
                 Logger.getLogger(AbstractLayout.class.getName()).log(Level.SEVERE, null, ex);
@@ -74,5 +68,4 @@ public abstract class AbstractLayout implements IAcqLayout {
         return layout;
     }
     
-
 }

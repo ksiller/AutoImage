@@ -2,6 +2,7 @@ package autoimage.utils;
 
 import autoimage.data.FieldOfView;
 import autoimage.data.Detector;
+import autoimage.data.acquisition.MMConfig;
 import autoimage.utils.Utils;
 import autoimage.gui.views.AcqFrame;
 import ij.IJ;
@@ -29,6 +30,7 @@ import mmcorej.Configuration;
 import mmcorej.MMCoreJ;
 import mmcorej.PropertySetting;
 import mmcorej.StrVector;
+import org.micromanager.conf2.ConfigPreset;
 import org.micromanager.utils.ReportingUtils;
 
 /**
@@ -44,6 +46,38 @@ public class MMCoreUtils {
     
     public static Map<String,Detector> detectors = new HashMap<String,Detector>();
 
+    public static List<MMConfig> getAvailableMMConfigs(CMMCore core) {
+        List<MMConfig> availableConfigs = new ArrayList<MMConfig>();
+        for (String group:core.getAvailableConfigGroups()) {
+            List<String> presets=new ArrayList<String>();
+            StrVector configs=core.getAvailableConfigs(group);
+            if (configs!=null) {
+                for (String name:core.getAvailableConfigs(group)) {
+                    if (name!=null) {
+                        presets.add(name);
+                    } else {
+                        presets.add("EMPTY");
+                    }
+                }
+            } else {
+                presets.add("EMPTY");
+            }
+            String currentPreset="unknown";
+            try {
+                currentPreset = core.getCurrentConfig(group);
+            } catch (Exception ex) {
+                Logger.getLogger(MMCoreUtils.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            MMConfig config=new MMConfig.Builder()
+                    .name(group)
+                    .availablePresets(presets)
+                    .selectPreset(currentPreset)
+                    .build();
+            availableConfigs.add(config);
+        }
+        return availableConfigs;
+    }
+    
     public static String[] getPropertyNamesForAFDevice(String devName_, CMMCore core_){
         Vector<String> propNames = new Vector<String>();
         try {
