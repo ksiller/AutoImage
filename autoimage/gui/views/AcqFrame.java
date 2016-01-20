@@ -63,6 +63,7 @@ import autoimage.data.acquisition.MMConfig;
 import autoimage.events.landmark.LandmarkListEvent;
 import autoimage.events.landmark.SingleLandmarkEvent;
 import autoimage.events.StagePositionChangedEvent;
+import autoimage.events.acqsetting.AcqSettingSelectionChangedEvent;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 import ij.IJ;
@@ -233,6 +234,8 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     private CameraRotDlg cameraRotDialog;
     private ZOffsetDlg zOffsetDialog;
     private MMPlugin stageControlPlugin;
+    
+    private final ConfigWindow configWindow;
 
     //Monitors and Task Executors
     private VirtualAcquisitionDisplay virtualDisplay;
@@ -1279,6 +1282,11 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         tilingDirComboBox.setModel(new DefaultComboBoxModel(tilingDirOptions));
         tilingDirComboBox.setRenderer(new DirectionIconListRenderer(icons));
 
+        configWindow=new ConfigWindow(this,core,currentAcqSetting,MMCoreUtils.getAvailableMMConfigs(core));
+        configWindow.setVisible(true);
+        eventBus.register(configWindow);
+        gui.registerForEvents(configWindow);
+
         //get currentCamera from core; readout chip size, binning (stored in currentDetector)
         //param: null --> set fovRotation to FieldOfView.ROTATION_UNKNOWN
         Detector currentDetector=MMCoreUtils.updateAvailableCameras(core); //detector pixel size
@@ -1443,9 +1451,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         gui.addMMListener(this);
         initialized=true;
         
-        JDialog test=new ConfigWindow(this,currentAcqSetting,MMCoreUtils.getAvailableMMConfigs(core));
-        test.setVisible(true);
-
+        configWindow.acqSettingSelectionChanged(new AcqSettingSelectionChangedEvent(null,currentAcqSetting));
     }
 
     public boolean isInitialized() {
@@ -9088,6 +9094,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             return;
         }
         if (currentAcqSetting != newSetting) {
+            AcqSetting previousSetting=currentAcqSetting;
             currentAcqSetting = newSetting;
             sequenceTabbedPane.setBorder(BorderFactory.createTitledBorder(
                     "Sequence: "+currentAcqSetting.getName()));
@@ -9099,6 +9106,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             ((LayoutPanel) acqLayoutPanel).setAcqSetting(currentAcqSetting, true);
             updateAcqSettingTab(currentAcqSetting);
             updateProcessorTreeView(currentAcqSetting);
+            eventBus.post(new AcqSettingSelectionChangedEvent(previousSetting,currentAcqSetting));
             acqSettingTable.requestFocusInWindow();
         }
     }

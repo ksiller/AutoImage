@@ -8,6 +8,7 @@ import autoimage.events.landmark.LandmarkListEvent;
 import autoimage.events.landmark.LandmarkUpdatedEvent;
 import com.google.common.eventbus.Subscribe;
 import java.util.List;
+import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
 
 /**
@@ -162,41 +163,75 @@ public class LandmarkTableModel extends AbstractTableModel {
         }
     }
 
-    public void setAcqLayout(IAcqLayout layout) {
+    public void setAcqLayout(final IAcqLayout layout) {
         if (layout==null) {
             throw new IllegalArgumentException("Layout object cannot be null");
         }
-        acqLayout=layout;
-        acqLayout.registerForEvents(this);
-        landmarks=layout.getLandmarks();
-        fireTableDataChanged();
+        SwingUtilities.invokeLater(new Runnable() {
+
+            @Override
+            public void run() {
+                acqLayout=layout;
+                acqLayout.registerForEvents(this);
+                landmarks=layout.getLandmarks();
+                fireTableDataChanged();
+            }
+        });
     }
     
     @Subscribe
-    public void addedLandmark(LandmarkAddedEvent e) {
+    public void addedLandmark(final LandmarkAddedEvent e) {
         if (e.getLayout()==acqLayout) {
-            fireTableRowsInserted(e.getListIndex(), e.getListIndex());
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    fireTableRowsInserted(e.getListIndex(), e.getListIndex());
+                }
+            });
         }
     }
 
     @Subscribe
-    public void deletedLandmark(LandmarkDeletedEvent e) {
+    public void deletedLandmark(final LandmarkDeletedEvent e) {
         if (e.getLayout()==acqLayout) {
-            fireTableRowsDeleted(e.getListIndex(), e.getListIndex());
-        }
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    fireTableRowsDeleted(e.getListIndex(), e.getListIndex());
+                }
+            });
+        }    
     }
 
     @Subscribe
-    public void updatedLandmark(LandmarkUpdatedEvent e) {
+    public void updatedLandmark(final LandmarkUpdatedEvent e) {
         if (e.getLayout()==acqLayout) {
-            fireTableRowsUpdated(e.getListIndex(), e.getListIndex());
-        }
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    if (e.getLayout()==acqLayout) {
+                        fireTableRowsUpdated(e.getListIndex(), e.getListIndex());
+                    }
+                }
+            });
+        }    
     }
 
     @Subscribe
-    public void landmarkListChanged(LandmarkListEvent e) {
+    public void landmarkListChanged(final LandmarkListEvent e) {
         if (e.getLayout()==acqLayout) {
-            fireTableDataChanged();
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                    if (e.getLayout()==acqLayout) {
+                        fireTableDataChanged();
+                    }
+                }
+            });
         }
     }
    

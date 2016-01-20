@@ -350,11 +350,7 @@ public class AcqSetting {
     }
     
     public MMConfig putMMConfig(MMConfig newConfig) {
-        IJ.log("putMMConfig: isUsed="+newConfig.isUsed());
-        if (!newConfig.isUsed()) {
-            return null;
-        }
-        IJ.log("isUsed="+Boolean.toString(newConfig.isUsed()));
+        IJ.log("putMMConfig: "+newConfig.getName()+", "+newConfig.getSelectedPreset());
         int index=-1;
         for (int i=0; i<usedMMConfigs.size(); i++) {
             MMConfig config=usedMMConfigs.get(i);
@@ -387,9 +383,10 @@ public class AcqSetting {
     }
 
     public MMConfig deleteMMConfig(String name) {
-        IJ.log("deleteMMConfig");
+        IJ.log("deleteMMConfig: ");
         for (MMConfig config:usedMMConfigs) {
             if (config.getName().equals(name)) {
+                IJ.log("    deleteMMConfig: "+config.getName()+", "+config.getSelectedPreset());
                 if (usedMMConfigs.remove(config)) {
                     if (name.equals(channelGroupStr)) {
                         String oldChannelGroup=this.channelGroupStr;
@@ -405,10 +402,7 @@ public class AcqSetting {
     }
     
     public MMConfig updateUsedMMConfig(MMConfig newConfig) {
-        IJ.log("updateMMConfig");
-        if (!newConfig.isUsed()) {
-            return null;
-        }
+        IJ.log("updateMMConfig: "+newConfig.getName()+", "+newConfig.getSelectedPreset());
         for (int index=0; index<usedMMConfigs.size(); index++) {
             MMConfig config=usedMMConfigs.get(index);
             if (config.getName().equals(newConfig.getName())) {
@@ -422,11 +416,10 @@ public class AcqSetting {
     }
     
     public void setUsedMMConfigs(List<MMConfig> list) {
+        IJ.log("setUsedMMConfigs:");
         usedMMConfigs.clear();
         for (MMConfig config:list) {
-            if (config.isUsed()) {
-                usedMMConfigs.add(config);
-            }
+            usedMMConfigs.add(config);
         }
         eventBus.post(new MMConfigListChangedEvent(this, usedMMConfigsForPublic));
     }

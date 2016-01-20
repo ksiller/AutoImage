@@ -12,17 +12,15 @@ public class MMConfig {
     private final String groupName;
     private final String configName;
     private final List<String> availablePresets;
-    private final boolean isUsed;
     private final boolean isChannel;
     private final boolean isValid;
 //    private final boolean controlsMagnification;
     
-    private MMConfig(String name, String selpreset, List<String> presets, boolean isUsed, boolean isChannel, boolean isValid) {//, boolean ctrMagnification) {
+    private MMConfig(String name, String selpreset, List<String> presets, boolean isChannel, boolean isValid) {//, boolean ctrMagnification) {
         this.groupName=name;
         this.configName=selpreset;
         //consider creating defensive copy of each preset in list?
         this.availablePresets=new ArrayList<String>(presets);
-        this.isUsed=isUsed;
         this.isChannel=isChannel;
         this.isValid=isValid;
 //        this.controlsMagnification=ctrMagnification;
@@ -44,10 +42,6 @@ public class MMConfig {
         return this.isChannel;
     }
     
-    public boolean isUsed() {
-        return this.isUsed;
-    }
-
     public boolean isValid() {
         return this.isValid;
     }
@@ -58,8 +52,7 @@ public class MMConfig {
                 .availablePresets(this.availablePresets)
                 .selectPreset(this.configName)
                 .controlChannel(this.isChannel)
-                .validate(this.isValid)
-                .use(this.isUsed);
+                .validate(this.isValid);
         return copyBuilder;
     }
     
@@ -72,7 +65,6 @@ public class MMConfig {
         private String configName;
         private String selectedPreset = "<empty>";
         private List<String> availablePresets;
-        private boolean isUsed = false;
         private boolean isChannel = false;
         private boolean isValid = true;
 //        private boolean controlsMagnification = false;
@@ -99,14 +91,7 @@ public class MMConfig {
         }
         
         public Builder selectPreset(String preset) {
-            if (this.availablePresets.contains(preset)) {
-                this.selectedPreset=preset;
-            }
-            return this;
-        }
-        
-        public Builder use(boolean use) {
-            this.isUsed=use;
+            this.selectedPreset=preset;
             return this;
         }
         
@@ -129,7 +114,6 @@ public class MMConfig {
                     this.configName, 
                     this.selectedPreset,
                     this.availablePresets,
-                    this.isUsed,
                     this.isChannel,
                     this.isValid);
 //                    this.controlsMagnification);
