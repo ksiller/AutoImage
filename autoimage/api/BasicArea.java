@@ -712,7 +712,7 @@ public abstract class BasicArea implements Shape {
             int attempts=0;
             while (!Thread.currentThread().isInterrupted() && noOfClusters < tSetting.getMaxSites() && attempts < MAX_TILING_ATTEMPTS) {// && !abortTileCalc) {
                 double x=getTopLeftX()+Math.random()*shapeBounds.getWidth();
-                double y=getTopLeftY()+Math.random()*shapeBounds.getWidth();
+                double y=getTopLeftY()+Math.random()*shapeBounds.getHeight();
                 if (acceptTilePos(x,y,w,h,tSetting.isInsideOnly())) {
                     if (tSetting.isCluster() && (tSetting.getNrClusterTileX()>1 || tSetting.getNrClusterTileY()>1)) {
                         if (createCluster(noOfClusters,x,y,fov, tSetting) == TILING_OK) {
