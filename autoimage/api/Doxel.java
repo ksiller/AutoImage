@@ -2,7 +2,6 @@ package autoimage.api;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.json.JSONException;
 
 /**
  * Doxel: Dynamic Voxel
@@ -66,13 +65,18 @@ public class Doxel {
         unitZ=uZ;
         time=t;
         unitTime=uT;
+        if (props==null) {
+            props=new HashMap<String,Object>();
+        }
         properties=props;
     }
     
     public static Doxel duplicate(Doxel doxel) {
         Map<String,Object> props=new HashMap<String,Object>();
-        for (String key:doxel.properties.keySet()) {
-            props.put(key, doxel.properties.get(key));
+        if (doxel.properties!=null) {
+            for (String key:doxel.properties.keySet()) {
+                props.put(key, doxel.properties.get(key));
+            }
         }
         return new Doxel(doxel.xPos,doxel.unitX, doxel.yPos, doxel.unitY, doxel.zPos, doxel.unitZ, doxel.time, doxel.unitTime,props);
     }
@@ -83,11 +87,10 @@ public class Doxel {
     }
     
     public String toString(boolean includeProps) {
-        String s=this.properties.get(IDENTIFIER)+", "
-                + Double.toString(this.xPos) + this.unitX+", "
-                + Double.toString(this.yPos)+ this.unitY+", "
-                + Double.toString(this.zPos) + this.unitZ+", "
-                + Double.toString(this.time) + this.unitTime;
+        String s= Double.toString(this.xPos) + " " + this.unitX+", "
+                + Double.toString(this.yPos)+  " " + this.unitY+", "
+                + Double.toString(this.zPos) +  " " + this.unitZ+", "
+                + Double.toString(this.time) +  " " + this.unitTime;
         if (properties!=null && includeProps) {
             for (String prop:properties.keySet()) {
                 s+=", "+prop+": "+this.properties.get(prop).toString();
