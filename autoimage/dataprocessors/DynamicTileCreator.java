@@ -1,4 +1,4 @@
-package autoimage.dataprocessors;
+ package autoimage.dataprocessors;
 
 import autoimage.utils.ImgUtils;
 import autoimage.api.ExtImageTags;

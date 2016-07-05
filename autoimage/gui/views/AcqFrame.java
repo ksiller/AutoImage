@@ -356,14 +356,16 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     @Subscribe
     public void landmarkListChanged(LandmarkListEvent e) {
         if (e.getLayout()==acqLayout) {
-            acquireButton.setEnabled(acqLayout.getMappedLandmarks().size() > 0);
+        	boolean mapped = acqLayout.getMappedLandmarks().size() > 0;
+            this.setLandmarkFound(mapped);
         }
     }   
             
     @Subscribe
     public void singleLandmarkChanged(SingleLandmarkEvent e) {
         if (e.getLayout()==acqLayout) {
-            acquireButton.setEnabled(acqLayout.getMappedLandmarks().size() > 0);
+        	boolean mapped = acqLayout.getMappedLandmarks().size() > 0;
+            this.setLandmarkFound(mapped);
         }
     }
     
@@ -3739,6 +3741,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
     }
 
     public void setLandmarkFound(boolean b) {
+    	IJ.showMessage("landmark found "+Boolean.toString(b));
         acquireButton.setEnabled(b);
         moveToButton.setEnabled(b);
         newAreaButton.setEnabled(b);

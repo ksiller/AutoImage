@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 package autoimage;
 
 import autoimage.gui.views.AcqFrame;
@@ -58,67 +57,5 @@ public class FiveD_ISC implements MMPlugin {
     public String getCopyright() {
         return "Karsten Siller - University of Virginia, 2015"; 
     }
-    
-    
+        
 }
-=======
-package autoimage;
-
-import autoimage.gui.AcqFrame;
-import org.micromanager.api.ScriptInterface;
-
-/**
- *
- * @author Karsten Siller, University of Virginia
- */
-public class FiveD_ISC implements org.micromanager.api.MMPlugin{
-   public static String menuName = "5dISC";
-   public static String tooltipDescription = "5dISC: 5d Image Sequence Controller";
-   private AcqFrame acqFrame;
-    
-    @Override
-    public void dispose() {
-        acqFrame.cleanUp();        
-        acqFrame.dispose();
-    }
-
-    @Override
-    public void setApp(ScriptInterface app) {
-        if (acqFrame == null) {
-            acqFrame = new AcqFrame(app);
-        }
-        if (!acqFrame.isInitialized()) {
-            acqFrame=null;
-        }
-//        show();
-    }
-
-    @Override
-    public void show() {
-        if (acqFrame!=null && acqFrame.isInitialized())
-            acqFrame.setVisible(true);
-    }
-
-    @Override
-    public String getDescription() {
-        return tooltipDescription;
-    }
-
-    @Override
-    public String getInfo() {
-        return tooltipDescription;
-    }
-
-    @Override
-    public String getVersion() {
-        return "Version 1.0";
-    }
-
-    @Override
-    public String getCopyright() {
-        return "Karsten Siller - University of Virginia, 2015"; 
-    }
-    
-    
-}
->>>>>>> refs/heads/acqdisplay
