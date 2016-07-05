@@ -1577,3 +1577,4 @@ public abstract class BasicArea implements Shape {
     public abstract int supportedLayouts();
 
 }
+
