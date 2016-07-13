@@ -121,7 +121,7 @@ public interface IAcqLayout {
     return z;
     }
      */
-    double getEscapeZPos();
+    
 
     File getFile();
 
@@ -253,5 +253,10 @@ public interface IAcqLayout {
     public void cancelTileCalculation();
 
     public void registerForEvents(Object listener);
+
+    public Double getStageZMin();
+    
+    public Double getStageZMax();
+    
     
 }

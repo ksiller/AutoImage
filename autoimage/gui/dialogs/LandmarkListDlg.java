@@ -7,6 +7,7 @@ import autoimage.api.BasicArea;
 import autoimage.events.landmark.LandmarkSelectionChangedEvent;
 import autoimage.events.StagePositionChangedEvent;
 import autoimage.gui.models.LandmarkTableModel;
+import autoimage.utils.MMCoreUtils;
 import autoimage.utils.Utils;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
@@ -380,7 +381,7 @@ public class LandmarkListDlg extends javax.swing.JDialog {
                 double stageY=(Double)model.getValueAt(row,2);
                 double stageZ=(Double)model.getValueAt(row,3);
                 core.waitForDevice(zStageName);
-                core.setPosition(zStageName,acqLayout.getEscapeZPos());
+                core.setPosition(zStageName,MMCoreUtils.getEscapeZPos(core, acqLayout));
                 core.waitForDevice(xyStageName);
                 core.setXYPosition(xyStageName, stageX, stageY);
                 core.waitForDevice(zStageName);

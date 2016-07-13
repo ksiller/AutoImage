@@ -1,10 +1,12 @@
 package autoimage.utils;
 
 import autoimage.data.FieldOfView;
+import autoimage.api.IAcqLayout;
 import autoimage.data.Detector;
 import autoimage.data.acquisition.MMConfig;
 import autoimage.utils.Utils;
 import autoimage.gui.views.AcqFrame;
+//import autoimage.gui.views.MMCore;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.measure.Calibration;
@@ -43,6 +45,12 @@ public class MMCoreUtils {
     public final static int SCALE_CAMERA = -2;
     public final static int SCALE_AUTO = -1;
     public final static int SCALE_NONE = 0;
+    
+    private static double Z_ESCAPE_DIST = 100; 
+
+    public static void setZEscapeDistance(double dist) {
+    	Z_ESCAPE_DIST = dist;
+    }
     
     public static Map<String,Detector> detectors = new HashMap<String,Detector>();
 
@@ -570,5 +578,19 @@ public class MMCoreUtils {
         return currentDetector;
     }
 
-    
+    public static Double getEscapeZPos(CMMCore core, IAcqLayout layout) {
+    	double d;
+		try {
+			d = core.getFocusDirection(core.getFocusDevice());
+	    	if (d < 0) {
+	    		return layout.getStageZMax() + Z_ESCAPE_DIST;
+	    	} else {
+	    		return layout.getStageZMin() - Z_ESCAPE_DIST;
+	    	}
+		} catch (Exception e) {
+			return null;
+		}
+    }
+
+
 }

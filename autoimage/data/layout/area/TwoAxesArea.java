@@ -27,8 +27,8 @@ public abstract class TwoAxesArea extends BasicArea{
     public static final String TAG_WIDTH = "WIDTH";
     public static final String TAG_HEIGHT = "HEIGHT";
     
-    protected double width;//this is along the x-axis when not rotateted, it remains unchanged when rotating (unlike getBounds.getWidth())
-    protected double height;//this is along the y-axis when not rotateted, it remains unchanged when rotating (unlike getBounds.getHeight())
+    protected double width;//this is along the x-axis when not rotated, it remains unchanged when rotating (unlike getBounds.getWidth())
+    protected double height;//this is along the y-axis when not rotated, it remains unchanged when rotating (unlike getBounds.getHeight())
 
     public TwoAxesArea() {
         super();

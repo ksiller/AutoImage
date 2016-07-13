@@ -31,7 +31,7 @@ public class RectWellArea extends RectArea {
     public static Comparator<String> NameComparator = new Comparator<String>() {
 
         @Override
-	public int compare(String a1, String a2) {
+        public int compare(String a1, String a2) {
             String a1Name = a1.toUpperCase();
             String a2Name = a2.toUpperCase();
             int i=0;

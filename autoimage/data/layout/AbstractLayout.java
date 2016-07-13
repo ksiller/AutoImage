@@ -47,7 +47,7 @@ public abstract class AbstractLayout implements IAcqLayout {
             try {
                 //dynamic class loading
                 className = obj.getString(TAG_CLASS_NAME);
-                Class clazz=Class.forName(className);
+                Class<?> clazz=Class.forName(className);
                 layout=(AbstractLayout) clazz.newInstance();
                 layout.setFile(f);
                 layout.initializeFromJSONObject(obj, f);

@@ -9286,7 +9286,6 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
         }
     }
 
-
     private void moveToLayoutPos(double lx, double ly) {
 //        Landmark rp = acqLayout.getLandmark(0);
         Vec3d normVec = acqLayout.getNormalVector();
@@ -9305,7 +9304,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
 //                if (!core.deviceBusy(xyStageName))
                 String zStageName = core.getFocusDevice();
                 core.waitForDevice(zStageName);
-                core.setPosition(zStageName, acqLayout.getEscapeZPos());
+                core.setPosition(zStageName, MMCoreUtils.getEscapeZPos(core,acqLayout));
                 core.waitForDevice(xyStageName);
                 core.setXYPosition(xyStageName, stage.x, stage.y);
                 core.waitForDevice(zStageName);
@@ -9324,7 +9323,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
                 String xyStageName = core.getXYStageDevice();
                 String zStageName = core.getFocusDevice();
                 core.waitForDevice(zStageName);
-                core.setPosition(zStageName, acqLayout.getEscapeZPos());
+                core.setPosition(zStageName, MMCoreUtils.getEscapeZPos(core,acqLayout));
                 core.waitForDevice(xyStageName);
                 core.setXYPosition(xyStageName, stage.x, stage.y);
                 core.waitForDevice(xyStageName);
@@ -9343,7 +9342,7 @@ public class AcqFrame extends javax.swing.JFrame implements MMListenerInterface,
             try {
                 String zStageName = core.getFocusDevice();
                 core.waitForDevice(zStageName);
-                core.setPosition(zStageName, acqLayout.getEscapeZPos());
+                core.setPosition(zStageName, MMCoreUtils.getEscapeZPos(core,acqLayout));
                 core.waitForDevice(core.getXYStageDevice());
                 core.setXYPosition(core.getXYStageDevice(), lm.getStageCoordX(), lm.getStageCoordY());
                 core.waitForDevice(zStageName);

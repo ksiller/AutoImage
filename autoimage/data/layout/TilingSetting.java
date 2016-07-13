@@ -159,7 +159,7 @@ public class TilingSetting {
         
         public Builder(JSONObject obj) throws JSONException, IllegalArgumentException {
             String jsonExceptionStr="";
-            boolean illegalArgument=false;
+//            boolean illegalArgument=false;
             if (obj!=null) {
                 String m;
                 try {

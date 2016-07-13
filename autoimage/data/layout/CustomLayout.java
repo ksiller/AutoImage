@@ -66,8 +66,9 @@ public class CustomLayout extends AbstractLayout {
     private Vec3d normalVec;//normal to layout reference plane
     private File file;
     
-    private double escapeZPos; //z-stage is moved to this position when moving xystage to avoid collision with plate
-
+    private Double zmin; // lowest stage pos in layout plane
+    private Double zmax; // highest stage pos in layout plane;
+    
     private List<BasicArea> areas;
     private final List<Landmark> landmarks = Collections.synchronizedList(new ArrayList<Landmark>());
     private final List<Landmark> landmarksForPublic = Collections.unmodifiableList(landmarks);
@@ -76,14 +77,13 @@ public class CustomLayout extends AbstractLayout {
     private final EventBus eventBus = new EventBus();
      
     private static final String VERSION="1.0";
-    private static final double ESCAPE_ZPOS_SAFETY=50; //keeps z-stage at least 50um below plate
+//    private static final double ESCAPE_ZPOS_SAFETY=50; //keeps z-stage at least 50um below plate
     
     
     public CustomLayout() {
         version=VERSION;
         name="New_Layout.txt";
         file = new File(System.getProperty("user.home"),name);
-        escapeZPos = 50; //in um; z-stage is moved to this position when moving xystage to avoid collision with plate
         width=19999; //physical dim in um
         length=10000; //physical dim in um
         height=1000; //physical dim in um
@@ -521,7 +521,7 @@ public class CustomLayout extends AbstractLayout {
             
 //        normalVec.normalize();
         } else {
-            //single landmark --> create vector that is pefectly vertical
+            //single landmark --> create vector that is perfectly vertical
             normalVec=new Vec3d(0,0,1);
         }    
         //determine lowest corner to set escape z-pos when moving xy-stage
@@ -530,10 +530,22 @@ public class CustomLayout extends AbstractLayout {
             Vec3d p2=convertLayoutToStagePos(width,0,0);
             Vec3d p3=convertLayoutToStagePos(width,length,0);
             Vec3d p4=convertLayoutToStagePos(0,length,0);
-            escapeZPos=Math.min(Math.min(Math.min(p1.z,p2.z),p3.z),p4.z)-ESCAPE_ZPOS_SAFETY;
+            zmin=new Double(Math.min(Math.min(Math.min(p1.z,p2.z),p3.z),p4.z));
+            zmax=new Double(Math.min(Math.min(Math.min(p1.z,p2.z),p3.z),p4.z));
         } catch (Exception ex) {
-            escapeZPos=0;
+            zmin=null;
+            zmax=null;
         }
+    }
+    
+    @Override 
+    public Double getStageZMin() {
+    	return zmin;
+    }
+    
+    @Override
+    public Double getStageZMax() {
+    	return zmax;
     }
     
     @Override
@@ -591,12 +603,14 @@ public class CustomLayout extends AbstractLayout {
         double z=((-normalVec.x*(layoutX-rp.getLayoutCoordX())-normalVec.y*(layoutY-rp.getLayoutCoordY()))/normalVec.z)+rp.getStageCoordZ()-rp.getLayoutCoordZ();
         return z;
     }
-*/    
+*/   
+
+/*    
     @Override
     public double getEscapeZPos() {
         return escapeZPos;
     }
-    
+*/    
     @Override
     public AffineTransform getStageToLayoutTransform() {
         return stageToLayoutTransform;
@@ -741,6 +755,7 @@ public class CustomLayout extends AbstractLayout {
     public boolean deleteLandmark(Landmark landmark) {
         int index=landmarks.indexOf(landmark);
         if (index >= 0 && landmarks.remove(landmark)) {
+            calcStageToLayoutTransform();
             eventBus.post(new LandmarkDeletedEvent(this,landmark, index));
             return true;
         }
@@ -921,10 +936,10 @@ public class CustomLayout extends AbstractLayout {
     
     
     @Override
-    public ArrayList<BasicArea> getAllAreasTouching(double x, double y) {
+    public ArrayList<BasicArea> getAllAreasTouching(double lx, double ly) {
         ArrayList<BasicArea> list = new ArrayList<BasicArea>(areas.size());
         for (BasicArea area : areas) {
-            if (area.contains(x, y)) {
+            if (area.contains(lx, ly)) {
                 list.add(area);    
             }
         }
